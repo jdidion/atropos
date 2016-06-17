@@ -1,8 +1,5 @@
-.. image:: https://travis-ci.org/jdidion/atropos.svg?branch=master
-    :target: https://travis-ci.org/jdidion/atropos
-
-.. image:: https://img.shields.io/pypi/v/atropos.svg?branch=master
-    :target: https://pypi.python.org/pypi/atropos
+![https://travis-ci.org/jdidion/atropos](https://travis-ci.org/jdidion/atropos.svg?branch=master)
+![https://pypi.python.org/pypi/atropos](https://img.shields.io/pypi/v/atropos.svg?branch=master)
 
 # Atropos
 
