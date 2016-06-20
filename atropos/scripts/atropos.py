@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # kate: word-wrap off; remove-trailing-spaces all;
-#
+
 # Copyright (c) 2010-2016 Marcel Martin <marcel.martin@scilifelab.se>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
