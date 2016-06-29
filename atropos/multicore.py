@@ -122,7 +122,6 @@ class Control(object):
 			self.control.value = value
 
 class WorkerProcess(Process):
-
 	def __init__(self, index, modifiers, filters, formatters, input_queue,
 				 result_handler, summary_queue, timeout):
 		"""

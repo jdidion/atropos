@@ -2,31 +2,11 @@
 # -*- coding: utf-8 -*-
 # kate: word-wrap off; remove-trailing-spaces all;
 
-# Copyright (c) 2010-2016 Marcel Martin <marcel.martin@scilifelab.se>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-
 """
-atropos version %version
-Copyright (C) 2010-2016 Marcel Martin <marcel.martin@scilifelab.se>
+atropos version {version}
 
-atropos removes adapter sequences from high-throughput sequencing reads.
+atropos
+removes adapter sequences from high-throughput sequencing reads.
 
 Usage:
 	atropos -a ADAPTER [options] [-o output.fastq] input.fastq
@@ -45,30 +25,20 @@ Input may also be in FASTA format. Compressed input and output is supported and
 auto-detected from the file name (.gz, .xz, .bz2). Use the file name '-' for
 standard input/output. Without the -o option, output is sent to standard output.
 
-Citation:
-
-Marcel Martin. Cutadapt removes adapter sequences from high-throughput
-sequencing reads. EMBnet.Journal, 17(1):10-12, May 2011.
-http://dx.doi.org/10.14806/ej.17.1.200
-
 Use "atropos --help" to see all command-line options.
 See http://atropos.readthedocs.org/ for full documentation.
 """
 
-# This is a fork of Cutadapt that can use multiple threads to process
-# reads in parallel.
 
-# TODO: support reading from a pair of files but writing to interleaved file (including stdout)
-# TODO: implement an autodetect option for adapters similar to TrimGalore? - read first
-# 1M reads, search for common adapters, and pick the one that appears most frequently.
 
-from __future__ import print_function, division, absolute_import
+
+
+from __future__ import division, absolute_import
 
 # Print a helpful error message if the extension modules cannot be imported.
 from atropos import *
 check_importability()
 
-from atropos import __version__
 from atropos.scripts import atropos as atropos_script
 from atropos.seqio import (open_reader, UnknownFileType, Formatters, RestFormatter,
 							InfoFormatter, WildcardFormatter, FormatError, Writers)
@@ -78,35 +48,26 @@ from atropos.filters import FilterType, FilterFactory, Filters
 from atropos.report import *
 from atropos.compat import next
 
+import argparse
 from collections import defaultdict
 import logging
-from optparse import OptionParser, OptionGroup
 import os
 import platform
 import sys
 import time
 
-#from memory_profiler import profile
-#fp=open('memory_profiler.log','w+')
-#@profile(stream=fp)
 def main(cmdlineargs=None, default_outfile="-"):
 	"""
-	Main function that evaluates command-line parameters and iterates
-	over all reads.
+	Main function that evaluates command-line parameters and iterates over all reads.
 	
-	default_outfile is the file to which trimmed reads are sent if the ``-o``
+	:param cmdlineargs: iterable of command line arguments; `None` is equivalent to
+	`sys.argv[1:]`
+	:param default_outfile: the file to which trimmed reads are sent if the ``-o``
 	parameter is not used.
 	"""
-	# For CPU profiling
-	#import yappi
-	#yappi.start()
 	
-	parser = get_option_parser()
-	
-	if cmdlineargs is None:
-		cmdlineargs = sys.argv[1:]
-	
-	options, args = parser.parse_args(args=cmdlineargs)
+	parser = get_argument_parser()
+	args = parser.parse_args(args=cmdlineargs)
 	
 	# Setup logging only if there are not already any handlers (can happen when
 	# this function is being called externally such as from unit tests)
@@ -162,18 +123,11 @@ def main(cmdlineargs=None, default_outfile="-"):
 		stop_cpu_time - start_cpu_time,
 		summary,
 		modifiers.get_trimmer_classes())
-	
-	#yappi.stop()
-	#yappi.get_func_stats().print_all()
-	#yappi.get_thread_stats().print_all()
+
 	
 def get_option_parser():
-	# TODO: upgrade to argparse
-	class CutadaptOptionParser(OptionParser):
-		def get_usage(self):
-			return self.usage.lstrip().replace('%version', __version__)
-	
-	parser = CutadaptOptionParser(usage=__doc__, version=__version__)
+	parser = argparse.ArgumentParser(usage=__doc__.lstrip().format(version=__version__))
+	parser.add_argument("inputs", nargs=argparse.REMAINDER)
 	
 	parser.add_option("--debug", action='store_true', default=False,
 		help="Print debugging information.")
@@ -427,7 +381,7 @@ def get_option_parser():
 		help="Number of threads to use for read trimming. Set to 0 to use max available threads.")
 	group.add_option("--no-writer-process", action="store_true", default=False,
 		help="Do not use a writer process; instead, each worker thread writes its "
-			 "own output to a file with a '.N' prefix.")
+			 "own output to a file with a '.N' suffix.")
 	group.add_option("--preserve-order", action="store_true", default=False,
 		help="Preserve order of reads in input files (ignored if --no-writer-process is set).")
 	group.add_option("--process-timeout", type=int, default=30, metavar="SECONDS",

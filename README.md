@@ -3,7 +3,7 @@
 
 # Atropos
 
-Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is a fork of the venerable cutadapt read trimmer (https://github.com/marcelm/cutadapt, [DOI:10.14806/ej.17.1.200](http://dx.doi.org/10.14806/ej.17.1.200)), with the primary improvements being:
+Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is a fork of the venerable Cutadapt read trimmer (https://github.com/marcelm/cutadapt, [DOI:10.14806/ej.17.1.200](http://dx.doi.org/10.14806/ej.17.1.200)), with the primary improvements being:
 
 1. Multi-threading support that has been optimized for different parallel computing environments.
 2. Options for trimming specific types of data (miRNA, bisulfite).
@@ -62,3 +62,17 @@ We are currently improving Atropos to support the [Parallel Pipeline Paridigm]()
 * [Source code](https://github.com/jdidion/atropos/)
 * [Report an issue](https://github.com/jdidion/atropos/issues)
 * [Project page on PyPI (Python package index)](https://pypi.python.org/pypi/atropos/)
+
+## Planned enhancments
+
+* Implement an autodetect option for adapters similar to TrimGalore: read the first 1M reads, search for common adapters, and pick the one that appears most frequently.
+
+## Citations
+
+The citation for the original Cutadapt paper is:
+ 
+> Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
+
+A manuscript for Atropos is currently in preparation. For now, you can cite it as:
+
+> John P Didion. "Atropos." 2016. https://github.com/jdidion/atropos
