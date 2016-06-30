@@ -105,10 +105,10 @@ class ColorspaceSequence(Sequence):
 			self.qualities[key] if self.qualities is not None else None,
 			self.primer,
 			self.name2,
-            self.original_length,
+			self.original_length,
 			self.match,
 			self.match_info,
-            self.clipped)
+			self.clipped)
 
 def sra_colorspace_sequence(name, sequence, qualities, name2):
 	"""Factory for an SRA colorspace sequence (which has one quality value too many)"""
@@ -431,9 +431,7 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
 		"File format {0!r} is unknown (expected 'sra-fastq' (only for colorspace), "
 		"'fasta' or 'fastq').".format(fileformat))
 
-suffix_re = re.compile("(.*)\.\d+")
-
-def guess_format_from_name(file, raise_on_failure=False, check_suffix=False):
+def guess_format_from_name(file, raise_on_failure=False):
 	# Detect file format
 	name = None
 	if isinstance(file, basestring):
@@ -441,18 +439,9 @@ def guess_format_from_name(file, raise_on_failure=False, check_suffix=False):
 	elif hasattr(file, "name"):	 # seems to be an open file-like object
 		name = file.name
 	
-	if check_suffix:
-		suffix_match = suffix_re.match(name)
-		if suffix_match:
-			name = suffix_match.group(1)
-	
 	if name:
-		for ext in ('.gz', '.xz', '.bz2'):
-			if name.endswith(ext):
-				name = name[:-len(ext)]
-				break
-		name, ext = splitext(name)
-		ext = ext.lower()
+		name, ext1, ext2 = _splitext(name)
+		ext = ext1.lower()
 		if ext in ['.fasta', '.fa', '.fna', '.csfasta', '.csfa']:
 			return 'fasta'
 		elif ext in ['.fastq', '.fq'] or (ext == '.txt' and name.endswith('_sequence')):
@@ -461,6 +450,24 @@ def guess_format_from_name(file, raise_on_failure=False, check_suffix=False):
 	if raise_on_failure:
 		raise UnknownFileType("Could not determine whether file {0!r} is FASTA "
 			"or FASTQ: file name extension {1!r} not recognized".format(file, ext))
+
+def add_suffix_to_path(path, suffix):
+	"""
+	Add the suffix (str or int) after the file name but
+	before the extension.
+	"""
+	name, ext1, ext2 = _splitext(name)
+	return "{}{}{}{}".format(name, suffix, ext1, ext2 or "")
+	
+def _splitext(name):
+	ext1 = ext2 = None
+	for ext in ('.gz', '.xz', '.bz2'):
+		if name.endswith(ext):
+			ext2 = ext
+			name = name[:-len(ext)]
+			break
+	name, ext1 = splitext(name)
+	return (name, ext1, ext2)
 
 ## Converting reads to strings ##
 
@@ -602,7 +609,7 @@ def get_format(file, fileformat=None, colorspace=False, qualities=None, line_len
 		  auto-detected output format is FASTQ.
 	"""
 	if fileformat is None:
-		fileformat = guess_format_from_name(file, raise_on_failure=qualities is None, check_suffix=True)
+		fileformat = guess_format_from_name(file, raise_on_failure=qualities is None)
 	
 	if fileformat is None:
 		if qualities is True:
@@ -692,7 +699,7 @@ class Writers(object):
 	def __init__(self, force_create):
 		self.writers = {}
 		self.force_create = force_create
-		self.suffix = ""
+		self.suffix = None
 	
 	def write_result(self, result, compressed=False):
 		"""
@@ -716,7 +723,10 @@ class Writers(object):
 		else:
 			path = file_desc
 		if path not in self.writers:
-			real_path = path + self.suffix
+			if self.suffix:
+				real_path = add_suffix_to_path(path, self.suffix)
+			else:
+				real_path = path
 			# TODO: test whether O_NONBLOCK allows non-blocking write to NFS
 			if compressed:
 				self.writers[path] = open_output(real_path, mode)
