@@ -71,7 +71,7 @@ class FilterFactory(object):
         self.min_affected = min_affected
     
     def __call__(self, filter_type, *args, **kwargs):
-        f = filter_type.value(*args, **kwargs)
+        f = filter_type(*args, **kwargs)
         if self.paired == "both":
             return PairedWrapper(f, self.min_affected)
         else:

@@ -42,6 +42,7 @@ from __future__ import division, absolute_import
 from atropos import *
 check_importability()
 
+from atropos import __version__
 from atropos.scripts import atropos as atropos_script
 from atropos.seqio import (open_reader, UnknownFileType, Formatters, RestFormatter,
                             InfoFormatter, WildcardFormatter, FormatError, Writers)
@@ -70,7 +71,7 @@ def main(cmdlineargs=None, default_outfile="-"):
     """
     
     parser = get_argument_parser()
-    args = parser.parse_args(args=cmdlineargs)
+    options = parser.parse_args(args=cmdlineargs)
     
     # Setup logging only if there are not already any handlers (can happen when
     # this function is being called externally such as from unit tests)
@@ -78,8 +79,8 @@ def main(cmdlineargs=None, default_outfile="-"):
         level = options.log_level or ("ERROR" if options.quiet else "INFO")
         setup_logging(stdout=bool(options.output), level=level)
     
-    paired = validate_options(options, args, parser)
-    reader, qualities, has_qual_file = create_reader(args, options, paired, parser)
+    paired = validate_options(options, parser)
+    reader, qualities, has_qual_file = create_reader(options.inputs, options, paired, parser)
     modifiers, num_adapters = create_modifiers(options, paired, qualities, has_qual_file, parser)
     min_affected = 2 if options.pair_filter == 'both' else 1
     filters = create_filters(options, paired, min_affected)
@@ -127,7 +128,7 @@ def main(cmdlineargs=None, default_outfile="-"):
         summary,
         modifiers.get_trimmer_classes())
     
-def get_option_parser():
+def get_argument_parser():
     parser = argparse.ArgumentParser(usage=__doc__.lstrip().format(version=__version__))
     parser.add_argument("inputs", nargs=argparse.REMAINDER)
     
@@ -207,7 +208,7 @@ def get_option_parser():
     #		 "N: set the base to N; random: select one of the two bases at random. Note that if "
     #		 "exactly one base is ambiguous, the non-ambiguous base is always used.")
     
-    group = parser.add_argument_group(parser, "Additional read modifications")
+    group = parser.add_argument_group("Additional read modifications")
     group.add_argument("-u", "--cut", action='append', default=[], type=int, metavar="LENGTH",
         help="Remove bases from each read (first read only if paired). "
             "If LENGTH is positive, remove bases from the beginning. "
@@ -243,7 +244,7 @@ def get_option_parser():
             "length of the trimmed read. For example, use --length-tag 'length=' "
             "to correct fields like 'length=123'.")
     
-    group = parser.add_argument_group(parser, "Filtering of processed reads")
+    group = parser.add_argument_group("Filtering of processed reads")
     group.add_argument("--discard-trimmed", "--discard", action='store_true', default=False,
         help="Discard reads that contain an adapter. Also use -O to avoid "
             "discarding too many randomly matching reads!")
@@ -263,7 +264,7 @@ def get_option_parser():
             "is treated as the absolute number of N bases. If it is between 0 "
             "and 1, it is treated as the proportion of N's allowed in a read.")
     
-    group = parser.add_argument_group(parser, "Output")
+    group = parser.add_argument_group("Output")
     group.add_argument("--quiet", default=False, action='store_true',
         help="Print only error messages.")
     group.add_argument("-o", "--output", metavar="FILE",
@@ -299,7 +300,7 @@ def get_option_parser():
     group.add_argument("--log-level", default=None,
         help="Logging level; by default set to ERROR when --quiet else INFO.")
     
-    group = parser.add_argument_group(parser, "Colorspace options")
+    group = parser.add_argument_group("Colorspace options")
     group.add_argument("-c", "--colorspace", action='store_true', default=False,
         help="Enable colorspace mode: Also trim the color that is adjacent to the found adapter.")
     group.add_argument("-d", "--double-encode", action='store_true', default=False,
@@ -322,7 +323,7 @@ def get_option_parser():
         "to disable it.")
     parser.set_defaults(zero_cap=None, action='trim')
     
-    group = parser.add_argument_group(parser, "Paired-end options", description="The "
+    group = parser.add_argument_group("Paired-end options", description="The "
         "-A/-G/-B/-U options work like their -a/-b/-g/-u counterparts, but "
         "are applied to the second read in each pair.")
     group.add_argument("-A", dest='adapters2', action='append', default=[], metavar='ADAPTER',
@@ -359,7 +360,7 @@ def get_option_parser():
         help="Write second read in a pair to this file if pair is too long. "
             "Use together with --too-long-output.")
     
-    group = parser.add_argument_group(parser, "Method-specific options")
+    group = parser.add_argument_group("Method-specific options")
     group.add_argument("--bisulfite", default=False, metavar="METHOD",
         help="Set default option values for bisulfite-treated data. The argument specifies the "
              "type of bisulfite library (non-directional, truseq, epignome, or swift) or custom "
@@ -371,7 +372,7 @@ def get_option_parser():
     group.add_argument("--mirna", action="store_true", default=False,
         help="Set default option values for miRNA data.")
     
-    group = parser.add_argument_group(parser, "Parallel (multi-core) options")
+    group = parser.add_argument_group("Parallel (multi-core) options")
     group.add_argument("-T", "--threads", type=int, default=None, metavar="THREADS",
         help="Number of threads to use for read trimming. Set to 0 to use max available threads.")
     group.add_argument("--no-writer-process", action="store_true", default=False,
@@ -386,7 +387,7 @@ def get_option_parser():
              "the program is running. local: assumes fast file I/O and more limited memory; "
              "cluster: assumes slower (i.e. network-based) file I/O and greater memory availablity.")
     
-    group = parser.add_argument_group(parser, "Performance-tuning options")
+    group = parser.add_argument_group("Performance-tuning options")
     group.add_argument("--batch-size", type=int, default=5000, metavar="SIZE",
         help="Number of records to process in each batch.")
     group.add_argument("--read-queue-size", type=int, default=None, metavar="SIZE",
@@ -417,13 +418,14 @@ MAGNITUDE = dict(
     K=(1E3, "000")
 )
 
-def validate_options(options, args, parser):
+def validate_options(options, parser):
     if sum(int(opt is not False) for opt in (options.mirna, options.bisulfite)) > 1:
         parser.error("Cannot specify more than one method-specific option")
     
     if options.debug and options.threads is not None:
         parser.error("Cannot use debug mode with multiple threads")
-        
+    
+    args = options.inputs
     if len(args) == 0:
         parser.error("At least one parameter needed: name of a FASTA or FASTQ file.")
     elif len(args) > 2:
