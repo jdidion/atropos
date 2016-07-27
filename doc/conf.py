@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# cutadapt documentation build configuration file, created by
+# atropos documentation build configuration file, created by
 # sphinx-quickstart on Fri Sep 12 09:11:16 2014.
 #
 # This file is execfile()d with the current directory set to its
@@ -45,14 +45,14 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'cutadapt'
-copyright = u'2010-2014, Marcel Martin'
+project = u'atropos'
+copyright = u'Original Cutadapt code: 2010-2014, Marcel Martin; Atropos modifications and improvements: 2015-2016, John P Didion'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 
-from cutadapt import __version__
+from atropos import __version__
 
 #
 # The short X.Y version.
@@ -188,7 +188,7 @@ html_use_smartypants = True
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'cutadaptdoc'
+htmlhelp_basename = 'atroposdoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -208,7 +208,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'cutadapt.tex', u'cutadapt Documentation',
+  ('index', 'atropos.tex', u'atropos Documentation',
    u'Marcel Martin', 'manual'),
 ]
 
@@ -238,7 +238,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'cutadapt', u'cutadapt Documentation',
+    ('index', 'atropos', u'atropos Documentation',
      [u'Marcel Martin'], 1)
 ]
 
@@ -252,8 +252,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'cutadapt', u'cutadapt Documentation',
-   u'Marcel Martin', 'cutadapt', 'One line description of project.',
+  ('index', 'atropos', u'atropos Documentation',
+   u'Marcel Martin', 'atropos', 'One line description of project.',
    'Miscellaneous'),
 ]
 

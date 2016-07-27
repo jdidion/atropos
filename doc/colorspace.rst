@@ -1,7 +1,7 @@
 Colorspace reads
 ================
 
-Cutadapt was designed to work with colorspace reads from the ABi SOLiD
+Atropos was designed to work with colorspace reads from the ABi SOLiD
 sequencer. Colorspace trimming is activated by the ``--colorspace``
 option (or use ``-c`` for short). The input reads can be given either:
 
@@ -11,9 +11,9 @@ option (or use ``-c`` for short). The input reads can be given either:
    format).
 
 In all cases, the colors must be represented by the characters 0, 1, 2,
-3. Example input files are in the cutadapt distribution at
+3. Example input files are in the atropos distribution at
 ``tests/data/solid.*``. The ``.csfasta``/``.qual`` file format is
-automatically assumed if two input files are given to cutadapt.
+automatically assumed if two input files are given to atropos.
 
 In colorspace mode, the adapter sequences given to the ``-a``, ``-b``
 and ``-g`` options can be given both as colors or as nucleotides. If
@@ -21,7 +21,7 @@ given as nucleotides, they will automatically be converted to
 colorspace. For example, to trim an adapter from ``solid.csfasta`` and
 ``solid.qual``, use this command-line::
 
-    cutadapt -c -a CGCCTTGGCCGTACAGCAG solid.csfasta solid.qual > output.fastq
+    atropos -c -a CGCCTTGGCCGTACAGCAG solid.csfasta solid.qual > output.fastq
 
 In case you know the colorspace adapter sequence, you can also write
 ``330201030313112312`` instead of ``CGCCTTGGCCGTACAGCAG`` and the result
@@ -32,7 +32,7 @@ Ambiguity in colorspace
 
 The ambiguity of colorspace encoding leads to some effects to be aware
 of when trimming 3' adapters from colorspace reads. For example, when
-trimming the adapter ``AACTC``, cutadapt searches for its
+trimming the adapter ``AACTC``, atropos searches for its
 colorspace-encoded version ``0122``. But also ``TTGAG``, ``CCAGA`` and
 ``GGTCT`` have an encoding of ``0122``. This means that effectively four
 different adapter sequences are searched and trimmed at the same time.
@@ -79,19 +79,19 @@ To cut an adapter from SOLiD data given in ``solid.csfasta`` and
 default of 10% errors and write the resulting FASTQ file to
 output.fastq::
 
-    cutadapt --bwa -a CGCCTTGGCCGTACAGCAG solid.csfasta solid.qual > output.fastq
+    atropos --bwa -a CGCCTTGGCCGTACAGCAG solid.csfasta solid.qual > output.fastq
 
 Instead of redirecting standard output with ``>``, the ``-o`` option can
 be used. This also shows that you can give the adapter in colorspace and
 how to use a different error rate::
 
-    cutadapt --bwa -e 0.15 -a 330201030313112312 -o output.fastq solid.csfasta solid.qual
+    atropos --bwa -e 0.15 -a 330201030313112312 -o output.fastq solid.csfasta solid.qual
 
 This does the same as above, but produces BFAST-compatible output,
 strips the \_F3 suffix from read names and adds the prefix "abc:" to
 them::
 
-    cutadapt -c -e 0.15 -a 330201030313112312 -x abc: --strip-f3 solid.csfasta solid.qual > output.fastq
+    atropos -c -e 0.15 -a 330201030313112312 -x abc: --strip-f3 solid.csfasta solid.qual > output.fastq
 
 
 Bowtie
@@ -102,7 +102,7 @@ confused and prints this message::
 
     Encountered a space parsing the quality string for read xyz
 
-BWA also has a problem with such data. Cutadapt therefore converts
+BWA also has a problem with such data. Atropos therefore converts
 negative quality values to zero in colorspace data. Use the option
 ``--no-zero-cap`` to turn this off.
 
@@ -116,13 +116,13 @@ the ``fastq-dump`` program from the sra-toolkit package is used to convert
 these ``.sra`` files to FASTQ format, colorspace reads will get an extra
 quality value in the beginning of each read. You may get an error like this::
 
-    cutadapt: error: In read named 'xyz': length of colorspace quality
+    atropos: error: In read named 'xyz': length of colorspace quality
     sequence (36) and length of read (35) do not match (primer is: 'T')
 
-To make cutadapt ignore the extra quality base, add ``--format=sra-fastq`` to
+To make atropos ignore the extra quality base, add ``--format=sra-fastq`` to
 your command-line, as in this example::
 
-    cutadapt -c --format=sra-fastq -a CGCCTTGGCCG sra.fastq > trimmed.fastq
+    atropos -c --format=sra-fastq -a CGCCTTGGCCG sra.fastq > trimmed.fastq
 
 When you use ``--format=sra-fastq``, the spurious quality value will be removed
 from all reads in the file.

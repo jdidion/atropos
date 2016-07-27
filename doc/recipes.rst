@@ -4,7 +4,7 @@ Recipes
 
 For some trimming applications, the pre-defined adapter types behave differently
 from what you would like to have. In this section, we show some ways in which
-cutadapt can be made to behave in the desired way.
+atropos can be made to behave in the desired way.
 
 .. note:: This section is still being written.
 
@@ -26,19 +26,19 @@ adapter, you have two options.
 First, you can specify both adapters and also ``--times=2`` (or the short
 version ``-n 2``). For example::
 
-	cutadapt -g ^TTAAGGCC -a TACGGACT -n 2 -o output.fastq input.fastq
+	atropos -g ^TTAAGGCC -a TACGGACT -n 2 -o output.fastq input.fastq
 
-This instructs cutadapt to run two rounds of adapter finding and removal. That
+This instructs atropos to run two rounds of adapter finding and removal. That
 means that, after the first round and only when an adapter was actually found,
 another round is performed. In both rounds, all given adapters (two in this
 case) are searched and removed. The problem is that it could happen that one
 adapter is found twice (so the 3' adapter, for example, could be removed twice).
 
-The second option is to not use the ``-n`` option, but to run cutadapt twice,
+The second option is to not use the ``-n`` option, but to run atropos twice,
 first removing one adapter and then the other. It is easiest if you use a pipe
 as in this example::
 
-	cutadapt -g ^TTAAGGCC input.fastq | cutadapt -a TACGGACT - > output.fastq
+	atropos -g ^TTAAGGCC input.fastq | atropos -a TACGGACT - > output.fastq
 
 
 Trimming poly-A tails
@@ -46,10 +46,10 @@ Trimming poly-A tails
 
 If you want to trim a poly-A tail from the 3' end of your reads, use the 3'
 adapter type (``-a``) with an adapter sequence of many repeated ``A``
-nucleotides. Starting with version 1.8 of cutadapt, you can use the
+nucleotides. Starting with version 1.8 of atropos, you can use the
 following notation to specify a sequence that consists of 100 ``A``::
 
-	cutadapt -a "A{100}" -o output.fastq input.fastq
+	atropos -a "A{100}" -o output.fastq input.fastq
 
 This also works when there are sequencing errors in the poly-A tail. So this
 read ::
@@ -62,7 +62,7 @@ will be trimmed to::
 
 If for some reason you would like to use a shorter sequence of ``A``, you can
 do so: The matching algorithm always picks the leftmost match that it can find,
-so cutadapt will do the right thing even when the tail has more ``A`` than you
+so atropos will do the right thing even when the tail has more ``A`` than you
 used in the adapter sequence. However, sequencing errors may result in shorter
 matches than desired. For example, using ``-a "A{10}"``, the read above (where
 the ``AAAT`` is followed by eleven ``A``) would be trimmed to::
@@ -78,6 +78,6 @@ Other things (unfinished)
 -------------------------
 
 * How to detect adapters
-* Use cutadapt for quality-trimming only
+* Use atropos for quality-trimming only
 * Use it for minimum/maximum length filtering
 * Use it for conversion to FASTQ

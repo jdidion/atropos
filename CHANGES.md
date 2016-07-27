@@ -9,6 +9,7 @@ v1.0
 * Re-wrote all of the output-oriented code in seqio.py
     * Formatting Sequence objects is now separate from writing data
     * There is a container class (seqio.Formatters) that manages the formatters for output files
+    * Added support for interleaved output
 * Implemented multiprocessing
     * Added several new options in scripts.atropos to control parallelization
     * Wrote all of the parallel processing code in atropos.multicore

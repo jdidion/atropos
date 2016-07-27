@@ -11,7 +11,6 @@ Table of contents
    guide
    colorspace
    recipes
-   ideas
    changes
 
 
@@ -22,4 +21,3 @@ Table of contents
    * :ref:`genindex`
    * :ref:`modindex`
    * :ref:`search`
-

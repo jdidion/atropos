@@ -38,16 +38,6 @@ atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
-## Technical details
-
-When the `--threads` option is set, the main process that loads batches of reads from the input file(s) and posts them to a Queue. One or more worker processes take batches from the Queue and process them in much the same manner as cutadapt. Writing the results to disk can be a bottleneck, and so there are multiple options for how to handle this:
-
-1. Local mode: the program is being run on a system with a local disk (e.g. a laptop or desktop machine) with perhaps limited memory. In this mode, there is a worker thread that collects the results from the writer threads, compresses the data (if necessary), and writes it to disk. A relatively small maximum Queue size is used to keep from taking up too much memory.
-2. Cluster mode: the program is being run on a system with ample memory, but writes to remote file storage (NAS), which typically has much higher latency than local storage. In this mode, larger maximum Queue sizes are used, and data compression is handled by the worker threads, so that the writer thread's only task is writing bytes to disk.
-3. Parallel writing mode: in many cases, it is not actually necessary to write all results to the same file. For example, if the next processing step after trimming is alignment, and your aligner supports reading from multiple FASTQ files (or you are on a linux-based system and can use [process substitution](http://www.tldp.org/LDP/abs/html/process-sub.html)) to concatenate multiple files to a single input stream) then it can be much faster to have worker thread write results directly to separate files.
-
-If you are going to be processing lots of data, we recommend taking some time to optimize Atropos for your particular environment. You can do this by using the `--max-reads` parameter to limit the number of input reads (we recommend 1-10 M reads to get a good idea of average processing time per read) and then experiment with multiple parameter combinations. Turning on DEBUG log messages (`--log-level DEBUG`) can also be helpful for this task. Note that increasing the number of available threads has diminishing returns, and should certainly not exceed the number of cores available on your system. We generally find 8 threads to offer the best trade-off between speed and resource usage, though this may differ for your own environment.
-
 ## Links
 
 * [Documentation](https://atropos.readthedocs.org/)

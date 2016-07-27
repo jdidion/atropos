@@ -5,17 +5,17 @@ Installation
 Quickstart
 ----------
 
-The easiest way to install cutadapt is to use ``pip`` on the command line::
+The easiest way to install atropos is to use ``pip`` on the command line::
 
-    pip install --user --upgrade cutadapt
+    pip install --user --upgrade atropos
 
 This will download the software from `PyPI (the Python packaging
-index) <https://pypi.python.org/pypi/cutadapt/>`_, and
-install the cutadapt binary into ``$HOME/.local/bin``. If an old version of
-cutadapt exists on your system, the ``--upgrade`` parameter is required in order
+index) <https://pypi.python.org/pypi/atropos/>`_, and
+install the atropos binary into ``$HOME/.local/bin``. If an old version of
+atropos exists on your system, the ``--upgrade`` parameter is required in order
 to install a newer version. You can then run the program like this::
 
-    ~/.local/bin/cutadapt --help
+    ~/.local/bin/atropos --help
 
 If you want to avoid typing the full path, add the directory
 ``$HOME/.local/bin`` to your ``$PATH`` environment variable.
@@ -26,10 +26,9 @@ If the above does not work, keep reading.
 Dependencies
 ------------
 
-Cutadapt requires this software to be installed:
+Atropos requires this software to be installed:
 
-* One of Python 2.6, 2.7, 3.3 or 3.4. Python 2.7 is a bit faster than the other
-  versions.
+* One of Python 2.7 or 3.3+.
 * A C compiler.
 
 Under Ubuntu, you may need to install the packages ``build-essential`` and
@@ -58,15 +57,15 @@ for Python 3).
 System-wide installation
 ------------------------
 
-If you have root access, then you can install cutadapt system-wide by running::
+If you have root access, then you can install atropos system-wide by running::
 
-    sudo pip install cutadapt
+    sudo pip install atropos
 
-This installs cutadapt into `/usr/local/bin`.
+This installs atropos into `/usr/local/bin`.
 
 If you want to upgrade from an older version, use this command instead::
 
-    sudo pip install --upgrade cutadapt
+    sudo pip install --upgrade atropos
 
 
 Use without installation
@@ -79,9 +78,9 @@ compiled version of the module for Linux x86\_64 is already included)::
 
 Then simply run the script from where it is, similar to this::
 
-    bin/cutadapt --help
+    bin/atropos --help
 
 If you get any errors, first try to explicitly request a specific Python
-version by running cutadapt like this::
+version by running atropos like this::
 
-    python2.7 bin/cutadapt --help
+    python2.7 bin/atropos --help
