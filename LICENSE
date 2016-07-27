@@ -1,4 +1,6 @@
-The portions of this software that were written by Marcel Martin as part of Cutadapt are covered by the following copyright and license statement:
+Atropos began as a fork of Cutadapt [1]. Specifically, it is a fork of commit
+2f3cc0717aa9ff1e0326ea6bcb36b712950d4999 on June 22, 2016. All
+code that remains in its original form is subject to the license below:
 
 > Copyright (c) 2010-2016 Marcel Martin <marcel.martin@scilifelab.se>
 >
@@ -20,4 +22,16 @@ The portions of this software that were written by Marcel Martin as part of Cuta
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 > THE SOFTWARE.
 
-All code written by John Didion are works of the United States Government, and are thus in the public domain within the United States. Additionally, the National Human Genome Research Institute (National Institutes of Health, Department of Health and Human Services) waives copyright and related rights in the work worldwide through the CC0 1.0 Universal Public Domain Dedication (which can be found at https://creativecommons.org/publicdomain/zero/1.0/).
+All additions and non-trivial modifications (which can be discovered by comparing
+the Atropos source against [2]) were created by John P Didion, and are subject to
+the below copyright wavier:
+
+> This is a work of the United States Government, and is in the public domain
+> within the United States. The National Human Genome Research Institute (National
+> Institutes of Health, Department of Health and Human Services) waives copyright and
+> related rights in the work worldwide through the CC0 1.0 Universal Public Domain
+> Dedication [3].
+
+[1] https://github.com/marcelm/cutadapt.
+[2] https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d4999
+[3] https://creativecommons.org/publicdomain/zero/1.0/

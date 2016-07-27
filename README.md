@@ -38,10 +38,6 @@ atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
-## License
-
-Atropos incorporates a substantial amount of code from cutadapt. Those portions of code are clearly marked, and are [governed by the MIT license](https://github.com/marcelm/cutadapt/blob/master/LICENSE)). The portions of code developed by John Didion (also clearly marked) are government work and thus in the public domain. Note that by contributing pull requests to this project you give up the right to copyright that code, as it will (if accepted) also belong to the public domain.
-
 ## Technical details
 
 When the `--threads` option is set, the main process that loads batches of reads from the input file(s) and posts them to a Queue. One or more worker processes take batches from the Queue and process them in much the same manner as cutadapt. Writing the results to disk can be a bottleneck, and so there are multiple options for how to handle this:
@@ -52,16 +48,11 @@ When the `--threads` option is set, the main process that loads batches of reads
 
 If you are going to be processing lots of data, we recommend taking some time to optimize Atropos for your particular environment. You can do this by using the `--max-reads` parameter to limit the number of input reads (we recommend 1-10 M reads to get a good idea of average processing time per read) and then experiment with multiple parameter combinations. Turning on DEBUG log messages (`--log-level DEBUG`) can also be helpful for this task. Note that increasing the number of available threads has diminishing returns, and should certainly not exceed the number of cores available on your system. We generally find 8 threads to offer the best trade-off between speed and resource usage, though this may differ for your own environment.
 
-## The Parallel Pipeline Paridigm
-
-We are currently improving Atropos to support the [Parallel Pipeline Paridigm]() (PPP). The general idea of PPP is that software pipelines waste too much time on splitting and merging data, and on disk I/O. The solution is to connect all components of the pipeline so that all data is transmitted in memory, and, furthermore, so that when adjacent tools in the pipeline are both multi-threaded, data can be transmitted directly from a parallel process in the first tool to a corresponding process in the second tool without the need for multiplexing and then demultiplexing the data. PPP advocates sockets for inter-process communication (IPC), but also allows for named pipes and other file-like methods of IPC, especially for integrating tools that do not yet support sockets. We are developing [Lachesis]() as a light-weight framework for creating and executing parallel pipleines.
-
 ## Links
 
 * [Documentation](https://atropos.readthedocs.org/)
 * [Source code](https://github.com/jdidion/atropos/)
 * [Report an issue](https://github.com/jdidion/atropos/issues)
-* [Project page on PyPI (Python package index)](https://pypi.python.org/pypi/atropos/)
 
 ## Planned enhancments
 
