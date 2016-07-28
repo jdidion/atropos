@@ -223,7 +223,7 @@ def xopen(filename, mode='r'):
         return open(filename, mode)
 
 compressors = {
-    ".gz"  : gzip,
+    ".gz"  : zlib,
     ".bz2" : bz2,
     ".xz"  : lzma
 }
