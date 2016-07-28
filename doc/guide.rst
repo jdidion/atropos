@@ -1201,7 +1201,7 @@ Parallel writing
 In many cases, it is not actually necessary to write all results to the
 same file. For example, if the next processing step after trimming is alignment, and your aligner
 supports reading from multiple FASTQ files (or you are on a linux-based system and can use
-`process substitution<http://www.tldp.org/LDP/abs/html/process-sub.html>`_) to concatenate multiple
+`process substitution <http://www.tldp.org/LDP/abs/html/process-sub.html>`_) to concatenate multiple
 files to a single input stream) then it can be much faster to have worker thread write results
 directly to separate files. This mode is enabled by specifying the ``--no-writer-process``
 option, and is compatible with both local and cluster modes.
