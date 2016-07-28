@@ -13,7 +13,6 @@ by a filter, and which one.
 """
 from __future__ import print_function, division, absolute_import
 from collections import OrderedDict
-from enum import Enum
 
 # Constants used when returning from a Filter’s __call__ method to improve
 # readability (it is unintuitive that "return True" means "discard the read").
