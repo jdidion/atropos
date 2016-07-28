@@ -13,8 +13,6 @@ C 1 0 3 2
 G 2 3 0 1
 T 3 2 1 0
 """
-from __future__ import print_function, division, absolute_import
-
 def _initialize_dicts():
     """
     Create the colorspace encoding and decoding dictionaries.

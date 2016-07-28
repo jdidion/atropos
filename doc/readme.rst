@@ -19,6 +19,9 @@ improvements being:
 5. The ability to write interleaved FASTQ output.
 6. A progress bar, and other minor usability enhancements.
 
+Also note that one potential downside of Atropos is that it requires python 3.3+. If you require
+python 2.7 support, you can still use `Cutadapt <https://github.com/marcelm/cutadapt>`_.
+
 Atropos finds and removes adapter sequences, primers, poly-A tails and other
 types of unwanted sequence from your high-throughput sequencing reads.
 

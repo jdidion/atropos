@@ -5,11 +5,9 @@ A modifier must be callable. It is implemented as a function if no parameters
 need to be stored, and as a class with a __call__ method if there are parameters
 (or statistics).
 """
-from __future__ import print_function, division, absolute_import
 import re
 from collections import OrderedDict
 from atropos.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.compat import maketrans
 from atropos.align import Aligner, SEMIGLOBAL
 import logging
 
@@ -254,7 +252,7 @@ class DoubleEncoder(object):
     Double-encode colorspace reads, using characters ACGTN to represent colors.
     """
     def __init__(self):
-        self.double_encode_trans = maketrans('0123.', 'ACGTN')
+        self.double_encode_trans = str.maketrans('0123.', 'ACGTN')
 
     def __call__(self, read):
         read = read[:]
@@ -267,7 +265,7 @@ class ZeroCapper(object):
     """
     def __init__(self, quality_base=33):
         qb = quality_base
-        self.zero_cap_trans = maketrans(''.join(map(chr, range(qb))), chr(qb) * qb)
+        self.zero_cap_trans = str.maketrans(''.join(map(chr, range(qb))), chr(qb) * qb)
 
     def __call__(self, read):
         read = read[:]

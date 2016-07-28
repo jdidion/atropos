@@ -139,7 +139,6 @@ setup(
 		"License :: Public Domain",
 		"Natural Language :: English",
 		"Programming Language :: Cython",
-		"Programming Language :: Python :: 2.7",
 		"Programming Language :: Python :: 3",
 		"Topic :: Scientific/Engineering :: Bio-Informatics"
 	]

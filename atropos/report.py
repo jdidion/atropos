@@ -2,8 +2,6 @@
 """
 Routines for printing a report.
 """
-from __future__ import print_function, division, absolute_import
-
 import sys
 from collections import OrderedDict, defaultdict
 from contextlib import contextmanager

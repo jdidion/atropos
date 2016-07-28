@@ -19,4 +19,4 @@ v1.0
 * Added progress bar support
 * Switched argument parsing to argparse
 * Reorganized the monolithic scripts.atropos.main() into multiple functions
-* Dropped support for python 2.6
+* Dropped all support for python 2.x

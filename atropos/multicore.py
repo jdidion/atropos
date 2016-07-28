@@ -41,13 +41,13 @@
 
 from collections import defaultdict
 import logging
+from queue import Empty, Full
 import time
 from multiprocessing import Process, Queue, Value, cpu_count
 
 from .report import *
 from .seqio import Writers, FormatError
 from .xopen import get_compressor
-from .compat import Empty, Full
 
 __author__ = "John Didion"
 

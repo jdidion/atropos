@@ -1,15 +1,12 @@
 """
 Open compressed files transparently.
 """
-from __future__ import print_function, division, absolute_import
-
 import gzip
 import sys
 import io
 import os
 import re
 from subprocess import Popen, PIPE
-from .compat import PY3, basestring
 
 try:
     import bz2
@@ -20,84 +17,6 @@ try:
     import lzma
 except ImportError:
     lzma = None
-
-if sys.version_info < (2, 7):
-    buffered_reader = lambda fileobj: fileobj
-    buffered_writer = lambda fileobj: fileobj
-else:
-    buffered_reader = lambda fileobj: io.BufferedReader(fileobj)
-    buffered_writer = lambda fileobj: io.BufferedWriter(fileobj)
-
-class GzipReader:
-    def __init__(self, path):
-        self.process = Popen(['gzip', '-cd', path], stdout=PIPE)
-
-    def close(self):
-        retcode = self.process.poll()
-        if retcode is None:
-            # still running
-            self.process.terminate()
-        self._raise_if_error()
-
-    def __iter__(self):
-        for line in self.process.stdout:
-            yield line
-        self.process.wait()
-        self._raise_if_error()
-
-    def _raise_if_error(self):
-        """
-        Raise EOFError if process is not running anymore and the
-        exit code is nonzero.
-        """
-        retcode = self.process.poll()
-        if retcode is not None and retcode != 0:
-            raise EOFError("gzip process returned non-zero exit code {0}. Is the "
-                "input file truncated or corrupt?".format(retcode))
-
-    def read(self, *args):
-        data = self.process.stdout.read(*args)
-        if len(args) == 0 or args[0] <= 0:
-            # wait for process to terminate until we check the exit code
-            self.process.wait()
-        self._raise_if_error()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        self.close()
-
-class GzipWriter:
-    def __init__(self, path, mode='w', buffer_size=io.DEFAULT_BUFFER_SIZE):
-        self.outfile = open(path, mode, buffering=buffer_size)
-        self.devnull = open(os.devnull, 'w')
-        try:
-            # Setting close_fds to True is necessary due to
-            # http://bugs.python.org/issue12786
-            self.process = Popen(['gzip'], stdin=PIPE, stdout=self.outfile,
-                stderr=self.devnull, close_fds=True)
-        except IOError as e:
-            self.outfile.close()
-            self.devnull.close()
-            raise
-
-    def write(self, arg):
-        self.process.stdin.write(arg)
-
-    def close(self):
-        self.process.stdin.close()
-        retcode = self.process.wait()
-        self.outfile.close()
-        self.devnull.close()
-        if retcode != 0:
-            raise IOError("Output gzip process terminated with exit code {0}".format(retcode))
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        self.close()
 
 def open_output(filename, mode='w'):
     """
@@ -122,15 +41,11 @@ def open_output(filename, mode='w'):
         mode = 'at'
     if mode not in ('wt', 'wb', 'at', 'ab'):
         raise ValueError("mode '{0}' not supported".format(mode))
-    if not PY3:
-        mode = mode[0]
-    if not isinstance(filename, basestring):
+    if not isinstance(filename, str):
         raise ValueError("the filename must be a string")
 
     # standard input and standard output handling
     if filename == '-':
-        if not PY3:
-            return sys.stdout
         return dict(
             wt=sys.stdout,
             wb=sys.stdout.buffer)[mode]
@@ -162,15 +77,11 @@ def xopen(filename, mode='r'):
         mode = 'at'
     if mode not in ('rt', 'rb', 'wt', 'wb', 'at', 'ab'):
         raise ValueError("mode '{0}' not supported".format(mode))
-    if not PY3:
-        mode = mode[0]
-    if not isinstance(filename, basestring):
+    if not isinstance(filename, str):
         raise ValueError("the filename must be a string")
 
     # standard input and standard output handling
     if filename == '-':
-        if not PY3:
-            return sys.stdin if 'r' in mode else sys.stdout
         return dict(
             rt=sys.stdin,
             wt=sys.stdout,
@@ -180,11 +91,8 @@ def xopen(filename, mode='r'):
     if filename.endswith('.bz2'):
         if bz2 is None:
             raise ImportError("Cannot open bz2 files: The bz2 module is not available")
-        if PY3:
-            if 't' in mode:
-                return io.TextIOWrapper(bz2.BZ2File(filename, mode[0]))
-            else:
-                return bz2.BZ2File(filename, mode)
+        if 't' in mode:
+            return io.TextIOWrapper(bz2.BZ2File(filename, mode[0]))
         else:
             return bz2.BZ2File(filename, mode)
     elif filename.endswith('.xz'):
@@ -192,39 +100,20 @@ def xopen(filename, mode='r'):
             raise ImportError("Cannot open xz files: The lzma module is not available "
                 "(use Python 3.3 or newer)")
         return lzma.open(filename, mode)
-        #if 'r' in mode:
-        #	return buffered_reader(lzma.open(filename, mode))
-        #else:
-        #	return buffered_writer(lzma.open(filename, mode))
     elif filename.endswith('.gz'):
-        if PY3:
-            if 't' in mode:
-                # gzip.open in Python 3.2 does not support modes 'rt' and 'wt''
-                return io.TextIOWrapper(gzip.open(filename, mode[0]))
-            else:
-                if 'r' in mode:
-                    return io.BufferedReader(gzip.open(filename, mode))
-                else:
-                    return io.BufferedWriter(gzip.open(filename, mode))
+        if 't' in mode:
+            # gzip.open in Python 3.2 does not support modes 'rt' and 'wt''
+            return io.TextIOWrapper(gzip.open(filename, mode[0]))
         else:
-            # rb/rt are equivalent in Py2
             if 'r' in mode:
-                try:
-                    return GzipReader(filename)
-                except IOError:
-                    # gzip not installed
-                    return buffered_reader(gzip.open(filename, mode))
+                return io.BufferedReader(gzip.open(filename, mode))
             else:
-                try:
-                    return GzipWriter(filename, mode)
-                except IOError:
-                    return buffered_writer(gzip.open(filename, mode))
+                return io.BufferedWriter(gzip.open(filename, mode))
     else:
         return open(filename, mode)
 
-import zlib
 compressors = {
-    ".gz"  : zlib.compressobj(-1, zlib.DEFLATED, -15),
+    ".gz"  : gzip,
     ".bz2" : bz2,
     ".xz"  : lzma
 }

@@ -7,14 +7,12 @@ TODO
 - Sequence.name should be Sequence.description or so (reserve .name for the part
   before the first space)
 """
-from __future__ import print_function, division, absolute_import
 import re
 import sys
 import io
 from os.path import splitext
 from .filters import NoFilter
 from .xopen import xopen, open_output
-from .compat import zip, basestring
 
 def _shorten(s, n=100):
     """Shorten string s to at most n characters, appending "..." if necessary."""
@@ -45,7 +43,7 @@ class SequenceReader(object):
         file is a path or a file-like object. In both cases, the file may
         be compressed (.gz, .bz2, .xz).
         """
-        if isinstance(file, basestring):
+        if isinstance(file, str):
             file = xopen(file)
             self._close_on_exit = True
         self._file = file
@@ -432,7 +430,7 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
 def guess_format_from_name(file, raise_on_failure=False):
     # Detect file format
     name = None
-    if isinstance(file, basestring):
+    if isinstance(file, str):
         name = file
     elif hasattr(file, "name"):	 # seems to be an open file-like object
         name = file.name

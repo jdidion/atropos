@@ -2,13 +2,7 @@
 """
 Quality trimming.
 """
-from __future__ import print_function, division, absolute_import
-
 import sys
-
-if sys.version > '3':
-    xrange = range
-
 
 def quality_trim_index(qualities, cutoff, base=33):
     """
@@ -25,7 +19,7 @@ def quality_trim_index(qualities, cutoff, base=33):
     s = 0
     max_qual = 0
     max_i = len(qualities)
-    for i in reversed(xrange(max_i)):
+    for i in reversed(range(max_i)):
         q = ord(qualities[i]) - base
         s += cutoff - q
         if s < 0:

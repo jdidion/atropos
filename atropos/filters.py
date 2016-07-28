@@ -11,7 +11,6 @@ each Wrapper is called in turn until one returns True. The main program will
 determine whether and where to write the read(s) based on whether it was rejected
 by a filter, and which one.
 """
-from __future__ import print_function, division, absolute_import
 from collections import OrderedDict
 
 # Constants used when returning from a Filter’s __call__ method to improve

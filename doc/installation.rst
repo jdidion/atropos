@@ -28,7 +28,7 @@ Dependencies
 
 Atropos requires this software to be installed:
 
-* One of Python 2.7 or 3.3+.
+* One of Python 3.3+.
 * A C compiler.
 
 Under Ubuntu, you may need to install the packages ``build-essential`` and
@@ -39,10 +39,9 @@ Installation
 ------------
 
 If you have already downloaded and unpacked the ``.tar.gz`` file, then
-installation is done like this (replace "python" with "python3" to
-install the Python 3 version)::
+installation is done like this::
 
-    python setup.py install --user
+    python3 setup.py install --user
 
 If you get an error message::
 
@@ -50,8 +49,7 @@ If you get an error message::
 
 Then check the entire error message. If it says something about a missing ``Python.h``
 file, then you need to install the Python development packages. The
-appropriate package is called ``python-dev`` in Ubuntu (or ``python3-dev``
-for Python 3).
+appropriate package is called ``python3-dev`` in Ubuntu.sour
 
 
 System-wide installation

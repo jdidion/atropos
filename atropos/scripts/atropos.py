@@ -36,7 +36,6 @@ https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d499
 by John Didion, "Atropos: sensitive, specific, and speedy trimming of NGS reads,"
 in prep.
 """
-from __future__ import division, absolute_import
 
 # Print a helpful error message if the extension modules cannot be imported.
 from atropos import *
@@ -49,7 +48,6 @@ from atropos.adapters import AdapterParser
 from atropos.modifiers import *
 from atropos.filters import *
 from atropos.report import *
-from atropos.compat import next
 
 import argparse
 from collections import defaultdict
