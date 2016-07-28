@@ -3,6 +3,7 @@ Open compressed files transparently.
 """
 from __future__ import print_function, division, absolute_import
 
+import gzip
 import zlib
 import sys
 import io
