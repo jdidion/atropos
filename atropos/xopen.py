@@ -224,7 +224,7 @@ def xopen(filename, mode='r'):
 
 import zlib
 compressors = {
-    ".gz"  : zlib.compressobj(wbits=-15),
+    ".gz"  : zlib.compressobj(-1, zlib.DEFLATED, -15),
     ".bz2" : bz2,
     ".xz"  : lzma
 }
