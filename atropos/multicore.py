@@ -47,7 +47,7 @@ from multiprocessing import Process, Queue, Value, cpu_count
 from .report import *
 from .seqio import Writers, FormatError
 from .xopen import get_compressor
-from .compat.queue import Empty, Full
+from .compat import Empty, Full
 
 __author__ = "John Didion"
 
