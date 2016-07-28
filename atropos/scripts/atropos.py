@@ -53,6 +53,7 @@ from atropos.compat import next
 
 import argparse
 from collections import defaultdict
+import copy
 import logging
 import os
 import platform
@@ -725,7 +726,7 @@ class BatchIterator(object):
             self.close()
             raise
         
-        batch = self._empty_batch.copy()
+        batch = copy.copy(self._empty_batch)
         batch[0] = record
         batch_index = 1
         max_size = self.size
