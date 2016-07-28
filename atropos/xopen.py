@@ -4,7 +4,6 @@ Open compressed files transparently.
 from __future__ import print_function, division, absolute_import
 
 import gzip
-import zlib
 import sys
 import io
 import os
@@ -223,8 +222,9 @@ def xopen(filename, mode='r'):
     else:
         return open(filename, mode)
 
+import zlib
 compressors = {
-    ".gz"  : zlib,
+    ".gz"  : zlib.compressobj(wbits=-15),
     ".bz2" : bz2,
     ".xz"  : lzma
 }

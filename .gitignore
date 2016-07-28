@@ -17,3 +17,5 @@ doc/_build
 tests/testtmp
 virtualenv
 *.egg-info
+*.c
+*.so

@@ -43,6 +43,7 @@ def test_append():
 				pass
 			with open_output(path, mode) as f:
 				f.write(text)
+			print(path)
 			with open_output(path, mode) as f:
 				f.write(text)
 			with xopen(path, 'r') as f:
