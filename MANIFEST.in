@@ -2,7 +2,7 @@
 include README.md
 include CHANGES.md
 include CITATION
-include LICENSE
+include LICENSE.txt
 include doc/*.rst
 include doc/conf.py
 include doc/Makefile
