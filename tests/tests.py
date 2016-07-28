@@ -6,9 +6,9 @@ from __future__ import print_function, division, absolute_import
 
 import os
 import sys
+from io import StringIO
 from nose.tools import raises
 from atropos.scripts import atropos
-from atropos.compat import StringIO
 from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
 
 def test_example():

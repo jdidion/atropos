@@ -5,6 +5,7 @@ from collections import defaultdict
 import random
 import sys
 import os
+from io import StringIO
 import shutil
 from textwrap import dedent
 from nose.tools import raises
@@ -13,7 +14,6 @@ from atropos.seqio import (Sequence, ColorspaceSequence, FormatError,
 	FastaReader, FastqReader, FastaQualReader, InterleavedSequenceReader,
 	FastaFormat, FastqFormat, InterleavedFormatter, get_format,
 	open_reader as openseq, sequence_names_match, open_output)
-from atropos.compat import StringIO
 from atropos.xopen import xopen, open_output
 from .utils import temporary_path
 
