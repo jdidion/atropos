@@ -14,7 +14,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 
 ## Dependencies
 
-* Python 3.3+
+* Python 3.3+ (python 2.x is NOT supported)
 * Cython 0.24+ (`pip install Cython`)
 
 ## Installation
