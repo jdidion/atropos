@@ -11,7 +11,8 @@ if PY3:
     basestring = str
     zip = zip
     next = next
-
+    import queue
+    
     def bytes_to_str(s):
         return s.decode('ascii')
 
@@ -42,3 +43,4 @@ else:
     basestring = basestring
     from itertools import izip as zip
     from StringIO import StringIO
+    import Queue as queue
