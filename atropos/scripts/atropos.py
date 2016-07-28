@@ -43,7 +43,6 @@ from atropos import *
 check_importability()
 
 from atropos import __version__
-from atropos.scripts import atropos as atropos_script
 from atropos.seqio import (open_reader, UnknownFileType, Formatters, RestFormatter,
                             InfoFormatter, WildcardFormatter, FormatError, Writers)
 from atropos.adapters import AdapterParser
