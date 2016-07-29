@@ -781,6 +781,20 @@ class ProgressMessageReader(object):
         self.iterable.close()
         
 def create_progress_reader(reader, max_reads=None, counter_magnitude="M"):
+    try:
+        return create_progressbar_reader(reader, max_reads, counter_magnitude)
+    except:
+        pass
+    
+    try:
+        return create_tqdm_reader(reader)
+    except:
+        pass
+    
+    logging.getLogger().warn("No progress bar library available")
+    return reader
+
+def create_progressbar_reader(reader, max_reads=None, counter_magnitude="M"):
     import progressbar
     import progressbar.widgets
     import math
@@ -836,6 +850,10 @@ def create_progress_reader(reader, max_reads=None, counter_magnitude="M"):
         ])
     
     return reader
+
+def create_tqdm_reader(reader):
+    import tqdm
+    return tqdm.tqdm(reader)
 
 def create_filters(options, paired, min_affected):
     filters = Filters(FilterFactory(paired, min_affected))

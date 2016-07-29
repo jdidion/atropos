@@ -30,6 +30,7 @@ Atropos requires this software to be installed:
 
 * One of Python 3.3+.
 * A C compiler.
+* Cython 0.24
 
 Under Ubuntu, you may need to install the packages ``build-essential`` and
 ``python-dev``.
@@ -81,4 +82,4 @@ Then simply run the script from where it is, similar to this::
 If you get any errors, first try to explicitly request a specific Python
 version by running atropos like this::
 
-    python2.7 bin/atropos --help
+    python3 bin/atropos --help
