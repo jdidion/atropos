@@ -19,3 +19,4 @@ virtualenv
 *.egg-info
 *.c
 *.so
+paper/data
