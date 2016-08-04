@@ -20,3 +20,4 @@ virtualenv
 *.c
 *.so
 paper/data
+paper/software

@@ -113,3 +113,13 @@ adjust.profile <- function(orig.path, new.path, target.err, rescale=TRUE) {
     writeLines(new.lines, out)
     close(out)
 }
+
+args <- commandArgs(trailingOnly=TRUE)
+stopifnot(length(args) == 3)
+
+# for some reason, the acutal error rate
+# in simulated reads is about twice what
+# is expected based on the empirical
+# distribution of quality scores
+error.rate <- as.numeric(args[3]) / 2
+adjust.profile(args[1], args[2], error.rate)
