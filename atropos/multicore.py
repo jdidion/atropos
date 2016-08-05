@@ -49,7 +49,7 @@ from multiprocessing import Process, Queue, Value, cpu_count
 
 from .report import *
 from .seqio import Writers, FormatError
-from .xopen import get_compressor
+from .compression import get_compressor, can_use_system_compression
 
 __author__ = "John Didion"
 
@@ -439,7 +439,7 @@ class PendingQueue(object):
 
 def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, timeout=30,
                  preserve_order=False, input_queue_size=0, result_queue_size=0,
-                 use_writer_process=True, writer_compression=False):
+                 use_writer_process=True, compression=None):
     """
     Execute atropos in parallel mode.
 
@@ -462,7 +462,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
                         disk. Otherwise, each worker thread will write its results to
                         an output file with a '.N' extension, where N is the thread index.
                         This is useful in cases where the I/O is the main bottleneck.
-    writer_compression	If True, the writer process perform sdata compression, otherwise
+    compression	        If "writer", the writer process perform data compression, otherwise
                         the worker processes performs compression.
     """
     logging.getLogger().debug(
@@ -471,7 +471,9 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
     assert threads >= 2
     
     # Reserve a thread for the writer process if it will be doing the compression and if one is available.
-    if writer_compression and threads > 2:
+    if compression is None:
+        compression = "writer" if use_writer_process and can_use_system_compression() else "worker"
+    if compression == "writer" and threads > 2:
         threads -= 1
     
     timeout = max(timeout, RETRY_INTERVAL)
@@ -489,7 +491,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
 
     if use_writer_process:
         worker_result_handler = QueueResultHandler(result_queue)
-        if writer_compression:
+        if compression == "writer":
             worker_result_handler = WorkerResultHandler(worker_result_handler)
         else:
             worker_result_handler = CompressingWorkerResultHandler(worker_result_handler)
@@ -499,10 +501,10 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
         # result handler
         if preserve_order:
             writer_result_handler = OrderPreservingWriterResultHandler(
-                writers, compressed=not writer_compression)
+                writers, compressed=compression == "worker")
         else:
             writer_result_handler = WriterResultHandler(
-                writers, compressed=not writer_compression)
+                writers, compressed=compression == "worker")
         # writer process
         writer_process = WriterProcess(writer_result_handler, result_queue, writer_control, timeout)
         writer_process.start()

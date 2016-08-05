@@ -4,13 +4,12 @@ import os
 import random
 import sys
 from nose.tools import raises
-from atropos.xopen import xopen, lzma, open_output, get_compressor
+from atropos.xopen import xopen, open_output
+from atropos.compression import get_compressor
 from .utils import temporary_path
 
 base = "tests/data/small.fastq"
-files = [ base + ext for ext in ['', '.gz', '.bz2' ] ]
-if lzma is not None:
-    files.append(base + '.xz')
+files = [ base + ext for ext in ['', '.gz', '.bz2', '.xz' ] ]
 
 def test_context_manager():
     major, minor = sys.version_info[0:2]
@@ -21,7 +20,6 @@ def test_context_manager():
             lines = list(f)
             assert len(lines) == 12
             assert lines[5] == 'AGCCGCTANGACGGGTTGGCCCTTAGACGTATCT\n', name
-            f.close()
 
 def test_append():
     for ext in ["", ".gz"]:  # BZ2 does NOT support append

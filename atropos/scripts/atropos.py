@@ -111,7 +111,7 @@ def main(cmdlineargs=None, default_outfile="-"):
         rc, summary = atropos.multicore.run_parallel(
             reader, modifiers, filters, formatters, writers, options.threads,
             options.process_timeout, options.preserve_order, options.read_queue_size,
-            options.result_queue_size, not options.no_writer_process, options.writer_compression)
+            options.result_queue_size, not options.no_writer_process, options.compression)
     
     if rc != 0:
         sys.exit(rc)
@@ -402,9 +402,9 @@ def get_argument_parser():
         help="Size of queue for batches of reads to be processed. (THREADS * 100)")
     group.add_argument("--result-queue-size", type=int, default=None, metavar="SIZE",
         help="Size of queue for batches of results to be written. (THREADS * 100)")
-    group.add_argument("--writer-compression", action="store_true", default=False,
-        help="Perform data compression in the writer process rather than the "
-             "worker processes. (no)")
+    group.add_argument("--compression", choices=("worker", "writer"), default=None,
+        help="Where data compression should be performed. Defaults to 'writer' if "
+             "system-level compression can be used, otherwise defaults to 'worker'.")
     
     return parser
 
@@ -654,8 +654,14 @@ def validate_options(options, parser):
     options.max_reads = int_or_str(options.max_reads)
     
     if options.threads is not None:
-        if options.writer_compression and options.no_writer_process:
-            parser.error("--writer-compression and --no-writer-process are mutually exclusive")
+        if options.compression is None:
+            if options.no_writer_process:
+                options.compression = "worker"
+            else:
+                from atropos.compression import can_use_system_compression
+                options.compression = "writer" if can_use_system_compression() else "worker"
+        elif options.compression == "writer" and options.no_writer_process:
+            parser.error(" writer compression and --no-writer-process are mutually exclusive")
         
         threads = options.threads
         if threads <= 0:
@@ -672,12 +678,12 @@ def validate_options(options, parser):
         # If we are using writer compression, the back-up will be in the result queue,
         # otherwise it will be in the read queue.
         if options.read_queue_size is None:
-            options.read_queue_size = threads * (100 if options.writer_compression else 1000)
+            options.read_queue_size = threads * (100 if options.compression == "writer" else 1000)
         elif options.read_queue_size > 0:
             assert options.read_queue_size >= threads
     
         if options.result_queue_size is None:
-            options.result_queue_size = threads * (1000 if options.writer_compression else 100)
+            options.result_queue_size = threads * (100 if options.compression == "worker" else 1000)
         elif options.result_queue_size > 0:
             assert options.result_queue_size >= threads
     

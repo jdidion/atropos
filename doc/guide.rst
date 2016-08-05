@@ -1168,10 +1168,11 @@ read input, process reads, and write output. To use multiple cores, specify the
   atropos -T 4 -a ADAPTER -o output.fastq input.fastq
 
 It is important to note that, whatever number of threads you give Atropos, it will
-one of those for reading input and, if you use the ``--writer-compression`` option,
-another for writing output. For example, the above command would use 4 cores, 1 reader
-thread, and 3 trimming threads. It is recommended that you have at least 2 available
-cores when using multi-threading.
+one of those for reading input and, if you use the ``--compression writer`` option
+(or if writer compression is used automatically because your system has a gzip
+program available), another for writing output. For example, the above command would
+use 4 cores, 1 reader thread, 1 writer thread, and 2 trimming threads. It is
+recommended that you have at least 2 available cores when using multi-threading.
 
 Parallel writing
 ----------------
@@ -1189,15 +1190,19 @@ Technical details
 
 When the ``--threads`` option is set, the main process loads batches of reads from the
 input file(s) and posts them to a Queue. One or more worker processes take batches from the
-Queue and process them in much the same manner as cutadapt. By default, if compressed output
-is requested, the worker threads compress the data before placing it on the result queue. The
-writer process then takes batches of results from the result queue and writes them to disk.
+Queue and process them in much the same manner as cutadapt. If compressed output is requested,
+the --compression option determines if compression is performed by the worker processes or
+by the writer process, and the default is based on whether you are using a system with a gzip
+program (which includes linux and OSX) -- using system-level compression is about 2x faster than
+compressing files through the python interface. If worker compression is used, the worker processes compress
+the data before placing it on the result queue, and the writer process then takes batches of results
+from the result queue and writes them to disk. On the other hand, if writer compression is used,
+the workers place uncompressed results in the result queue, and the writer compresses them (if
+necessary) before writing them to disk.
 
 One thread is reserved for the reader process, but once all reads are loaded an additional
-worker process is started since the reader process will become idle. It is possible to have
-the writer process perform data compression (using ``--writer-compression``), but this almost
-always leads to slower overall runtimes, so we don't recommend it. If you do use writer compression,
-one thread is reserved for the writer process, so you must have more than two available threads.
+worker process is started since the reader process will become idle. With writer compression,
+one thread is also reserved for the writer process, so you must have more than two available threads.
 
 Other options
 -------------
@@ -1225,9 +1230,10 @@ Other options
     a DEBUG message. However, if the wait time exceeds the value set for this parameter,
     then those messages are escalated to ERROR level, which suggests that the user might
     want to investigate.
-``-writer-compression``
-    Perform data compression in the worker (trimmer) processes rather than the writer
-    process. This is automatically enabled in ``cluster`` mode.
+``--compression``
+    If 'worker', perform data compression in the worker (trimmer) processes; if 'writer',
+    perform compression in the writer process. Otherwise, Atropos makes a choice based on
+    whether system-level gzip is available.
         
 Optimization
 ------------

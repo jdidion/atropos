@@ -1,22 +1,11 @@
 """
 Open compressed files transparently.
 """
-import gzip
 import sys
 import io
 import os
-import re
-from subprocess import Popen, PIPE
 
-try:
-    import bz2
-except ImportError:
-    bz2 = None
-
-try:
-    import lzma
-except ImportError:
-    lzma = None
+from .compression import get_file_opener
 
 def open_output(filename, mode='w'):
     """
@@ -87,40 +76,9 @@ def xopen(filename, mode='r'):
             wt=sys.stdout,
             rb=sys.stdin.buffer,
             wb=sys.stdout.buffer)[mode]
-
-    if filename.endswith('.bz2'):
-        if bz2 is None:
-            raise ImportError("Cannot open bz2 files: The bz2 module is not available")
-        if 't' in mode:
-            return io.TextIOWrapper(bz2.BZ2File(filename, mode[0]))
-        else:
-            return bz2.BZ2File(filename, mode)
-    elif filename.endswith('.xz'):
-        if lzma is None:
-            raise ImportError("Cannot open xz files: The lzma module is not available "
-                "(use Python 3.3 or newer)")
-        return lzma.open(filename, mode)
-    elif filename.endswith('.gz'):
-        if 't' in mode:
-            # We require python 3.3+, which automatically wraps
-            # GzipFile in io.TextIOWrapper
-            return gzip.open(filename, mode)
-        else:
-            if 'r' in mode:
-                return io.BufferedReader(gzip.open(filename, mode))
-            else:
-                return io.BufferedWriter(gzip.open(filename, mode))
+    
+    file_opener = get_file_opener(filename)
+    if file_opener:
+        return file_opener(filename, mode)
     else:
-        return open(filename, mode)
-
-compressors = {
-    ".gz"  : gzip,
-    ".bz2" : bz2,
-    ".xz"  : lzma
-}
-
-def get_compressor(filename):
-    for ext, compressor in compressors.items():
-        if filename.endswith(ext):
-            return compressor
-    return None
+         return open(filename, mode)
