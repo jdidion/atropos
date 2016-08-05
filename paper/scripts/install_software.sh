@@ -11,7 +11,8 @@
 # * git
 # * cmake
 
-root=`pwd`
+scripts=`pwd`
+root=`dirname $scripts`
 mkdir ../software/build
 automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 
@@ -28,7 +29,7 @@ mkdir ../software/build/art &&
     rm $f
     ln -s $automake_dir/$f .
     done &&
-    ./configure --prefix $root &&
+    ./configure --prefix $root/software &&
     make &&
     make install &&
     cd ../../../scripts
@@ -44,7 +45,8 @@ mkdir ../software/build/skewer &&
     cd skewer-master &&
     sed -i -e 's/\/usr\/local\/bin/..\/..\/..\/bin/' Makefile &&
     make &&
-    make install
+    make install &&
+    cd ../../../scripts
 
 # Install SeqPurge
 mkdir ../software/build/seqpurge &&
@@ -53,4 +55,8 @@ mkdir ../software/build/seqpurge &&
     unzip ngs-bits_2016.08.04.zip &&
     cd ngs-bits &&
     make build_3rdparty &&
-    make build_tools_release
+    make build_tools_release &&
+    ln -s bin/SeqPurge ../../../bin &&
+    cd ../../../scripts
+
+echo "You may need to 'export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$root/software/build/seqpurge/ngs-bits/bin'"

@@ -15,7 +15,7 @@ for err in 005 01
 do
   for mate in 1 2
   do
-    Rscript --vanilla adjust_error_profiles.R ../data/HiSeq2500L125R${mate}.txt ../data/HiSeq2500L125R${mate}_${err}.txt 0.${err}
+    Rscript --vanilla adjust_error_profiles.R ../data/HiSeq2500L125R${mate}_001.txt ../data/HiSeq2500L125R${mate}_${err}.txt 0.${err}
   done
 done
 
@@ -27,7 +27,7 @@ sd_frag=100
 cov=0.1
 
 # Simulate reads
-for prof in std 005 01
+for prof in 001 005 01
 do
   # NOTE: REF_GENOME is externally defined to point to the fasta file for hg19/GRCh37.
   # This assumes that the modified version of ART has been downloaded and compiled in the bin folder.
