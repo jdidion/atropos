@@ -102,8 +102,9 @@ def xopen(filename, mode='r'):
         return lzma.open(filename, mode)
     elif filename.endswith('.gz'):
         if 't' in mode:
-            # gzip.open in Python 3.2 does not support modes 'rt' and 'wt''
-            return io.TextIOWrapper(gzip.open(filename, mode[0]))
+            # We require python 3.3+, which automatically wraps
+            # GzipFile in io.TextIOWrapper
+            return gzip.open(filename, mode)
         else:
             if 'r' in mode:
                 return io.BufferedReader(gzip.open(filename, mode))

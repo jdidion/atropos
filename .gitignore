@@ -21,3 +21,6 @@ virtualenv
 *.so
 paper/data
 paper/software
+paper/scripts/atropos
+paper/scripts/skewer
+paper/scripts/seqpurge

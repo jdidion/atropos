@@ -40,7 +40,9 @@
 # the program.
 
 from collections import defaultdict
+import inspect
 import logging
+import os
 from queue import Empty, Full
 import time
 from multiprocessing import Process, Queue, Value, cpu_count
@@ -54,7 +56,7 @@ __author__ = "John Didion"
 # Max time to wait between retrying operations
 RETRY_INTERVAL = 5
 
-def wait_on(condition, message="Waiting {}", timeout=None, fail_callback=None, wait=None, timeout_callback=None):
+def wait_on(condition, wait_message="Waiting {}", timeout=None, fail_callback=None, wait=None, timeout_callback=None):
     if wait is True:
         wait = lambda: time.sleep(RETRY_INTERVAL)
     elif isinstance(wait, int):
@@ -72,11 +74,11 @@ def wait_on(condition, message="Waiting {}", timeout=None, fail_callback=None, w
             wait_start = now
         else:
             waiting = now - wait_start
-            msg = message.format("for {} seconds".format(round(waiting, 1)))
+            msg = wait_message.format("for {} seconds".format(round(waiting, 1)))
             if timeout is not None and waiting >= timeout:
                 logging.getLogger().error(msg)
                 if timeout_callback:
-                    if issubclass(timeout_callback, Exception):
+                    if inspect.isclass(timeout_callback):
                         raise timeout_callback()
                     else:
                         timeout_callback()
@@ -85,22 +87,22 @@ def wait_on(condition, message="Waiting {}", timeout=None, fail_callback=None, w
             if wait:
                 wait()
 
-def enqueue(queue, item, message="Waiting to enqueue item {}", block_timeout=RETRY_INTERVAL, **kwargs):
+def enqueue(queue, item, wait_message="Waiting to enqueue item {}", block_timeout=RETRY_INTERVAL, **kwargs):
     def condition():
         try:
             queue.put(item, block=True, timeout=block_timeout)
             return True
         except Full:
             return False
-    wait_on(condition, message=message, **kwargs)
+    wait_on(condition, wait_message=wait_message, **kwargs)
 
-def dequeue(queue, message="Waiting to dequeue item {}", block_timeout=RETRY_INTERVAL, **kwargs):
+def dequeue(queue, wait_message="Waiting to dequeue item {}", block_timeout=RETRY_INTERVAL, **kwargs):
     def condition():
         try:
             return queue.get(block=True, timeout=block_timeout)
         except Empty:
             return False
-    return wait_on(condition, message=message, **kwargs)
+    return wait_on(condition, wait_message=wait_message, **kwargs)
 
 class Control(object):
     def __init__(self, initial_value):
@@ -148,11 +150,13 @@ class WorkerProcess(Process):
         self.seen_batches = set()
     
     def run(self):
+        logging.getLogger().debug("{} running under pid {}".format(self.name, os.getpid()))
+        
         def iter_batches():
             while True:
                 batch = dequeue(
                     self.input_queue,
-                    message="{} waiting on batch {{}}".format(self.name),
+                    wait_message="{} waiting on batch {{}}".format(self.name),
                     timeout=self.timeout)
                 yield batch
         
@@ -167,7 +171,7 @@ class WorkerProcess(Process):
             enqueue(
                 self.summary_queue,
                 (self.index, self.seen_batches, process_stats, adapter_stats),
-                "{} waiting to queue summary {{}}".format(self.name),
+                wait_message="{} waiting to queue summary {{}}".format(self.name),
                 timeout=self.timeout
             )
         
@@ -181,6 +185,8 @@ class WorkerProcess(Process):
                 batch_num, (batch_size, records) = batch
                 self.seen_batches.add(batch_num)
                 self.processed_reads += batch_size
+                
+                logging.getLogger().debug("{} processing batch of size {}".format(self.name, batch_size))
                 
                 result = defaultdict(lambda: [])
                 for record in records:
@@ -237,6 +243,8 @@ class WriterProcess(Process):
         self.num_batches = None
 
     def run(self):
+        logging.getLogger().debug("Writer process running under pid {}".format(self.name, os.getpid()))
+        
         class Done(Exception): pass
         class Killed(Exception): pass
 
@@ -256,7 +264,7 @@ class WriterProcess(Process):
             while True:
                 batch = dequeue(
                     self.queue,
-                    message="Writer waiting on result {}",
+                    wait_message="Writer waiting on result {}",
                     timeout=self.timeout,
                     fail_callback=fail_callback,
                     timeout_callback=timeout_callback)
@@ -343,7 +351,7 @@ class QueueResultHandler(object):
         enqueue(
             self.queue,
             (batch_num, result),
-            self.message,
+            wait_message=self.message,
             timeout=self.timeout
         )
 
@@ -429,9 +437,9 @@ class PendingQueue(object):
     def empty(self):
         return len(self.queue) == 0
 
-def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, timeout=30,
+def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, timeout=30,
                  preserve_order=False, input_queue_size=0, result_queue_size=0,
-                 use_writer_process=True, worker_compression=False):
+                 use_writer_process=True, writer_compression=False):
     """
     Execute atropos in parallel mode.
 
@@ -454,19 +462,25 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
                         disk. Otherwise, each worker thread will write its results to
                         an output file with a '.N' extension, where N is the thread index.
                         This is useful in cases where the I/O is the main bottleneck.
-    worker_compression	If True, the worker processes perform data compression, otherwise
-                        the writer process performs compression.
+    writer_compression	If True, the writer process perform sdata compression, otherwise
+                        the worker processes performs compression.
     """
     logging.getLogger().debug(
         "Starting atropos in parallel mode with threads={}, timeout={}".format(threads, timeout))
-
+    
+    assert threads >= 2
+    
+    # Reserve a thread for the writer process if it will be doing the compression and if one is available.
+    if writer_compression and threads > 2:
+        threads -= 1
+    
     timeout = max(timeout, RETRY_INTERVAL)
 
-    # Queue by which batches of reads are sent to worker threads
+    # Queue by which batches of reads are sent to worker processes
     input_queue = Queue(input_queue_size)
-    # Queue by which results are sent from the worker threads to the writer thread
+    # Queue by which results are sent from the worker processes to the writer process
     result_queue = Queue(result_queue_size)
-    # Queue for threads to send summary information back to main process
+    # Queue for processes to send summary information back to main process
     summary_queue = Queue(threads)
     # Aggregate summary
     summary = Summary(trimmer_classes=modifiers.get_trimmer_classes())
@@ -475,20 +489,20 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
 
     if use_writer_process:
         worker_result_handler = QueueResultHandler(result_queue)
-        if worker_compression:
-            worker_result_handler = CompressingWorkerResultHandler(worker_result_handler)
-        else:
+        if writer_compression:
             worker_result_handler = WorkerResultHandler(worker_result_handler)
+        else:
+            worker_result_handler = CompressingWorkerResultHandler(worker_result_handler)
         
         # Shared variable for communicating with writer thread
         writer_control = Control(WRITER_ACTIVE)
         # result handler
         if preserve_order:
             writer_result_handler = OrderPreservingWriterResultHandler(
-                writers, compressed=worker_compression)
+                writers, compressed=not writer_compression)
         else:
             writer_result_handler = WriterResultHandler(
-                writers, compressed=worker_compression)
+                writers, compressed=not writer_compression)
         # writer process
         writer_process = WriterProcess(writer_result_handler, result_queue, writer_control, timeout)
         writer_process.start()
@@ -496,15 +510,18 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
         worker_result_handler = WorkerResultHandler(WriterResultHandler(writers, use_suffix=True))
 
     # worker processes
-    worker_processes = [
-        WorkerProcess(
-            i, modifiers, filters, formatters, input_queue,
-            worker_result_handler, summary_queue, timeout)
-        for i in range(threads)
-    ]
-    # start workers
-    for worker in worker_processes: worker.start()
-
+    def launch_workers(n, offset=0):
+        logging.getLogger().info("Starting {} worker processes".format(n))
+        workers = [
+            WorkerProcess(
+                i+offset, modifiers, filters, formatters, input_queue,
+                worker_result_handler, summary_queue, timeout)
+            for i in range(n)
+        ]
+        # start workers
+        for worker in workers: worker.start()
+        return workers
+    
     def ensure_alive():
         alive = [worker.is_alive() for worker in worker_processes]
         if not all(alive):
@@ -524,7 +541,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
                     return False
             wait_on(
                 condition,
-                message="Main process waiting to queue item {}",
+                wait_message="Main process waiting to queue item {}",
                 timeout=timeout,
                 fail_callback=ensure_alive)
             num_items += 1
@@ -534,30 +551,38 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
         timeout_callback = lambda: process.terminate() if terminate else None
         wait_on(
             lambda: not process.is_alive(),
-            message="Waiting on {} to terminate {{}}".format(process.name),
+            wait_message="Waiting on {} to terminate {{}}".format(process.name),
             timeout=timeout,
             wait=lambda: process.join(RETRY_INTERVAL),
             timeout_callback=timeout_callback)
-
+    
+    # Start worker processes, reserve a thread for the reader process,
+    # which we will get back after it completes
+    worker_processes = launch_workers(threads - 1)
+    
     try:
         # Add batches of reads to the input queue. Provide a timeout callback
         # to check that subprocesses are alive.
         num_batches = enqueue_all(enumerate(reader, 1))
         logging.getLogger().debug(
             "Main loop complete; saw {} batches".format(num_batches))
-
+        
         # Tell the worker processes no more input is coming
         enqueue_all((None,) * threads)
-
+        
         # Tell the writer thread the max number of batches to expect
         if use_writer_process:
             writer_control.set_value(num_batches)
-
+        
         # Wait for workers to exit
         #for worker in worker_processes:
         #	# Wait for worker to exit
         #	wait_on_process(worker)
-
+        
+        # Now that the reader process is done, it essentially
+        # frees up another thread to use for a worker
+        worker_processes += launch_workers(1, threads-1)
+        
         # Wait for all summaries to be available on queue
         def summary_timeout_callback():
             alive = [worker.is_alive() for worker in worker_processes]
@@ -567,13 +592,13 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
                     "Workers are still alive and haven't returned summaries: {}".format(missing))
         wait_on(
             lambda: summary_queue.full(),
-            "Waiting on worker summaries {}",
+            wait_message="Waiting on worker summaries {}",
             timeout=timeout,
             wait=True,
             timeout_callback=summary_timeout_callback)
 
-        # Process summary information from worker threads
-        logging.getLogger().debug("Processing summary information from worker threads")
+        # Process summary information from worker processes
+        logging.getLogger().debug("Processing summary information from worker processes")
         seen_summaries = set()
         seen_batches = set()
         def summary_fail_callback():
@@ -639,4 +664,5 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=1, tim
         if use_writer_process:
             kill(writer_process)
     
-    return (rc, summary.finish())
+    report = summary.finish() if rc == 0 else None
+    return (rc, report)

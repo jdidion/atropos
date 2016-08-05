@@ -1165,35 +1165,13 @@ processors to speed up read trimming. By default, Atropos uses a single thread t
 read input, process reads, and write output. To use multiple cores, specify the
 ``-T`` (or ``--threads``) option with the number of threads to use for trimming:
 
-  atropos -T 2 -a ADAPTER -o output.fastq input.fastq
+  atropos -T 4 -a ADAPTER -o output.fastq input.fastq
 
 It is important to note that, whatever number of threads you give Atropos, it will
-use 1 or 2 additional threads - one for reading input and, unless you use the
-``--no-writer-process`` option, one for writing output. For example, the above
-command would use 4 cores, 1 reader thread, 1 writer thread, and 2 trimming threads.
-Thus, it is recommended that you have at least 4 available cores when using multi-threading.
-
-Multi-threading modes
----------------------
-
-When the ``--threads`` option is set, the main process that loads batches of reads from the
-input file(s) and posts them to a Queue. One or more worker processes take batches from the
-Queue and process them in much the same manner as cutadapt. Writing the results to disk can
-be a bottleneck, and so there are multiple options for how to handle this:
-
-1. Local mode: the program is being run on a system with a local disk (e.g. a laptop or
-   desktop machine) with perhaps limited memory. In this mode, there is a worker thread that
-   collects the results from the writer threads, compresses the data (if necessary), and writes
-   it to disk. A relatively small maximum Queue size is used to keep from taking up too much memory.
-2. Cluster mode: the program is being run on a system with ample memory, but writes to remote
-   file storage (NAS), which typically has higher latency than local storage. In this mode, larger
-   maximum Queue sizes are used, and data compression is handled by the worker threads, so that the
-   writer thread's only task is writing bytes to disk.
-
-The default mode is ``local`` and can be changed with the ``--parallel-environment`` option.
-Note that the mode that you choose comes with default settings for additional options (see
-"Other options" below), but you can change the defaults by explicitly setting values for
-those options.
+one of those for reading input and, if you use the ``--writer-compression`` option,
+another for writing output. For example, the above command would use 4 cores, 1 reader
+thread, and 3 trimming threads. It is recommended that you have at least 2 available
+cores when using multi-threading.
 
 Parallel writing
 ----------------
@@ -1205,6 +1183,21 @@ supports reading from multiple FASTQ files (or you are on a linux-based system a
 files to a single input stream) then it can be much faster to have worker threads write results
 directly to separate files. This mode is enabled by specifying the ``--no-writer-process``
 option, and is compatible with both local and cluster modes.
+
+Technical details
+-----------------
+
+When the ``--threads`` option is set, the main process loads batches of reads from the
+input file(s) and posts them to a Queue. One or more worker processes take batches from the
+Queue and process them in much the same manner as cutadapt. By default, if compressed output
+is requested, the worker threads compress the data before placing it on the result queue. The
+writer process then takes batches of results from the result queue and writes them to disk.
+
+One thread is reserved for the reader process, but once all reads are loaded an additional
+worker process is started since the reader process will become idle. It is possible to have
+the writer process perform data compression (using ``--writer-compression``), but this almost
+always leads to slower overall runtimes, so we don't recommend it. If you do use writer compression,
+one thread is reserved for the writer process, so you must have more than two available threads.
 
 Other options
 -------------
@@ -1232,7 +1225,7 @@ Other options
     a DEBUG message. However, if the wait time exceeds the value set for this parameter,
     then those messages are escalated to ERROR level, which suggests that the user might
     want to investigate.
-``-worker-compression``
+``-writer-compression``
     Perform data compression in the worker (trimmer) processes rather than the writer
     process. This is automatically enabled in ``cluster`` mode.
         

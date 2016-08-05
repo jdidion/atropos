@@ -67,7 +67,7 @@ def main(cmdlineargs=None, default_outfile="-"):
     :param default_outfile: the file to which trimmed reads are sent if the ``-o``
     parameter is not used.
     """
-    
+    orig_args = copy.copy(cmdlineargs or sys.argv)
     parser = get_argument_parser()
     options = parser.parse_args(args=cmdlineargs)
     
@@ -87,7 +87,7 @@ def main(cmdlineargs=None, default_outfile="-"):
     
     logger = logging.getLogger()
     logger.info("This is atropos %s with Python %s", __version__, platform.python_version())
-    logger.info("Command line parameters: %s", " ".join(cmdlineargs))
+    logger.info("Command line parameters: %s", " ".join(orig_args))
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[paired])
@@ -111,7 +111,7 @@ def main(cmdlineargs=None, default_outfile="-"):
         rc, summary = atropos.multicore.run_parallel(
             reader, modifiers, filters, formatters, writers, options.threads,
             options.process_timeout, options.preserve_order, options.read_queue_size,
-            options.result_queue_size, not options.no_writer_process, options.worker_compression)
+            options.result_queue_size, not options.no_writer_process, options.writer_compression)
     
     if rc != 0:
         sys.exit(rc)
@@ -171,7 +171,7 @@ def get_argument_parser():
             "ligated to! (none)")
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate (no. of errors divided by the length "
-            "of the matching region). (none)")
+            "of the matching region). (0.1)")
     group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
         help="Allow only mismatches in alignments. "
             "(allow both mismatches and indels)")
@@ -393,27 +393,18 @@ def get_argument_parser():
     group.add_argument("--preserve-order", action="store_true", default=False,
         help="Preserve order of reads in input files (ignored if "
              "--no-writer-process is set). (no)")
-    group.add_argument("--process-timeout", type=int, default=30, metavar="SECONDS",
+    group.add_argument("--process-timeout", type=int, default=60, metavar="SECONDS",
         help="Number of seconds process should wait before escalating messages "
-             "to ERROR level. (30)")
-    group.add_argument("--parallel-environment", choices=("local", "cluster"), default="local",
-        help="Automatically set performance-tuning parameters based on the environment in which "
-             "the program is running. local: assumes fast file I/O and more limited memory; "
-             "cluster: assumes slower (i.e. network-based) file I/O and greater memory availablity. "
-             "(local)")
-    
-    group = parser.add_argument_group("Performance-tuning options")
+             "to ERROR level. (60)")
     group.add_argument("--batch-size", type=int, default=5000, metavar="SIZE",
         help="Number of records to process in each batch. (5000)")
     group.add_argument("--read-queue-size", type=int, default=None, metavar="SIZE",
-        help="Size of queue for batches of reads to be processed. (THREADS * 100 "
-             "in local mode, and THREADS * 1000 in cluster mode)")
+        help="Size of queue for batches of reads to be processed. (THREADS * 100)")
     group.add_argument("--result-queue-size", type=int, default=None, metavar="SIZE",
-        help="Size of queue for batches of results to be written. (THREADS * 100 "
-             "in local mode, and THREADS * 1000 in cluster mode)")
-    group.add_argument("--worker-compression", action="store_true", default=False,
-        help="Perform data compression in the worker processes rather than the "
-             "writer process. (no)")
+        help="Size of queue for batches of results to be written. (THREADS * 100)")
+    group.add_argument("--writer-compression", action="store_true", default=False,
+        help="Perform data compression in the writer process rather than the "
+             "worker processes. (no)")
     
     return parser
 
@@ -551,17 +542,22 @@ def validate_options(options, parser):
         cutoffs = options.quality_cutoff.split(',')
         if len(cutoffs) == 1:
             try:
-                options.quality_cutoff = [0, int(cutoffs[0])]
+                cutoffs_array = [0, int(cutoffs[0])]
             except ValueError as e:
                 parser.error("Quality cutoff value not recognized: {0}".format(e))
         elif len(cutoffs) == 2:
             try:
-                options.quality_cutoff = [int(cutoffs[0]), int(cutoffs[1])]
+                cutoffs_array = [int(cutoffs[0]), int(cutoffs[1])]
             except ValueError as e:
                 parser.error("Quality cutoff value not recognized: {0}".format(e))
         else:
             parser.error("Expected one value or two values separated by comma for the quality cutoff")
-
+        
+        if all(x <= 0 for x in cutoffs_array):
+            options.quality_cutoff = None
+        else:
+            options.quality_cutoff = cutoffs_array
+        
     if options.pair_filter is None:
         options.pair_filter = 'any'
 
@@ -658,37 +654,32 @@ def validate_options(options, parser):
     options.max_reads = int_or_str(options.max_reads)
     
     if options.threads is not None:
+        if options.writer_compression and options.no_writer_process:
+            parser.error("--writer-compression and --no-writer-process are mutually exclusive")
+        
         threads = options.threads
         if threads <= 0:
             threads = cpu_count()
-        # reserve one thread each for the reader and writer processes
-        threads = threads - (1 if options.no_writer_process else 2)
-        if threads <= 0:
-            logging.getLogger().warn("Using more than the available number of CPUs")
-            threads = 1
+        if threads < 2:
+            parser.error("At least two threads are required for multi-processing")
         options.threads = threads
         
         options.batch_size = int_or_str(options.batch_size)
         if options.process_timeout < 0:
             options.process_timeout = 0
         
-        # set default option values based on running environment
-        if options.parallel_environment == "local":
-            default_queue_size = options.threads * 100
-        elif options.parallel_environment == "cluster":
-            default_queue_size = options.threads * 1000
-            options.worker_compression = True
-        
-        # set queue sizes if necessary
+        # Set queue sizes if necessary.
+        # If we are using writer compression, the back-up will be in the result queue,
+        # otherwise it will be in the read queue.
         if options.read_queue_size is None:
-            options.read_queue_size = default_queue_size
+            options.read_queue_size = threads * (100 if options.writer_compression else 1000)
         elif options.read_queue_size > 0:
-            assert options.read_queue_size >= options.threads
+            assert options.read_queue_size >= threads
     
         if options.result_queue_size is None:
-            options.result_queue_size = default_queue_size
+            options.result_queue_size = threads * (1000 if options.writer_compression else 100)
         elif options.result_queue_size > 0:
-            assert options.result_queue_size > options.threads
+            assert options.result_queue_size >= threads
     
     return paired
 

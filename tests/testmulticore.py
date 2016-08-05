@@ -46,7 +46,7 @@ def test_wait_on():
         def fail_callback(self):
             self.j += 1
     c = callbacks()
-    wait_on(c.condition, message="waiting", fail_callback=c.fail_callback)
+    wait_on(c.condition, wait_message="waiting", fail_callback=c.fail_callback)
     assert c.i == 5
     assert c.j == 4
     #assert_log("DEBUG: waiting for {} seconds".format())
