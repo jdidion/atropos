@@ -170,18 +170,18 @@ def get_argument_parser():
             "ligated to!")
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate (no. of errors divided by the length "
-            "of the matching region). Default: %default")
+            "of the matching region).")
     group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
         help="Allow only mismatches in alignments. "
             "Default: allow both mismatches and indels")
     group.add_argument("-n", "--times", type=int, metavar="COUNT", default=1,
-        help="Remove up to COUNT adapters from each read. Default: %default")
+        help="Remove up to COUNT adapters from each read.")
     group.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=3,
         help="If the overlap between the read and the adapter is shorter than "
             "MINLENGTH, the read is not modified. Reduces the no. of bases "
-            "trimmed due to random adapter matches. Default: %default")
+            "trimmed due to random adapter matches.")
     group.add_argument("--match-read-wildcards", action="store_true", default=False,
-        help="Interpret IUPAC wildcards in reads. Default: %default")
+        help="Interpret IUPAC wildcards in reads.")
     group.add_argument("-N", "--no-match-adapter-wildcards", action="store_false",
         default=True, dest='match_adapter_wildcards',
         help="Do not interpret IUPAC wildcards in adapters.")
@@ -227,7 +227,7 @@ def get_argument_parser():
     group.add_argument("--quality-base", type=int, default=33,
         help="Assume that quality values in FASTQ are encoded as ascii(quality "
             "+ QUALITY_BASE). This needs to be set to 64 for some old Illumina "
-            "FASTQ files. Default: %default")
+            "FASTQ files.")
     group.add_argument("--trim-n", action='store_true', default=False,
         help="Trim N's on ends of reads.")
     group.add_argument("-x", "--prefix", default='',
