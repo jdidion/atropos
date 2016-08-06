@@ -1,0 +1,6 @@
+paper/data filter=lfs diff=lfs merge=lfs -text
+paper/results filter=lfs diff=lfs merge=lfs -text
+paper/software/ngs-bits_2016.08.04.zip filter=lfs diff=lfs merge=lfs -text
+paper/software/skewer_2016.08.04.zip filter=lfs diff=lfs merge=lfs -text
+paper/software/art_illumina_src151-adapter-enabled.tar.gz filter=lfs diff=lfs merge=lfs -text
+paper/software/art_illumina_src151.tar.gz filter=lfs diff=lfs merge=lfs -text

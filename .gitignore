@@ -19,8 +19,9 @@ virtualenv
 *.egg-info
 *.c
 *.so
-paper/data
-paper/software
+paper/software/bin
+paper/software/build
+paper/software/doc
 paper/scripts/atropos
 paper/scripts/skewer
 paper/scripts/seqpurge
