@@ -369,7 +369,7 @@ if not ((3, 2) <= sys.version_info[:2] <= (3, 3)):
 	def test_truncated_gz_iter():
 		with temporary_path('truncated.gz') as path:
 			create_truncated_file(path)
-			f = xopen(path, 'r')
+			f = xopen(path, 'r', use_system=False) # work around bug in py3.4
 			for line in f:
 				pass
 			f.close()

@@ -41,7 +41,7 @@ def open_output(filename, mode='w'):
     
     return open(filename, mode)
 
-def xopen(filename, mode='r'):
+def xopen(filename, mode='r', use_system=True):
     """
     Replacement for the "open" function that can also open files that have
     been compressed with gzip, bzip2 or xz. If the filename is '-', standard
@@ -79,6 +79,6 @@ def xopen(filename, mode='r'):
     
     file_opener = get_file_opener(filename)
     if file_opener:
-        return file_opener(filename, mode)
+        return file_opener(filename, mode, use_system)
     else:
          return open(filename, mode)

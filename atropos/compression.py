@@ -136,13 +136,13 @@ def open_gzip_file(filename, mode, use_system=True):
 
 # TODO: experiment with system process-based bzip and lzma readers/writers
 
-def open_bzip_file(filename, mode):
+def open_bzip_file(filename, mode, use_system=False):
     if 't' in mode:
         return io.TextIOWrapper(bz2.BZ2File(filename, mode[0]))
     else:
         return bz2.BZ2File(filename, mode)
 
-def open_lzma_file(filename, mode):
+def open_lzma_file(filename, mode, use_system=False):
     return lzma.open(filename, mode)
 
 file_openers = {
