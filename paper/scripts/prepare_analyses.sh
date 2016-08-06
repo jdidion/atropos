@@ -147,9 +147,9 @@ do
     
     echo "echo Skewer $profile" >> $commands
     echo "/usr/bin/time -p $SKEWER -m pe -l $MIN_LEN -k $MIN_OVERLAP" \
-    "-o skewer/${profile} -z" \
+    "-o skewer/${profile} -z --quiet" \
     "-x $ADAPTER1 -y $ADAPTER2 -t $threads" \
-    "-q $qcut $n $fq1 $fq2 >> skewer/${profile}.summary.txt" >> $commands
+    "-q $qcut $n $fq1 $fq2 > skewer/${profile}.summary.txt" >> $commands
   done
 done
 
