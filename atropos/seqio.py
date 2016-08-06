@@ -452,7 +452,7 @@ def add_suffix_to_path(path, suffix):
     Add the suffix (str or int) after the file name but
     before the extension.
     """
-    name, ext1, ext2 = _splitext(name)
+    name, ext1, ext2 = _splitext(path)
     return "{}{}{}{}".format(name, suffix, ext1, ext2 or "")
     
 def _splitext(name):
