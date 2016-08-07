@@ -79,7 +79,7 @@ do
   
   for qcut in 0 20
   do
-    profile="${err}_q${qcut}_writercomp"
+    profile="${threads}_${err}_q${qcut}_writercomp"
     echo "echo Atropos $profile" >> $commands
     echo "/usr/bin/time -p $ATROPOS -T $threads" \
     "-a $ADAPTER1 -A $ADAPTER2" \
@@ -91,7 +91,7 @@ do
     "--log-level ERROR --quiet" \
     "--compression writer $fq1 $fq2" >> $commands
   
-    profile="${err}_q${qcut}_workercomp"
+    profile="${threads}_${err}_q${qcut}_workercomp"
     echo "#echo Atropos $profile" >> $commands
     echo "#/usr/bin/time -p $ATROPOS -T $threads" \
     "-a $ADAPTER1 -A $ADAPTER2" \
@@ -103,7 +103,7 @@ do
     "--log-level ERROR --quiet" \
     "--compression worker $fq1 $fq2" >> $commands
     
-    profile="${err}_q${qcut}_nowriter"
+    profile="${threads}_${err}_q${qcut}_nowriter"
     echo "echo Atropos $profile" >> $commands
     echo "/usr/bin/time -p $ATROPOS -T $threads" \
     "-a $ADAPTER1 -A $ADAPTER2" \
@@ -115,7 +115,7 @@ do
     "--log-level ERROR --quiet" \
     "--no-writer-process $fq1 $fq2" >> $commands
     
-    profile="${err}_q${qcut}"
+    profile="${threads}_${err}_q${qcut}"
     
     # SeqPurge:
     # 1. There is a -mep parameter that may be important
