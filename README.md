@@ -32,8 +32,7 @@ atropos -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz reads.fq.gz
 
 To take advantage of multi-threading, set the `--threads` option:
 
-```
-{r}
+```{r}
 atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz reads.fq.gz
 ```
 
