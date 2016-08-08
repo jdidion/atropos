@@ -12,31 +12,16 @@
 from argparse import ArgumentParser
 import csv
 import fileinput
-
-class fileoutput(object):
-    def __init__(path, mode='wt'):
-        if path == '-':
-            self.fh = sys.stdout
-            close = False
-        else:
-            self.fh = open(path, mode)
-            close = True
-    
-    def __enter__(self):
-        return self.fh
-    
-    def __exit__(self, type, value, traceback):
-        if self.close:
-            self.fh.close()
+from common import fileoutput
 
 def summarize_timing(i, w):
     for line in i:
-        if any(i.startswith(prog) for prog in ('atropos', 'skewer', 'seqpurge')):
+        if any(line.startswith(prog) for prog in ('atropos', 'skewer', 'seqpurge')):
             profile = line.rstrip().split("_")
             line = next(i)
             assert line.startswith('real')
             time = float(line.rstrip()[5:])
-            w.writerow((profile[0], profile[4] if len(profile) > 4 else "") + profile[1:4] + (time,))
+            w.writerow([profile[0], profile[4] if len(profile) > 4 else ""] + profile[1:4] + [time])
             # throw away user and sys times - not super informative, especially with multi-threaded programs
             line = next(i)
             assert line.startswith('user')
@@ -50,7 +35,7 @@ def main():
     args = parser.parse_args()
     
     with fileinput.input(args.input) as i, fileoutput(args.output) as o:
-        w = csv.writer(o, separator="\t")
+        w = csv.writer(o, delimiter="\t")
         summarize_timing(i, w)
 
 if __name__ == "__main__":

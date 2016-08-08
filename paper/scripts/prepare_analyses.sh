@@ -75,12 +75,14 @@ do
   then
       fq1=$root/data/real/NA12878_03_AACGTGAT_L001_R1_001.fastq.gz
       fq2=$root/data/real/NA12878_03_AACGTGAT_L001_R2_001.fastq.gz
+      quals='0 20'
   else
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
+      quals='0'
   fi
   
-  for qcut in 0 20
+  for qcut in quals
   do
     profile="atropos_${threads}_${err}_q${qcut}_writercomp"
     echo ">&2 echo $profile && /usr/bin/time -p" \

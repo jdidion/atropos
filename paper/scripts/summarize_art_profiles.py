@@ -3,27 +3,7 @@ from argparse import ArgumentParser
 import csv
 import sys
 import editdistance
-
-DEFAULT_ADAPTERS = [
-    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG",
-    "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
-]
-
-class fileoutput(object):
-    def __init__(path, mode='wt'):
-        if path == '-':
-            self.fh = sys.stdout
-            close = False
-        else:
-            self.fh = open(path, mode)
-            close = True
-    
-    def __enter__(self):
-        return self.fh
-    
-    def __exit__(self, type, value, traceback):
-        if self.close:
-            self.fh.close()
+from common import *
 
 def summarize_art_profile(p, w, i, adapter):
     while True:
@@ -80,7 +60,7 @@ def main():
     args = parser.parse_args()
     
     with open(args.profile1, 'rt') as p1, open(args.profile2, 'rt') as p2, fileoutput(args.output) as o:
-        w = csv.writer(o, separator="\t")
+        w = csv.writer(o, delimiter="\t")
         w.writeline(('adapter',
             'num_adapters', 'num_reads_mismatch', 'total_reads',
             'total_edit_dist', 'total_ref_bp',
