@@ -3,10 +3,11 @@
 # directory into the ../bin directory. It also installs
 # Atropos from pypi.
 # Prerequisites:
-# 1. python 3.3+ (we recommend Anaconda)
-# 2. cython 0.24+ ('conda install cython' or 'pip install cython')
-# 3. modern C++ compiler (we use homebrew/linuxbrew to install gcc 5.1)
-# 4. To install SeqPurge, you need
+# 1. modern C++ compiler (we use homebrew/linuxbrew to install gcc 5.1)
+# 2. python 3.3+ (we recommend Anaconda)
+# * cython 0.24+ ('conda install cython' or 'pip install cython')
+# * editdistance ('pip install editdistance')
+# 3. To install SeqPurge, you need
 # * Qt 5.3+ with xmlpatterns and mysql packages
 # * git
 # * cmake

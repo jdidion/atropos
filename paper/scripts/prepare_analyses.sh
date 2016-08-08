@@ -80,7 +80,7 @@ do
   for qcut in 0 20
   do
     profile="${threads}_${err}_q${qcut}_writercomp"
-    echo "echo Atropos $profile" >> $commands
+    echo ">&2 echo Atropos $profile" >> $commands
     echo "/usr/bin/time -p $ATROPOS -T $threads" \
     "-a $ADAPTER1 -A $ADAPTER2" \
     "-O $MIN_OVERLAP -q $qcut --trim-n" \
@@ -92,7 +92,7 @@ do
     "--compression writer $fq1 $fq2" >> $commands
   
     profile="${threads}_${err}_q${qcut}_workercomp"
-    echo "#echo Atropos $profile" >> $commands
+    echo "#>&2 echo Atropos $profile" >> $commands
     echo "#/usr/bin/time -p $ATROPOS -T $threads" \
     "-a $ADAPTER1 -A $ADAPTER2" \
     "-O $MIN_OVERLAP -q $qcut --trim-n" \
@@ -104,7 +104,7 @@ do
     "--compression worker $fq1 $fq2" >> $commands
     
     profile="${threads}_${err}_q${qcut}_nowriter"
-    echo "echo Atropos $profile" >> $commands
+    echo ">&2 echo Atropos $profile" >> $commands
     echo "/usr/bin/time -p $ATROPOS -T $threads" \
     "-a $ADAPTER1 -A $ADAPTER2" \
     "-O $MIN_OVERLAP -q $qcut --trim-n" \
@@ -136,7 +136,7 @@ do
       ncut=7
     fi
     
-    echo "echo SeqPurge $profile" >> $commands
+    echo ">&2 echo SeqPurge $profile" >> $commands
     echo "/usr/bin/time -p $SEQPURGE -in1 $fq1 -in2 $fq2" \
     "-out1 seqpurge/${profile}.1.fq.gz" \
     "-out2 seqpurge/${profile}.2.fq.gz" \
@@ -145,7 +145,7 @@ do
     "-prefetch $BATCH_SIZE -match_perc 0.9" \
     "-summary seqpurge/${profile}.summary" >> $commands
     
-    echo "echo Skewer $profile" >> $commands
+    echo ">&2 echo Skewer $profile" >> $commands
     echo "/usr/bin/time -p $SKEWER -m pe -l $MIN_LEN -k $MIN_OVERLAP" \
     "-o skewer/${profile} -z --quiet" \
     "-x $ADAPTER1 -y $ADAPTER2 -t $threads" \

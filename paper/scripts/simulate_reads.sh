@@ -17,6 +17,10 @@ do
   do
     Rscript --vanilla adjust_error_profiles.R ../data/HiSeq2500L125R${mate}_001.txt ../data/HiSeq2500L125R${mate}_${err}.txt 0.${err}
   done
+  python summarize_art_profiles.py \
+    -1 ../data/HiSeq2500L125R1_${err}.txt 0.${err} \
+    -2 ../data/HiSeq2500L125R1_${err}.txt 0.${err} \
+    -o ../results/HiSeq2500L125_${err}.summary.txt
 done
 
 # Variables used in read simulation
