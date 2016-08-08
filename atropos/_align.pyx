@@ -221,7 +221,7 @@ cdef class Aligner:
         """
         def __set__(self, value):
             if value < 1:
-                raise ValueError('Insertion/deletion cost must be at leat 1')
+                raise ValueError('Insertion/deletion cost must be at least 1')
             self._insertion_cost = value
             self._deletion_cost = value
 
