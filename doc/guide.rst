@@ -1169,10 +1169,10 @@ read input, process reads, and write output. To use multiple cores, specify the
 
 It is important to note that, whatever number of threads you give Atropos, it will
 one of those for reading input and, if you use the ``--compression writer`` option
-(or if writer compression is used automatically because your system has a gzip
-program available), another for writing output. For example, the above command would
-use 4 cores, 1 reader thread, 1 writer thread, and 2 trimming threads. It is
-recommended that you have at least 2 available cores when using multi-threading.
+(or if writer compression is used automatically), another for writing output. For
+example, the above command would use 4 cores, 1 reader thread, 1 writer thread, and
+2 trimming threads. It is recommended that you have at least 2 available cores when
+using multi-threading.
 
 Parallel writing
 ----------------
@@ -1190,18 +1190,21 @@ Technical details
 
 When the ``--threads`` option is set, the main process loads batches of reads from the
 input file(s) and posts them to a Queue. One or more worker processes take batches from the
-Queue and process them in much the same manner as cutadapt. If compressed output is requested,
-the --compression option determines if compression is performed by the worker processes or
-by the writer process, and the default is based on whether you are using a system with a gzip
-program (which includes linux and OSX) -- using system-level compression is about 2x faster than
-compressing files through the python interface. If worker compression is used, the worker processes compress
-the data before placing it on the result queue, and the writer process then takes batches of results
-from the result queue and writes them to disk. On the other hand, if writer compression is used,
-the workers place uncompressed results in the result queue, and the writer compresses them (if
-necessary) before writing them to disk.
+Queue and process them in much the same manner as cutadapt.
+
+If compressed output is requested, the --compression option determines if compression is performed by
+the worker processes or by the writer process, and the default is based on how many threads you specify
+and whether you are using a system with a gzip program (which includes linux and OSX) -- using system-level
+compression is about 2x faster than compressing files through the python interface. However, we find that with
+8 or more threads, having the workers perform compression leads to an overall performance gain. Thus,
+the default is to use worker compression unless you have both fewer than 8 threads and system-level gzip.
+If worker compression is used, the worker processes compress the data before placing it on the result
+queue, and the writer process then takes batches of results from the result queue and writes them to
+disk. On the other hand, if writer compression is used, the workers place uncompressed results in the
+result queue, and the writer compresses them (if necessary) before writing them to disk.
 
 One thread is reserved for the reader process, but once all reads are loaded an additional
-worker process is started since the reader process will become idle. With writer compression,
+worker process is started since the reader process becomes idle. With writer compression,
 one thread is also reserved for the writer process, so you must have more than two available threads.
 
 Other options

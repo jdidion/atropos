@@ -404,7 +404,8 @@ def get_argument_parser():
         help="Size of queue for batches of results to be written. (THREADS * 100)")
     group.add_argument("--compression", choices=("worker", "writer"), default=None,
         help="Where data compression should be performed. Defaults to 'writer' if "
-             "system-level compression can be used, otherwise defaults to 'worker'.")
+             "system-level compression can be used and (1 < threads < 8), otherwise "
+             "defaults to 'worker'.")
     
     return parser
 
@@ -654,21 +655,26 @@ def validate_options(options, parser):
     options.max_reads = int_or_str(options.max_reads)
     
     if options.threads is not None:
-        if options.compression is None:
-            if options.no_writer_process:
-                options.compression = "worker"
-            else:
-                from atropos.compression import can_use_system_compression
-                options.compression = "writer" if can_use_system_compression() else "worker"
-        elif options.compression == "writer" and options.no_writer_process:
-            parser.error(" writer compression and --no-writer-process are mutually exclusive")
-        
         threads = options.threads
         if threads <= 0:
             threads = cpu_count()
         if threads < 2:
             parser.error("At least two threads are required for multi-processing")
         options.threads = threads
+        
+        if options.compression is None:
+            # Our tests show that with 8 or more threads, worker compression is
+            # more efficient.
+            if options.no_writer_process or threads == 2 or threads >= 8:
+                options.compression = "worker"
+            else:
+                from atropos.compression import can_use_system_compression
+                options.compression = "writer" if can_use_system_compression() else "worker"
+        elif options.compression == "writer" and options.no_writer_process:
+            parser.error("Writer compression and --no-writer-process are mutually exclusive")
+        elif threads == 2 and options.compression == "writer":
+            logging.getLogger.warn("Writer compression requires > 2 threads; using worker compression instead")
+            options.compression = "worker"
         
         options.batch_size = int_or_str(options.batch_size)
         if options.process_timeout < 0:
