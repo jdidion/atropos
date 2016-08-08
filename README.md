@@ -5,7 +5,7 @@
 
 Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is a fork of the venerable Cutadapt read trimmer (https://github.com/marcelm/cutadapt, [DOI:10.14806/ej.17.1.200](http://dx.doi.org/10.14806/ej.17.1.200)), with the primary improvements being:
 
-1. Multi-threading support that has been optimized for different parallel computing environments.
+1. Multi-threading support, including an extremely fast "parallel write" mode.
 2. Options for trimming specific types of data (miRNA, bisulfite).
 3. The ability (currently limited) to merge overlapping reads.
 4. The ability to write the summary report and log messages to separate files.
