@@ -1,7 +1,38 @@
 # Changes
 
-v1.0
-----
+v1.0.7 (dev)
+------------
+
+v1.0.6 (8/8/16)
+---------------
+
+* Based on tests, worker compression is faster than writer compression when more than 8 threads are available, so set this to be the default.
+
+v1.0.5 (8/6/16)
+---------------
+
+* Interanal code reorganization - compression code moved to separate module
+* Eliminated the --worker-compression option in favor of --compression (whose value is either 'worker' or 'writer')
+* More documentation improvements
+
+v1.0.3 (8/5/16)
+---------------
+
+* Significant performance improvements:
+    * Start an extra worker once the main process is finished loading reads
+    * Use system-level gzip for writer compression
+    * Use writer compression by default
+* More documentation fixes
+* Disable quality trimming if all cutoffs are set to 0
+* Eliminated the --parallel-environment option
+
+v1.0.1 (8/4/16)
+---------------
+
+* Fix documentation bugs associated with migration from optparse to argparse
+
+v1.0 (7/29/16)
+--------------
 * Initial release (forked from cutadapt 1.10)
 * Re-wrote much of filters.py and modifiers.py to separate modifying/filtering from file writing.
     * File writing is now managed by a separate class (seqio.Writers)
