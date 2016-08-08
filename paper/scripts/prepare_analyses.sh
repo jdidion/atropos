@@ -112,7 +112,7 @@ do
     "-a $ADAPTER1 -A $ADAPTER2" \
     "-O $MIN_OVERLAP -q $qcut --trim-n" \
     "-m $MIN_LEN --batch-size $BATCH_SIZE " \
-    "--report-file atropos/${profile}_nowriter.report.txt" \
+    "--report-file ${outdir} /${profile}_nowriter.report.txt" \
     "-o ${outdir}/${profile}.1.fq.gz" \
     "-p ${outdir}/${profile}.2.fq.gz" \
     "--log-level ERROR --quiet" \

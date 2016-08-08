@@ -26,10 +26,10 @@ do
     rm -f ./commands_t${threads}.sh
     ./prepare_analyses.sh -t $threads -r $ATROPOS_ROOT -o $ATROPOS_RESULT
     
-    #if [ "$env" == "local" ]
-    #then
-    #    ./commands_t${threads}.sh
-    #else
-    #    swarm --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}.sh
-    #fi
+    if [ "$env" == "local" ]
+    then
+        ./commands_t${threads}.sh >> timing_log.txt
+    else
+        swarm --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}.sh
+    fi
 done
