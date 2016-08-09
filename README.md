@@ -44,10 +44,15 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * [Source code](https://github.com/jdidion/atropos/)
 * [Report an issue](https://github.com/jdidion/atropos/issues)
 
-## Planned enhancments
+## In-progress enhancements
+
+* Implementing the SeqPurge adapter trimming algorithm for paired-end reads (Sturm et al. 2016, DOI: 10.1186/s12859-016-1069-7)
+
+## Planned enhancments and experiments
 
 * Implement an autodetect option for adapters similar to TrimGalore: read the first 1M reads, search for common adapters, and pick the one that appears most frequently.
 * Optional error correction for overlapping pairs (if there are mismatches, change the lower quality base to the higher quality base)
+* Experiment with alignment using one-hot coded bases, rather than characters (as is done in Skewer).
 
 ## Citations
 
