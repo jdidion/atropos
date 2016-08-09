@@ -49,10 +49,11 @@ def test_quality_trimmer():
 def test_Modifiers_single():
 	m = Modifiers(paired=False)
 	m.add_modifier(UnconditionalCutter, lengths=[5])
-	assert len(m.modifiers1) == 1
-	assert list(m.modifiers1.keys())[0] == UnconditionalCutter
-	assert list(m.modifiers1.values())[0].__class__ == UnconditionalCutter
-	assert len(m.modifiers2) == 0
+	mod1 = m.get_modifiers(read=1)
+	mod2 = m.get_modifiers(read=2)
+	assert len(mod1) == 1
+	assert isinstance(mod1[0], UnconditionalCutter)
+	assert len(mod2) == 0
 	# test single-end
 	read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
 	mod_read, mod_bp = m.modify(read)
@@ -70,10 +71,12 @@ def test_Modifiers_paired_legacy():
 def test_Modifiers_paired_both():
 	m = Modifiers(paired="both")
 	m.add_modifier(UnconditionalCutter, read=1|2, lengths=[5])
-	assert len(m.modifiers1) == 1
-	assert len(m.modifiers2) == 1
-	assert list(m.modifiers1.keys())[0] == list(m.modifiers2.keys())[0] == UnconditionalCutter
-	assert list(m.modifiers1.values())[0].__class__ == list(m.modifiers2.values())[0].__class__  == UnconditionalCutter
+	mod1 = m.get_modifiers(read=1)
+	mod2 = m.get_modifiers(read=2)
+	assert len(mod1) == 1
+	assert len(mod2) == 1
+	assert isinstance(mod1[0], UnconditionalCutter)
+	assert isinstance(mod2[0], UnconditionalCutter)
 	read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
 	read2 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
 	(mod_read, mod_read2), mod_bp = m.modify((read, read2))

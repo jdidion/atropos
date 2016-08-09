@@ -6,9 +6,10 @@ need to be stored, and as a class with a __call__ method if there are parameters
 (or statistics).
 """
 import re
-from collections import OrderedDict
 from atropos.qualtrim import quality_trim_index, nextseq_trim_index
 from atropos.align import Aligner, SEMIGLOBAL
+from collections import defaultdict
+import copy
 import logging
 
 class AdapterCutter(object):
@@ -108,6 +109,11 @@ class AdapterCutter(object):
         
         self.with_adapters += 1
         return trimmed_read
+
+class ReadPairModifier(object):
+    """Superclass of modifiers that edit a pair of reads simultaneously."""
+    def __call__(self, read1, read2):
+        raise NotImplemented()
 
 class Trimmer(object):
     def __init__(self):
@@ -461,19 +467,52 @@ class MergeOverlapping(object):
 
 class Modifiers(object):
     def __init__(self, paired, merger=None):
-        self.modifiers1 = OrderedDict()
-        self.modifiers2 = OrderedDict()
+        self.modifiers = []
+        self.modifier_indexes = defaultdict(lambda: [])
         self.paired = paired
         self.merger = merger
     
     def add_modifier(self, mod_class, read=1|2, **kwargs):
-        if read & 1 > 0:
-            self.modifiers1[mod_class] = mod_class(**kwargs)
-        if read & 2 > 0 and self.paired == "both":
-            self.modifiers2[mod_class] = mod_class(**kwargs)
+        if issubclass(mod_class, ReadPairModifier):
+            mods = mod_class(**kwargs)
+        else:
+            mods = [None, None]
+            if read & 1 > 0:
+                mods[0] = mod_class(**kwargs)
+            if read & 2 > 0 and self.paired == "both":
+                mods[1] = mod_class(**kwargs)
+        return self._add_modifiers(mod_class, mods)
     
-    def get_modifier_pair(self, mod_class):
-        return [self.modifiers1.get(mod_class, None), self.modifiers2.get(mod_class, None)]
+    def add_modifier_pair(self, mod_class, read1_args=None, read2_args=None):
+        mods = [None, None]
+        if read1_args is not None:
+            mods[0] = mod_class(**read1_args)
+        if read2_args is not None and self.paired == "both":
+            mods[1] = mod_class(**read2_args)
+        return self._add_modifiers(mod_class, mods)
+    
+    def _add_modifiers(self, mod_class, mods):
+        if all(m is None for m in mods):
+            return None
+        i = len(self.modifiers)
+        self.modifiers.append(mods)
+        self.modifier_indexes[mod_class].append(i)
+        return i
+    
+    def get_modifiers(self, mod_class=None, read=None):
+        if mod_class is None:
+            mods = copy.copy(self.modifiers)
+        else:
+            mods = [self.modifiers[i] for i in self.modifier_indexes[mod_class]]
+        if read is not None:
+            mods = [m[read-1] for m in mods if m[read-1] is not None]
+        return mods
+    
+    def get_trimmer_classes(self):
+        return [
+            klass for klass in self.modifier_indexes.keys()
+            if issubclass(klass, Trimmer)
+        ]
     
     def modify(self, record):
         bp = [0,0]
@@ -481,27 +520,21 @@ class Modifiers(object):
             read1, read2 = record
             bp[0] = len(read1.sequence)
             bp[1] = len(read2.sequence)
-            for mod in self.modifiers1.values():
-                read1 = mod(read1)
-            for mod in self.modifiers2.values():
-                read2 = mod(read2)
+            for mods in self.modifiers:
+                if isinstance(mods, ReadPairModifier):
+                    read1, read2 = mods(read1, read2)
+                else:
+                    if mods[0] is not None:
+                        read1 = mods[0](read1)
+                    if mods[1] is not None:
+                        read2 = mods[1](read2)
             if self.merger:
                 read1, read2 = self.merger.merge(read1, read2)
             reads = [read1, read2]
         else:
             read = record
             bp[0] = len(read.sequence)
-            for mod in self.modifiers1.values():
-                read = mod(read)
+            for mods in self.modifiers:
+                read = mods[0](read)
             reads = [read]
         return (reads, bp)
-    
-    def __getitem__(self, i):
-        if i == 0:
-            return self.modifiers1
-        else:
-            return self.modifiers2
-    
-    def get_trimmer_classes(self):
-        return (set(k for k,v in self.modifiers1.items() if isinstance(v, Trimmer)) |
-                set(k for k,v in self.modifiers2.items() if isinstance(v, Trimmer)))

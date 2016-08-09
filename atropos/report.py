@@ -108,16 +108,16 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
         stats["too_many_n"] = filters[NContentFilter].filtered
     
     stats["with_adapters"] = [0, 0]
-    for i in (0, 1):
-        if AdapterCutter in modifiers[i]:
-            stats["with_adapters"][i] += modifiers[i][AdapterCutter].with_adapters
+    for read in (1, 2):
+        for modifier in modifiers.get_modifiers(AdapterCutter, read):
+            stats["with_adapters"][read-1] += modifier.with_adapters
     
-    for modifier in modifiers[0].values():
+    for modifier in modifiers.get_modifiers(read=1):
         if isinstance(modifier, Trimmer):
             key = "{}_bp".format(type(modifier).__name__)
             stats[key][0] = modifier.trimmed_bases
             
-    for modifier in modifiers[1].values():
+    for modifier in modifiers.get_modifiers(read=2):
         if isinstance(modifier, Trimmer):
             key = "{}_bp".format(type(modifier).__name__)
             stats[key][1] = modifier.trimmed_bases
@@ -130,10 +130,17 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
 
 def summarize_adapters(mods):
     summary = [{}, {}]
-    if mods[0] is not None:
-        summary[0] = collect_adapter_statistics(mods[0].adapters)
-    if mods[1] is not None:
-        summary[1] = collect_adapter_statistics(mods[1].adapters)
+    for a1, a2 in mods:
+        if a1 is not None:
+            if len(summary[0]) == 0:
+                summary[0] = collect_adapter_statistics(a1.adapters)
+            else:
+                raise Exception("Did not expect multiple read1 adapter modfiers")
+        if a2 is not None:
+            if len(summary[1]) == 0:
+                summary[1] = collect_adapter_statistics(a2.adapters)
+            else:
+                raise Exception("Did not expect multiple read2 adapter modfiers")
     return summary
 
 def collect_adapter_statistics(adapters):

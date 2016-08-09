@@ -91,7 +91,7 @@ def main(cmdlineargs=None, default_outfile="-"):
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[paired])
-    if paired == 'first' and (len(modifiers.modifiers2) > 0 or options.quality_cutoff):
+    if paired == 'first' and (len(modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
         import textwrap
         logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
             'modifications are applied only to the first '
@@ -942,8 +942,10 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
     modifiers = Modifiers(paired, merger)
     
     if options.cut or options.cut2:
-        modifiers.add_modifier(UnconditionalCutter, read=1, lengths=options.cut)
-        modifiers.add_modifier(UnconditionalCutter, read=2, lengths=options.cut2)
+        modifiers.add_modifier_pair(UnconditionalCutter,
+            dict(lengths=options.cut),
+            dict(lengths=options.cut2),
+        )
     
     if options.nextseq_trim is not None:
         modifiers.add_modifier(NextseqQualityTrimmer, read=1,
@@ -954,8 +956,10 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
                                cutoff_back=options.quality_cutoff[1], base=options.quality_base)
     
     if adapters1 or adapters2:
-        modifiers.add_modifier(AdapterCutter, read=1, adapters=adapters1, times=options.times, action=options.action)
-        modifiers.add_modifier(AdapterCutter, read=2, adapters=adapters2, times=options.times, action=options.action)
+        modifiers.add_modifier_pair(AdapterCutter,
+            dict(adapters=adapters1, times=options.times, action=options.action),
+            dict(adapters=adapters2, times=options.times, action=options.action),
+        )
     
     if options.bisulfite:
         if isinstance(options.bisulfite, str):
@@ -978,8 +982,10 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
         modifiers.add_modifier(NEndTrimmer)
     
     if options.cut_min or options.cut_min2:
-        modifiers.add_modifier(MinCutter, read=1, lengths=options.cut_min)
-        modifiers.add_modifier(MinCutter, read=2, lengths=options.cut_min2)
+        modifiers.add_modifier_pair(MinCutter,
+            dict(lengths=options.cut_min),
+            dict(lengths=options.cut_min2)
+        )
     
     if options.length_tag:
         modifiers.add_modifier(LengthTagModifier, length_tag=options.length_tag)
@@ -1075,7 +1081,7 @@ def run_serial(reader, modifiers, filters, formatters, writers):
         
         return (0, Summary(
             collect_process_statistics(n, total_bp1, total_bp2, modifiers, filters, formatters),
-            summarize_adapters(modifiers.get_modifier_pair(AdapterCutter)),
+            summarize_adapters(modifiers.get_modifiers(AdapterCutter)),
             modifiers.get_trimmer_classes()
         ).finish())
     
