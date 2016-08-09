@@ -47,6 +47,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 ## Planned enhancments
 
 * Implement an autodetect option for adapters similar to TrimGalore: read the first 1M reads, search for common adapters, and pick the one that appears most frequently.
+* Optional error correction for overlapping pairs (if there are mismatches, change the lower quality base to the higher quality base)
 
 ## Citations
 

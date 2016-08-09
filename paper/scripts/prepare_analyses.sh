@@ -13,6 +13,8 @@
 # ftp://ftp.sra.ebi.ac.uk/vol1/ERA494/ERA494451/).
 #
 # Call: run_analyses.sh -t <threads> -r <root dir> -o <output dir>
+#
+# TODO: Add SeqPrep and Scythe to the benchmarks
 
 # A POSIX variable; reset in case getopts has been used
 # previously in the shell.
