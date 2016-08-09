@@ -7,7 +7,7 @@ need to be stored, and as a class with a __call__ method if there are parameters
 """
 import re
 from atropos.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.align import Aligner, SEMIGLOBAL
+from atropos.align import Aligner, SEMIGLOBAL #, SeqPurgeAligner
 from collections import defaultdict
 import copy
 import logging
@@ -127,7 +127,6 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
     
     def __call__(self, read1, read2):
         pass
-        
 
 class Trimmer(object):
     def __init__(self):

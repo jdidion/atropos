@@ -20,14 +20,12 @@ if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
 
-
 # set __version__
 with open(os.path.join(os.path.dirname(__file__), 'atropos', '__init__.py')) as f:
     for line in f:
         if line.startswith('__version__'):
             exec(line)
             break
-
 
 def out_of_date(extensions):
     """
@@ -52,7 +50,6 @@ def out_of_date(extensions):
                 return True
     return False
 
-
 def no_cythonize(extensions, **_ignore):
     """
     Change file extensions from .pyx to .c or .cpp.
@@ -72,7 +69,6 @@ def no_cythonize(extensions, **_ignore):
             sources.append(sfile)
         extension.sources[:] = sources
 
-
 def check_cython_version():
     """Exit if Cython was not found or is too old"""
     try:
@@ -88,13 +84,12 @@ def check_cython_version():
             "', but at least version " + str(MIN_CYTHON_VERSION) + " is required.\n")
         sys.exit(1)
 
-
 extensions = [
     Extension('atropos._align', sources=['atropos/_align.pyx']),
+    Extension('atropos._align_pe', sources=['atropos/_align_pe.pyx']),
     Extension('atropos._qualtrim', sources=['atropos/_qualtrim.pyx']),
     Extension('atropos._seqio', sources=['atropos/_seqio.pyx']),
 ]
-
 
 class build_ext(_build_ext):
     def run(self):
@@ -110,7 +105,6 @@ class build_ext(_build_ext):
             from Cython.Build import cythonize
             self.extensions = cythonize(self.extensions)
         _build_ext.run(self)
-
 
 class sdist(_sdist):
     def run(self):
@@ -132,8 +126,10 @@ setup(
     ext_modules = extensions,
     packages = ['atropos', 'atropos.scripts'],
     scripts = ['bin/atropos'],
+    tests_require = ['mpmath'],
     extras_require = {
-        'progressbar' : ['progressbar2']
+        'progressbar' : ['progressbar2'],
+        'tqdm' : ['tqdm']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",
