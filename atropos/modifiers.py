@@ -115,6 +115,20 @@ class ReadPairModifier(object):
     def __call__(self, read1, read2):
         raise NotImplemented()
 
+class SeqPurgeAdapterCutter(ReadPairModifier):
+    """
+    Implementation of the SeqPurge [1] algorithm for adapter trimming.
+    Reads are aligned and the overlap is used to determine the potential
+    starting points of the adapters.
+    1. Sturm et al. 2016, DOI: 10.1186/s12859-016-1069-7
+    """
+    def __init__(self, adapters1=[], adapters2=[], times=1, action='trim', keep_match_info=False):
+        pass
+    
+    def __call__(self, read1, read2):
+        pass
+        
+
 class Trimmer(object):
     def __init__(self):
         self.trimmed_bases = 0
