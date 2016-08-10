@@ -1,4 +1,21 @@
 # cython: profile=False, emit_code_comments=False
+
+# Alternative semi-global alignment (
+# http://www.bioinf.uni-freiburg.de/Lehre/Courses/2013_SS/V_Bioinformatik_1/lecture4.pdf)
+# strategies designed to improve insert matching of paired-end reads.
+#
+# 1. SeqPrep algorithm: insert match algorithm that performs thresholded exhaustive
+#    comparison to minimize probability of incorrect alignment. Relies on the fact that
+#    overlapping reads share alleles and indels (i.e. no gaps are required) (in C++).
+#    https://github.com/imgag/ngs-bits/tree/master/src/SeqPurge.
+# 2. Skewer algorithm: bit-masked k-difference matching (in C++).
+#    https://github.com/relipmoc/skewer
+# 3. Quality-aware overlap alignment (in Haskell).
+#    https://hackage.haskell.org/package/bio-0.5.3/docs/Bio-Alignment-QAlign.html
+# 4. FOGSAA, modified for semi-global alignment.
+#    http://www.nature.com/articles/srep01746
+#    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
+
 from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
 
 from cpython.array cimport array, clone

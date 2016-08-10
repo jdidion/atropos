@@ -1,4 +1,9 @@
 # cython: profile=False, emit_code_comments=False
+
+# TODO: Flouri et al. report errors in Gotoh's original paper that persist
+# in most implementations of NW alignment (http://biorxiv.org/content/biorxiv/early/2015/11/12/031500.full.pdf).
+# They provide a correct implementation (qalign: http://www.exelixis-lab.org/web/software/alignment/).
+
 from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
 
 DEF START_WITHIN_SEQ1 = 1
