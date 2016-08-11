@@ -1,7 +1,8 @@
 # coding: utf-8
 from __future__ import print_function, division, absolute_import
 
-from atropos.align import (locate, compare_prefixes, compare_suffixes, Aligner)
+from atropos.align import (locate, compare_prefixes, compare_suffixes, Aligner,
+    FactorialCache, OneHotEncoded, match_probability)
 from atropos.adapters import BACK
 
 
@@ -121,8 +122,7 @@ def test_no_match():
     a = locate('CTGATCTGGCCG', 'AAAAGGG', 0.1, BACK)
     assert a is None, a
 
-from atropos._align_pe import *
-import mpmath
+import math
 from .utils import approx_equal
 
 def test_factorial_cache():
@@ -131,19 +131,29 @@ def test_factorial_cache():
     assert f.factorial(0) == 1
     assert f.factorial(1) == 1
     assert f.factorial(3) == 6
-    # test big number that should match mpmath exactly
-    assert int(f.factorial(27)) == int(mpmath.factorial(27))
-    # test big number that should work but that is too big for mpmath
-    assert int(f.factorial(150)) > 0
-    # test big number that should overflow
-    assert int(f.factorial(200)) == -1
-    assert not f.can_compute(200)
+    assert int(f.factorial(27)) == int(math.factorial(27))
+    # test big number
+    assert int(f.factorial(150)) == int(math.factorial(150))
 
 def test_match_probability():
     f = FactorialCache()
     k = 3
     n = 5
-    i3 = (120 / (6 * 2)) * (0.25**3) * (0.75**2)
-    i4 = (120 / 24) * (0.25**4) * 0.75
-    i5 = 0.25**5
-    assert approx_equal(match_probability(k, n-k, f), i3 + i4 + i5, 0.0001)
+    i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
+    i4 = (120 / 24) * (0.25 ** 4) * 0.75
+    i5 = 0.25 ** 5
+    assert approx_equal(match_probability(k, n, f), i3 + i4 + i5, 0.0001)
+
+def test_one_hot_encoding():
+    ohe1 = OneHotEncoded('ATCGNACGA')
+    assert repr(ohe1) == 'ATCGNACGA'
+    ohe1.reverse_complement()
+    assert repr(ohe1) == 'TCGTNCGAT'
+    ohe1 = OneHotEncoded('ATCGNACGA')
+    ohe2 = OneHotEncoded('ACCGNGCTC')
+    assert ohe1.compare(ohe2, ambig_match=True) == (5, 9)
+    assert ohe1.compare(ohe2, ambig_match=False) == (4, 9)
+    assert ohe1.compare(ohe2, ambig_match=None) == (4, 8)
+
+def test_seqpurge_align():
+    pass

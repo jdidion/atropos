@@ -129,7 +129,8 @@ setup(
     tests_require = ['mpmath'],
     extras_require = {
         'progressbar' : ['progressbar2'],
-        'tqdm' : ['tqdm']
+        'tqdm' : ['tqdm'],
+        'bitarray' : ['bitarray']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

@@ -21,6 +21,10 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
 from cpython.array cimport array, clone
 cdef array ld_array = array('d', [])
 
+# Faster versions of min and max.
+cdef inline int int_max(int a, int b): return a if a >= b else b
+cdef inline int int_min(int a, int b): return a if a <= b else b
+
 cdef class FactorialCache:
     cdef array factorials
     cdef int cur_array_size
