@@ -118,6 +118,28 @@ way:
    to a separate output file.
 3. If the read has passed all the filters, it is written to the output file.
 
+Read modifications are applied in a specific order (below), and steps not requested
+on the command-line are skipped.
+
+1. :ref:`NextSeq polyG trimming <nextseq>` with ``--nextseq-trim`` (G).
+2. :ref:`Adapter removal <removing-adapters>` with ``-a``/``-A``, ``-b``/``-B``, and ``-g``/``-G`` (A).
+3. :ref:`Removing a fixed number of bases <cut-bases>` with ``-c`` (C).
+4. :ref:`Quality trimming <quality-trimming>` with ``-q``/``-Q`` (Q).
+5. :ref:`Bisulfite sequencing-specific trimming <bisulfite>` with ``--bisulfite``.
+6. :ref:`N trimming <dealing-with-ns>` with ``--trim-n``.
+7. :ref:`Ensuring at least a fixed number of bases have been trimmed <cut-bases>` with ``-i``/``-I``.
+8. :ref:`Length tag modification <mod-read-names>` with ``--length-tag``.
+9. :ref:`Read name suffix removal <mod-read-names>` with ``--strip-suffix``.
+10. :ref:`Addition of prefix and suffix to read name <mod-read-names>` with ``-x``/``--prefix`` and ``-y``/``--suffix``.
+11. Double-encode the sequence (only colorspace).
+12. Replace negative quality values with zero (zero capping, only colorspace).
+13. Trim primer base (only colorspace).
+
+The user can have some control over the order in which operations are applied. The
+``--op-order`` option takes a string of characters (in parentheses above) that controls the
+order in which the first four operations are applied. By default, ``--op-order GACQ``; however,
+for users switching to Atropos from Cutadapt, it is important to note that this default order
+is NOT the same as it was in Cutadapt. For backward compatibility to Cutadapt, use ``--op-order CGQA``.
 
 .. _removing-adapters:
 
@@ -521,6 +543,18 @@ To remove the last seven bases of each read::
 The ``-u``/``--cut`` option can be combined with the other options, but
 the desired bases are removed *before* any adapter trimming.
 
+The ``--cut-min`` option (``-i``) works identically to the ``--cut``
+option, except that bases are removed after all other modifications have
+been applied, and only if the required number of bases have not already
+been removed. For example, if the following sequence is in reads.fastq::
+
+    ACGTACGTACGTADAP
+
+The following command will first trim the ``ADAP`` part of the adapter
+off the end. Then, since only 4 bases were trimmed, the ``-i 5`` option
+will cause a 5th base to be removed.
+
+    atropos -A ADAPTER -i 5 -o trimmed.fastq reads.fastq
 
 .. _quality-trimming:
 
@@ -579,6 +613,7 @@ but shown here for completeness. The position of the minimum (-25) is used as
 the trimming position. Therefore, the read is trimmed to the first four bases,
 which have quality values 42, 40, 26, 27.
 
+.. _mod-read-names:
 
 Modifying read names
 --------------------
@@ -612,26 +647,16 @@ After trimming, the read would perhaps look like this::
     >read1 length=10
     ACGTACGTAC
 
+.. _nextseq:
 
-Read modification order
------------------------
+NextSeq-specific trimming
+-------------------------
 
-The read modifications described above are applied in the following order to
-each read. Steps not requested on the command-line are skipped.
-
-1. Unconditional base removal with ``--cut``
-2. Quality trimming (``-q``)
-3. Adapter trimming (``-a``, ``-b``, ``-g`` and uppercase versions)
-4. N-end trimming (``--trim-n``)
-5. Length tag modification (``--length-tag``)
-6. Read name suffixe removal (``--strip-suffix``)
-7. Addition of prefix and suffix to read name (``-x``/``--prefix`` and ``-y``/``--suffix``)
-8. Double-encode the sequence (only colorspace)
-9. Replace negative quality values with zero (zero capping, only colorspace)
-10. Trim primer base (only colorspace)
-
-The last three steps are colorspace-specific.
-
+Some data from the new Illumina NextSeq platform generates base calls that have
+high quality scores but are incorrect due to the use of only two fluorescent tags
+(rather than the 4 used in the MiSeq and HiSeq sequencers). These base calls
+appear as a polyG string at the end of the read. The ``--nextseq-trim`` option will
+remove these bases.
 
 .. _filtering:
 
