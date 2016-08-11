@@ -141,6 +141,11 @@ def get_argument_parser():
     parser.add_argument("--progress", default=None,
         help="Show progress. bar = show progress bar; msg = show a status "
              "message. (no)")
+    parser.add_argument("--op-order", default="GACQ",
+        help="The order in which trimming operations are be applied. This is a string of "
+             "1-4 of the following characters: A = adapter trimming; C = cutting (unconditional); "
+             "G = NextSeq trimming; Q = quality trimming. The default is 'GACQ' -- *NOTE* this is "
+             "different than the order used in Cutadapt, which was 'CGQA'.")
     
     group = parser.add_argument_group("Finding adapters:",
         description="Parameters -a, -g, -b specify adapters to be removed from "
@@ -202,6 +207,7 @@ def get_argument_parser():
              "it specifies the minimum length as the fraction of the length of the *shorter* read "
              "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
              "with an absolute minimum of 2 bp). (0.9)")
+    # TODO: error correction:
     #group.add_argument("--merge-mismatches", choices=("best", "N", "random"), default="best",
     #	help="How to handle mismatches while merging; best: select the base with the best quality; "
     #		 "N: set the base to N; random: select one of the two bases at random. Note that if "
@@ -501,6 +507,10 @@ def validate_options(options, parser):
     if options.format is not None and options.format.lower() not in ['fasta', 'fastq', 'sra-fastq']:
         parser.error("The input file format must be either 'fasta', 'fastq' or "
             "'sra-fastq' (not '{0}').".format(options.format))
+    
+    options.op_order = list(options.op_order)
+    if not (1 <= len(options.op_order) <= 4 and all(o in ('A','C','G','Q') for o in options.op_order)):
+        parser.error("--op-order must be a string of 1-4 characters consisting of A,C,G,Q")
     
     if options.mirna and options.bisulfite is not None:
         parser.error("Can only specify one of --mirna, --bisulfite")
@@ -941,25 +951,23 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
     
     modifiers = Modifiers(paired, merger)
     
-    if options.cut or options.cut2:
-        modifiers.add_modifier_pair(UnconditionalCutter,
-            dict(lengths=options.cut),
-            dict(lengths=options.cut2),
-        )
-    
-    if options.nextseq_trim is not None:
-        modifiers.add_modifier(NextseqQualityTrimmer, read=1,
-                               cutoff=options.nextseq_trim, base=options.quality_base)
-    
-    if options.quality_cutoff:
-        modifiers.add_modifier(QualityTrimmer, cutoff_front=options.quality_cutoff[0],
-                               cutoff_back=options.quality_cutoff[1], base=options.quality_base)
-    
-    if adapters1 or adapters2:
-        modifiers.add_modifier_pair(AdapterCutter,
-            dict(adapters=adapters1, times=options.times, action=options.action),
-            dict(adapters=adapters2, times=options.times, action=options.action),
-        )
+    for op in options.op_order:
+        if op == 'A' and (adapters1 or adapters2):
+            modifiers.add_modifier_pair(AdapterCutter,
+                dict(adapters=adapters1, times=options.times, action=options.action),
+                dict(adapters=adapters2, times=options.times, action=options.action),
+            )
+        elif op == 'C' and (options.cut or options.cut2):
+            modifiers.add_modifier_pair(UnconditionalCutter,
+                dict(lengths=options.cut),
+                dict(lengths=options.cut2),
+            )
+        elif op == 'G' and (options.nextseq_trim is not None):
+            modifiers.add_modifier(NextseqQualityTrimmer, read=1,
+                                   cutoff=options.nextseq_trim, base=options.quality_base)
+        elif op == 'Q' and options.quality_cutoff:
+            modifiers.add_modifier(QualityTrimmer, cutoff_front=options.quality_cutoff[0],
+                                   cutoff_back=options.quality_cutoff[1], base=options.quality_base)
     
     if options.bisulfite:
         if isinstance(options.bisulfite, str):
