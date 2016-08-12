@@ -2,7 +2,7 @@
 from __future__ import print_function, division, absolute_import
 
 from atropos.align import (locate, compare_prefixes, compare_suffixes, Aligner,
-    FactorialCache, OneHotEncoded, match_probability)
+    SeqPurgeAligner, FactorialCache, OneHotEncoded)
 from atropos.adapters import BACK
 
 
@@ -136,13 +136,13 @@ def test_factorial_cache():
     assert int(f.factorial(150)) == int(math.factorial(150))
 
 def test_match_probability():
-    f = FactorialCache()
+    a = SeqPurgeAligner('TTAGACATAT', 'CAGTGGAGTA')
     k = 3
     n = 5
     i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
     i4 = (120 / 24) * (0.25 ** 4) * 0.75
     i5 = 0.25 ** 5
-    assert approx_equal(match_probability(k, n, f), i3 + i4 + i5, 0.0001)
+    assert approx_equal(a.match_probability(k, n), i3 + i4 + i5, 0.0001)
 
 def test_one_hot_encoding():
     ohe1 = OneHotEncoded('ATCGNACGA')
@@ -155,5 +155,22 @@ def test_one_hot_encoding():
     assert ohe1.compare(ohe2, ambig_match=False) == (4, 9)
     assert ohe1.compare(ohe2, ambig_match=None) == (4, 8)
 
+def test_one_hot_encoding_compare_offset():
+    ohe1 = OneHotEncoded('TTTCCCGGACGA')
+    ohe2 = OneHotEncoded('AACGTTTCCC')
+    print(ohe1.compare(ohe2, offset=4))
+    assert ohe1.compare(ohe2, offset=4) == (6,6)
+
+def test_one_hot_encoding_compare_overlap():
+    ohe1 = OneHotEncoded('TACTCCACTGAGTCGAGCCCATTGCAGACT')
+    ohe2 = OneHotEncoded('GGTACTCCACTG')
+    assert ohe1.compare(ohe2, overlap=10) == (10,10)
+
 def test_seqpurge_align():
-    pass
+    a1 = 'TTAGACATATGG'
+    a2 = 'CAGTGGAGTATA'
+    aligner = SeqPurgeAligner(a1, a2)
+    r1 = 'AGTCGAGCCCATTGCAGACT' + a1[0:10]
+    r2 = 'AGTCTGCAATGGGCTCGACT' + a2[0:10]
+    assert aligner.match(r1, r2) == 20
+    

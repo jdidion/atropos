@@ -21,7 +21,6 @@ STOP_WITHIN_SEQ2 = 8
 # (all gaps in the beginning or end are free)
 SEMIGLOBAL = START_WITHIN_SEQ1 | START_WITHIN_SEQ2 | STOP_WITHIN_SEQ1 | STOP_WITHIN_SEQ2
 
-
 def compare_suffixes(s1, s2, wildcard_ref=False, wildcard_query=False):
     """
     Find out whether one string is the suffix of the other one, allowing
@@ -89,17 +88,24 @@ BASE_ENCODING = dict(
 )
 
 class OneHotEncoded:
-    def __init__(self, seq=None, bits=None, ambig=None):
+    def __init__(self, seq=None, bits=None, ambig=None, reverse_complement=False):
         if seq is not None:
             seq = seq.upper()
             self.size = len(seq)
             self.bits = bitarray()
             self.bits.encode(BASE_ENCODING, seq)
-            self.ambig = bitarray(''.join('1' if b == 'N' else '0' for b in seq))
+            ambig = ('1' if b == 'N' else '0' for b in seq)
+            if reverse_complement:
+                self.bits.reverse()
+                self.ambig = bitarray(''.join(reversed(tuple(ambig))))
+            else:
+                self.ambig = bitarray(''.join(ambig))
         else:
             self.size = len(bits) // 4
             self.bits = bits
             self.ambig = ambig
+            if reverse_complement:
+                self.reverse_complement()
     
     def __len__(self):
         return self.size
@@ -133,22 +139,24 @@ class OneHotEncoded:
         """
         l1 = len(self)
         l2 = len(other)
-        size = min(l1, l2)
         if offset is None and overlap is None and (l1 == l2):
             eq = self.bits & other.bits
             ambig1 = self.ambig
             ambig2 = other.ambig
             size = l1
         else:
-            start = 0
+            max_size = min(l1, l2)
             if offset:
-                assert offset < size
+                assert offset < max_size
                 start = offset
-                size = size - offset
+                size = max_size - offset
             elif overlap:
-                assert overlap < size
-                start = size - overlap
+                assert overlap <= max_size
                 size = overlap
+                start = l2 - overlap
+            else:
+                start = 0
+                size = max_size
             bits1, ambig1 = self._subseq(0, size)
             bits2, ambig2 = other._subseq(start, start + size)
             eq = bits1 & bits2
@@ -167,7 +175,7 @@ class OneHotEncoded:
     
     def _subseq(self, start, stop):
         return (
-            self.bits[(start*4):((stop*4) + 1)],
+            self.bits[(start*4):(stop*4)],
             self.ambig[start:stop]
         )
     
@@ -190,23 +198,6 @@ class OneHotEncoded:
     def __str__(self):
         return "ACGT\n----\n" + "\n".join("{} : {}".format(*t) for t in self.translate())
 
-def match_probability(matches, size, factorial_cache):
-    nfac = factorial_cache.factorial(size)
-    p = 0.0
-    i = matches
-    
-    while i <= size:
-        p += (
-            (0.75 ** (size - i)) *
-            (0.25 ** i) *
-            nfac /
-            factorial_cache.factorial(i) /
-            factorial_cache.factorial(size - i)
-        )
-        i += 1
-
-    return p
-
 class SeqPurgeAligner(object):
     """
     Implementation of the SeqPurge insert matching algorithm.
@@ -217,10 +208,10 @@ class SeqPurgeAligner(object):
                  min_adapter_overlap=1, min_adapter_match_frac=0.8,
                  adapter_check_cutoff=9):
         self.fw = OneHotEncoded(fw_adapter)
-        self.rv = OneHotEncoded(rv_adapter)
-        self.rv.reverse_complement()
-        self.min_insert_match_frac = min_insert_match_frac
+        self.rv = OneHotEncoded(rv_adapter, reverse_complement=True)
         self.max_error_prob = max_error_prob
+        self.min_insert_overlap = min_insert_overlap
+        self.min_insert_match_frac = min_insert_match_frac
         self.min_adapter_overlap = min_adapter_overlap
         self.min_adapter_match_frac = min_adapter_match_frac
         self.adapter_check_cutoff = adapter_check_cutoff
@@ -236,8 +227,7 @@ class SeqPurgeAligner(object):
             seq2 = seq1[:l1]
         
         seq1 = OneHotEncoded(seq1)
-        seq2 = OneHotEncoded(seq2)
-        seq2.reverse_complement()
+        seq2 = OneHotEncoded(seq2, reverse_complement=True)
         
         best_offset = None
         best_p = 1.0
@@ -246,24 +236,24 @@ class SeqPurgeAligner(object):
             # Count number of matches between the two sequences.
             # size = total number of bases compared (excluding Ns)
             matches, size = seq1.compare(seq2, offset)
-
+            
             # Check that at least 1 base was compared and that there are fewer
             # than the maximium number of allowed mismatches
-            if size < min_insert_overlap or matches >= round(float(seq_len - offset) * self.min_insert_match_frac):
+            if size < self.min_insert_overlap or matches < round(float(seq_len - offset) * self.min_insert_match_frac):
                 continue
-
+            
             # Compute probability of seeing this number of matches at random and
             # make sure it's less than the maximum allowed
-            p = match_probability(matches, size)
+            p = self.match_probability(matches, size)
             if p > self.max_error_prob:
                 continue
             
             # Match the overhang against the adapter sequence
             if offset > self.adapter_check_cutoff:
-                a1_match = seq1.compare(self.fw, overlap=offset)
-                a1_prob = match_probability(*a1_match)
-                a2_match = self.rv.compare(seq2, overlap=offset)
-                a2_prob = match_probability(*a2_match)
+                a1_match = self.fw.compare(seq1, overlap=offset)
+                a1_prob = self.match_probability(*a1_match)
+                a2_match = seq2.compare(self.rv, overlap=offset)
+                a2_prob = self.match_probability(*a2_match)
                 if (a1_prob * a2_prob) > self.max_error_prob:
                     continue
             else:
@@ -283,4 +273,21 @@ class SeqPurgeAligner(object):
             return None
         
         # Otherwise, return the adapter start position in each read
-        return seq_len - offset
+        return seq_len - best_offset
+
+    def match_probability(self, matches, size):
+        nfac = self.factorial_cache.factorial(size)
+        p = 0.0
+        i = matches
+        
+        while i <= size:
+            p += (
+                (0.75 ** (size - i)) *
+                (0.25 ** i) *
+                nfac /
+                self.factorial_cache.factorial(i) /
+                self.factorial_cache.factorial(size - i)
+            )
+            i += 1
+
+        return p
