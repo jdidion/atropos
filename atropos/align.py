@@ -61,16 +61,13 @@ class FactorialCache(object):
         
     def factorial(self, n):
         if n > self.max_n:
-            if n >= self.cur_array_size:
-                self._extend(n)
             self._fill_upto(n)
         return self.factorials[n]
         
-    def _extend(self, n):
-        extension_size = n - self.cur_array_size + 1
-        self.factorials += [1] * extension_size
-    
     def _fill_upto(self, n):
+        if n >= self.cur_array_size:
+            extension_size = n - self.cur_array_size + 1
+            self.factorials += [1] * extension_size
         i = self.max_n
         next_i = i + 1
         while i < n:
@@ -106,6 +103,7 @@ class OneHotEncoded:
         return self.size
     
     def __getitem__(self, key):
+        """Returns a new OneHotEncoded with the specified subsequence."""
         bits, ambig = self._subseq(key.start, key.stop)
         new_ohe = OneHotEncoded()
         new_ohe.size = len(bits) // 4
@@ -116,6 +114,7 @@ class OneHotEncoded:
     def compare(self, other, offset=None, overlap=None, ambig_match=None):
         """
         Returns the number of matching bases between this sequence and `other`.
+        Currently, this can handle Ns but not other IUPAC ambiguous characters.
         
         offset: the number of bases to move self forward from the left
                 relative to other before comparing.
@@ -199,9 +198,14 @@ class OneHotEncoded:
             for i in range(len(self)))
     
     def __repr__(self):
+        """Returns the original DNA base string."""
         return "".join(self.to_acgt())
     
     def __str__(self):
+        """
+        Returns a string representation of the one-hot encoding in matrix form,
+        along with the equivalent base character for each row.
+        """
         return "ACGT\n----\n" + "\n".join("{} : {}".format(*t) for t in self.translate())
 
 class SeqPurgeAligner(object):
@@ -237,22 +241,26 @@ class SeqPurgeAligner(object):
         
         best_offset = None
         best_p = 1.0
+        insert_match = False
         
-        for offset in range(seq_len):
+        for offset in range(self.min_insert_overlap, seq_len):
             # Count number of matches between the two sequences.
             # size = total number of bases compared (excluding Ns)
             matches, size = seq1.compare(seq2, offset)
             
-            # Check that at least 1 base was compared and that there are fewer
-            # than the maximium number of allowed mismatches
+            # Check that at least min_insert_overlap base were compared and that
+            # there are fewer than the maximium number of allowed mismatches
             if size < self.min_insert_overlap or matches < round(float(seq_len - offset) * self.min_insert_match_frac):
                 continue
             
             # Compute probability of seeing this number of matches at random and
-            # make sure it's less than the maximum allowed
+            # check that it's less than the maximum allowed
             p = self.match_probability(matches, size)
             if p > self.max_error_prob:
                 continue
+            
+            # Otherwise, we've found an acceptable insert match
+            insert_match = True
             
             # Match the overhang against the adapter sequence
             if offset > self.adapter_check_cutoff:
@@ -274,13 +282,17 @@ class SeqPurgeAligner(object):
                 best_p = p
                 best_offset = offset
         
-        # If we didn't find a match, or if the best match is too short, return None
-        if best_offset is None or best_offset < self.min_adapter_overlap:
-            return None
-        
-        # Otherwise, return the adapter start position in each read
-        return seq_len - best_offset
-
+        return (
+            # the best offset, or None if no match was found
+            best_offset,
+            # the adapter start position
+            seq_len - (best_offset or 0),
+            # whether there was an insert match even if no adapter match was found
+            insert_match,
+            # whether the best adapter match length passed the threshold
+            best_offset >= self.min_adapter_overlap if best_offset else False
+        )
+    
     def match_probability(self, matches, size):
         nfac = self.factorial_cache.factorial(size)
         p = 0.0

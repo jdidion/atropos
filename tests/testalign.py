@@ -172,5 +172,9 @@ def test_seqpurge_align():
     aligner = SeqPurgeAligner(a1, a2)
     r1 = 'AGTCGAGCCCATTGCAGACT' + a1[0:10]
     r2 = 'AGTCTGCAATGGGCTCGACT' + a2[0:10]
-    assert aligner.match(r1, r2) == 20
+    match = aligner.match(r1, r2)
+    assert match[0] == 10
+    assert match[1] == 20
+    assert match[2] is True
+    assert match[3] is True
     
