@@ -141,11 +141,12 @@ def get_argument_parser():
     parser.add_argument("--progress", default=None,
         help="Show progress. bar = show progress bar; msg = show a status "
              "message. (no)")
-    parser.add_argument("--op-order", default="GACQ",
+    parser.add_argument("--op-order", default="CGQA",
         help="The order in which trimming operations are be applied. This is a string of "
-             "1-4 of the following characters: A = adapter trimming; C = cutting (unconditional); "
-             "G = NextSeq trimming; Q = quality trimming. The default is 'GACQ' -- *NOTE* this is "
-             "different than the order used in Cutadapt, which was 'CGQA'.")
+             "1-4 of the following characters: A = adapter trimming; C = cutting "
+             "(unconditional); G = NextSeq trimming; Q = quality trimming. The default is "
+             "'CGQA' to maintain compatibility with Cutadapt; however, this is likely to "
+             "change to 'GACQ' in the near future.")
     
     group = parser.add_argument_group("Finding adapters:",
         description="Parameters -a, -g, -b specify adapters to be removed from "
@@ -174,6 +175,10 @@ def get_argument_parser():
             "as with -a. This option is mostly for rescuing failed library "
             "preparations - do not use if you know which end your adapter was "
             "ligated to! (none)")
+    group.add_argument("--aligner", choices=('cutadapt'), default='cutadapt',
+        help="Which alignment algorithm to use for identifying adapters. Currently, "
+             "only the original Cutadapt algorithm is available. However, new algorithms "
+             "are being implemented and the default is likely to change.")
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate (no. of errors divided by the length "
             "of the matching region). (0.1)")

@@ -121,10 +121,10 @@ way:
 Read modifications are applied in a specific order (below), and steps not requested
 on the command-line are skipped.
 
-1. :ref:`NextSeq polyG trimming <nextseq>` with ``--nextseq-trim`` (G).
-2. :ref:`Adapter removal <removing-adapters>` with ``-a``/``-A``, ``-b``/``-B``, and ``-g``/``-G`` (A).
-3. :ref:`Removing a fixed number of bases <cut-bases>` with ``-c`` (C).
-4. :ref:`Quality trimming <quality-trimming>` with ``-q``/``-Q`` (Q).
+1. :ref:`Removing a fixed number of bases <cut-bases>` with ``-c`` (C).
+2. :ref:`NextSeq polyG trimming <nextseq>` with ``--nextseq-trim`` (G).
+3. :ref:`Quality trimming <quality-trimming>` with ``-q``/``-Q`` (Q).
+4. :ref:`Adapter removal <removing-adapters>` with ``-a``/``-A``, ``-b``/``-B``, and ``-g``/``-G`` (A).
 5. :ref:`Bisulfite sequencing-specific trimming <bisulfite>` with ``--bisulfite``.
 6. :ref:`N trimming <dealing-with-ns>` with ``--trim-n``.
 7. :ref:`Ensuring at least a fixed number of bases have been trimmed <cut-bases>` with ``-i``/``-I``.
@@ -137,9 +137,8 @@ on the command-line are skipped.
 
 The user can have some control over the order in which operations are applied. The
 ``--op-order`` option takes a string of characters (in parentheses above) that controls the
-order in which the first four operations are applied. By default, ``--op-order GACQ``; however,
-for users switching to Atropos from Cutadapt, it is important to note that this default order
-is NOT the same as it was in Cutadapt. For backward compatibility to Cutadapt, use ``--op-order CGQA``.
+order in which the first four operations are applied. By default, ``--op-order CGQA`` to maintain
+compatibility with Cutadapt; however, this is likely to change to 'GACQ' in the near future.
 
 .. _removing-adapters:
 
