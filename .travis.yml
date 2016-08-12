@@ -11,6 +11,7 @@ python:
 install:
   - pip install --upgrade pip wheel
   - pip install Cython
+  - pip install bitarray
   - pip install .
 
 script:

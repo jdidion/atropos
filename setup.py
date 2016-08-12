@@ -126,7 +126,7 @@ setup(
     ext_modules = extensions,
     packages = ['atropos', 'atropos.scripts'],
     scripts = ['bin/atropos'],
-    tests_require = ['mpmath'],
+    tests_require = ['bitarray'],
     extras_require = {
         'progressbar' : ['progressbar2'],
         'tqdm' : ['tqdm'],
