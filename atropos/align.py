@@ -88,7 +88,8 @@ BASE_ENCODING = dict(
 )
 
 class OneHotEncoded:
-    def __init__(self, seq=None, bits=None, ambig=None, reverse_complement=False):
+    def __init__(self, seq=None, reverse_complement=False):
+        """Create a new one-hot encoded DNA sequence from a DNA sequence."""
         if seq is not None:
             seq = seq.upper()
             self.size = len(seq)
@@ -100,23 +101,22 @@ class OneHotEncoded:
                 self.ambig = bitarray(''.join(reversed(tuple(ambig))))
             else:
                 self.ambig = bitarray(''.join(ambig))
-        else:
-            self.size = len(bits) // 4
-            self.bits = bits
-            self.ambig = ambig
-            if reverse_complement:
-                self.reverse_complement()
     
     def __len__(self):
         return self.size
     
     def __getitem__(self, key):
         bits, ambig = self._subseq(key.start, key.stop)
-        return OneHotEncoded(bits=bits, ambig=ambig)
-    
+        new_ohe = OneHotEncoded()
+        new_ohe.size = len(bits) // 4
+        new_ohe.bits = bits
+        new_ohe.ambig = ambig
+        return new_ohe
+        
     def compare(self, other, offset=None, overlap=None, ambig_match=None):
         """
-        Returns the number of matching bases.
+        Returns the number of matching bases between this sequence and `other`.
+        
         offset: the number of bases to move self forward from the left
                 relative to other before comparing.
         overlap: the number of bases to move self backward from the right
@@ -125,8 +125,7 @@ class OneHotEncoded:
                      mismatches (False) or ignore them (None).
         
         Offset and overalap are mutually exclusive. The diagram below shows
-        how they work. Comparsions are made on the sequences between the
-        pipes.
+        how they work. Comparsions are made on the sequences between the pipes.
         
         offset > 0
         
@@ -180,13 +179,20 @@ class OneHotEncoded:
         )
     
     def reverse_complement(self):
+        """Reverse-complements the sequence in place."""
         self.bits.reverse()
         self.ambig.reverse()
                 
     def to_acgt(self):
+        """Returns the sequence as a list of DNA base characters."""
         return self.bits.decode(BASE_ENCODING)
     
     def translate(self):
+        """
+        Returns a list of tuples where, at position i, the first element is the
+        four-bit encoding of the base at i, and the second element is the character
+        corresponding to that base.
+        """
         binstr = self.bits.to01()
         basestr = self.to_acgt()
         return ((binstr[(i*4):((i+1)*4)], basestr[i])
