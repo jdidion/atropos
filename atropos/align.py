@@ -227,7 +227,7 @@ class SeqPurgeAligner(object):
         self.adapter_check_cutoff = adapter_check_cutoff
         self.factorial_cache = FactorialCache()
     
-    def match(self, seq1, seq2):
+    def match_insert(self, seq1, seq2):
         l1 = len(seq1)
         l2 = len(seq2)
         seq_len = min(l1, l2)
@@ -250,7 +250,7 @@ class SeqPurgeAligner(object):
             
             # Check that at least min_insert_overlap base were compared and that
             # there are fewer than the maximium number of allowed mismatches
-            if size < self.min_insert_overlap or matches < round(float(seq_len - offset) * self.min_insert_match_frac):
+            if size < self.min_insert_overlap or matches < (size * self.min_insert_match_frac):
                 continue
             
             # Compute probability of seeing this number of matches at random and
@@ -292,6 +292,25 @@ class SeqPurgeAligner(object):
             # whether the best adapter match length passed the threshold
             best_offset >= self.min_adapter_overlap if best_offset else False
         )
+    
+    def match_adapter(self, seq, read=1):
+        """
+        Try to match the adapter to the read sequence, starting at the 5' end.
+        Note: this does not attempt to deal with indels.
+        Returns the position at which the adapter starts within the read, or
+        None if no match was found.
+        """
+        seq_len = len(seq)
+        seq = OneHotEncoded(seq)
+        adapter = self.fw if read == 1 else self.rv
+        for offset in range(0, seq_len - self.min_adapter_overlap):
+            matches, size = adapter.compare(seq, offset)
+            if matches < (size * self.min_adapter_match_frac):
+                continue
+            if self.match_probability(matches, size) > self.max_error_prob:
+                continue
+            return offset
+        return None
     
     def match_probability(self, matches, size):
         nfac = self.factorial_cache.factorial(size)

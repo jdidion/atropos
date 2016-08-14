@@ -166,7 +166,7 @@ def test_one_hot_encoding_compare_overlap():
     ohe2 = OneHotEncoded('GGTACTCCACTG')
     assert ohe1.compare(ohe2, overlap=10) == (10,10)
 
-def test_seqpurge_align():
+def test_seqpurge_insert_align():
     a1 = 'TTAGACATATGG'
     a2 = 'CAGTGGAGTATA'
     aligner = SeqPurgeAligner(a1, a2)
