@@ -181,3 +181,11 @@ def test_seqpurge_insert_align():
     assert match2.length == 10
     assert insert_match is True
     
+def test_seqpurge_adapter_align():
+    a_seq = 'TTAGACATATGG'
+    a = OneHotEncoded(a_seq)
+    aligner = SeqPurgeAligner()
+    r = 'AGTCGAGCCCATTGCAGACT' + a_seq[0:10]
+    match = aligner.match_adapter(r, a)
+    assert match.rstart == 20
+    assert match.length == 10

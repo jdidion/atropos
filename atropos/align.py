@@ -250,18 +250,19 @@ class OneHotEncoded:
             ambig2 = other.ambig
             size = l1
         else:
-            max_size = min(l1, l2)
             if offset:
-                assert offset < max_size
+                assert offset < l2
                 start = offset
-                size = max_size - offset
-            elif overlap:
-                assert overlap <= max_size
-                size = overlap
-                start = l2 - overlap
+                size = min(l1, l2 - offset)
             else:
-                start = 0
-                size = max_size
+                max_size = min(l1, l2)
+                if overlap:
+                    assert overlap <= max_size
+                    size = overlap
+                    start = l2 - overlap
+                else:
+                    start = 0
+                    size = max_size
             bits1, ambig1 = self._subseq(0, size)
             bits2, ambig2 = other._subseq(start, start + size)
             eq = bits1 & bits2
