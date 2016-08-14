@@ -3,6 +3,7 @@
 Alignment module.
 """
 from atropos._align import Aligner, compare_prefixes, locate
+from collections import namedtuple
 
 # flags for global alignment
 
@@ -30,6 +31,103 @@ def compare_suffixes(s1, s2, wildcard_ref=False, wildcard_query=False):
     s2 = s2[::-1]
     _, length, _, _, matches, errors = compare_prefixes(s1, s2, wildcard_ref, wildcard_query)
     return (len(s1) - length, len(s1), len(s2) - length, len(s2), matches, errors)
+
+# Common match-result object returned by aligners
+
+class Match(object):
+    """
+    TODO creating instances of this class is relatively slow and responsible for quite some runtime.
+    """
+    __slots__ = ['astart', 'astop', 'rstart', 'rstop', 'matches', 'errors', 'front', 'adapter', 'read', 'length']
+    def __init__(self, astart, astop, rstart, rstop, matches, errors, front=None, adapter=None, read=None):
+        self.astart = astart
+        self.astop = astop
+        self.rstart = rstart
+        self.rstop = rstop
+        self.matches = matches
+        self.errors = errors
+        self.front = self._guess_is_front() if front is None else front
+        self.adapter = adapter
+        self.read = read
+        # Number of aligned characters in the adapter. If there are indels,
+        # this may be different from the number of characters in the read.
+        self.length = self.astop - self.astart
+        assert self.length > 0
+        assert self.length - self.errors > 0
+        if self.adapter:
+            assert self.errors / self.length <= self.adapter.max_error_rate
+
+    def __str__(self):
+        return 'Match(astart={0}, astop={1}, rstart={2}, rstop={3}, matches={4}, errors={5})'.format(
+            self.astart, self.astop, self.rstart, self.rstop, self.matches, self.errors)
+
+    def _guess_is_front(self):
+        """
+        Return whether this is guessed to be a front adapter.
+
+        The match is assumed to be a front adapter when the first base of
+        the read is involved in the alignment to the adapter.
+        """
+        return self.rstart == 0
+
+    def wildcards(self, wildcard_char='N'):
+        """
+        Return a string that contains, for each wildcard character,
+        the character that it matches. For example, if the adapter
+        ATNGNA matches ATCGTA, then the string 'CT' is returned.
+
+        If there are indels, this is not reliable as the full alignment
+        is not available.
+        """
+        wildcards = [ self.read.sequence[self.rstart + i:self.rstart + i + 1] for i in range(self.length)
+            if self.adapter.sequence[self.astart + i] == wildcard_char and self.rstart + i < len(self.read.sequence) ]
+        return ''.join(wildcards)
+
+    def rest(self):
+        """
+        Return the part of the read before this match if this is a
+        'front' (5') adapter,
+        return the part after the match if this is not a 'front' adapter (3').
+        This can be an empty string.
+        """
+        if self.front:
+            return self.read.sequence[:self.rstart]
+        else:
+            return self.read.sequence[self.rstop:]
+    
+    # TODO: write test
+    def get_info_record(self):
+        seq = self.read.sequence
+        qualities = self.read.qualities
+        if qualities is None:
+            qualities = ''
+        rsize = rsize_total = self.rstop - self.rstart
+        if self.front and self.rstart > 0:
+            rsize_total = self.rstop
+        elif not self.front and self.rstop < len(seq):
+            rsize_total = len(seq) - self.rstart
+        return MatchInfo(
+            self.read.name,
+            self.errors,
+            self.rstart,
+            self.rstop,
+            seq[0:self.rstart],
+            seq[self.rstart:self.rstop],
+            seq[self.rstop:],
+            self.adapter.name,
+            qualities[0:self.rstart],
+            qualities[self.rstart:self.rstop],
+            qualities[self.rstop:],
+            self.front,
+            self.astop - self.astart,
+            rsize, rsize_total
+        )
+
+MatchInfo = namedtuple("MatchInfo", (
+    "read_name", "errors", "rstart", "rstop", "seq_before", "seq_adapter", "seq_after",
+    "adapter_name", "qual_before", "qual_adapter", "qual_after", "is_front", "asize",
+    "rsize_adapter", "rsize_total"
+))
 
 # Alternative semi-global alignment (
 # http://www.bioinf.uni-freiburg.de/Lehre/Courses/2013_SS/V_Bioinformatik_1/lecture4.pdf)
@@ -109,6 +207,15 @@ class OneHotEncoded:
         new_ohe.size = len(bits) // 4
         new_ohe.bits = bits
         new_ohe.ambig = ambig
+        return new_ohe
+    
+    def copy(self, reverse_complement=False):
+        new_ohe = OneHotEncoded()
+        new_ohe.size = self.size
+        new_ohe.bits = self.bits.copy()
+        new_ohe.ambig = self.ambig.copy()
+        if reverse_complement:
+            new_ohe.reverse_complement()
         return new_ohe
         
     def compare(self, other, offset=None, overlap=None, ambig_match=None):
@@ -213,12 +320,8 @@ class SeqPurgeAligner(object):
     Implementation of the SeqPurge insert matching algorithm.
     This only works with paired-end reads with 3' adapters.
     """
-    def __init__(self, fw_adapter, rv_adapter, max_error_prob=1E-6,
-                 min_insert_overlap=1, min_insert_match_frac=0.8,
-                 min_adapter_overlap=1, min_adapter_match_frac=0.8,
-                 adapter_check_cutoff=9):
-        self.fw = OneHotEncoded(fw_adapter)
-        self.rv = OneHotEncoded(rv_adapter, reverse_complement=True)
+    def __init__(self, max_error_prob=1E-6, min_insert_overlap=1, min_insert_match_frac=0.8,
+                 min_adapter_overlap=1, min_adapter_match_frac=0.8, adapter_check_cutoff=9):
         self.max_error_prob = max_error_prob
         self.min_insert_overlap = min_insert_overlap
         self.min_insert_match_frac = min_insert_match_frac
@@ -227,7 +330,7 @@ class SeqPurgeAligner(object):
         self.adapter_check_cutoff = adapter_check_cutoff
         self.factorial_cache = FactorialCache()
     
-    def match_insert(self, seq1, seq2):
+    def match_insert(self, seq1, seq2, adapter1, adapter2):
         l1 = len(seq1)
         l2 = len(seq2)
         seq_len = min(l1, l2)
@@ -239,7 +342,7 @@ class SeqPurgeAligner(object):
         seq1 = OneHotEncoded(seq1)
         seq2 = OneHotEncoded(seq2, reverse_complement=True)
         
-        best_offset = None
+        best_offset = best_a1_match = best_a2_match = None
         best_p = 1.0
         insert_match = False
         
@@ -264,36 +367,36 @@ class SeqPurgeAligner(object):
             
             # Match the overhang against the adapter sequence
             if offset > self.adapter_check_cutoff:
-                a1_match = self.fw.compare(seq1, overlap=offset)
+                a1_match = adapter1.compare(seq1, overlap=offset)
                 a1_prob = self.match_probability(*a1_match)
-                a2_match = seq2.compare(self.rv, overlap=offset)
+                a2_match = seq2.compare(adapter2, overlap=offset)
                 a2_prob = self.match_probability(*a2_match)
                 if (a1_prob * a2_prob) > self.max_error_prob:
                     continue
             else:
                 min_adapter_matches = math.ceil(offset * self.min_adapter_match_frac)
-                a1_match = seq1.compare(self.fw, overlap=offset)
-                if a1_match[0] < min_adapter_matches:
-                    a2_match = self.rv.compare(seq2, overlap=offset)
-                    if a2_match[0] < min_adapter_matches:
-                        continue
+                a1_match = seq1.compare(adapter1, overlap=offset)
+                a2_match = adapter2.compare(seq2, overlap=offset)
+                if a1_match[0] < min_adapter_matches and a2_match[0] < min_adapter_matches:
+                    continue
             
             if p < best_p:
                 best_p = p
                 best_offset = offset
+                best_a1_match = a1_match
+                best_a2_match = a2_match
         
-        return (
-            # the best offset, or None if no match was found
-            best_offset,
-            # the adapter start position
-            seq_len - (best_offset or 0),
-            # whether there was an insert match even if no adapter match was found
-            insert_match,
-            # whether the best adapter match length passed the threshold
-            best_offset >= self.min_adapter_overlap if best_offset else False
-        )
-    
-    def match_adapter(self, seq, read=1):
+        if best_offset is None or best_offset < self.min_adapter_overlap:
+            return (None, None, insert_match)
+        
+        insert_match_size = seq_len - best_offset
+        adapter_len1 = min(len(adapter1), l1 - insert_match_size)
+        adapter_len2 = min(len(adapter2), l2 - insert_match_size)
+        match1 = Match(0, adapter_len1, insert_match_size, insert_match_size + adapter_len1, a1_match[0], a1_match[1] - a1_match[0])
+        match2 = Match(0, adapter_len2, insert_match_size, insert_match_size + adapter_len2, a2_match[0], a2_match[1] - a2_match[0])
+        return (match1, match2, insert_match)
+        
+    def match_adapter(self, seq, adapter):
         """
         Try to match the adapter to the read sequence, starting at the 5' end.
         Note: this does not attempt to deal with indels.
@@ -302,14 +405,14 @@ class SeqPurgeAligner(object):
         """
         seq_len = len(seq)
         seq = OneHotEncoded(seq)
-        adapter = self.fw if read == 1 else self.rv
         for offset in range(0, seq_len - self.min_adapter_overlap):
             matches, size = adapter.compare(seq, offset)
             if matches < (size * self.min_adapter_match_frac):
                 continue
             if self.match_probability(matches, size) > self.max_error_prob:
                 continue
-            return offset
+            adapter_len = min(len(adapter), len(seq) - offset)
+            return Match(0, adapter_len, offset, offset + adapter_len, matches, size - matches)
         return None
     
     def match_probability(self, matches, size):

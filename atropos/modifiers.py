@@ -7,7 +7,7 @@ need to be stored, and as a class with a __call__ method if there are parameters
 """
 import re
 from atropos.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.align import Aligner, SEMIGLOBAL #, SeqPurgeAligner
+from atropos.align import Aligner, SEMIGLOBAL, SeqPurgeAligner
 from collections import defaultdict
 import copy
 import logging
@@ -117,16 +117,75 @@ class ReadPairModifier(object):
 
 class SeqPurgeAdapterCutter(ReadPairModifier):
     """
-    Implementation of the SeqPurge [1] algorithm for adapter trimming.
-    Reads are aligned and the overlap is used to determine the potential
-    starting points of the adapters.
-    1. Sturm et al. 2016, DOI: 10.1186/s12859-016-1069-7
+    AdapterCutter that uses SeqPurgeAligner to first try to identify
+    insert overlap before falling back to semi-global adapter alignment.
     """
-    def __init__(self, adapters1=[], adapters2=[], times=1, action='trim', keep_match_info=False):
-        pass
+    def __init__(self, aligner, adapter1, adapter2, action='trim', keep_match_info=False, symmetric=True):
+        self.aligner = aligner
+        self.adapters = (adapter1, adapter2)
+        self.action = action
+        self.keep_match_info = keep_match_info
+        self.symmetric = symmetric
+        self.with_adapters = [0,0]
+        
+        # Create one-hot encoded adapter sequences
+        self.ohe_adapter1 = OneHotEncoded(adapter1.sequence)
+        if adapter1.indels:
+            self.adapter_match1 = lambda read: self.adapters[0].match_to(read)
+        else:
+            self.adapter_match1 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter1)
+        
+        self.ohe_adapter2 = OneHotEncoded(adapter2.sequence, reverse_complement=True)
+        if adapter.indels:
+            self.adapter_match2 = lambda read: self.adapters[1].match_to(read)
+        else:
+            self.ohe_adapter2_fw = OneHotEncoded(adapter2.sequence)
+            self.adapter_match2 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter2_fw)
     
     def __call__(self, read1, read2):
-        pass
+        match = self.aligner.match_insert(read1.sequence, read2.sequence, self.ohe_adapter1, self.ohe_adapter2)
+            
+        if match:
+            return (self.trim(read1, 0, match), self.trim(read2, 1, match))
+        else:
+            match1 = self.adapter_match1(read1)
+            match2 = self.adapter_match2(read2)
+            return (
+                self.trim(read1, 0, match1 or (match2 if self.symmetric else None)),
+                self.trim(read2, 1, match2 or (match1 if self.symmetric else None))
+            )
+    
+    def trim(self, read, read_idx, match):
+        trimmed_read = read
+        adapter = self.adapters[read_idx]
+        if match:
+            trimmed_read = adapter.trimmed(match)
+        else:
+            trimmed_read.match = None
+            trimmed_read.match_info = None
+            return trimmed_read
+        
+        if __debug__:
+            assert len(trimmed_read) < len(read), "Trimmed read isn't shorter than original"
+        
+        if self.action == 'trim':
+            # read is already trimmed, nothing to do
+            pass
+        elif self.action == 'mask':
+            # add N from last modification
+            masked_sequence = trimmed_read.sequence
+            masked_sequence += ('N' * len(read) - len(trimmed_read))
+            # set masked sequence as sequence with original quality
+            trimmed_read.sequence = masked_sequence
+            trimmed_read.qualities = read.qualities
+        elif self.action is None:
+            trimmed_read = read
+        
+        trimmed_read.match = match
+        trimmed_read.match_info = [match.get_info_record()]
+        
+        self.with_adapters[read_idx] += 1
+        return trimmed_read
 
 class Trimmer(object):
     def __init__(self):

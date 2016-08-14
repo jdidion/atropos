@@ -4,8 +4,9 @@ Adapters
 """
 import sys
 import re
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from atropos import align, colorspace
+from atropos.align import Match
 from atropos.seqio import ColorspaceSequence, FastaReader
 
 # Constants for the find_best_alignment function.
@@ -163,101 +164,6 @@ class AdapterParser(object):
                 adapters.extend(self.parse_with_file(spec, cmdline_type))
         return adapters
 
-MatchInfo = namedtuple("MatchInfo", (
-    "read_name", "errors", "rstart", "rstop", "seq_before", "seq_adapter", "seq_after",
-    "adapter_name", "qual_before", "qual_adapter", "qual_after", "is_front", "asize",
-    "rsize_adapter", "rsize_total"
-))
-
-class Match(object):
-    """
-    TODO creating instances of this class is relatively slow and responsible for quite some runtime.
-    """
-    __slots__ = ['astart', 'astop', 'rstart', 'rstop', 'matches', 'errors', 'front', 'adapter', 'read', 'length']
-    def __init__(self, astart, astop, rstart, rstop, matches, errors, front, adapter, read):
-        self.astart = astart
-        self.astop = astop
-        self.rstart = rstart
-        self.rstop = rstop
-        self.matches = matches
-        self.errors = errors
-        self.front = self._guess_is_front() if front is None else front
-        self.adapter = adapter
-        self.read = read
-        # Number of aligned characters in the adapter. If there are
-        # indels, this may be different from the number of characters
-        # in the read.
-        self.length = self.astop - self.astart
-        assert self.length > 0
-        assert self.errors / self.length <= self.adapter.max_error_rate
-        assert self.length - self.errors > 0
-
-    def __str__(self):
-        return 'Match(astart={0}, astop={1}, rstart={2}, rstop={3}, matches={4}, errors={5})'.format(
-            self.astart, self.astop, self.rstart, self.rstop, self.matches, self.errors)
-
-    def _guess_is_front(self):
-        """
-        Return whether this is guessed to be a front adapter.
-
-        The match is assumed to be a front adapter when the first base of
-        the read is involved in the alignment to the adapter.
-        """
-        return self.rstart == 0
-
-    def wildcards(self, wildcard_char='N'):
-        """
-        Return a string that contains, for each wildcard character,
-        the character that it matches. For example, if the adapter
-        ATNGNA matches ATCGTA, then the string 'CT' is returned.
-
-        If there are indels, this is not reliable as the full alignment
-        is not available.
-        """
-        wildcards = [ self.read.sequence[self.rstart + i:self.rstart + i + 1] for i in range(self.length)
-            if self.adapter.sequence[self.astart + i] == wildcard_char and self.rstart + i < len(self.read.sequence) ]
-        return ''.join(wildcards)
-
-    def rest(self):
-        """
-        Return the part of the read before this match if this is a
-        'front' (5') adapter,
-        return the part after the match if this is not a 'front' adapter (3').
-        This can be an empty string.
-        """
-        if self.front:
-            return self.read.sequence[:self.rstart]
-        else:
-            return self.read.sequence[self.rstop:]
-    
-    # TODO: write test
-    def get_info_record(self):
-        seq = self.read.sequence
-        qualities = self.read.qualities
-        if qualities is None:
-            qualities = ''
-        rsize = rsize_total = self.rstop - self.rstart
-        if self.front and self.rstart > 0:
-            rsize_total = self.rstop
-        elif not self.front and self.rstop < len(seq):
-            rsize_total = len(seq) - self.rstart
-        return MatchInfo(
-            self.read.name,
-            self.errors,
-            self.rstart,
-            self.rstop,
-            seq[0:self.rstart],
-            seq[self.rstart:self.rstop],
-            seq[self.rstop:],
-            self.adapter.name,
-            qualities[0:self.rstart],
-            qualities[self.rstart:self.rstop],
-            qualities[self.rstop:],
-            self.front,
-            self.astop - self.astart,
-            rsize, rsize_total
-        )
-
 def _generate_adapter_name(_start=[1]):
     name = str(_start[0])
     _start[0] += 1
@@ -292,7 +198,7 @@ class Adapter(object):
         unique number.
     """
     def __init__(self, sequence, where, max_error_rate=0.1, min_overlap=3,
-            read_wildcards=False, adapter_wildcards=True, name=None, indels=True):
+                 read_wildcards=False, adapter_wildcards=True, name=None, indels=True):
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
         self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
