@@ -1,7 +1,7 @@
 # Changes
 
-v1.0.7 (dev)
-------------
+v1.0.7
+------
 
 * Re-engineered modifiers.py (and all dependent code) to enable use of modifiers that simultaneously edit both reads in a pair.
 * Add --op-order option to enable use to specify order of first four trimming operations.
