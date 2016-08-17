@@ -271,7 +271,6 @@ class OneHotEncoded:
                     size = min(l1, offset)
             else:
                 size = min(l1, l2)
-            #print("{} {} {}".format(start1, start2, size))
             bits1, ambig1 = self._subseq(start1, start1 + size)
             bits2, ambig2 = other._subseq(start2, start2 + size)
             eq = bits1 & bits2
@@ -378,11 +377,6 @@ class SeqPurgeAligner(object):
             # Match the overhang against the adapter sequence
             a1_match = seq1.compare(adapter1, offset=-offset)
             a2_match = seq2.compare(adapter2, offset=-offset)
-            print(repr(adapter1))
-            print(repr(seq1))
-            print(repr(seq2))
-            print(repr(adapter2))
-            print(offset)
             min_adapter_matches = math.ceil(offset * self.min_adapter_match_frac)
             if a1_match[0] < min_adapter_matches and a2_match[0] < min_adapter_matches:
                 continue
@@ -404,7 +398,6 @@ class SeqPurgeAligner(object):
         insert_match_size = seq_len - best_offset
         adapter_len1 = min(len(adapter1), l1 - insert_match_size)
         adapter_len2 = min(len(adapter2), l2 - insert_match_size)
-        #print("0 {} {} {} {}".format(adapter_len2, insert_match_size, insert_match_size + adapter_len2, a2_match))
         best_matches = best_match[0]
         best_mismatches = best_match[1] - best_matches
         match1 = Match(0, adapter_len1, insert_match_size, l1, best_matches, best_mismatches)

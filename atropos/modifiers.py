@@ -605,7 +605,6 @@ class Modifiers(object):
             bp[0] = len(read1.sequence)
             bp[1] = len(read2.sequence)
             for mods in self.modifiers:
-                print("Mod: {} ; Before: {} {}".format(mods, read1.sequence, read2.sequence))
                 if isinstance(mods, ReadPairModifier):
                     read1, read2 = mods(read1, read2)
                 else:
@@ -613,7 +612,6 @@ class Modifiers(object):
                         read1 = mods[0](read1)
                     if mods[1] is not None:
                         read2 = mods[1](read2)
-                print("After: {} {}".format(read1.sequence, read2.sequence))
             if self.merger:
                 read1, read2 = self.merger.merge(read1, read2)
             reads = [read1, read2]
