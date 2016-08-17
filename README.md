@@ -52,6 +52,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 * Implement an auto-detect option for adapters similar to TrimGalore: read the first 1M reads, search for common adapters, and pick the one that appears most frequently.
 * Optional error correction for overlapping pairs (if there are mismatches, change the lower quality base to the higher quality base)
+* Currently, SeqPurge aligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the SeqPurge aligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 
 ## Citations
 

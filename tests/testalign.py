@@ -164,7 +164,7 @@ def test_one_hot_encoding_compare_offset():
 def test_one_hot_encoding_compare_overlap():
     ohe1 = OneHotEncoded('TACTCCACTGAGTCGAGCCCATTGCAGACT')
     ohe2 = OneHotEncoded('GGTACTCCACTG')
-    assert ohe1.compare(ohe2, overlap=10) == (10,10)
+    assert ohe1.compare(ohe2, offset=-10) == (10,10)
 
 def test_seqpurge_insert_align():
     a1_seq = 'TTAGACATATGG'
@@ -189,3 +189,15 @@ def test_seqpurge_adapter_align():
     match = aligner.match_adapter(r, a)
     assert match.rstart == 20
     assert match.length == 10
+
+def test_short_adapter_overlap():
+    a1 = OneHotEncoded('TTAGACATAT')
+    a2 = OneHotEncoded('CAGTGGAGTA', reverse_complement=True)
+    seq1 = 'GACAGGCCGTTTGAATGTTGACGGGATGTT'
+    seq2 = 'CATCCCGTCAACATTCAAACGGCCTGTCCA'
+    aligner = SeqPurgeAligner()
+    match1, match2, insert_match = aligner.match_insert(seq1, seq2, a1, a2)
+    assert match1.rstart == 28
+    assert match1.length == 2
+    assert match2.rstart == 28
+    assert match2.length == 2

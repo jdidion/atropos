@@ -7,7 +7,7 @@ need to be stored, and as a class with a __call__ method if there are parameters
 """
 import re
 from atropos.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.align import Aligner, SEMIGLOBAL, SeqPurgeAligner
+from atropos.align import Aligner, SEMIGLOBAL, SeqPurgeAligner, OneHotEncoded
 from collections import defaultdict
 import copy
 import logging
@@ -19,7 +19,7 @@ class AdapterCutter(object):
     times parameter.
     """
 
-    def __init__(self, adapters=[], times=1, action='trim', keep_match_info=False):
+    def __init__(self, adapters=[], times=1, action='trim'):
         """
         adapters -- list of Adapter objects
 
@@ -30,7 +30,6 @@ class AdapterCutter(object):
         self.times = times
         self.action = action
         self.with_adapters = 0
-        self.keep_match_info = keep_match_info
 
     def _best_match(self, read):
         """
@@ -120,13 +119,12 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
     AdapterCutter that uses SeqPurgeAligner to first try to identify
     insert overlap before falling back to semi-global adapter alignment.
     """
-    def __init__(self, aligner, adapter1, adapter2, action='trim', keep_match_info=False, symmetric=True):
-        self.aligner = aligner
+    def __init__(self, adapter1, adapter2, aligner=None, action='trim', symmetric=True):
         self.adapters = (adapter1, adapter2)
+        self.aligner = aligner or SeqPurgeAligner()
         self.action = action
-        self.keep_match_info = keep_match_info
         self.symmetric = symmetric
-        self.with_adapters = [0,0]
+        self.with_adapters = [0, 0]
         
         # Create one-hot encoded adapter sequences
         self.ohe_adapter1 = OneHotEncoded(adapter1.sequence)
@@ -136,34 +134,45 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
             self.adapter_match1 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter1)
         
         self.ohe_adapter2 = OneHotEncoded(adapter2.sequence, reverse_complement=True)
-        if adapter.indels:
+        if adapter2.indels:
             self.adapter_match2 = lambda read: self.adapters[1].match_to(read)
         else:
             self.ohe_adapter2_fw = OneHotEncoded(adapter2.sequence)
             self.adapter_match2 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter2_fw)
     
     def __call__(self, read1, read2):
-        match = self.aligner.match_insert(read1.sequence, read2.sequence, self.ohe_adapter1, self.ohe_adapter2)
-            
-        if match:
-            return (self.trim(read1, 0, match), self.trim(read2, 1, match))
-        else:
+        match1, match2, insert_match = self.aligner.match_insert(read1.sequence, read2.sequence, self.ohe_adapter1, self.ohe_adapter2)
+        
+        if match1 is None and match2 is None:
             match1 = self.adapter_match1(read1)
             match2 = self.adapter_match2(read2)
-            return (
-                self.trim(read1, 0, match1 or (match2 if self.symmetric else None)),
-                self.trim(read2, 1, match2 or (match1 if self.symmetric else None))
-            )
+        
+        if self.symmetric:
+            if match1 is None and match2:
+                match1 = match2.copy()
+            if match2 is None and match1:
+                match2 = match1.copy()
+            
+        if match1 is not None:
+            match1.adapter = self.adapters[0]
+            match1.read = read1
+            match1.front = False
+        
+        if match2 is not None:
+            match2.adapter = self.adapters[1]
+            match2.read = read2
+            match2.front = False
+        
+        return (self.trim(read1, match1, 0), self.trim(read2, match2, 1))
     
-    def trim(self, read, read_idx, match):
-        trimmed_read = read
+    def trim(self, read, match, read_idx):
+        if not match:
+            read.match = None
+            read.match_info = None
+            return read
+        
         adapter = self.adapters[read_idx]
-        if match:
-            trimmed_read = adapter.trimmed(match)
-        else:
-            trimmed_read.match = None
-            trimmed_read.match_info = None
-            return trimmed_read
+        trimmed_read = adapter.trimmed(match)
         
         if __debug__:
             assert len(trimmed_read) < len(read), "Trimmed read isn't shorter than original"
@@ -546,6 +555,7 @@ class Modifiers(object):
     
     def add_modifier(self, mod_class, read=1|2, **kwargs):
         if issubclass(mod_class, ReadPairModifier):
+            assert self.paired == "both" and read == 1|2
             mods = mod_class(**kwargs)
         else:
             mods = [None, None]
@@ -553,6 +563,8 @@ class Modifiers(object):
                 mods[0] = mod_class(**kwargs)
             if read & 2 > 0 and self.paired == "both":
                 mods[1] = mod_class(**kwargs)
+            if all(m is None for m in mods):
+                return None
         return self._add_modifiers(mod_class, mods)
     
     def add_modifier_pair(self, mod_class, read1_args=None, read2_args=None):
@@ -561,11 +573,11 @@ class Modifiers(object):
             mods[0] = mod_class(**read1_args)
         if read2_args is not None and self.paired == "both":
             mods[1] = mod_class(**read2_args)
+        if all(m is None for m in mods):
+            return None
         return self._add_modifiers(mod_class, mods)
     
     def _add_modifiers(self, mod_class, mods):
-        if all(m is None for m in mods):
-            return None
         i = len(self.modifiers)
         self.modifiers.append(mods)
         self.modifier_indexes[mod_class].append(i)
@@ -593,6 +605,7 @@ class Modifiers(object):
             bp[0] = len(read1.sequence)
             bp[1] = len(read2.sequence)
             for mods in self.modifiers:
+                print("Mod: {} ; Before: {} {}".format(mods, read1.sequence, read2.sequence))
                 if isinstance(mods, ReadPairModifier):
                     read1, read2 = mods(read1, read2)
                 else:
@@ -600,6 +613,7 @@ class Modifiers(object):
                         read1 = mods[0](read1)
                     if mods[1] is not None:
                         read2 = mods[1](read2)
+                print("After: {} {}".format(read1.sequence, read2.sequence))
             if self.merger:
                 read1, read2 = self.merger.merge(read1, read2)
             reads = [read1, read2]

@@ -44,7 +44,7 @@ check_importability()
 from atropos import __version__
 from atropos.seqio import (open_reader, UnknownFileType, Formatters, RestFormatter,
                             InfoFormatter, WildcardFormatter, FormatError, Writers)
-from atropos.adapters import AdapterParser
+from atropos.adapters import AdapterParser, BACK
 from atropos.modifiers import *
 from atropos.filters import *
 from atropos.report import *
@@ -175,7 +175,7 @@ def get_argument_parser():
             "as with -a. This option is mostly for rescuing failed library "
             "preparations - do not use if you know which end your adapter was "
             "ligated to! (none)")
-    group.add_argument("--aligner", choices=('cutadapt'), default='cutadapt',
+    group.add_argument("--aligner", choices=('cutadapt', 'seqpurge'), default='cutadapt',
         help="Which alignment algorithm to use for identifying adapters. Currently, "
              "only the original Cutadapt algorithm is available. However, new algorithms "
              "are being implemented and the default is likely to change.")
@@ -501,6 +501,12 @@ def validate_options(options, parser):
         if options.format is not None:
             parser.error("If a pair of .fasta and .qual files is given, the -f/--format "
                 "parameter cannot be used.")
+    
+    if options.aligner != 'cutadapt':
+        if options.aligner == 'seqpurge' and paired != 'both':
+            parser.error("SeqPurge aligner only works with paired-end reads")
+            # TODO: should also be checking that there is exactly one 3' adapter for each read
+            # TODO: have the aligner tell us whether it can be used based on options?
     
     if options.merge_overlapping and (
             paired != "both" or
@@ -895,26 +901,6 @@ def create_tqdm_reader(reader):
     import tqdm
     return tqdm.tqdm(reader)
 
-def create_filters(options, paired, min_affected):
-    filters = Filters(FilterFactory(paired, min_affected))
-    
-    if options.minimum_length is not None and options.minimum_length > 0:
-        filters.add_filter(TooShortReadFilter, options.minimum_length)
-    
-    if options.maximum_length < sys.maxsize:
-        filters.add_filter(TooLongReadFilter, options.maximum_length)
-    
-    if options.max_n >= 0:
-        filters.add_filter(NContentFilter, options.max_n)
-    
-    if options.discard_trimmed:
-        filters.add_filter(TrimmedFilter)
-    
-    if options.discard_untrimmed or options.untrimmed_output:
-        filters.add_filter(UntrimmedFilter)
-    
-    return filters
-
 def create_modifiers(options, paired, qualities, has_qual_file, parser):
     adapter_parser = AdapterParser(
         colorspace=options.colorspace,
@@ -944,6 +930,11 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
             options.max_n == -1 and not options.trim_n:
         parser.error("You need to provide at least one adapter sequence.")
     
+    if options.aligner == 'seqpurge' and (
+            not adapters1 or len(adapters1) > 1 or adapters1[0].where != BACK or
+            not adapters2 or len(adapters2) > 1 or adapters2[0].where != BACK):
+        parser.error("SeqPurge aligner requires a single 3' adapter for each read")
+    
     if options.debug:
         for adapter in adapters1 + adapters2:
             adapter.enable_debug()
@@ -958,21 +949,28 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
     
     for op in options.op_order:
         if op == 'A' and (adapters1 or adapters2):
-            modifiers.add_modifier_pair(AdapterCutter,
-                dict(adapters=adapters1, times=options.times, action=options.action),
-                dict(adapters=adapters2, times=options.times, action=options.action),
-            )
+            # TODO: generalize this using some kind of factory class
+            if options.aligner == 'seqpurge':
+                modifiers.add_modifier(SeqPurgeAdapterCutter,
+                    adapter1=adapters1[0], adapter2=adapters2[0], action=options.action)
+            else:
+                modifiers.add_modifier_pair(AdapterCutter,
+                    dict(adapters=adapters1, times=options.times, action=options.action),
+                    dict(adapters=adapters2, times=options.times, action=options.action)
+                )
         elif op == 'C' and (options.cut or options.cut2):
             modifiers.add_modifier_pair(UnconditionalCutter,
                 dict(lengths=options.cut),
-                dict(lengths=options.cut2),
+                dict(lengths=options.cut2)
             )
         elif op == 'G' and (options.nextseq_trim is not None):
-            modifiers.add_modifier(NextseqQualityTrimmer, read=1,
-                                   cutoff=options.nextseq_trim, base=options.quality_base)
+            modifiers.add_modifier(NextseqQualityTrimmer,
+                read=1, cutoff=options.nextseq_trim, base=options.quality_base)
         elif op == 'Q' and options.quality_cutoff:
-            modifiers.add_modifier(QualityTrimmer, cutoff_front=options.quality_cutoff[0],
-                                   cutoff_back=options.quality_cutoff[1], base=options.quality_base)
+            modifiers.add_modifier(QualityTrimmer,
+                cutoff_front=options.quality_cutoff[0],
+                cutoff_back=options.quality_cutoff[1],
+                base=options.quality_base)
     
     if options.bisulfite:
         if isinstance(options.bisulfite, str):
@@ -1019,6 +1017,26 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
         modifiers.add_modifier(PrimerTrimmer)
     
     return (modifiers, len(adapters1) + len(adapters2))
+
+def create_filters(options, paired, min_affected):
+    filters = Filters(FilterFactory(paired, min_affected))
+    
+    if options.minimum_length is not None and options.minimum_length > 0:
+        filters.add_filter(TooShortReadFilter, options.minimum_length)
+    
+    if options.maximum_length < sys.maxsize:
+        filters.add_filter(TooLongReadFilter, options.maximum_length)
+    
+    if options.max_n >= 0:
+        filters.add_filter(NContentFilter, options.max_n)
+    
+    if options.discard_trimmed:
+        filters.add_filter(TrimmedFilter)
+    
+    if options.discard_untrimmed or options.untrimmed_output:
+        filters.add_filter(UntrimmedFilter)
+    
+    return filters
 
 def create_formatters(options, qualities, default_outfile):
     seq_formatter_args = dict(

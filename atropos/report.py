@@ -111,18 +111,16 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
     for read in (1, 2):
         for modifier in modifiers.get_modifiers(AdapterCutter, read):
             stats["with_adapters"][read-1] += modifier.with_adapters
-    
-    for modifier in modifiers.get_modifiers(read=1):
-        if isinstance(modifier, Trimmer):
-            key = "{}_bp".format(type(modifier).__name__)
-            stats[key][0] = modifier.trimmed_bases
-            
-    for modifier in modifiers.get_modifiers(read=2):
-        if isinstance(modifier, Trimmer):
-            key = "{}_bp".format(type(modifier).__name__)
-            stats[key][1] = modifier.trimmed_bases
             
     for modifier_class in modifiers.get_trimmer_classes():
+        for modifier in modifiers.get_modifiers(modifier_class, 1):
+            key = "{}_bp".format(type(modifier).__name__)
+            stats[key][0] = modifier.trimmed_bases
+                
+        for modifier in modifiers.get_modifiers(modifier_class, 2):
+            key = "{}_bp".format(type(modifier).__name__)
+            stats[key][1] = modifier.trimmed_bases
+        
         name = modifier_class.__name__
         stats[name] = sum(stats["{}_bp".format(name)])
     
