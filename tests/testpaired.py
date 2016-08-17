@@ -2,6 +2,7 @@
 from __future__ import print_function, division, absolute_import
 
 import shutil
+import os
 from nose.tools import raises
 from atropos.scripts import atropos
 from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
@@ -137,17 +138,12 @@ def test_unmatched_read_names():
             with open(swapped, 'w') as f:
                 f.writelines(lines)
             with redirect_stderr():
+                print('here')
                 atropos.main('-a XX -o out1.fastq --paired-output out2.fastq'.split() + [swapped, datapath('paired.2.fastq')])
         finally:
-            try:
-                os.remove('out1.fastq')
-            except:
-                pass
-            try:
-                os.remove('out2.fastq')
-            except:
-                pass
-
+            os.remove('out1.fastq')
+            os.remove('out2.fastq')
+            
 def test_legacy_minlength():
     '''Ensure -m is not applied to second read in a pair in legacy mode'''
     run_paired('-a XXX -m 27',
