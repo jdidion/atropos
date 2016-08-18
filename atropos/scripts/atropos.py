@@ -450,7 +450,7 @@ def validate_options(options, parser):
     if len(args) == 0:
         parser.error("At least one parameter needed: name of a FASTA or FASTQ file.")
     elif len(args) > 2:
-        parser.error("Too many parameters.")
+        parser.error("Too many parameters: {}".format(args))
     if args[0].endswith('.qual'):
         parser.error("If a .qual file is given, it must be the second argument.")
     

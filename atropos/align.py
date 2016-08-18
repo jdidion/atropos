@@ -466,6 +466,7 @@ class SeqPurgeAligner(object):
         
         return result
     
+    # TODO: try this in cython
     def match_insert3(self, seq1, seq2, adapter1, adapter2):
         """Use the original seqpurge implementation (iterative comparison)"""
         alen1 = len(adapter1)
