@@ -1,9 +1,11 @@
+
 #!/usr/bin/env python
 # Summarizes trimming accuracy for simulated reads.
 
 from argparse import ArgumentParser
-from atropos import align, xopen
+from atropos import xopen
 import csv
+import pylev
 from common import *
 
 def aln_iterator(i):
@@ -14,9 +16,11 @@ def aln_iterator(i):
         chrm, name, pos, strand = line[1:].rstrip().split('\t')
         if name.endswith('-1'):
             name = name[:-2]
+        mate = name[-1]
+        name = name[:-2]
         ref = next(i).rstrip()
         actual = next(i).rstrip()
-        yield (name, chrm, pos, strand, ref, actual)
+        yield (name, mate, chrm, pos, strand, ref, actual)
 
 def fq_iterator(i, mate):
     for read in zip(*[i] * 4):
@@ -25,19 +29,66 @@ def fq_iterator(i, mate):
         name = name[:-2]
         yield (name, mate, read[1].rstrip())
 
-REF_ALIGN_FLAGS = align.START_WITHIN_SEQ2 | align.STOP_WITHIN_SEQ2 | align.START_WITHIN_SEQ1
-
-def summarize_accuracy(a, r, w, adapters):
-    adapter_aligners = [align.Aligner(adapters[i], 0.1) for i in (0,1)]
+def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=True):
     adapter_lengths = [len(adapters[i]) for i in (0,1)]
     
+    #if read_id != 'chr1-199374': continue
+    debug = False
+    
+    def summarize_alignment(a):
+        ref_seq = a[5]
+        if debug: print(ref_seq)
+        ref_len = len(ref_seq)
+        if debug: print(ref_len)
+        read_seq = a[6]
+        if debug: print(read_seq)
+        read_len = len(read_seq)
+        if debug: print(read_len)
+        
+        ref_ins = [i for i in range(len(ref_seq)) if ref_seq[i] == '-']
+        expected_read = "".join(b for b in read_seq[0:ref_len] if b != '-')
+        expected_read_len = len(expected_read)
+        ref_del = ref_len - expected_read_len
+        
+        has_adapter = ref_len < read_len
+        adapter_seq = []
+        adapter_len = adapter_ins = adapter_del = polyA = 0
+        if debug: print(has_adapter)
+        
+        if has_adapter:
+            for b in read_seq[ref_len:]:
+                if adapter_len >= adapter_lengths[i] and b == 'A':
+                    polyA += 1
+                else:
+                    if b == '-':
+                        adapter_del += 1
+                    else:
+                        adapter_seq.append(b)
+                        adapter_len += 1
+            
+            adapter_ref_len = adapter_len + adapter_del
+            if adapter_ref_len > adapter_lengths[i]:
+                adapter_ins = adapter_ref_len - adapter_lengths[i]
+        
+        edit_dist = pylev.levenshtein(adapters[i][:adapter_len], "".join(adapter_seq))
+        return [expected_read, (int(has_adapter), adapter_len, edit_dist, adapter_ins, adapter_del, polyA)]
+    
+    if progress:
+        import tqdm
+        read_iter = tqdm.tqdm(read_iter)
+    
     cache = {}
-    for reads in r:
+    overtrimmed = 0
+    undertrimmed = 0
+    raw_trimmed_mismatch = 0
+    for num_reads, reads in enumerate(read_iter, 1):
         read_id = reads[0][0]
+        aln = None
+        
         assert read_id == reads[1][0], "Read IDs differ - {} != {}".format(read_id, reads[1][0])
         assert int(reads[0][1]) == 1 and int(reads[1][1]) == 2, "Mate identifiers are incorrect for {}".format(read_id)
         if read_id not in cache:
-            for aln in a:
+            for aln in aln_iter:
                 if read_id == aln[0][0]:
                     break
                 else:
@@ -45,57 +96,58 @@ def summarize_accuracy(a, r, w, adapters):
         else:
             aln = cache.pop(read_id)
         
-        try:
-            for i in (0,1):
-                aa = aln[i]
-                rr = reads[i]
-                
-                # identify each part of the read
-                ref_seq = aa[4]
-                read_seq = aa[5]
-                read_len = len(read_seq)
-                ref_aligner = align.Aligner(ref_seq, 0.1, REF_ALIGN_FLAGS)
-                ref_match = ref_aligner.locate(read_seq)
-                if ref_match is None:
-                    raise Exception("reference sequence doesn't align to read")
-                if ref_match[1] < len(ref_seq):
-                    raise Exception("reference sequence doesn't fully align to read")
-                ref_end = ref_match[3]
-                has_adapter = ref_end < read_len
-                has_polyA = False
-                if has_adapter:
-                    adapter_match = adapter_aligners[i].locate(read_seq)
-                    if adapter_match is None:
-                        raise Exception("adapter sequence doesn't align")
-                    if adapter_match[0] > 0 or adapter_match[1] < min(read_len - ref_end, adapter_lengths[i]):
-                        raise Exception("adapter sequence doesn't fully align")
-                    if adapter_match[2] != ref_end:
-                        raise Exception("ambiguous adapter start position")
-                    if has_polyA and not all(read_seq[b] == 'A' for b in range(adapter_match[3], read_len)):
-                        raise Exception("base other than A found in tail sequence")
-                
-                trimmed_len = len(rr[2])
-                if rr[2] != read_seq[:trimmed_len]:
-                    raise Exception("mismatch between raw and trimmed read sequences")
-                
-                w.writerow((read_id, i+1, int(has_adapter), int(has_polyA), ref_end, trimmed_len, 'OK'))
-                
+        if debug: print(reads)
+        if debug: print(aln)
+        
+        if aln is None:
+            raise Exception("No alignment for read {}".format(read_id))
+        
+        for i in (0,1):
+            expected_read, adapter_info = summarize_alignment(aln[i])
+            expected_read_len = len(expected_read)
             
-        except Exception as e:
-            print("Cannot evaluate {}: {}".format(read_id, e.args[0]))
-            w.writerow((read_id, i+1, '', '', '', '', e.args[0]))
-    
+            r = reads[i]
+            trimmed_len = len(r[2])
+            
+            if debug: print(trimmed_len)
+            if debug: print(r[2])
+            if debug: print(expected_read)
+            
+            status = 'OK'
+            common_len = min(trimmed_len, expected_read_len)
+            if expected_read_len > trimmed_len:
+                overtrimmed += expected_read_len - trimmed_len
+                status = 'OVERTRIMMED'
+            elif expected_read_len < trimmed_len:
+                undertrimmed += trimmed_len - expected_read_len
+                status = 'UNDERTRIMMED'
+            if r[2][:common_len] != expected_read[:common_len]:
+                raw_trimmed_mismatch += 1
+                status = 'MISMATCH'
+            
+            w.writerow((read_id, i+1, expected_read_len, trimmed_len, status) + adapter_info)
+
     # all remaining alignments represent reads that were discarded
     
     def handle_discarded(aln):
         read_id = aln[0][0]
-        w.writerow((read_id, 1, '', '', '', '', 'discarded'))
-        w.writerow((read_id, 2, '', '', '', '', 'discarded'))
-        
+        for i in (0, 1):
+            expected_read, adapter_info = summarize_alignment(aln[i])
+            w.writerow((read_id, i+1, len(expected_read), '', 'DISCARDED') + adapter_info)
+    
+    num_discarded = len(cache)
     for aln in cache.values():
         handle_discarded(aln)
-    for aln in a:
+    for aln in aln_iter:
         handle_discarded(aln)
+        num_discarded += 1
+    
+    print("{} retained reads".format(num_reads))
+    print("{} mismatch reads".format(raw_trimmed_mismatch))
+    print("{} discarded reads".format(num_discarded))
+    print("{} total reads".format(num_reads + num_discarded))
+    print("{} overtrimmed bases".format(overtrimmed))
+    print("{} undertrimmed bases".format(undertrimmed))
 
 def main():
     parser = ArgumentParser()
@@ -103,6 +155,7 @@ def main():
     parser.add_argument('-a2', '--aln2', help=".aln file associated with simulated read2")
     parser.add_argument('-r1', '--reads1', help="trimmed fastq file read1")
     parser.add_argument('-r2', '--reads2', help="trimmed fastq file read1")
+    parser.add_argument('-l', '--read-length', type=int, default=125)
     parser.add_argument('-o', '--output', default='-')
     parser.add_argument("--adapters", nargs=2, default=DEFAULT_ADAPTERS)
     args = parser.parse_args()
@@ -115,7 +168,10 @@ def main():
             
             with fileoutput(args.output) as o:
                 w = csv.writer(o, delimiter="\t")
-                summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, args.adapters)
+                w.writerow((
+                    'read_id','mate','expected_len','actual_len','status','has_adapter',
+                    'adapter_len','adapter_edit_dist','adapter_ins','adapter_del','polyA'))
+                summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, args.read_length, args.adapters)
 
 if __name__ == "__main__":
     main()

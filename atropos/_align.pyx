@@ -639,6 +639,7 @@ def _acgt_comp_table():
 
 cdef bytes COMP_TABLE = _acgt_comp_table()
 
+# This is still much slower than expected - perhaps related to GIL issues?
 cdef class SeqPurgeAligner:
     cdef bytes adapter1
     cdef int adapter1_len
