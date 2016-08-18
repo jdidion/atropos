@@ -36,7 +36,8 @@ do
     
     if [ "$env" == "local" ]
     then
-        ./commands_t${threads}.sh 2>> timing_log.txt
+        rm -f timing_log_${threads}.txt
+        ./commands_t${threads}.sh 2>> timing_log_${threads}.txt
     else
         swarm --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}.sh
     fi
