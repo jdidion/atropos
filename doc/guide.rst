@@ -175,6 +175,30 @@ In addition, it is possible to :ref:`remove a fixed number of
 bases <cut-bases>` from the beginning or end of each read, and to :ref:`remove
 low-quality bases (quality trimming) <quality-trimming>` from the 3' and 5' ends.
 
+Alignment algorithms
+--------------------
+
+Cutadapt was developed when single-end reads were common, and thus its alignment
+algorithm was optimized for that data. It uses a very high-performance Implementation
+of semi-global alignment to identify adapters within reads. However, most current data
+sets are paired-end, which enables much better adapter trimming. With most paired-end
+read data, adapter contamination should be symmetric, because the sequencer reads the
+same number of bases in either direction. So, for example, if you have 150 bp paired-end
+reads and you have a read pair with an insert size of 130, the sequencer will read the
+130 bp from the forward direction and then read an additional 20 bp of the forward adapter,
+and will then read the same 130 bp in the reverse direction followed by 20 bp of the
+reverse adapter. This means that adapter contamination can be more accurately dectected by
+first aligning the reads to each other and then examining the overhangs for adapter sequences.
+This procedure is called insert alignment, as opposed to adapter alignment. Atropos implements
+a version of the algorithm described in Strum et al. (DOI: 10.1186/s12859-016-1069-7) that
+first attempts insert alignment (leveraging the dynamic programming model that was implemented
+in Cutadapt), followed by adapter alignment if the insert alignment fails. This new algorithm
+only works with paired-end data that contains a single 3' adapter in each direction. To enable
+this aligner, use the `--aligner insert` option.
+
+    atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz \
+    reads.1.fq.gz reads.2.fq.gz
 
 .. _three-prime-adapters:
 

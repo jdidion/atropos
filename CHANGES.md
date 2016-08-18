@@ -5,7 +5,7 @@ v1.0.7 (8/18/16)
 
 * Re-engineered modifiers.py (and all dependent code) to enable use of modifiers that simultaneously edit both reads in a pair.
 * Add --op-order option to enable use to specify order of first four trimming operations.
-* Implemented the SeqPurge algorithm for paired-end adapter trimming. This is currently experimental. Benchmarking against SeqPurge and Skewer using simulated reads showed that the method Cutadapt uses to align adapters, while optimal for single-end reads, is much less sensitive and specific than the insert match algorithms used by SeqPurge and Skewer. We chose to implement the SeqPurge algorithm because it is conceptually simpler and also less sensitive to parameter choices (Cutadapt and Skewer are both very sensitive to the choice of k -- the required minimum number of matching bases between the adapter and read sequences).
+* Implemented insert-based alignment for paired-end adapter trimming. This is currently experimental. Benchmarking against SeqPurge and Skewer using simulated reads showed that the method Cutadapt uses to align adapters, while optimal for single-end reads, is much less sensitive and specific than the insert match algorithms used by SeqPurge and Skewer. Our algorithm is similar to the one used by SeqPurge but leverages the dynamic programming model of Cutadapt.
 
 v1.0.6 (8/8/16)
 ---------------
