@@ -86,7 +86,7 @@ do
   
   for qcut in $quals
   do
-    for aligner in cutadapt seqpurge
+    for aligner in adapter insert
     do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_writercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
