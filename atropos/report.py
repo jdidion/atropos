@@ -107,10 +107,15 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
     if NContentFilter in filters:
         stats["too_many_n"] = filters[NContentFilter].filtered
     
-    stats["with_adapters"] = [0, 0]
-    for read in (1, 2):
-        for modifier in modifiers.get_modifiers(AdapterCutter, read):
-            stats["with_adapters"][read-1] += modifier.with_adapters
+    # TODO: generalize this
+    insert_cutter = modifiers.get_modifiers(InsertAdapterCutter)
+    if len(insert_cutter) > 0:
+        stats["with_adapters"] = insert_cutter[0].with_adapters
+    else:
+        stats["with_adapters"] = [0, 0]
+        for read in (1, 2):
+            for modifier in modifiers.get_modifiers(AdapterCutter, read):
+                stats["with_adapters"][read-1] += modifier.with_adapters
             
     for modifier_class in modifiers.get_trimmer_classes():
         for modifier in modifiers.get_modifiers(modifier_class, 1):

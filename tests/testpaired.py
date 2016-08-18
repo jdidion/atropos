@@ -7,9 +7,9 @@ from nose.tools import raises
 from atropos.scripts import atropos
 from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
 
-BACK_ALIGNERS = ('cutadapt', 'seqpurge')
+BACK_ALIGNERS = ('adapter', 'insert')
 
-def run_paired(params, in1, in2, expected1, expected2, aligners=('cutadapt',), callback=None):
+def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',), callback=None):
     if type(params) is str:
         params = params.split()
     for aligner in aligners:
@@ -25,7 +25,7 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('cutadapt',), c
                 if callback:
                     callback(aligner)
 
-def run_interleaved(params, inpath, expected, aligners=('cutadapt',)):
+def run_interleaved(params, inpath, expected, aligners=('adapter',)):
     if type(params) is str:
         params = params.split()
     for aligner in aligners:
@@ -35,7 +35,7 @@ def run_interleaved(params, inpath, expected, aligners=('cutadapt',)):
             assert atropos.main(p) is None
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
-def run_interleaved2(params, inpath, expected1, expected2, aligners=('cutadapt',)):
+def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
     assert False  # unused function
     if type(params) is str:
         params = params.split()

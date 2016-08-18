@@ -175,10 +175,13 @@ def get_argument_parser():
             "as with -a. This option is mostly for rescuing failed library "
             "preparations - do not use if you know which end your adapter was "
             "ligated to! (none)")
-    group.add_argument("--aligner", choices=('cutadapt', 'seqpurge'), default='cutadapt',
+    group.add_argument("--aligner", choices=('adapter', 'insert'), default='adapter',
         help="Which alignment algorithm to use for identifying adapters. Currently, "
-             "only the original Cutadapt algorithm is available. However, new algorithms "
-             "are being implemented and the default is likely to change.")
+             "you can choose between the semi-global alignment strategy used in Cutdapt "
+             "('adapter') or the more accurate insert-based alignment algorithm ('insert'). "
+             "Note that insert-based alignment can only be used with paired-end reads "
+             "containing 3' adapters. New algorithms are being implemented and the default "
+             "is likely to change. (adapter)")
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate (no. of errors divided by the length "
             "of the matching region). (0.1)")
@@ -502,9 +505,9 @@ def validate_options(options, parser):
             parser.error("If a pair of .fasta and .qual files is given, the -f/--format "
                 "parameter cannot be used.")
     
-    if options.aligner != 'cutadapt':
-        if options.aligner == 'seqpurge' and paired != 'both':
-            parser.error("SeqPurge aligner only works with paired-end reads")
+    if options.aligner != 'adapter':
+        if options.aligner == 'insert' and paired != 'both':
+            parser.error("Insert aligner only works with paired-end reads")
             # TODO: should also be checking that there is exactly one 3' adapter for each read
             # TODO: have the aligner tell us whether it can be used based on options?
     
@@ -930,10 +933,10 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
             options.max_n == -1 and not options.trim_n:
         parser.error("You need to provide at least one adapter sequence.")
     
-    if options.aligner == 'seqpurge' and (
+    if options.aligner == 'insert' and (
             not adapters1 or len(adapters1) > 1 or adapters1[0].where != BACK or
             not adapters2 or len(adapters2) > 1 or adapters2[0].where != BACK):
-        parser.error("SeqPurge aligner requires a single 3' adapter for each read")
+        parser.error("Insert aligner requires a single 3' adapter for each read")
     
     if options.debug:
         for adapter in adapters1 + adapters2:
@@ -950,8 +953,8 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
     for op in options.op_order:
         if op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
-            if options.aligner == 'seqpurge':
-                modifiers.add_modifier(SeqPurgeAdapterCutter,
+            if options.aligner == 'insert':
+                modifiers.add_modifier(InsertAdapterCutter,
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action)
             else:
                 modifiers.add_modifier_pair(AdapterCutter,
@@ -1124,7 +1127,7 @@ def run_serial(reader, modifiers, filters, formatters, writers):
             return (1, None)
         raise
     except (FormatError, EOFError) as e:
-        logging.getLogger().error("Cutadapt error", exc_info=True)
+        logging.getLogger().error("Atropos error", exc_info=True)
         return(1, None)
     finally:
         reader.close()

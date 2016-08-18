@@ -141,7 +141,7 @@ MatchInfo = namedtuple("MatchInfo", (
 # Note: these are currently just prototype implementations. They will need to be optimized
 # using numpy and/or re-written in cython.
 #
-# 1. SeqPrep algorithm: insert match algorithm that performs thresholded exhaustive
+# 1. SeqPurge algorithm: insert match algorithm that performs thresholded exhaustive
 #    comparison to minimize probability of incorrect alignment. Relies on the fact that
 #    overlapping reads share alleles and indels (i.e. no gaps are required) (in C++).
 #    https://github.com/imgag/ngs-bits/tree/master/src/SeqPurge.
@@ -184,244 +184,29 @@ class FactorialCache(object):
             next_i += 1
         self.max_n = i
 
-BASE_ENCODING = dict(
-    A=bitarray('1000'),
-    C=bitarray('0100'),
-    G=bitarray('0010'),
-    T=bitarray('0001'),
-    N=bitarray('1111')
-)
-
-class OneHotEncoded:
-    def __init__(self, seq=None, reverse_complement=False):
-        """Create a new one-hot encoded DNA sequence from a DNA sequence."""
-        if seq is not None:
-            seq = seq.upper()
-            self.size = len(seq)
-            self.bits = bitarray()
-            self.bits.encode(BASE_ENCODING, seq)
-            ambig = ('1' if b == 'N' else '0' for b in seq)
-            if reverse_complement:
-                self.bits.reverse()
-                self.ambig = bitarray(''.join(reversed(tuple(ambig))))
-            else:
-                self.ambig = bitarray(''.join(ambig))
-
-    def __len__(self):
-        return self.size
-
-    def __getitem__(self, key):
-        """Returns a new OneHotEncoded with the specified subsequence."""
-        bits, ambig = self._subseq(key.start, key.stop)
-        new_ohe = OneHotEncoded()
-        new_ohe.size = len(bits) // 4
-        new_ohe.bits = bits
-        new_ohe.ambig = ambig
-        return new_ohe
-
-    def copy(self, reverse_complement=False):
-        new_ohe = OneHotEncoded()
-        new_ohe.size = self.size
-        new_ohe.bits = self.bits.copy()
-        new_ohe.ambig = self.ambig.copy()
-        if reverse_complement:
-            new_ohe.reverse_complement()
-        return new_ohe
-
-    def compare(self, other, offset=0, ambig_match=None):
-        """
-        Returns the number of matching bases between this sequence and `other`.
-        Currently, this can handle Ns but not other IUPAC ambiguous characters.
-
-        offset: If positive: the number of bases to move self forward from the
-                left relative to other before comparing. If negative: the number
-                of bases to move self backward from the right relative to other
-                before comparing.
-        ambig_match: whether to count ambiguous characters as matches (True),
-                     mismatches (False) or ignore them (None).
-
-        Offset and overalap are mutually exclusive. The diagram below shows
-        how they work. Comparsions are made on the sequences between the pipes.
-
-        offset > 0
-
-        ..offset..|-------seq1--------|----------
-        ----------|-------seq2--------|..offset..
-
-        offset < 0
-                      |--offset--|-----seq1------
-        ------seq2----|--offset--|
-        """
-
-        l1 = len(self)
-        l2 = len(other)
-        if offset == 0 and (l1 == l2):
-            eq = self.bits & other.bits
-            ambig1 = self.ambig
-            ambig2 = other.ambig
-            size = l1
-        else:
-            start1 = start2 = 0
-            if offset > 0:
-                assert offset < l2
-                start2 = offset
-                size = min(l1, l2 - offset)
-            elif offset < 0:
-                offset = abs(offset)
-                assert offset < max(l1, l2)
-                if offset > l2:
-                    start1 = offset - l2
-                    size = min(l2, l1 - start1)
-                else:
-                    start2 = l2 - offset
-                    size = min(l1, offset)
-            else:
-                size = min(l1, l2)
-            bits1, ambig1 = self._subseq(start1, start1 + size)
-            bits2, ambig2 = other._subseq(start2, start2 + size)
-            eq = bits1 & bits2
-
-        # when ambiguous bases match, they contribute 4 counts rather than 1
-        matches = eq.count() - ((ambig1 & ambig2).count() * 3)
-        if ambig_match is True:
-            return (matches, size)
-        else:
-            num_ambig = (ambig1 | ambig2).count()
-            matches -= num_ambig
-            if ambig_match is False:
-                return (matches, size)
-            else:
-                return (matches, size - num_ambig)
-
-    def _subseq(self, start, stop):
-        return (
-            self.bits[(start*4):(stop*4)],
-            self.ambig[start:stop]
-        )
-
-    def reverse_complement(self):
-        """Reverse-complements the sequence in place."""
-        self.bits.reverse()
-        self.ambig.reverse()
-
-    def to_acgt(self):
-        """Returns the sequence as a list of DNA base characters."""
-        return self.bits.decode(BASE_ENCODING)
-
-    def translate(self):
-        """
-        Returns a list of tuples where, at position i, the first element is the
-        four-bit encoding of the base at i, and the second element is the character
-        corresponding to that base.
-        """
-        binstr = self.bits.to01()
-        basestr = self.to_acgt()
-        return ((binstr[(i*4):((i+1)*4)], basestr[i])
-            for i in range(len(self)))
-
-    def __repr__(self):
-        """Returns the original DNA base string."""
-        return "".join(self.to_acgt())
-
-    def __str__(self):
-        """
-        Returns a string representation of the one-hot encoding in matrix form,
-        along with the equivalent base character for each row.
-        """
-        return "ACGT\n----\n" + "\n".join("{} : {}".format(*t) for t in self.translate())
-
-class SeqPurgeAligner(object):
+class InsertAligner(object):
     """
-    Implementation of the SeqPurge insert matching algorithm.
+    Implementation of an insert matching algorithm.
     This only works with paired-end reads with 3' adapters.
     """
-    def __init__(self, max_error_prob=1E-6, min_insert_overlap=1, min_insert_match_frac=0.8,
-                 min_adapter_overlap=1, min_adapter_match_frac=0.8, adapter_check_cutoff=9):
+    def __init__(self, adapter1, adapter2, max_error_prob=1E-6, min_insert_overlap=1,
+                 max_insert_mismatch_frac=0.2, min_adapter_overlap=1, min_adapter_match_frac=0.8,
+                 adapter_check_cutoff=9):
+        self.adapter1 = adapter1
+        self.adapter1_len = len(adapter1)
+        self.adapter2 = adapter2
+        self.adapter2_len = len(adapter2)
         self.max_error_prob = max_error_prob
         self.min_insert_overlap = min_insert_overlap
-        self.min_insert_match_frac = float(min_insert_match_frac)
-        self.max_insert_mismatch_frac = 1.0 - min_insert_match_frac
+        self.max_insert_mismatch_frac = float(max_insert_mismatch_frac)
         self.min_adapter_overlap = min_adapter_overlap
         self.min_adapter_match_frac = float(min_adapter_match_frac)
         self.max_adapter_mismatch_frac = 1.0 - self.min_adapter_match_frac
         self.adapter_check_cutoff = adapter_check_cutoff
         self.factorial_cache = FactorialCache()
 
-    def match_insert1(self, seq1, seq2, adapter1, adapter2):
-        """Use one-hot encoding for insert and adpater matching"""
-        l1 = len(seq1)
-        l2 = len(seq2)
-        seq_len = min(l1, l2)
-        if l1 > l2:
-            seq1 = seq1[:l2]
-        elif l2 > l1:
-            seq2 = seq1[:l1]
-
-        seq1 = OneHotEncoded(seq1)
-        seq2 = OneHotEncoded(seq2, reverse_complement=True)
-
-        best_offset = None
-        best_adapter_match = None
-        best_p = self.max_error_prob
-        insert_match = None
-
-        for offset in range(self.min_insert_overlap, seq_len):
-            # Count number of matches between the two sequences.
-            # size = total number of bases compared (excluding Ns)
-            matches, size = seq1.compare(seq2, offset)
-
-            # Check that at least min_insert_overlap base were compared and that
-            # there are fewer than the maximium number of allowed mismatches
-            if size < self.min_insert_overlap or matches < (size * self.min_insert_match_frac):
-                continue
-
-            # Compute probability of seeing this number of matches at random and
-            # check that it's less than the maximum allowed
-            p = self.match_probability(matches, size)
-            if p >= best_p:
-                continue
-
-            # Otherwise, we've found an acceptable insert match
-            if insert_match is None:
-                insert_match = size
-
-            if (seq_len - size) < self.min_adapter_overlap:
-                continue
-
-            # Match the overhang against the adapter sequence
-            a1_match = seq1.compare(adapter1, offset=-offset)
-            a2_match = seq2.compare(adapter2, offset=-offset)
-            min_adapter_matches = math.ceil(offset * self.min_adapter_match_frac)
-            if a1_match[0] < min_adapter_matches and a2_match[0] < min_adapter_matches:
-                continue
-            a1_prob = self.match_probability(*a1_match)
-            a2_prob = self.match_probability(*a2_match)
-            if offset > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
-                continue
-
-            best_p = p
-            best_offset = offset
-            # This is a shortcut - if the match isn't symmetrical (e.g. if bases are trimmed off
-            # the 5' end of one read but not the other), this will screw up the adapter stats. We
-            # can solve this by always aligning adapters, at the expense of performance
-            best_match = a1_match if a1_prob < a2_prob else a2_match
-
-        if best_offset is None or best_offset < self.min_adapter_overlap:
-            return (None, None, insert_match)
-
-        insert_match_size = seq_len - best_offset
-        adapter_len1 = min(len(adapter1), l1 - insert_match_size)
-        adapter_len2 = min(len(adapter2), l2 - insert_match_size)
-        best_matches = best_match[0]
-        best_mismatches = best_match[1] - best_matches
-        match1 = Match(0, adapter_len1, insert_match_size, l1, best_matches, best_mismatches)
-        match2 = Match(0, adapter_len2, insert_match_size, l2, best_matches, best_mismatches)
-        return (match1, match2, insert_match)
-
-    def match_insert2(self, seq1, seq2, adapter1, adapter2):
+    def match_insert(self, seq1, seq2):
         """Use cutadapt aligner for insert and adapter matching"""
-        alen1 = len(adapter1)
-        alen2 = len(adapter2)
         l1 = len(seq1)
         l2 = len(seq2)
         seq_len = min(l1, l2)
@@ -432,9 +217,14 @@ class SeqPurgeAligner(object):
 
         seq2_rc = reverse_complement(seq2)
         result = [None, None, 0]
-
-        aligner = Aligner(seq2_rc, 1 - self.min_insert_match_frac,
-                          START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2, False, False)
+        
+        # TODO: at the very least, I should be able to modifier
+        # Aligner to strip out all the indel-related code
+        aligner = Aligner(
+            seq2_rc,
+            self.max_insert_mismatch_frac,
+            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+            False, False)
         aligner.min_overlap = self.min_insert_overlap
         aligner.indel_cost = 100000
         insert_match = aligner.locate(seq1)
@@ -448,9 +238,9 @@ class SeqPurgeAligner(object):
                     self.match_probability(insert_match[4], insert_match_size) > self.max_error_prob):
                 return result
 
-            a1_match = compare_prefixes(seq1[insert_match_size:], adapter1)
-            a2_match = compare_prefixes(seq2[insert_match_size:], adapter2)
-            adapter_len = min(offset, alen1, alen2)
+            a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
+            a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
+            adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
             min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
             if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
                 return result
@@ -459,120 +249,14 @@ class SeqPurgeAligner(object):
             if adapter_len > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
                 return result
 
-            adapter_len1 = min(alen1, l1 - insert_match_size)
-            adapter_len2 = min(alen2, l2 - insert_match_size)
+            adapter_len1 = min(self.adapter1_len, l1 - insert_match_size)
+            adapter_len2 = min(self.adapter2_len, l2 - insert_match_size)
             best_adapter_matches, best_adapter_mismatches = (a1_match if a1_prob < a2_prob else a2_match)[4:6]
             result[0] = Match(0, adapter_len1, insert_match_size, l1, best_adapter_matches, best_adapter_mismatches)
             result[1] = Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
 
         return result
-
-    # TODO: try this in cython
-    def match_insert3(self, seq1, seq2, adapter1, adapter2):
-        """Use the original seqpurge implementation (iterative comparison)"""
-        alen1 = len(adapter1)
-        alen2 = len(adapter2)
-        slen1 = len(seq1)
-        slen2 = len(seq2)
-        seq_len = min(slen1, slen2)
-        if slen1 > seq_len:
-            seq1 = seq1[:seq_len]
-        elif slen2 > seq_len:
-            seq2 = seq1[:seq_len]
-        seq2_rc = reverse_complement(seq2)
-
-        best_offset = best_matches = best_mismatches = None
-        best_p = self.max_error_prob
-        best_insert_match = None
-
-        def compare_insert(offset):
-            size = seq_len - offset
-            max_mismatches = self.max_insert_mismatch_frac * size
-            mismatches = 0
-            invalid = 0
-            for b1, b2 in zip(seq1[:size], seq2_rc[offset:]):
-                if b1 == 'N' or b2 == 'N':
-                    invalid += 1
-                elif b1 != b2:
-                    mismatches += 1
-                    if mismatches > max_mismatches:
-                        return None
-            size -= invalid
-            return (size - mismatches, size)
-
-        for offset in range(self.min_insert_overlap, seq_len):
-            insert_match = compare_insert(offset)
-            if not insert_match:
-                continue
-
-            matches, size = insert_match
-            if size < self.min_insert_overlap:
-                continue
-
-            # Compute probability of seeing this number of matches at random and
-            # check that it's less than the maximum allowed
-            p = self.match_probability(matches, size)
-            if p >= best_p:
-                continue
-
-            # Otherwise, we've found an acceptable insert match
-            if best_insert_match is None:
-                best_insert_match = size
-
-            if (seq_len - size) < self.min_adapter_overlap:
-                continue
-
-            a1_match = compare_prefixes(seq1[size:], adapter1)
-            a2_match = compare_prefixes(seq2[size:], adapter2)
-            adapter_len = min(seq_len - size, alen1, alen2)
-            min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
-            if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
-                continue
-            a1_prob = self.match_probability(a1_match[4], adapter_len)
-            a2_prob = self.match_probability(a2_match[4], adapter_len)
-            if adapter_len > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
-                continue
-
-            best_p = p
-            best_offset = offset
-            # This is a shortcut - if the match isn't symmetrical (e.g. if bases are trimmed off
-            # the 5' end of one read but not the other), this will screw up the adapter stats. We
-            # can solve this by always aligning adapters, at the expense of performance
-            best_adapter_matches, best_adapter_mismatches = (a1_match if a1_prob < a2_prob else a2_match)[4:6]
-
-        if best_offset is None or best_offset < self.min_adapter_overlap:
-            return (None, None, best_insert_match)
-
-        insert_match_size = seq_len - best_offset
-        adapter_len1 = min(alen1, slen1 - insert_match_size)
-        adapter_len2 = min(alen2, slen2 - insert_match_size)
-        return (
-            Match(0, adapter_len1, insert_match_size, slen1, best_adapter_matches, best_adapter_mismatches),
-            Match(0, adapter_len2, insert_match_size, slen2, best_adapter_matches, best_adapter_mismatches),
-            insert_match_size
-        )
-
-    match_insert = match_insert2
-
-    def match_adapter(self, seq, adapter):
-        """
-        Try to match the adapter to the read sequence, starting at the 5' end.
-        Note: this does not attempt to deal with indels.
-        Returns the position at which the adapter starts within the read, or
-        None if no match was found.
-        """
-        seq_len = len(seq)
-        seq = OneHotEncoded(seq)
-        for offset in range(0, seq_len - self.min_adapter_overlap):
-            matches, size = adapter.compare(seq, offset)
-            if matches < (size * self.min_adapter_match_frac):
-                continue
-            if self.match_probability(matches, size) > self.max_error_prob:
-                continue
-            adapter_len = min(len(adapter), len(seq) - offset)
-            return Match(0, adapter_len, offset, offset + adapter_len, matches, size - matches)
-        return None
-
+    
     def match_probability(self, matches, size):
         nfac = self.factorial_cache.factorial(size)
         p = 0.0

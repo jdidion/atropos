@@ -2,7 +2,7 @@
 from __future__ import print_function, division, absolute_import
 
 from atropos.align import (locate, compare_prefixes, compare_suffixes, Aligner,
-    SeqPurgeAligner, FactorialCache, OneHotEncoded)
+    InsertAligner, FactorialCache)
 from atropos.adapters import BACK
 
 
@@ -136,7 +136,7 @@ def test_factorial_cache():
     assert int(f.factorial(150)) == int(math.factorial(150))
 
 def test_match_probability():
-    a = SeqPurgeAligner('TTAGACATAT', 'CAGTGGAGTA')
+    a = InsertAligner('TTAGACATAT', 'CAGTGGAGTA')
     k = 3
     n = 5
     i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
@@ -144,61 +144,26 @@ def test_match_probability():
     i5 = 0.25 ** 5
     assert approx_equal(a.match_probability(k, n), i3 + i4 + i5, 0.0001)
 
-def test_one_hot_encoding():
-    ohe1 = OneHotEncoded('ATCGNACGA')
-    assert repr(ohe1) == 'ATCGNACGA'
-    ohe1.reverse_complement()
-    assert repr(ohe1) == 'TCGTNCGAT'
-    ohe1 = OneHotEncoded('ATCGNACGA')
-    ohe2 = OneHotEncoded('ACCGNGCTC')
-    assert ohe1.compare(ohe2, ambig_match=True) == (5, 9)
-    assert ohe1.compare(ohe2, ambig_match=False) == (4, 9)
-    assert ohe1.compare(ohe2, ambig_match=None) == (4, 8)
-
-def test_one_hot_encoding_compare_offset():
-    ohe1 = OneHotEncoded('TTTCCCGGACGA')
-    ohe2 = OneHotEncoded('AACGTTTCCC')
-    print(ohe1.compare(ohe2, offset=4))
-    assert ohe1.compare(ohe2, offset=4) == (6,6)
-
-def test_one_hot_encoding_compare_overlap():
-    ohe1 = OneHotEncoded('TACTCCACTGAGTCGAGCCCATTGCAGACT')
-    ohe2 = OneHotEncoded('GGTACTCCACTG')
-    assert ohe1.compare(ohe2, offset=-10) == (10,10)
-
 def test_seqpurge_insert_align():
     a1_seq = 'TTAGACATATGG'
     a2_seq = 'CAGTGGAGTATA'
-    #a1 = OneHotEncoded(a1_seq)
-    #a2 = OneHotEncoded(a2_seq, reverse_complement=True)
-    aligner = SeqPurgeAligner()
+    aligner = InsertAligner(a1_seq, a2_seq)
     r1 = 'AGTCGAGCCCATTGCAGACT' + a1_seq[0:10]
     r2 = 'AGTCTGCAATGGGCTCGACT' + a2_seq[0:10]
-    match1, match2, insert_match = aligner.match_insert(r1, r2, a1_seq, a2_seq)
+    match1, match2, insert_match = aligner.match_insert(r1, r2)
     assert match1.rstart == 20
     assert match1.length == 10
     assert match2.rstart == 20
     assert match2.length == 10
     assert insert_match == 20
     
-def test_seqpurge_adapter_align():
-    a_seq = 'TTAGACATATGG'
-    a = OneHotEncoded(a_seq)
-    aligner = SeqPurgeAligner()
-    r = 'AGTCGAGCCCATTGCAGACT' + a_seq[0:10]
-    match = aligner.match_adapter(r, a)
-    assert match.rstart == 20
-    assert match.length == 10
-
 def test_short_adapter_overlap():
     a1_seq = 'TTAGACATAT'
     a2_seq = 'CAGTGGAGTA'
-    #a1 = OneHotEncoded(a1_seq)
-    #a2 = OneHotEncoded(a2_seq, reverse_complement=True)
     seq1 = 'GACAGGCCGTTTGAATGTTGACGGGATGTT'
     seq2 = 'CATCCCGTCAACATTCAAACGGCCTGTCCA'
-    aligner = SeqPurgeAligner()
-    match1, match2, insert_match = aligner.match_insert(seq1, seq2, a1_seq, a2_seq)
+    aligner = InsertAligner(a1_seq, a2_seq)
+    match1, match2, insert_match = aligner.match_insert(seq1, seq2)
     assert match1.rstart == 28
     assert match1.length == 2
     assert match2.rstart == 28
