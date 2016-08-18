@@ -159,22 +159,22 @@ class InsertAdapterCutter(ReadPairModifier):
             read.match_info = None
             return read
         
-        trimmed_read = match.adapter.trimmed(match)
-        
-        if __debug__:
-            assert len(trimmed_read) < len(read), "Trimmed read isn't shorter than original"
-        
-        if self.action == 'trim':
-            # read is already trimmed, nothing to do
-            pass
-        elif self.action == 'mask':
-            # add N from last modification
-            masked_sequence = trimmed_read.sequence
-            masked_sequence += ('N' * len(read) - len(trimmed_read))
-            # set masked sequence as sequence with original quality
-            trimmed_read.sequence = masked_sequence
-            trimmed_read.qualities = read.qualities
-        elif self.action is None:
+        if match.rstart < len(read):
+            trimmed_read = match.adapter.trimmed(match)
+            
+            if self.action == 'trim':
+                # read is already trimmed, nothing to do
+                pass
+            elif self.action == 'mask':
+                # add N from last modification
+                masked_sequence = trimmed_read.sequence
+                masked_sequence += ('N' * len(read) - len(trimmed_read))
+                # set masked sequence as sequence with original quality
+                trimmed_read.sequence = masked_sequence
+                trimmed_read.qualities = read.qualities
+            elif self.action is None:
+                trimmed_read = read
+        else:
             trimmed_read = read
         
         trimmed_read.match = match
