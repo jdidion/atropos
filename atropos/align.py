@@ -2,8 +2,9 @@
 """
 Alignment module.
 """
-from atropos._align import Aligner, compare_prefixes, locate
 from collections import namedtuple
+from ._align import Aligner, compare_prefixes, locate
+from .util import reverse_complement
 
 # flags for global alignment
 
@@ -144,6 +145,11 @@ MatchInfo = namedtuple("MatchInfo", (
 #    comparison to minimize probability of incorrect alignment. Relies on the fact that
 #    overlapping reads share alleles and indels (i.e. no gaps are required) (in C++).
 #    https://github.com/imgag/ngs-bits/tree/master/src/SeqPurge.
+#   * Speed up sequence comparison:
+#     * Between adapters and overhangs:
+#       * http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4080745/pdf/btu177.pdf
+#     * Between reads:
+#       * http://bioinformatics.oxfordjournals.org/content/30/14/2000.abstract
 # 2. Skewer algorithm: bit-masked k-difference matching (in C++).
 #    https://github.com/relipmoc/skewer
 # 3. Quality-aware overlap alignment (in Haskell).
@@ -348,61 +354,96 @@ class SeqPurgeAligner(object):
         elif l2 > l1:
             seq2 = seq1[:l1]
         
-        seq1 = OneHotEncoded(seq1)
-        seq2 = OneHotEncoded(seq2, reverse_complement=True)
+        #seq1 = OneHotEncoded(seq1)
+        #seq2 = OneHotEncoded(seq2, reverse_complement=True)
+        seq2_rc = reverse_complement(seq2)
+        result = [None, None, 0]
         
-        best_offset = best_a1_match = best_a2_match = None
-        best_p = self.max_error_prob
-        insert_match = False
+        aligner = Aligner(seq2_rc, 1 - self.min_insert_match_frac,
+                          START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2, False, False)
+        aligner.min_overlap = self.min_insert_overlap
+        aligner.indel_cost = 100000
+        insert_match = aligner.locate(seq1)
         
-        for offset in range(self.min_insert_overlap, seq_len):
-            # Count number of matches between the two sequences.
-            # size = total number of bases compared (excluding Ns)
-            matches, size = seq1.compare(seq2, offset)
+        if insert_match:
+            adapter_len = min(insert_match[0], seq_len - insert_match[3])
+            insert_match_size = seq_len - adapter_len
+            result[2] = insert_match_size
             
-            # Check that at least min_insert_overlap base were compared and that
-            # there are fewer than the maximium number of allowed mismatches
-            if size < self.min_insert_overlap or matches < (size * self.min_insert_match_frac):
-                continue
+            if (adapter_len < self.min_adapter_overlap or
+                    self.match_probability(insert_match[4], insert_match_size) > self.max_error_prob):
+                return result
             
-            # Compute probability of seeing this number of matches at random and
-            # check that it's less than the maximum allowed
-            p = self.match_probability(matches, size)
-            if p >= best_p:
-                continue
+            a1_match = compare_prefixes(seq1[insert_match_size:], adapter1)
+            a2_match = compare_prefixes(seq2[insert_match_size:], adapter2)
+            min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
+            if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
+                return result
+            a1_prob = self.match_probability(a1_match[4], adapter_len)
+            a2_prob = self.match_probability(a2_match[4], adapter_len)
+            if adapter_len > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
+                return result
             
-            # Otherwise, we've found an acceptable insert match
-            insert_match = True
-
-            # Match the overhang against the adapter sequence
-            a1_match = seq1.compare(adapter1, offset=-offset)
-            a2_match = seq2.compare(adapter2, offset=-offset)
-            min_adapter_matches = math.ceil(offset * self.min_adapter_match_frac)
-            if a1_match[0] < min_adapter_matches and a2_match[0] < min_adapter_matches:
-                continue
-            a1_prob = self.match_probability(*a1_match)
-            a2_prob = self.match_probability(*a2_match)
-            if offset > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
-                continue
+            adapter_len1 = min(len(adapter1), l1 - insert_match_size)
+            adapter_len2 = min(len(adapter2), l2 - insert_match_size)
+            best_matches, best_mismatches = (a1_match if a1_prob < a2_prob else a2_match)[4:6]
+            result[0] = Match(0, adapter_len1, insert_match_size, l1, best_matches, best_mismatches)
+            result[1] = Match(0, adapter_len2, insert_match_size, l2, best_matches, best_mismatches)
             
-            best_p = p
-            best_offset = offset
-            # This is a shortcut - if the match isn't symmetrical (e.g. if bases are trimmed off
-            # the 5' end of one read but not the other), this will screw up the adapter stats. We
-            # can solve this by always aligning adapters, at the expense of performance
-            best_match = a1_match if a1_prob < a2_prob else a2_match
-        
-        if best_offset is None or best_offset < self.min_adapter_overlap:
-            return (None, None, insert_match)
-        
-        insert_match_size = seq_len - best_offset
-        adapter_len1 = min(len(adapter1), l1 - insert_match_size)
-        adapter_len2 = min(len(adapter2), l2 - insert_match_size)
-        best_matches = best_match[0]
-        best_mismatches = best_match[1] - best_matches
-        match1 = Match(0, adapter_len1, insert_match_size, l1, best_matches, best_mismatches)
-        match2 = Match(0, adapter_len2, insert_match_size, l2, best_matches, best_mismatches)
-        return (match1, match2, insert_match)
+        return result
+            
+        # best_offset = best_a1_match = best_a2_match = None
+        # best_p = self.max_error_prob
+        # insert_match = False
+        #
+        # for offset in range(self.min_insert_overlap, seq_len):
+        #     # Count number of matches between the two sequences.
+        #     # size = total number of bases compared (excluding Ns)
+        #     matches, size = seq1.compare(seq2, offset)
+        #
+        #     # Check that at least min_insert_overlap base were compared and that
+        #     # there are fewer than the maximium number of allowed mismatches
+        #     if size < self.min_insert_overlap or matches < (size * self.min_insert_match_frac):
+        #         continue
+        #
+        #     # Compute probability of seeing this number of matches at random and
+        #     # check that it's less than the maximum allowed
+        #     p = self.match_probability(matches, size)
+        #     if p >= best_p:
+        #         continue
+        #
+        #     # Otherwise, we've found an acceptable insert match
+        #     insert_match = True
+        #
+        #     # Match the overhang against the adapter sequence
+        #     a1_match = seq1.compare(adapter1, offset=-offset)
+        #     a2_match = seq2.compare(adapter2, offset=-offset)
+        #     min_adapter_matches = math.ceil(offset * self.min_adapter_match_frac)
+        #     if a1_match[0] < min_adapter_matches and a2_match[0] < min_adapter_matches:
+        #         continue
+        #     a1_prob = self.match_probability(*a1_match)
+        #     a2_prob = self.match_probability(*a2_match)
+        #     if offset > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
+        #         continue
+        #
+        #     best_p = p
+        #     best_offset = offset
+        #     # This is a shortcut - if the match isn't symmetrical (e.g. if bases are trimmed off
+        #     # the 5' end of one read but not the other), this will screw up the adapter stats. We
+        #     # can solve this by always aligning adapters, at the expense of performance
+        #     best_match = a1_match if a1_prob < a2_prob else a2_match
+        #
+        # if best_offset is None or best_offset < self.min_adapter_overlap:
+        #     return (None, None, insert_match)
+        #
+        # insert_match_size = seq_len - best_offset
+        # adapter_len1 = min(len(adapter1), l1 - insert_match_size)
+        # adapter_len2 = min(len(adapter2), l2 - insert_match_size)
+        # best_matches = best_match[0]
+        # best_mismatches = best_match[1] - best_matches
+        # match1 = Match(0, adapter_len1, insert_match_size, l1, best_matches, best_mismatches)
+        # match2 = Match(0, adapter_len2, insert_match_size, l2, best_matches, best_mismatches)
+        # return (match1, match2, insert_match)
     
     def match_adapter(self, seq, adapter):
         """

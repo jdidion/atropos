@@ -6,8 +6,9 @@ need to be stored, and as a class with a __call__ method if there are parameters
 (or statistics).
 """
 import re
-from atropos.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.align import Aligner, SEMIGLOBAL, SeqPurgeAligner, OneHotEncoded
+from .qualtrim import quality_trim_index, nextseq_trim_index
+from .align import Aligner, SEMIGLOBAL, SeqPurgeAligner, OneHotEncoded
+from .util import reverse_complement
 from collections import defaultdict
 import copy
 import logging
@@ -120,32 +121,37 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
     insert overlap before falling back to semi-global adapter alignment.
     """
     def __init__(self, adapter1, adapter2, aligner=None, action='trim', symmetric=True):
-        self.adapters = (adapter1, adapter2)
+        #self.adapters = (adapter1, adapter2)
+        self.adapter1 = adapter1
+        self.adapter2 = adapter2
         self.aligner = aligner or SeqPurgeAligner()
         self.action = action
         self.symmetric = symmetric
         self.with_adapters = [0, 0]
         
         # Create one-hot encoded adapter sequences
-        self.ohe_adapter1 = OneHotEncoded(adapter1.sequence)
-        if adapter1.indels:
-            self.adapter_match1 = lambda read: self.adapters[0].match_to(read)
-        else:
-            self.adapter_match1 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter1)
-        
-        self.ohe_adapter2 = OneHotEncoded(adapter2.sequence, reverse_complement=True)
-        if adapter2.indels:
-            self.adapter_match2 = lambda read: self.adapters[1].match_to(read)
-        else:
-            self.ohe_adapter2_fw = OneHotEncoded(adapter2.sequence)
-            self.adapter_match2 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter2_fw)
+        # self.ohe_adapter1 = OneHotEncoded(adapter1.sequence)
+        # if adapter1.indels:
+        #     self.adapter_match1 = lambda read: self.adapters[0].match_to(read)
+        # else:
+        #     self.adapter_match1 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter1)
+        #
+        # self.ohe_adapter2 = OneHotEncoded(adapter2.sequence, reverse_complement=True)
+        # if adapter2.indels:
+        #     self.adapter_match2 = lambda read: self.adapters[1].match_to(read)
+        # else:
+        #     self.ohe_adapter2_fw = OneHotEncoded(adapter2.sequence)
+        #     self.adapter_match2 = lambda read: self.aligner.match_adapter(read.sequence, self.ohe_adapter2_fw)
     
     def __call__(self, read1, read2):
-        match1, match2, insert_match = self.aligner.match_insert(read1.sequence, read2.sequence, self.ohe_adapter1, self.ohe_adapter2)
+        match1, match2, insert_match = self.aligner.match_insert(
+            read1.sequence, read2.sequence, self.adapter1.sequence, self.adapter2.sequence)
         
         if match1 is None and match2 is None:
-            match1 = self.adapter_match1(read1)
-            match2 = self.adapter_match2(read2)
+            #match1 = self.adapter_match1(read1)
+            #match2 = self.adapter_match2(read2)
+            match1 = self.adapter1.match_to(read1)
+            match2 = self.adapter2.match_to(read2)
         
         if self.symmetric:
             if match1 is None and match2:
@@ -154,12 +160,14 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
                 match2 = match1.copy()
             
         if match1 is not None:
-            match1.adapter = self.adapters[0]
+            #match1.adapter = self.adapters[0]
+            match1.adapter = self.adapter1
             match1.read = read1
             match1.front = False
         
         if match2 is not None:
-            match2.adapter = self.adapters[1]
+            #match2.adapter = self.adapters[1]
+            match2.adapter = self.adapter2
             match2.read = read2
             match2.front = False
         
@@ -171,8 +179,7 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
             read.match_info = None
             return read
         
-        adapter = self.adapters[read_idx]
-        trimmed_read = adapter.trimmed(match)
+        trimmed_read = match.adapter.trimmed(match)
         
         if __debug__:
             assert len(trimmed_read) < len(read), "Trimmed read isn't shorter than original"
@@ -478,25 +485,6 @@ class SwiftBisulfiteTrimmer(object):
     @property
     def modified_bases(self):
         return self._shortCutter.trimmed_bases + self._longCutter.trimmed_bases
-
-complement = {
-    'A' : 'T',
-    'C' : 'G',
-    'R' : 'Y',
-    'S' : 'S',
-    'W' : 'W',
-    'K' : 'M',
-    'B' : 'V',
-    'D' : 'H',
-    'N' : 'N'
-}
-for k,v in list(complement.items()):
-    complement[v] = k
-    complement[k.lower()] = v.lower()
-    complement[v.lower()] = k.lower()
-
-def reverse_complement(seq):
-    return "".join(complement[base] for base in reversed(seq))
 
 class MergeOverlapping(object):
     def __init__(self, min_overlap=0.9, error_rate=0.1):

@@ -235,7 +235,7 @@ def test_interleaved_input_paired_output():
 def test_pair_filter():
     run_paired('--pair-filter=both -a TTAGACATAT -A GGAGTA -m 14',
         in1='paired.1.fastq', in2='paired.2.fastq',
-        expected1='paired-filterboth.1.fastq', expected2='paired-filterboth_{aligner}.2.fastq',
+        expected1='paired-filterboth_{aligner}.1.fastq', expected2='paired-filterboth_{aligner}.2.fastq',
         aligners=BACK_ALIGNERS
     )
 

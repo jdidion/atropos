@@ -169,17 +169,17 @@ def test_one_hot_encoding_compare_overlap():
 def test_seqpurge_insert_align():
     a1_seq = 'TTAGACATATGG'
     a2_seq = 'CAGTGGAGTATA'
-    a1 = OneHotEncoded(a1_seq)
-    a2 = OneHotEncoded(a2_seq, reverse_complement=True)
+    #a1 = OneHotEncoded(a1_seq)
+    #a2 = OneHotEncoded(a2_seq, reverse_complement=True)
     aligner = SeqPurgeAligner()
     r1 = 'AGTCGAGCCCATTGCAGACT' + a1_seq[0:10]
     r2 = 'AGTCTGCAATGGGCTCGACT' + a2_seq[0:10]
-    match1, match2, insert_match = aligner.match_insert(r1, r2, a1, a2)
+    match1, match2, insert_match = aligner.match_insert(r1, r2, a1_seq, a2_seq)
     assert match1.rstart == 20
     assert match1.length == 10
     assert match2.rstart == 20
     assert match2.length == 10
-    assert insert_match is True
+    assert insert_match == 20
     
 def test_seqpurge_adapter_align():
     a_seq = 'TTAGACATATGG'
@@ -191,12 +191,14 @@ def test_seqpurge_adapter_align():
     assert match.length == 10
 
 def test_short_adapter_overlap():
-    a1 = OneHotEncoded('TTAGACATAT')
-    a2 = OneHotEncoded('CAGTGGAGTA', reverse_complement=True)
+    a1_seq = 'TTAGACATAT'
+    a2_seq = 'CAGTGGAGTA'
+    #a1 = OneHotEncoded(a1_seq)
+    #a2 = OneHotEncoded(a2_seq, reverse_complement=True)
     seq1 = 'GACAGGCCGTTTGAATGTTGACGGGATGTT'
     seq2 = 'CATCCCGTCAACATTCAAACGGCCTGTCCA'
     aligner = SeqPurgeAligner()
-    match1, match2, insert_match = aligner.match_insert(seq1, seq2, a1, a2)
+    match1, match2, insert_match = aligner.match_insert(seq1, seq2, a1_seq, a2_seq)
     assert match1.rstart == 28
     assert match1.length == 2
     assert match2.rstart == 28
