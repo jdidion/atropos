@@ -111,3 +111,10 @@ real        41.38
 user       156.56
 sys          4.49
 seqpurge_4_real_q20
+real       107.97
+user       425.32
+sys          3.34
+skewer_4_real_q20
+real        23.27
+user        71.71
+sys         21.16
