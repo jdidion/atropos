@@ -5,6 +5,9 @@
 # They provide a correct implementation (qalign: http://www.exelixis-lab.org/web/software/alignment/).
 
 from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
+from cpython.array cimport array, clone
+cdef array ld_array = array('d', [])
+from libc.math cimport ceil
 
 DEF START_WITHIN_SEQ1 = 1
 DEF START_WITHIN_SEQ2 = 2
@@ -491,7 +494,6 @@ def locate(str reference, str query, double max_error_rate, int flags=SEMIGLOBAL
     aligner.min_overlap = min_overlap
     return aligner.locate(query)
 
-
 def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_query=False):
     """
     Find out whether one string is the prefix of the other one, allowing
@@ -536,3 +538,257 @@ def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_
 
     # length - matches = no. of errors
     return (0, length, 0, length, matches, length - matches)
+
+# Faster versions of min and max.
+cdef inline int int_max(int a, int b): return a if a > b else b
+cdef inline int int_min(int a, int b): return a if a < b else b
+
+cdef class FactorialCache:
+    cdef array factorials
+    cdef int cur_array_size
+    cdef int max_n
+    cdef bint nan_limit
+    
+    def __cinit__(self, bint init_size=150):
+        self.factorials = clone(ld_array, init_size, zero=True)
+        self.factorials[0] = 1
+        self.factorials[1] = 1
+        self.max_n = 1
+        self.cur_array_size = init_size
+        self.nan_limit = False
+        
+    def factorial(self, n):
+        if n > self.max_n:
+            if self.nan_limit:
+                return -1
+            if n >= self.cur_array_size:
+                self._extend(n)
+            self._fill_upto(n)
+            if self.nan_limit:
+                return -1
+        return self.factorials[n]
+    
+    def can_compute(self, n):
+        if n < self.max_n:
+            return True
+        elif self.nan_limit:
+            return False
+        if n >= self.cur_array_size:
+            self._extend(n)
+        if not self.nan_limit:
+            self._fill_upto(n)
+        return n <= self.max_n
+    
+    def _extend(self, n):
+        cdef int extension_size = n - self.cur_array_size + 1
+        cdef array extension = clone(ld_array, extension_size, zero=False)
+        array.extend(self.factorials, extension)
+        self.cur_array_size += extension_size
+    
+    def _fill_upto(self, n):
+        cdef int i = self.max_n
+        cdef int next_i = i + 1
+        cdef double next_val
+        while i < n:
+            next_val = next_i * self.factorials[i]
+            if next_val == float('inf'):
+                self.nan_limit = True
+                break
+            else:
+                self.factorials[next_i] = next_val
+                i = next_i
+                next_i += 1
+        self.max_n = i
+
+cdef object factorial_cache = FactorialCache()
+
+def match_probability(int matches, int mismatches, int count):
+    while not factorial_cache.can_compute(count):
+        matches = matches // 2
+        mismatches = mismatches // 2
+        count = matches + mismatches
+    
+    cdef int i = matches
+    cdef double p = 0.0
+    cdef double nfac = factorial_cache.factorial(count)
+    while i <= count:
+        p += (
+            (0.75 ** (count - i)) *
+            (0.25 ** i) *
+            nfac /
+            factorial_cache.factorial(i) /
+            factorial_cache.factorial(count - i)
+        )
+        i += 1
+    
+    return p
+
+def _acgt_comp_table():
+    """
+    Return a translation table that maps A, C, G, T characters to the their complement.
+    Other characters (including possibly IUPAC characters) are mapped to zero.
+
+    Lowercase versions are also translated, and U is treated the same as T.
+    """
+    d = dict(A=8, C=4, G=2, T=1, U=1)
+    t = bytearray(b'\0') * 256
+    for c, v in d.items():
+        t[ord(c)] = v
+        t[ord(c.lower())] = v
+    return bytes(t)
+
+cdef bytes COMP_TABLE = _acgt_comp_table()
+
+cdef class SeqPurgeAligner:
+    cdef bytes adapter1
+    cdef int adapter1_len
+    cdef bytes adapter2
+    cdef int adapter2_len
+    cdef double max_error_prob
+    cdef int min_insert_overlap
+    cdef double max_insert_mismatch_frac
+    cdef int min_adapter_overlap
+    cdef double min_adapter_match_frac
+    cdef int adapter_check_cutoff
+    
+    def __cinit__(self, str adapter1, str adapter2, double max_error_prob=1E-6,
+                  int min_insert_overlap=1, double max_insert_mismatch_frac=0.8,
+                  int min_adapter_overlap=1, double min_adapter_match_frac=0.8,
+                  int adapter_check_cutoff=9):
+        """
+        adapter1: read1 adapter
+        adapter2: read2 adapter
+        """
+        cdef bytes a1 = adapter1.encode('ascii')
+        self.adapter1 = a1.translate(ACGT_TABLE)
+        self.adapter1_len = len(a1)
+        cdef bytes a2 = adapter2.encode('ascii')
+        self.adapter2 = a2.translate(ACGT_TABLE)
+        self.adapter2_len = len(a2)
+        self.max_error_prob = max_error_prob
+        self.min_insert_overlap = min_insert_overlap
+        self.max_insert_mismatch_frac = max_insert_mismatch_frac
+        self.min_adapter_overlap = min_adapter_overlap
+        self.min_adapter_match_frac = min_adapter_match_frac
+        self.adapter_check_cutoff = adapter_check_cutoff
+    
+    def match_insert(self, str seq1, str seq2):
+        cdef int s1_len = len(seq1)
+        cdef int s2_len = len(seq2)
+        cdef int seq_len = int_min(s1_len, s2_len)
+        
+        cdef bytes s1 = seq1[:seq_len].encode('ascii')
+        s1 = s1.translate(ACGT_TABLE)
+        cdef bytes s2 = seq2[:seq_len].encode('ascii')
+        cdef bytes s2_revcomp = s2[::-1].translate(COMP_TABLE)
+        s2 = s2.translate(ACGT_TABLE)
+        
+        cdef double best_p = self.max_error_prob
+        cdef int best_offset = -1
+        cdef int best_insert_match = -1
+        cdef int best_adapter_matches = -1
+        cdef int best_adapter_mismatches = -1
+        
+        cdef int offset
+        cdef int overlap_length
+        cdef int max_adapter_len
+        cdef double max_mismatches
+        cdef int matches
+        cdef int mismatches
+        cdef int count
+        cdef int a1_len
+        cdef double a1_min_matches
+        cdef int a1_matches
+        cdef int a1_mismatches
+        cdef double a1_prob
+        cdef int a2_len
+        cdef double a2_min_matches
+        cdef int a2_matches
+        cdef int a2_mismatches
+        cdef double a2_prob
+        cdef int invalid
+        cdef int i
+        cdef char b1
+        cdef char b2
+        cdef double p
+        
+        for offset in range(self.min_insert_overlap, seq_len):
+            overlap_length = seq_len - offset
+            max_mismatches = ceil(overlap_length * self.max_insert_mismatch_frac)
+            matches = 0
+            mismatches = 0
+            count = 0
+            
+            for i in range(overlap_length):
+                b1 = s1[i]
+                b2 = s2_revcomp[i+offset]
+                if b1 != b2:
+                    mismatches += 1
+                    if mismatches > max_mismatches:
+                        break
+                elif b1 > 0 and b2 > 0:
+                    matches += 1
+                
+            else:
+                count = matches + mismatches
+                if count < self.min_insert_overlap:
+                    continue
+                
+                p = match_probability(matches, mismatches, count)
+                if p >= best_p:
+                    continue
+                
+                if best_insert_match < 0:
+                    best_insert_match = overlap_length
+                
+                max_adapter_len = seq_len - overlap_length
+                if max_adapter_len < self.min_adapter_overlap:
+                    continue
+                
+                a1_len = int_min(self.adapter1_len, max_adapter_len)
+                a1_matches = 0
+                a1_mismatches = 0
+                
+                for i in range(a1_len):
+                    b1 = s1[overlap_length+i]
+                    b2 = self.adapter1[i]
+                    if b1 != b2:
+                        a1_mismatches += 1
+                    elif b1 > 0 and b2 > 0:
+                        a1_matches += 1
+                
+                a2_len = int_min(self.adapter2_len, max_adapter_len)
+                a2_matches = 0
+                a2_mismatches = 0
+                
+                for i in range(a2_len):
+                    b1 = s2[overlap_length+i]
+                    b2 = self.adapter2[i]
+                    if b1 != b2:
+                        a2_mismatches += 1
+                    elif b1 > 0 and b2 > 0:
+                        a2_matches += 1
+                
+                a1_min_matches = ceil(a1_len * self.min_adapter_match_frac)
+                a2_min_matches = ceil(a2_len * self.min_adapter_match_frac)
+                if a1_matches < a1_min_matches and a2_matches < a2_min_matches:
+                    continue
+                
+                a1_prob = match_probability(a1_matches, a1_mismatches, a1_matches + a1_mismatches)
+                a2_prob = match_probability(a2_matches, a2_mismatches, a2_matches + a2_mismatches)
+                if max_adapter_len > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
+                    continue
+                
+                best_p = p
+                best_offset = offset
+                best_adapter_matches = a1_matches if a1_prob < a2_prob else a2_matches
+                best_adapter_mismatches = a1_mismatches if a1_prob < a2_prob else a2_mismatches
+        
+        if best_offset is None or best_offset < self.min_adapter_overlap:
+            return (False, best_insert_match, -1, -1, -1, -1, -1, -1)
+        
+        cdef insert_match_len = seq_len - best_offset
+        cdef adapter_len1 = int_min(a1_len, s1_len - insert_match_len)
+        cdef adapter_len2 = int_min(a2_len, s2_len - insert_match_len)
+        return (True, insert_match_len, adapter_len1, adapter_len2, s1_len, s2_len,
+                best_adapter_matches, best_adapter_mismatches)

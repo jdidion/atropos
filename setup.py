@@ -86,7 +86,6 @@ def check_cython_version():
 
 extensions = [
     Extension('atropos._align', sources=['atropos/_align.pyx']),
-    Extension('atropos._align_pe', sources=['atropos/_align_pe.pyx']),
     Extension('atropos._qualtrim', sources=['atropos/_qualtrim.pyx']),
     Extension('atropos._seqio', sources=['atropos/_seqio.pyx']),
 ]

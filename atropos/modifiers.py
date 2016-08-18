@@ -7,7 +7,7 @@ need to be stored, and as a class with a __call__ method if there are parameters
 """
 import re
 from .qualtrim import quality_trim_index, nextseq_trim_index
-from .align import Aligner, SEMIGLOBAL, SeqPurgeAligner, OneHotEncoded
+from .align import Aligner, SEMIGLOBAL, SeqPurgeAligner#, Match#, OneHotEncoded
 from .util import reverse_complement
 from collections import defaultdict
 import copy
@@ -124,6 +124,7 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
         #self.adapters = (adapter1, adapter2)
         self.adapter1 = adapter1
         self.adapter2 = adapter2
+        #self.aligner = aligner or SeqPurgeAligner(adapter1.sequence, adapter2.sequence)
         self.aligner = aligner or SeqPurgeAligner()
         self.action = action
         self.symmetric = symmetric
@@ -146,7 +147,11 @@ class SeqPurgeAdapterCutter(ReadPairModifier):
     def __call__(self, read1, read2):
         match1, match2, insert_match = self.aligner.match_insert(
             read1.sequence, read2.sequence, self.adapter1.sequence, self.adapter2.sequence)
-        
+        #match = self.aligner.match_insert(read1.sequence, read2.sequence)
+        #if match[0]:
+        #    match1 = Match(0, match[2], match[1], match[4], match[6], match[7])
+        #    match2 = Match(0, match[3], match[1], match[5], match[6], match[7])
+        #else:
         if match1 is None and match2 is None:
             #match1 = self.adapter_match1(read1)
             #match2 = self.adapter_match2(read2)
