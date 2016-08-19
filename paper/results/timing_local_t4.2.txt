@@ -1,0 +1,120 @@
+atropos_4_001_q0_adapter_writercomp
+real        54.37
+user       114.02
+sys          4.03
+atropos_4_001_q0_adapter_nowriter
+real        29.89
+user       115.00
+sys          3.59
+atropos_4_001_q0_insert_writercomp
+real        55.04
+user       141.77
+sys          4.53
+atropos_4_001_q0_insert_nowriter
+real        39.82
+user       140.69
+sys          3.87
+seqpurge_4_001_q0
+real       112.77
+user       440.46
+sys          3.46
+skewer_4_001_q0
+real        28.86
+user        81.14
+sys         27.16
+atropos_4_005_q0_adapter_writercomp
+real        54.19
+user       114.22
+sys          4.05
+atropos_4_005_q0_adapter_nowriter
+real        29.87
+user       114.96
+sys          3.61
+atropos_4_005_q0_insert_writercomp
+real        56.20
+user       145.92
+sys          4.96
+atropos_4_005_q0_insert_nowriter
+real        41.33
+user       146.86
+sys          4.42
+seqpurge_4_005_q0
+real       107.68
+user       421.43
+sys          2.98
+skewer_4_005_q0
+real        29.15
+user        83.15
+sys         28.21
+atropos_4_01_q0_adapter_writercomp
+real        55.51
+user       118.56
+sys          4.26
+atropos_4_01_q0_adapter_nowriter
+real        30.75
+user       120.99
+sys          3.88
+atropos_4_01_q0_insert_writercomp
+real        56.22
+user       144.56
+sys          4.56
+atropos_4_01_q0_insert_nowriter
+real        39.71
+user       139.82
+sys          3.84
+seqpurge_4_01_q0
+real       114.24
+user       443.42
+sys          4.29
+skewer_4_01_q0
+real        29.40
+user        82.94
+sys         27.77
+atropos_4_real_q0_adapter_writercomp
+real        41.08
+user        94.90
+sys          3.77
+atropos_4_real_q0_adapter_nowriter
+real        23.18
+user        94.35
+sys          3.26
+atropos_4_real_q0_insert_writercomp
+real        41.92
+user       117.62
+sys          4.13
+atropos_4_real_q0_insert_nowriter
+real        33.31
+user       119.23
+sys          3.97
+seqpurge_4_real_q0
+real        98.88
+user       390.02
+sys          2.93
+skewer_4_real_q0
+real        20.75
+user        66.10
+sys         18.58
+atropos_4_real_q20_adapter_writercomp
+real        41.07
+user        97.78
+sys          3.81
+atropos_4_real_q20_adapter_nowriter
+real        28.49
+user        99.51
+sys          3.37
+atropos_4_real_q20_insert_writercomp
+real        41.75
+user       118.61
+sys          4.04
+atropos_4_real_q20_insert_nowriter
+real        32.98
+user       120.59
+sys          3.59
+seqpurge_4_real_q20
+real        96.67
+user       384.84
+sys          2.33
+skewer_4_real_q20
+real        24.69
+user        76.20
+sys         23.12
