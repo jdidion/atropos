@@ -21,14 +21,12 @@ ctypedef struct _Entry:
     int matches  # no. of matches in this alignment
     int origin   # where the alignment originated: negative for positions within seq1, positive for pos. within seq2
 
-
 ctypedef struct _Match:
     int origin
     int cost
     int matches
     int ref_stop
     int query_stop
-
 
 def _acgt_table():
     """
@@ -44,7 +42,6 @@ def _acgt_table():
         t[ord(c)] = v
         t[ord(c.lower())] = v
     return bytes(t)
-
 
 def _iupac_table():
     """
@@ -85,10 +82,8 @@ def _iupac_table():
         t[ord(c.lower())] = v
     return bytes(t)
 
-
 cdef bytes ACGT_TABLE = _acgt_table()
 cdef bytes IUPAC_TABLE = _iupac_table()
-
 
 class DPMatrix:
     """
@@ -122,7 +117,6 @@ class DPMatrix:
             r = c + ' ' + ' '.join('  ' if v is None else '{0:2d}'.format(v) for v in row)
             rows.append(r)
         return '\n'.join(rows)
-
 
 cdef class Aligner:
     """
@@ -538,257 +532,246 @@ def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_
     # length - matches = no. of errors
     return (0, length, 0, length, matches, length - matches)
 
-# cdef class NoIndelAligner:
-#     """
-#     Same as Aligner above, but does not allow indels or wildcards.
-#     """
-#     cdef int m
-#     cdef _Entry* column  # one column of the DP matrix
-#     cdef double max_error_rate
-#     cdef int flags
-#     cdef int _min_overlap
-#     cdef bint debug
-#     cdef object _dpmatrix
-#     cdef bytes _reference  # TODO rename to translated_reference or so
-#     cdef str str_reference
-#
-#     def __cinit__(self, str reference, double max_error_rate, int flags=SEMIGLOBAL):
-#         self.max_error_rate = max_error_rate
-#         self.flags = flags
-#         self.str_reference = reference
-#         self.reference = reference
-#         self._min_overlap = 1
-#         self.debug = False
-#         self._dpmatrix = None
-#
-#     property min_overlap:
-#         def __get__(self):
-#             return self._min_overlap
-#
-#         def __set__(self, int value):
-#             if value < 1:
-#                 raise ValueError('Minimum overlap must be at least 1')
-#             self._min_overlap = value
-#
-#     property reference:
-#         def __get__(self):
-#             return self._reference
-#
-#         def __set__(self, str reference):
-#             mem = <_Entry*> PyMem_Realloc(self.column, (len(reference) + 1) * sizeof(_Entry))
-#             if not mem:
-#                 raise MemoryError()
-#             self.column = mem
-#             self._reference = reference.encode('ascii')
-#             self.m = len(reference)
-#             self.str_reference = reference
-#
-#     property dpmatrix:
-#         """
-#         The dynamic programming matrix as a DPMatrix object. This attribute is
-#         usually None, unless debugging has been enabled with enable_debug().
-#         """
-#         def __get__(self):
-#             return self._dpmatrix
-#
-#     def enable_debug(self):
-#         """
-#         Store the dynamic programming matrix while running the locate() method
-#         and make it available in the .dpmatrix attribute.
-#         """
-#         self.debug = True
-#
-#     def locate(self, str query):
-#         """
-#         locate(query) -> (refstart, refstop, querystart, querystop, matches, errors)
-#
-#         Find the query within the reference associated with this aligner. The
-#         intervals (querystart, querystop) and (refstart, refstop) give the
-#         location of the match.
-#
-#         That is, the substrings query[querystart:querystop] and
-#         self.reference[refstart:refstop] were found to align best to each other,
-#         with the given number of matches and the given number of errors.
-#
-#         The alignment itself is not returned.
-#         """
-#         cdef char* s1 = self._reference
-#         cdef bytes query_bytes = query.encode('ascii')
-#         cdef char* s2 = query_bytes
-#         cdef int m = self.m
-#         cdef int n = len(query)
-#         cdef _Entry* column = self.column
-#         cdef double max_error_rate = self.max_error_rate
-#         cdef bint start_in_ref = self.flags & START_WITHIN_SEQ1
-#         cdef bint start_in_query = self.flags & START_WITHIN_SEQ2
-#         cdef bint stop_in_ref = self.flags & STOP_WITHIN_SEQ1
-#         cdef bint stop_in_query = self.flags & STOP_WITHIN_SEQ2
-#
-#         cdef int i, j
-#
-#         # maximum no. of errors
-#         cdef int k = <int> (max_error_rate * m)
-#
-#         # Determine largest and smallest column we need to compute
-#         cdef int max_n = n
-#         cdef int min_n = 0
-#         if not start_in_query:
-#             # costs can only get worse after column m
-#             max_n = min(n, m + k)
-#         if not stop_in_query:
-#             min_n = max(0, n - m - k)
-#
-#         # fill out columns only until 'last'
-#         if not start_in_ref and not start_in_query:
-#             for i in range(m + 1):
-#                 column[i].matches = 0
-#                 column[i].cost = max(i, min_n) * 100000
-#                 column[i].origin = 0
-#         elif start_in_ref and not start_in_query:
-#             for i in range(m + 1):
-#                 column[i].matches = 0
-#                 column[i].cost = min_n * 100000
-#                 column[i].origin = min(0, min_n - i)
-#         elif not start_in_ref and start_in_query:
-#             for i in range(m + 1):
-#                 column[i].matches = 0
-#                 column[i].cost = i * 100000
-#                 column[i].origin = max(0, min_n - i)
-#         else:
-#             for i in range(m + 1):
-#                 column[i].matches = 0
-#                 column[i].cost = min(i, min_n) * 100000
-#                 column[i].origin = min_n - i
-#
-#         if self.debug:
-#             self._dpmatrix = DPMatrix(self.str_reference, query)
-#             for i in range(m + 1):
-#                 self._dpmatrix.set_entry(i, min_n, column[i].cost)
-#
-#         cdef _Match best
-#         best.ref_stop = m
-#         best.query_stop = n
-#         best.cost = m + n
-#         best.origin = 0
-#         best.matches = 0
-#
-#         # Ukkonen's trick: index of the last cell that is less than k.
-#         cdef int last = min(m, k + 1)
-#         if start_in_ref:
-#             last = m
-#
-#         cdef int cost_diag
-#         cdef int cost_deletion
-#         cdef int cost_insertion
-#         cdef int origin, cost, matches
-#         cdef int length
-#         cdef bint characters_equal
-#         cdef _Entry tmp_entry
-#
-#         with nogil:
-#             # iterate over columns
-#             for j in range(min_n + 1, max_n + 1):
-#                 # remember first entry
-#                 tmp_entry = column[0]
-#
-#                 # fill in first entry in this column
-#                 if start_in_query:
-#                     column[0].origin = j
-#                 else:
-#                     column[0].cost = j * self._insertion_cost
-#                 for i in range(1, last + 1):
-#                     characters_equal = (s1[i-1] == s2[j-1])
-#                     if characters_equal:
-#                         # Characters match: This cannot be an indel.
-#                         cost = tmp_entry.cost
-#                         origin = tmp_entry.origin
-#                         matches = tmp_entry.matches + 1
-#                     else:
-#                         # Characters do not match.
-#                         cost_diag = tmp_entry.cost + 1
-#                         cost_deletion = column[i].cost + self._deletion_cost
-#                         cost_insertion = column[i-1].cost + self._insertion_cost
-#
-#                         if cost_diag <= cost_deletion and cost_diag <= cost_insertion:
-#                             # MISMATCH
-#                             cost = cost_diag
-#                             origin = tmp_entry.origin
-#                             matches = tmp_entry.matches
-#                         elif cost_insertion <= cost_deletion:
-#                             # INSERTION
-#                             cost = cost_insertion
-#                             origin = column[i-1].origin
-#                             matches = column[i-1].matches
-#                         else:
-#                             # DELETION
-#                             cost = cost_deletion
-#                             origin = column[i].origin
-#                             matches = column[i].matches
-#
-#                     # remember current cell for next iteration
-#                     tmp_entry = column[i]
-#
-#                     column[i].cost = cost
-#                     column[i].origin = origin
-#                     column[i].matches = matches
-#                 if self.debug:
-#                     with gil:
-#                         for i in range(last + 1):
-#                             self._dpmatrix.set_entry(i, j, column[i].cost)
-#                 while last >= 0 and column[last].cost > k:
-#                     last -= 1
-#                 # last can be -1 here, but will be incremented next.
-#                 # TODO if last is -1, can we stop searching?
-#                 if last < m:
-#                     last += 1
-#                 elif stop_in_query:
-#                     # Found a match. If requested, find best match in last row.
-#                     # length of the aligned part of the reference
-#                     length = m + min(column[m].origin, 0)
-#                     cost = column[m].cost
-#                     matches = column[m].matches
-#                     if length >= self._min_overlap and cost <= length * max_error_rate and (matches > best.matches or (matches == best.matches and cost < best.cost)):
-#                         # update
-#                         best.matches = matches
-#                         best.cost = cost
-#                         best.origin = column[m].origin
-#                         best.ref_stop = m
-#                         best.query_stop = j
-#                         if cost == 0 and matches == m:
-#                             # exact match, stop early
-#                             break
-#                 # column finished
-#
-#         if max_n == n:
-#             first_i = 0 if stop_in_ref else m
-#             # search in last column # TODO last?
-#             for i in range(first_i, m+1):
-#                 length = i + min(column[i].origin, 0)
-#                 cost = column[i].cost
-#                 matches = column[i].matches
-#                 if length >= self._min_overlap and cost <= length * max_error_rate and (matches > best.matches or (matches == best.matches and cost < best.cost)):
-#                     # update best
-#                     best.matches = matches
-#                     best.cost = cost
-#                     best.origin = column[i].origin
-#                     best.ref_stop = i
-#                     best.query_stop = n
-#         if best.cost == m + n:
-#             # best.cost was initialized with this value.
-#             # If it is unchanged, no alignment was found that has
-#             # an error rate within the allowed range.
-#             return None
-#
-#         cdef int start1, start2
-#         if best.origin >= 0:
-#             start1 = 0
-#             start2 = best.origin
-#         else:
-#             start1 = -best.origin
-#             start2 = 0
-#
-#         assert best.ref_stop - start1 > 0  # Do not return empty alignments.
-#         return (start1, best.ref_stop, start2, best.query_stop, best.matches, best.cost)
-#
-#     def __dealloc__(self):
-#         PyMem_Free(self.column)
+DEF OVERHANG_MULTIPLIER = 100000
+
+cdef class NoIndelAligner:
+    """
+    Same as Aligner above, but does not allow indels or wildcards.
+    """
+    cdef int m
+    cdef _Entry* column  # one column of the DP matrix
+    cdef double max_error_rate
+    cdef int flags
+    cdef int _min_overlap
+    cdef bint debug
+    cdef object _dpmatrix
+    cdef bytes _reference  # TODO rename to translated_reference or so
+    cdef str str_reference
+
+    def __cinit__(self, str reference, double max_error_rate, int flags=SEMIGLOBAL):
+        self.max_error_rate = max_error_rate
+        self.flags = flags
+        self.str_reference = reference
+        self.reference = reference
+        self._min_overlap = 1
+        self.debug = False
+        self._dpmatrix = None
+
+    property min_overlap:
+        def __get__(self):
+            return self._min_overlap
+
+        def __set__(self, int value):
+            if value < 1:
+                raise ValueError('Minimum overlap must be at least 1')
+            self._min_overlap = value
+
+    property reference:
+        def __get__(self):
+            return self._reference
+
+        def __set__(self, str reference):
+            mem = <_Entry*> PyMem_Realloc(self.column, (len(reference) + 1) * sizeof(_Entry))
+            if not mem:
+                raise MemoryError()
+            self.column = mem
+            self._reference = reference.encode('ascii')
+            self.m = len(reference)
+            self.str_reference = reference
+
+    property dpmatrix:
+        """
+        The dynamic programming matrix as a DPMatrix object. This attribute is
+        usually None, unless debugging has been enabled with enable_debug().
+        """
+        def __get__(self):
+            return self._dpmatrix
+
+    def enable_debug(self):
+        """
+        Store the dynamic programming matrix while running the locate() method
+        and make it available in the .dpmatrix attribute.
+        """
+        self.debug = True
+
+    def locate(self, str query):
+        """
+        locate(query) -> (refstart, refstop, querystart, querystop, matches, errors)
+
+        Find the query within the reference associated with this aligner. The
+        intervals (querystart, querystop) and (refstart, refstop) give the
+        location of the match.
+
+        That is, the substrings query[querystart:querystop] and
+        self.reference[refstart:refstop] were found to align best to each other,
+        with the given number of matches and the given number of errors.
+
+        The alignment itself is not returned.
+        """
+        cdef char* s1 = self._reference
+        cdef bytes query_bytes = query.encode('ascii')
+        cdef char* s2 = query_bytes
+        cdef int m = self.m
+        cdef int n = len(query)
+        cdef _Entry* column = self.column
+        cdef double max_error_rate = self.max_error_rate
+        cdef bint start_in_ref = self.flags & START_WITHIN_SEQ1
+        cdef bint start_in_query = self.flags & START_WITHIN_SEQ2
+        cdef bint stop_in_ref = self.flags & STOP_WITHIN_SEQ1
+        cdef bint stop_in_query = self.flags & STOP_WITHIN_SEQ2
+
+        cdef int i, j
+
+        # maximum no. of errors
+        cdef int k = <int> (max_error_rate * m)
+
+        # Determine largest and smallest column we need to compute
+        cdef int max_n = n
+        cdef int min_n = 0
+        if not start_in_query:
+            # costs can only get worse after column m
+            max_n = min(n, m + k)
+        if not stop_in_query:
+            min_n = max(0, n - m - k)
+
+        # fill out columns only until 'last'
+        if not start_in_ref and not start_in_query:
+            for i in range(m + 1):
+                column[i].matches = 0
+                column[i].cost = max(i, min_n) * OVERHANG_MULTIPLIER
+                column[i].origin = 0
+        elif start_in_ref and not start_in_query:
+            for i in range(m + 1):
+                column[i].matches = 0
+                column[i].cost = min_n * OVERHANG_MULTIPLIER
+                column[i].origin = min(0, min_n - i)
+        elif not start_in_ref and start_in_query:
+            for i in range(m + 1):
+                column[i].matches = 0
+                column[i].cost = i * OVERHANG_MULTIPLIER
+                column[i].origin = max(0, min_n - i)
+        else:
+            for i in range(m + 1):
+                column[i].matches = 0
+                column[i].cost = min(i, min_n) * OVERHANG_MULTIPLIER
+                column[i].origin = min_n - i
+
+        if self.debug:
+            self._dpmatrix = DPMatrix(self.str_reference, query)
+            for i in range(m + 1):
+                self._dpmatrix.set_entry(i, min_n, column[i].cost)
+
+        cdef _Match best
+        best.ref_stop = m
+        best.query_stop = n
+        best.cost = m + n
+        best.origin = 0
+        best.matches = 0
+
+        # Ukkonen's trick: index of the last cell that is less than k.
+        cdef int last = min(m, k + 1)
+        if start_in_ref:
+            last = m
+
+        cdef int origin, cost, matches
+        cdef int length
+        cdef bint characters_equal
+        cdef _Entry tmp_entry
+
+        with nogil:
+            # iterate over columns
+            for j in range(min_n + 1, max_n + 1):
+                # remember first entry
+                tmp_entry = column[0]
+
+                # fill in first entry in this column
+                if start_in_query:
+                    column[0].origin = j
+                else:
+                    column[0].cost = j * OVERHANG_MULTIPLIER
+                
+                for i in range(1, last + 1):
+                    characters_equal = (s1[i-1] == s2[j-1])
+                    if characters_equal:
+                        # Characters match: This cannot be an indel.
+                        cost = tmp_entry.cost
+                        origin = tmp_entry.origin
+                        matches = tmp_entry.matches + 1
+                    else:
+                        # Characters do not match.
+                        cost = tmp_entry.cost + 1
+                        origin = tmp_entry.origin
+                        matches = tmp_entry.matches
+                    
+                    # remember current cell for next iteration
+                    tmp_entry = column[i]
+
+                    column[i].cost = cost
+                    column[i].origin = origin
+                    column[i].matches = matches
+                
+                if self.debug:
+                    with gil:
+                        for i in range(last + 1):
+                            self._dpmatrix.set_entry(i, j, column[i].cost)
+                
+                while last >= 0 and column[last].cost > k:
+                    last -= 1
+                # last can be -1 here, but will be incremented next.
+                # TODO if last is -1, can we stop searching?
+                if last < m:
+                    last += 1
+                elif stop_in_query:
+                    # Found a match. If requested, find best match in last row.
+                    # length of the aligned part of the reference
+                    length = m + min(column[m].origin, 0)
+                    cost = column[m].cost
+                    matches = column[m].matches
+                    if (length >= self._min_overlap and cost <= length * max_error_rate and
+                            (matches > best.matches or (matches == best.matches and cost < best.cost))):
+                        # update
+                        best.matches = matches
+                        best.cost = cost
+                        best.origin = column[m].origin
+                        best.ref_stop = m
+                        best.query_stop = j
+                        if cost == 0 and matches == m:
+                            # exact match, stop early
+                            break
+                # column finished
+
+        if max_n == n:
+            first_i = 0 if stop_in_ref else m
+            # search in last column # TODO last?
+            for i in range(first_i, m+1):
+                length = i + min(column[i].origin, 0)
+                cost = column[i].cost
+                matches = column[i].matches
+                if (length >= self._min_overlap and cost <= length * max_error_rate and
+                        (matches > best.matches or (matches == best.matches and cost < best.cost))):
+                    # update best
+                    best.matches = matches
+                    best.cost = cost
+                    best.origin = column[i].origin
+                    best.ref_stop = i
+                    best.query_stop = n
+        
+        if best.cost == m + n:
+            # best.cost was initialized with this value.
+            # If it is unchanged, no alignment was found that has
+            # an error rate within the allowed range.
+            return None
+
+        cdef int start1, start2
+        if best.origin >= 0:
+            start1 = 0
+            start2 = best.origin
+        else:
+            start1 = -best.origin
+            start2 = 0
+
+        assert best.ref_stop - start1 > 0  # Do not return empty alignments.
+        return (start1, best.ref_stop, start2, best.query_stop, best.matches, best.cost)
+
+    def __dealloc__(self):
+        PyMem_Free(self.column)

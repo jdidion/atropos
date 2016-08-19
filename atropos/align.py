@@ -3,7 +3,7 @@
 Alignment module.
 """
 from collections import namedtuple
-from ._align import Aligner, compare_prefixes, locate
+from ._align import Aligner, NoIndelAligner, compare_prefixes, locate
 from .util import reverse_complement
 
 # flags for global alignment
@@ -218,15 +218,19 @@ class InsertAligner(object):
         seq2_rc = reverse_complement(seq2)
         result = [None, None, 0]
         
-        # TODO: at the very least, I should be able to modifier
-        # Aligner to strip out all the indel-related code
-        aligner = Aligner(
+        #aligner = Aligner(
+        #    seq2_rc,
+        #    self.max_insert_mismatch_frac,
+        #    START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+        #    False, False)
+        #aligner.min_overlap = self.min_insert_overlap
+        #aligner.indel_cost = 100000
+        
+        aligner = NoIndelAligner(
             seq2_rc,
             self.max_insert_mismatch_frac,
-            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
-            False, False)
+            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2)
         aligner.min_overlap = self.min_insert_overlap
-        aligner.indel_cost = 100000
         insert_match = aligner.locate(seq1)
 
         if insert_match:
