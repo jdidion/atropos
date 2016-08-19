@@ -218,19 +218,23 @@ class InsertAligner(object):
         seq2_rc = reverse_complement(seq2)
         result = [None, None, 0]
         
-        #aligner = Aligner(
-        #    seq2_rc,
-        #    self.max_insert_mismatch_frac,
-        #    START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
-        #    False, False)
-        #aligner.min_overlap = self.min_insert_overlap
-        #aligner.indel_cost = 100000
-        
-        aligner = NoIndelAligner(
+        aligner = Aligner(
             seq2_rc,
             self.max_insert_mismatch_frac,
-            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2)
+            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+            False, False)
         aligner.min_overlap = self.min_insert_overlap
+        aligner.indel_cost = 100000
+        
+        # In practice, this is only faster at relatively high error rates. I want to
+        # write more unit tests, and possible try a different algorithm instead, before
+        # enable this.
+        #aligner = NoIndelAligner(
+        #    seq2_rc,
+        #    self.max_insert_mismatch_frac,
+        #    START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2)
+        #aligner.min_overlap = self.min_insert_overlap
+        
         insert_match = aligner.locate(seq1)
 
         if insert_match:
