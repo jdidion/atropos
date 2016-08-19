@@ -1,4 +1,7 @@
 #!/usr/bin/env
+# TODO: eliminate this script and just have summarize_simulated_trimming_accuracy.py
+# compute these metrics.
+
 from argparse import ArgumentParser
 import csv
 import sys
@@ -53,15 +56,15 @@ def summarize_art_profile(p, w, i, adapter):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('-a', '--adapters', nargs=2, defaults=DEFAULT_ADAPTERS)
-    parser.add_argument('-1', '--profile1')
-    parser.add_argument('-2', '--profile2')
+    parser.add_argument('-a', '--adapters', nargs=2, default=DEFAULT_ADAPTERS)
+    parser.add_argument('-1', '--aln1')
+    parser.add_argument('-2', '--aln2')
     parser.add_argument('-o', '--output', default='-')
     args = parser.parse_args()
     
-    with open(args.profile1, 'rt') as p1, open(args.profile2, 'rt') as p2, fileoutput(args.output) as o:
+    with open(args.aln1, 'rt') as p1, open(args.aln2, 'rt') as p2, fileoutput(args.output) as o:
         w = csv.writer(o, delimiter="\t")
-        w.writeline(('adapter',
+        w.writerow(('adapter',
             'num_adapters', 'num_reads_mismatch', 'total_reads',
             'total_edit_dist', 'total_ref_bp',
             'total_adapter_edit_dist', 'total_adapter_bp'

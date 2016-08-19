@@ -643,7 +643,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
             raise
 
     except (FormatError, EOFError) as e:
-        logging.getLogger().error("Cutadapt error", exc_info=True)
+        logging.getLogger().error("Atropos error", exc_info=True)
         rc = 1
 
     except Exception as e:

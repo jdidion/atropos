@@ -115,11 +115,16 @@ adjust.profile <- function(orig.path, new.path, target.err, rescale=TRUE) {
 }
 
 args <- commandArgs(trailingOnly=TRUE)
-stopifnot(length(args) == 3)
-
-# for some reason, the acutal error rate
-# in simulated reads is about twice what
-# is expected based on the empirical
-# distribution of quality scores
-error.rate <- as.numeric(args[3]) / 2
-adjust.profile(args[1], args[2], error.rate)
+if (args[1] == '-g') {
+    stopifnot(length(args) == 4)
+    # for some reason, the acutal error rate
+    # in simulated reads is about twice what
+    # is expected based on the empirical
+    # distribution of quality scores
+    error.rate <- as.numeric(args[4]) / 2
+    adjust.profile(args[2], args[3], error.rate)
+    print(paste("The acutal error rate of the new profile is", profile.error(args[3])))
+} else if (args[1] == '-e') {
+    stopifnot(length(args) == 2)
+    print(paste("The acutal error rate of the profile is", round(profile.error(args[2]), 4)))
+}
