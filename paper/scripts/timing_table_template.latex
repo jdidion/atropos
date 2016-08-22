@@ -1,0 +1,17 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{l|r}
+    % if len(threads) == 1:
+    Program & Execution Time (Min-Max) \\\hline
+    % else:
+     & \multicolumn{${len(threads)}}{c}{Execution Time (Min-Max sec.)} \\\
+    Program & ${" & ".join(str(t) for t in threads)} \\\hline
+    % endif
+    % for row in rows[:-1]:
+    ${" & ".join(str(r) for r in row)} \\\
+    
+    % endfor
+    ${" & ".join(str(r) for r in rows[-1])}
+\end{tabular}
+\caption{\label{tab:${name}}${caption}}
+\end{table}

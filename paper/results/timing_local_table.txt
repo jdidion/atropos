@@ -1,0 +1,13 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{l|r}
+    Program & Execution Time (Min-Max) \\\hline
+    atropos (adapter + nowriter) & 23.18 - 30.75 \\    
+    atropos (adapter + writercomp) & 41.07 - 55.51 \\    
+    atropos (insert + nowriter) & 32.98 - 41.33 \\    
+    atropos (insert + writercomp) & 41.75 - 56.22 \\    
+    seqpurge & 96.67 - 114.24 \\    
+    skewer & 20.75 - 29.4
+\end{tabular}
+\caption{\label{tab:local-timing}Execution time for programs running on desktop with 4 threads.}
+\end{table}
