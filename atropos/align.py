@@ -3,6 +3,7 @@
 Alignment module.
 """
 from collections import namedtuple
+import math
 from ._align import Aligner, NoIndelAligner, compare_prefixes, locate
 from .util import reverse_complement
 
@@ -157,9 +158,6 @@ MatchInfo = namedtuple("MatchInfo", (
 # 4. FOGSAA, modified for semi-global alignment.
 #    http://www.nature.com/articles/srep01746
 #    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
-
-from bitarray import bitarray
-import math
 
 class FactorialCache(object):
     def __init__(self, init_size=150):
