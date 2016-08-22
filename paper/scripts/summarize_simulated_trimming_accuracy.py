@@ -45,8 +45,10 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
         read_len = len(read_seq)
         if debug: print(read_len)
         
+        read_ref = read_seq[:ref_len]
+        
         ref_ins = [i for i in range(len(ref_seq)) if ref_seq[i] == '-']
-        expected_read = "".join(b for b in read_seq[0:ref_len] if b != '-')
+        expected_read = "".join(b for b in read_ref if b != '-')
         expected_read_len = len(expected_read)
         ref_del = ref_len - expected_read_len
         
@@ -70,17 +72,35 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
             if adapter_ref_len > adapter_lengths[i]:
                 adapter_ins = adapter_ref_len - adapter_lengths[i]
         
-        edit_dist = pylev.levenshtein(adapters[i][:adapter_len], "".join(adapter_seq))
-        return [expected_read, (int(has_adapter), adapter_len, edit_dist, adapter_ins, adapter_del, polyA)]
+        ref_edit_dist = pylev.levenshtein(ref_seq, read_ref)
+        adapter_edit_dist = pylev.levenshtein(adapters[i][:adapter_len], "".join(adapter_seq))
+        return [expected_read, expected_read_len,
+            (ref_len, ref_edit_dist),
+            (int(has_adapter), adapter_len, adapter_edit_dist, adapter_ins, adapter_del, polyA)
+        ]
     
     if progress:
-        import tqdm
-        read_iter = tqdm.tqdm(read_iter)
+        try:
+            import tqdm
+            aln_iter = tqdm.tqdm(aln_iter)
+        except:
+            print("tqdm library is required for a progress bar")
     
     cache = {}
-    overtrimmed = 0
-    undertrimmed = 0
+    
+    total_ref_bp = 0
+    total_ref_edit_dist = 0
+    total_adapter_bp = 0
+    total_adapter_edit_dist = 0
+    overtrimmed_bp = 0
+    undertrimmed_bp = 0
     raw_trimmed_mismatch = 0
+    num_adapter_reads = 0
+    adapter_reads_untrimmed = 0
+    adapter_reads_undertrimmed = 0
+    adapter_reads_overtrimmed = 0
+    non_adapter_reads_trimmed = 0
+    
     for num_reads, reads in enumerate(read_iter, 1):
         read_id = reads[0][0]
         aln = None
@@ -102,9 +122,16 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
         if aln is None:
             raise Exception("No alignment for read {}".format(read_id))
         
-        for i in (0,1):
-            expected_read, adapter_info = summarize_alignment(aln[i])
-            expected_read_len = len(expected_read)
+        for i in (0, 1):
+            expected_read, expected_read_len, ref_info, adapter_info = summarize_alignment(aln[i])
+            total_ref_bp += ref_info[0]
+            total_ref_edit_dist += ref_info[1]
+            has_adapter = adapter_info[0] == 1
+            total_adapter_bp += adapter_info[1]
+            total_adapter_edit_dist += adapter_info[2]
+            
+            if has_adapter:
+                num_adapter_reads += 1
             
             r = reads[i]
             trimmed_len = len(r[2])
@@ -116,16 +143,27 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
             status = 'OK'
             common_len = min(trimmed_len, expected_read_len)
             if expected_read_len > trimmed_len:
-                overtrimmed += expected_read_len - trimmed_len
+                overtrimmed_bp += expected_read_len - trimmed_len
                 status = 'OVERTRIMMED'
+                if has_adapter:
+                    adapter_reads_overtrimmed += 1
+                else:
+                    non_adapter_reads_trimmed += 1
             elif expected_read_len < trimmed_len:
-                undertrimmed += trimmed_len - expected_read_len
+                undertrimmed_bp += trimmed_len - expected_read_len
                 status = 'UNDERTRIMMED'
+                if not has_adapter:
+                    raise Exception("Expected read length is less than trimmed "
+                                    "length for read without an adapter: {}".format(read_id))
+                elif trimmed_len == read_length:
+                    adapter_reads_untrimmed += 1
+                else:
+                    adapter_reads_undertrimmed += 1
             if r[2][:common_len] != expected_read[:common_len]:
                 raw_trimmed_mismatch += 1
                 status = 'MISMATCH'
             
-            w.writerow((read_id, i+1, expected_read_len, trimmed_len, status) + adapter_info)
+            w.writerow((read_id, i+1, expected_read_len, trimmed_len, status) + ref_info + adapter_info)
 
     # all remaining alignments represent reads that were discarded
     
@@ -146,8 +184,19 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
     print("{} mismatch reads".format(raw_trimmed_mismatch))
     print("{} discarded reads".format(num_discarded))
     print("{} total reads".format(num_reads + num_discarded))
-    print("{} overtrimmed bases".format(overtrimmed))
-    print("{} undertrimmed bases".format(undertrimmed))
+    
+    print("{} reads with adapters".format(num_adapter_reads))
+    print("{} non-adapter reads trimmed".format(non_adapter_reads_trimmed))
+    print("{} adapter reads untrimmed".format(adapter_reads_untrimmed))
+    print("{} adapter reads undertrimmed".format(adapter_reads_undertrimmed))
+    print("{} adapter reads overtrimmed".format(adapter_reads_overtrimmed))
+        
+    print("{} total ref bases".format(total_ref_bp))
+    print("{} total ref edit distance".format(total_ref_edit_dist))
+    print("{} total adapter bases".format(total_adapter_bp))
+    print("{} total adapter edit dist".format(total_adapter_edit_dist))
+    print("{} overtrimmed bases".format(overtrimmed_bp))
+    print("{} undertrimmed bases".format(undertrimmed_bp))
 
 def main():
     parser = ArgumentParser()
