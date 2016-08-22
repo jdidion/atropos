@@ -48,6 +48,7 @@ def format_table(raw_rows):
         table[row[0]][t].append(row[4])
         threads.add(t)
     rows = []
+    threads = list(sorted(threads))
     for key in sorted(table.keys()):
         row = [key]
         for t in threads:
@@ -83,8 +84,6 @@ def main():
             from mako.template import Template
             template = Template(filename='timing_table_template.latex')
             rows, threads = format_table(rows)
-            print(rows)
-            print(threads)
             o.write(template.render(rows=rows, threads=threads, name=args.table_name, caption=args.table_caption))
 
 if __name__ == "__main__":
