@@ -1,6 +1,6 @@
 \begin{table}[ht]
 \centering
-\begin{tabular}{l|r}
+\begin{tabular}{l c}
     % if len(threads) == 1:
     Program & Execution Time (Min-Max) \\\hline
     % else:

@@ -100,20 +100,17 @@ do
         "--log-level ERROR --quiet" \
         "--compression writer $fq1 $fq2" >> $commands
         
-        if [ "$threads" -gt "8" ]
-        then
-            profile="atropos_${threads}_${err}_q${qcut}_${aligner}_workercomp"
-            echo ">&2 echo $profile && /usr/bin/time -p" \
-            "$ATROPOS -T $threads --aligner $aligner" \
-            "-a $ADAPTER1 -A $ADAPTER2" \
-            "-O $MIN_OVERLAP -q $qcut --trim-n" \
-            "-m $MIN_LEN --batch-size $BATCH_SIZE " \
-            "--report-file ${outdir}/${profile}_nowriter.report.txt" \
-            "-o ${outdir}/${profile}.1.fq.gz" \
-            "-p ${outdir}/${profile}.2.fq.gz" \
-            "--log-level ERROR --quiet" \
-            "--compression worker $fq1 $fq2" >> $commands
-        fi
+        profile="atropos_${threads}_${err}_q${qcut}_${aligner}_workercomp"
+        echo ">&2 echo $profile && /usr/bin/time -p" \
+        "$ATROPOS -T $threads --aligner $aligner" \
+        "-a $ADAPTER1 -A $ADAPTER2" \
+        "-O $MIN_OVERLAP -q $qcut --trim-n" \
+        "-m $MIN_LEN --batch-size $BATCH_SIZE " \
+        "--report-file ${outdir}/${profile}_nowriter.report.txt" \
+        "-o ${outdir}/${profile}.1.fq.gz" \
+        "-p ${outdir}/${profile}.2.fq.gz" \
+        "--log-level ERROR --quiet" \
+        "--compression worker $fq1 $fq2" >> $commands
         
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_nowriter"
         echo ">&2 echo $profile && /usr/bin/time -p" \
