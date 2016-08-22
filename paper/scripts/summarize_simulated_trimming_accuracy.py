@@ -29,7 +29,7 @@ def fq_iterator(i, mate):
         name = name[:-2]
         yield (name, mate, read[1].rstrip())
 
-def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=True):
+def summarize_accuracy(aln_iter, read_iter, w, s, read_length, adapters):
     adapter_lengths = [len(adapters[i]) for i in (0,1)]
     
     #if read_id != 'chr1-199374': continue
@@ -72,19 +72,13 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
             if adapter_ref_len > adapter_lengths[i]:
                 adapter_ins = adapter_ref_len - adapter_lengths[i]
         
-        ref_edit_dist = pylev.levenshtein(ref_seq, read_ref)
+        #ref_edit_dist = pylev.levenshtein(ref_seq, read_ref)
+        ref_edit_dist=0
         adapter_edit_dist = pylev.levenshtein(adapters[i][:adapter_len], "".join(adapter_seq))
         return [expected_read, expected_read_len,
             (ref_len, ref_edit_dist),
             (int(has_adapter), adapter_len, adapter_edit_dist, adapter_ins, adapter_del, polyA)
         ]
-    
-    if progress:
-        try:
-            import tqdm
-            aln_iter = tqdm.tqdm(aln_iter)
-        except:
-            print("tqdm library is required for a progress bar")
     
     cache = {}
     
@@ -100,6 +94,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
     adapter_reads_undertrimmed = 0
     adapter_reads_overtrimmed = 0
     non_adapter_reads_trimmed = 0
+    num_aln = 0
     
     for num_reads, reads in enumerate(read_iter, 1):
         read_id = reads[0][0]
@@ -109,6 +104,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
         assert int(reads[0][1]) == 1 and int(reads[1][1]) == 2, "Mate identifiers are incorrect for {}".format(read_id)
         if read_id not in cache:
             for aln in aln_iter:
+                num_aln += 1
                 if read_id == aln[0][0]:
                     break
                 else:
@@ -180,23 +176,23 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters, progress=T
         handle_discarded(aln)
         num_discarded += 1
     
-    print("{} retained reads".format(num_reads))
-    print("{} mismatch reads".format(raw_trimmed_mismatch))
-    print("{} discarded reads".format(num_discarded))
-    print("{} total reads".format(num_reads + num_discarded))
+    print("{} retained reads".format(num_reads), file=s)
+    print("{} mismatch reads".format(raw_trimmed_mismatch), file=s)
+    print("{} discarded reads".format(num_discarded), file=s)
+    print("{} total reads".format(num_reads + num_discarded), file=s)
     
-    print("{} reads with adapters".format(num_adapter_reads))
-    print("{} non-adapter reads trimmed".format(non_adapter_reads_trimmed))
-    print("{} adapter reads untrimmed".format(adapter_reads_untrimmed))
-    print("{} adapter reads undertrimmed".format(adapter_reads_undertrimmed))
-    print("{} adapter reads overtrimmed".format(adapter_reads_overtrimmed))
+    print("{} reads with adapters".format(num_adapter_reads), file=s)
+    print("{} non-adapter reads trimmed".format(non_adapter_reads_trimmed), file=s)
+    print("{} adapter reads untrimmed".format(adapter_reads_untrimmed), file=s)
+    print("{} adapter reads undertrimmed".format(adapter_reads_undertrimmed), file=s)
+    print("{} adapter reads overtrimmed".format(adapter_reads_overtrimmed), file=s)
         
-    print("{} total ref bases".format(total_ref_bp))
-    print("{} total ref edit distance".format(total_ref_edit_dist))
-    print("{} total adapter bases".format(total_adapter_bp))
-    print("{} total adapter edit dist".format(total_adapter_edit_dist))
-    print("{} overtrimmed bases".format(overtrimmed_bp))
-    print("{} undertrimmed bases".format(undertrimmed_bp))
+    print("{} total ref bases".format(total_ref_bp), file=s)
+    print("{} total ref edit distance".format(total_ref_edit_dist), file=s)
+    print("{} total adapter bases".format(total_adapter_bp), file=s)
+    print("{} total adapter edit dist".format(total_adapter_edit_dist), file=s)
+    print("{} overtrimmed bases".format(overtrimmed_bp), file=s)
+    print("{} undertrimmed bases".format(undertrimmed_bp), file=s)
 
 def main():
     parser = ArgumentParser()
@@ -206,7 +202,9 @@ def main():
     parser.add_argument('-r2', '--reads2', help="trimmed fastq file read1")
     parser.add_argument('-l', '--read-length', type=int, default=125)
     parser.add_argument('-o', '--output', default='-')
+    parser.add_argument('-s', '--summary', default='-')
     parser.add_argument("--adapters", nargs=2, default=DEFAULT_ADAPTERS)
+    parser.add_argument("--no-progress", action="store_true", default=False)
     args = parser.parse_args()
     
     with open(args.aln1, 'rt') as a1, open(args.aln2, 'rt') as a2:
@@ -215,12 +213,19 @@ def main():
         with xopen.xopen(args.reads1, 'rt') as r1, xopen.xopen(args.reads2, 'rt') as r2:
             read_pair_iterator = zip(fq_iterator(r1, 1), fq_iterator(r2, 2))
             
-            with fileoutput(args.output) as o:
+            if not args.no_progress:
+                try:
+                    import tqdm
+                    aln_pair_iterator = iter(tqdm.tqdm(aln_pair_iterator))
+                except:
+                    print("tqdm library is required for a progress bar")
+            
+            with fileoutput(args.output) as o, fileoutput(args.summary) as s:
                 w = csv.writer(o, delimiter="\t")
                 w.writerow((
                     'read_id','mate','expected_len','actual_len','status','has_adapter',
                     'adapter_len','adapter_edit_dist','adapter_ins','adapter_del','polyA'))
-                summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, args.read_length, args.adapters)
+                summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, s, args.read_length, args.adapters)
 
 if __name__ == "__main__":
     main()

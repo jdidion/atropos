@@ -51,10 +51,14 @@ def format_table(raw_rows):
     for key in sorted(table.keys()):
         row = [key]
         for t in threads:
-            times = table[key][t]
-            min_time = min(times)
-            max_time = max(times)
-            row.append("{} - {}".format(min_time, max_time))
+            if t in table[key]:
+                times = table[key][t]
+                assert len(times) > 1, "Missing timing info for {} {}".format(key, t)
+                min_time = min(times)
+                max_time = max(times)
+                row.append("{} - {}".format(min_time, max_time))
+            else:
+                row.append("NA")
         rows.append(row)
     return rows, threads
 
