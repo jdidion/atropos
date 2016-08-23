@@ -13,13 +13,19 @@ from .xopen import open_output
 def main(options):
     known_contaminants = load_known_contaminants_from_url()
     infiles = [f for f in (
-        options.input1, options.input2, options.interleaved_input
+        options.single_input, options.input1, options.input2, options.interleaved_input
     ) if f is not None]
     with open_output(options.adapter_report) as o:
+        print("Detecting adapters and other potential contaminant sequences based on\n"
+              "{}-mers in {} reads".format(options.kmer_size, options.max_reads), file=o)
         for i, f in enumerate(infiles, 1):
-            print("File {}: {}".format(i, f), file=o)
-            contam = detect_contaminants(f, k=options.kmer_size, n_reads=options.max_reads, known_contaminants=known_contaminants)
-            contam = filter_contam(contam, known_only=True)
+            file_header = "File {}: {}".format(i, f)
+            print("", file=o)
+            print(file_header, file=o)
+            print('-' * len(file_header), file=o)
+            contam = detect_contaminants(f, k=options.kmer_size, n_reads=options.max_reads,
+                known_contaminants=known_contaminants)
+            contam = filter_contaminants(contam, known_only=True)
             summarize_contaminants(contam, o)
 
 def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None):
@@ -112,14 +118,14 @@ def filter_contaminants(contam, min_complexity=1.1, min_len=None, min_freq=0.000
     return contam
 
 def summarize_contaminants(contam, outstream):
-    print("Detected {} contaminants".format(len(contam)), file=outstream)
+    print("Detected {} adapters/contaminants:".format(len(contam)), file=outstream)
     pad = len(str(len(contam)))
     for i, row in enumerate(contam):
         print(("{:>" + str(pad) + "}. {}").format(i+1, row[0]), file=outstream)
-        print("    Median k-mer freq: {:.2%}".format(row[1]), file=outstream)
         if len(row) > 2:
             print("    Name: {}".format(row[2]), file=outstream)
-            print("    Frequent kmers: {:.2%}".format(row[3]), file=outstream)
+            print("    K-mers that are frequent: {:.2%}".format(row[3]), file=outstream)
+        print("    Median frequency of k-mers: {:.2%}".format(row[1]), file=outstream)
 
 def load_known_contaminants(path):
     with open(path, "rt") as i:
