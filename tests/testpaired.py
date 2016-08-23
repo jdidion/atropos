@@ -18,7 +18,7 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',), ca
                 print(aligner)
                 p = params.copy()
                 p += ['--aligner', aligner, '-o', p1, '-p', p2]
-                p += [datapath(in1.format(aligner=aligner)), datapath(in2.format(aligner=aligner))]
+                p += ['-pe1', datapath(in1.format(aligner=aligner)), '-pe2', datapath(in2.format(aligner=aligner))]
                 assert atropos.main(p) is None
                 assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                 assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
@@ -31,23 +31,23 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',)):
     for aligner in aligners:
         with temporary_path(expected.format(aligner=aligner)) as tmp:
             p = params.copy()
-            p += ['--aligner', aligner, '--interleaved', '-o', tmp, datapath(inpath.format(aligner=aligner))]
+            p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner)), '-L', tmp]
             assert atropos.main(p) is None
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
-def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
-    assert False  # unused function
-    if type(params) is str:
-        params = params.split()
-    for aligner in aligners:
-        with temporary_path('tmp1-' + expected1.format(aligner=aligner)) as p1:
-            with temporary_path('tmp2-' + expected2.format(aligner=aligner)) as p2:
-                p = params.copy()
-                p += ['--aligner', aligner, '--interleaved', '-o', p1, '-p', p2]
-                p += [datapath(inpath.format(aligner=aligner))]
-                assert atropos.main(p) is None
-                assert files_equal(cutpath(expected.format(aligner=aligner)), p1)
-                assert files_equal(cutpath(expected.format(aligner=aligner)), p2)
+# def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
+#     assert False  # unused function
+#     if type(params) is str:
+#         params = params.split()
+#     for aligner in aligners:
+#         with temporary_path('tmp1-' + expected1.format(aligner=aligner)) as p1:
+#             with temporary_path('tmp2-' + expected2.format(aligner=aligner)) as p2:
+#                 p = params.copy()
+#                 p += ['--aligner', aligner, '--interleaved', '-o', p1, '-p', p2]
+#                 p += [datapath(inpath.format(aligner=aligner))]
+#                 assert atropos.main(p) is None
+#                 assert files_equal(cutpath(expected.format(aligner=aligner)), p1)
+#                 assert files_equal(cutpath(expected.format(aligner=aligner)), p2)
 
 def test_paired_separate():
     '''test separate trimming of paired-end reads'''
@@ -92,11 +92,11 @@ def test_explicit_format_with_paired():
 
 def test_no_trimming_legacy():
     # make sure that this doesn't divide by zero
-    atropos.main(['-a', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', datapath('paired.1.fastq'), datapath('paired.2.fastq')])
+    atropos.main(['-a', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 def test_no_trimming():
     # make sure that this doesn't divide by zero
-    atropos.main(['-a', 'XXXXX', '-A', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', datapath('paired.1.fastq'), datapath('paired.2.fastq')])
+    atropos.main(['-a', 'XXXXX', '-A', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 @raises(SystemExit)
 def test_missing_file():
@@ -139,7 +139,7 @@ def test_unmatched_read_names():
                 f.writelines(lines)
             with redirect_stderr():
                 print('here')
-                atropos.main('-a XX -o out1.fastq --paired-output out2.fastq'.split() + [swapped, datapath('paired.2.fastq')])
+                atropos.main('-a XX -o out1.fastq -p out2.fastq'.split() + ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
         finally:
             os.remove('out1.fastq')
             os.remove('out2.fastq')

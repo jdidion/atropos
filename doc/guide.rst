@@ -7,7 +7,7 @@ Basic usage
 
 If you just want to trim a 3' adapter, the basic command-line for atropos is::
 
-    atropos -a AACCGGTT -o output.fastq input.fastq
+    atropos -a AACCGGTT -o output.fastq -se input.fastq
 
 The sequence of the adapter is given with the ``-a`` option. Of course, you
 need to replace ``AACCGGTT`` with your actual adapter sequence. Reads are read
@@ -54,7 +54,7 @@ automatically by inspecting the file name: If it ends in ``.gz``, then gzip
 compression is assumed. You can therefore run atropos like this and it works
 as expected::
 
-    atropos -a AACCGGTT -o output.fastq.gz input.fastq.gz
+    atropos -a AACCGGTT -o output.fastq.gz -se input.fastq.gz
 
 All of atropos's options that expect a file name support this.
 
@@ -70,27 +70,27 @@ If no output file is specified via the ``-o`` option, then the output is sent to
 the standard output stream. Instead of the example command line from above, you
 can therefore also write::
 
-    atropos -a AACCGGTT input.fastq > output.fastq
+    atropos -a AACCGGTT -se input.fastq > output.fastq
 
 There is one difference in behavior if you use atropos without ``-o``: The
 report is sent to the standard error stream instead of standard output. You
 can redirect it to a file like this::
 
-    atropos -a AACCGGTT input.fastq > output.fastq 2> report.txt
+    atropos -a AACCGGTT -se input.fastq > output.fastq 2> report.txt
 
-Wherever atropos expects a file name, you can also write a dash (``-``) in
+Wherever Atropos expects a file name, you can also write a dash (``-``) in
 order to specify that standard input or output should be used. For example::
 
-    tail -n 4 input.fastq | atropos -a AACCGGTT - > output.fastq
+    tail -n 4 input.fastq | atropos -a AACCGGTT -se - > output.fastq
 
 The ``tail -n 4`` prints out only the last four lines of ``input.fastq``, which
-are then piped into atropos. Thus, atropos will work only on the last read in
+are then piped into Atropos. Thus, Atropos will work only on the last read in
 the input file.
 
 In most cases, you should probably use ``-`` at most once for an input file and
 at most once for an output file, in order not to get mixed output.
 
-You cannot combine ``-`` and gzip compression since atropos needs to know the
+You cannot combine ``-`` and gzip compression since Atropos needs to know the
 file name of the output or input file. if you want to have a gzip-compressed
 output file, use ``-o`` with an explicit name.
 
@@ -99,7 +99,7 @@ file discards everything you send into it. If you only want to see the
 statistics output, for example, and do not care about the trimmed reads at all,
 you could use something like this::
 
-    atropos -a AACCGGTT -o /dev/null input.fastq
+    atropos -a AACCGGTT -o /dev/null -se input.fastq
 
 
 Read processing
@@ -198,7 +198,7 @@ this aligner, use the `--aligner insert` option.
 
     atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
     -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz \
-    reads.1.fq.gz reads.2.fq.gz
+    -pe1 reads.1.fq.gz -pe2 reads.2.fq.gz
 
 .. _three-prime-adapters:
 
@@ -294,7 +294,7 @@ cases like these are also recognized::
 
 The read will simply be empty after trimming.
 
-Be aware that atropos still searches for adapters error-tolerantly and, in
+Be aware that Atropos still searches for adapters error-tolerantly and, in
 particular, allows insertions. So if your maximum error rate is sufficiently
 high, even this read will be trimmed::
 
@@ -422,7 +422,7 @@ with one substitution. Therefore, only 9·0.1=0.9 errors are allowed. Since this
 is rounded off to zero allowed errors, the adapter will not be found.
 
 The number of errors allowed for a given adapter match length is also shown in
-the report that atropos prints::
+the report that Atropos prints::
 
     Sequence: 'LONGADAPTER'; Length: 11; Trimmed: 2 times.
 
@@ -441,8 +441,6 @@ desired.
 
 Insertions and deletions can be disallowed by using the option
 ``--no-indels``.
-
-See also the :ref:`section on details of the alignment algorithm <algorithm>`.
 
 
 Multiple adapter occurrences within a single read
@@ -466,7 +464,7 @@ The above applies when both occurrences of the adapter are *exact* matches, and
 it also applies when both occurrences of the adapter are *inexact* matches (that
 is, it has at least one indel or mismatch). However, if one match is exact, but
 the other is inexact, then the exact match wins, even if it is not the leftmost
-one! The reason for this behavior is that atropos searches for exact matches
+one! The reason for this behavior is that Atropos searches for exact matches
 first and, to improve performance, skips the error-tolerant matching step if an
 exact match was found.
 
@@ -474,7 +472,7 @@ exact match was found.
 Reducing random matches
 -----------------------
 
-Since atropos allows partial matches between the read and the adapter sequence,
+Since Atropos allows partial matches between the read and the adapter sequence,
 short matches can occur by chance, leading to erroneously trimmed bases. For
 example, roughly 25% of all reads end with a base that is identical to the
 first base of the adapter. To reduce the number of falsely trimmed bases,
@@ -491,7 +489,7 @@ overlap length of 3, only about 0.07 bases are lost per read.
 
 When choosing an appropriate minimum overlap length, take into account that
 true adapter matches are also lost when the overlap length is higher than
-zero, reducing atropos' sensitivity.
+zero, reducing Atropos' sensitivity.
 
 
 .. _wildcards:
@@ -505,7 +503,7 @@ sequence to match any nucleotide in the read, or use ``-a YACGT`` for an adapter
 that matches both ``CACGT`` and ``TACGT``. The wildcard character ``N`` is
 useful for trimming adapters with an embedded variable barcode::
 
-    atropos -a ACGTAANNNNTTAGC -o output.fastq input.fastq
+    atropos -a ACGTAANNNNTTAGC -o output.fastq -se input.fastq
 
 Wildcard characters in the adapter are enabled by default. Use the option ``-N``
 to disable this.
@@ -515,7 +513,7 @@ in order to avoid matches in reads that consist of many (often low-quality)
 ``N`` bases. Use ``--match-read-wildcards`` to enable wildcards also in reads.
 
 If wildcards are disabled entirely (that is, you use ``-N`` and *do not* use
-``--match-read-wildcards``), then atropos compares characters by ASCII value.
+``--match-read-wildcards``), then Atropos compares characters by ASCII value.
 Thus, both the read and adapter can be arbitrary strings (such as ``SEQUENCE``
 or ``ADAPTER`` as used here in the examples).
 
@@ -534,7 +532,7 @@ repeated. This works also for IUPAC wildcard characters, as in ``N{5}``.
 It is recommended that you use quotation marks around your adapter sequence if
 you use this feature. For poly-A trimming, for example, you would write::
 
-    atropos -a "A{100}" -o output.fastq input.fastq
+    atropos -a "A{100}" -o output.fastq -se input.fastq
 
 
 .. _modifying-reads:
@@ -557,11 +555,11 @@ of each read. If it is negative, the bases are removed from the end.
 
 For example, to remove the first five bases of each read::
 
-    atropos -u 5 -o trimmed.fastq reads.fastq
+    atropos -u 5 -o trimmed.fastq -se reads.fastq
 
 To remove the last seven bases of each read::
 
-    atropos -u -7 -o trimmed.fastq reads.fastq
+    atropos -u -7 -o trimmed.fastq -se reads.fastq
 
 The ``-u``/``--cut`` option can be combined with the other options, but
 the desired bases are removed *before* any adapter trimming.
@@ -577,7 +575,7 @@ The following command will first trim the ``ADAP`` part of the adapter
 off the end. Then, since only 4 bases were trimmed, the ``-i 5`` option
 will cause a 5th base to be removed.
 
-    atropos -A ADAPTER -i 5 -o trimmed.fastq reads.fastq
+    atropos -A ADAPTER -i 5 -o trimmed.fastq -se reads.fastq
 
 .. _quality-trimming:
 
@@ -592,12 +590,12 @@ correctly, the quality values must be encoded as ascii(phred quality +
 
 Quality trimming can be done without adapter trimming, so this will work::
 
-    atropos -q 10 -o output.fastq input.fastq
+    atropos -q 10 -o output.fastq -se input.fastq
 
 By default, only the 3' end of each read is quality-trimmed. If you want to
 trim the 5' end as well, use the ``-q`` option with two comma-separated cutoffs::
 
-    atropos -q 15,10 -o output.fastq input.fastq
+    atropos -q 15,10 -o output.fastq -se input.fastq
 
 The 5' end will then be trimmed with a cutoff of 15, and the 3' will be trimmed
 with a cutoff of 10. If you only want to trim the 5' end, then use a cutoff of
@@ -648,7 +646,7 @@ Use ``-y`` or ``--suffix`` to append a text to read names. The given string can
 contain the placeholder ``{name}``, which will be replaced with the name of the
 adapter found in that read. For example, writing ::
 
-    atropos -a adapter1=ACGT -y ' we found {name}' input.fastq
+    atropos -a adapter1=ACGT -y ' we found {name}' -se input.fastq
 
 changes a read named ``read1`` to ``read1 we found adapter1`` if the adapter
 ``ACGT`` was found. The options ``-x``/``--prefix`` work the same, but the text
@@ -749,21 +747,20 @@ and ``ADAPTER_REV`` from the reverse reads (second file).
 
 The basic command-line is::
 
-    atropos -a ADAPTER_FWD -A ADAPTER_REV -o out.1.fastq -p out.2.fastq reads.1.fastq reads.2.fastq
+    atropos -a ADAPTER_FWD -A ADAPTER_REV -o out.1.fastq -p out.2.fastq -pe1 reads.1.fastq -pe2 reads.2.fastq
 
 ``-p`` is the short form of ``--paired-output``. The option ``-A`` is used here
-to specify an adapter sequence that atropos
-should remove from the second read in each pair. There are also the options
-``-G``, ``-B``. All of them work just like their lowercase counterparts,
-except that the adapter is searched for in the second read in each paired-end
-read. There is also option ``-U``, which you can use to remove a fixed number
-of bases from the second read in a pair.
+to specify an adapter sequence that Atropos should remove from the second read
+in each pair. There are also the options ``-G``, ``-B``. All of them work just
+like their lowercase counterparts, except that the adapter is searched for in
+the second read in each paired-end read. There is also option ``-U``, which you
+can use to remove a fixed number of bases from the second read in a pair.
 
-While it is possible to run atropos on the two files separately, processing
+While it is possible to run Atropos on the two files separately, processing
 both files at the same time is highly recommended since the program can check
 for problems in your input files only when they are processed together.
 
-When you use ``-p``/``--paired-output``, atropos checks whether the files are
+When you use ``-p``/``--paired-output``, Atropos checks whether the files are
 properly paired. An error is raised if one of the files contains more reads than
 the other or if the read names in the two files do not match. Only the part of
 the read name before the first space is considered. If the read name ends with
@@ -779,7 +776,7 @@ and::
 As soon as you start to use one of the filtering options that discard reads, it
 is mandatory you process both files at the same time to make sure that the
 output files are kept synchronized: If a read is removed from one of the files,
-atropos will ensure it is also removed from the other file.
+Atropos will ensure it is also removed from the other file.
 
 
 The following command-line options are applied to *both* reads:
@@ -825,7 +822,7 @@ the case that at least one of the reads is *trimmed*!
 To require that filtering criteria must apply to *both* reads in order for a
 read pair to be considered "filtered", use the option ``--pair-filter=both``.
 
-To further complicate matters, atropos switches to a backwards compatibility
+To further complicate matters, Atropos switches to a backwards compatibility
 mode ("legacy mode") when none of the uppercase modification options
 (``-A``/``-B``/``-G``/``-U``) are given. In that mode, filtering criteria are
 checked only for the *first* read. Atropos will also tell you at the top of
@@ -857,16 +854,17 @@ Interleaved paired-end reads
 
 Paired-end reads can be read from a single FASTQ file in which the entries for
 the first and second read from each pair alternate. The first read in each pair
-comes before the second. Enable this file format by adding the ``--interleaved``
-option to the command-line. For example::
+comes before the second. Enable this file format by specifying an input file
+using the ``-l`` (``--interleaved-input``) option. For example::
 
-    atropos --interleaved -q 20 -a ACGT -A TGCA -o trimmed.fastq reads.fastq
+    atropos -q 20 -a ACGT -A TGCA -o trimmed.fastq -l reads.fastq
 
-The output FASTQ file will also be written interleaved. Atropos will detect if
-the input file is not properly interleaved by checking whether read names match
-and whether the file contains an even number of entries.
+The output can also be interleaved, using the ``-L`` (``--interleaved-output``)
+option. Atropos will detect if the input file is not properly interleaved by
+checking whether read names match and whether the file contains an even number of
+entries.
 
-When ``--interleaved`` is used, legacy mode is disabled (that is,
+When interleaved input is used, legacy mode is disabled (that is,
 read-modification options such as ``-q`` always apply to both reads).
 
 
@@ -875,15 +873,15 @@ Legacy paired-end read trimming
 
 .. note::
     This section describes the way paired-end trimming was done
-    in atropos before 1.8, where the ``-A``, ``-G``, ``-B`` options were not
+    in Cutadapt before 1.8, where the ``-A``, ``-G``, ``-B`` options were not
     available. It is less safe and more complicated, but you can still use it.
 
 If you do not use any of the filtering options that discard reads, such
 as ``--discard``, ``--minimum-length`` or ``--maximum-length``, you can run
-atropos on each file separately::
+Atropos on each file separately::
 
-    atropos -a ADAPTER_FWD -o trimmed.1.fastq reads1.fastq
-    atropos -a ADAPTER_REV -o trimmed.2.fastq reads2.fastq
+    atropos -a ADAPTER_FWD -o trimmed.1.fastq -se reads1.fastq
+    atropos -a ADAPTER_REV -o trimmed.2.fastq -se reads2.fastq
 
 You can use the options that are listed under 'Additional modifications'
 in atropos' help output without problems. For example, if you want to
@@ -891,20 +889,20 @@ quality-trim the first read in each pair with a threshold of 10, and the
 second read in each pair with a threshold of 15, then the commands could
 be::
 
-    atropos -q 10 -a ADAPTER_FWD -o trimmed.1.fastq reads1.fastq
-    atropos -q 15 -a ADAPTER_REV -o trimmed.2.fastq reads2.fastq
+    atropos -q 10 -a ADAPTER_FWD -o trimmed.1.fastq -se reads1.fastq
+    atropos -q 15 -a ADAPTER_REV -o trimmed.2.fastq -se reads2.fastq
 
-If you use any of the filtering options, you must use atropos in the following
+If you use any of the filtering options, you must use Atropos in the following
 way (with the ``-p`` option) to make sure that read pairs remain sychronized.
 
 First trim the forward read, writing output to temporary files (we also
 add some quality trimming)::
 
-    atropos -q 10 -a ADAPTER_FWD --minimum-length 20 -o tmp.1.fastq -p tmp.2.fastq reads.1.fastq reads.2.fastq
+    atropos -q 10 -a ADAPTER_FWD --minimum-length 20 -o tmp.1.fastq -p tmp.2.fastq -pe1 reads.1.fastq -pe2 reads.2.fastq
 
 Then trim the reverse read, using the temporary files as input::
 
-    atropos -q 15 -a ADAPTER_REV --minimum-length 20 -o trimmed.2.fastq -p trimmed.1.fastq tmp.2.fastq tmp.1.fastq
+    atropos -q 15 -a ADAPTER_REV --minimum-length 20 -o trimmed.2.fastq -p trimmed.1.fastq -pe1 tmp.2.fastq -pe2 tmp.1.fastq
 
 Finally, remove the temporary files::
 
@@ -914,7 +912,7 @@ Please see the previous section for a much simpler way of trimming paired-end
 reads!
 
 In legacy paired-end mode, the read-modifying options such as ``-q`` only
-apply to the first file in each call to atropos (first ``reads.1.fastq``, then
+apply to the first file in each call to Atropos (first ``reads.1.fastq``, then
 ``tmp.2.fastq`` in this example). Reads in the second file are not affected by those
 options, but by the filtering options: If a read in the first file is
 discarded, then the matching read in the second file is also filtered
@@ -935,19 +933,19 @@ is possible to :ref:`trim more than one adapter from each
 read <more-than-one>`). This is how a command may look like to trim one of two
 possible 3' adapters::
 
-    atropos -a TGAGACACGCA -a AGGCACACAGGG -o output.fastq input.fastq
+    atropos -a TGAGACACGCA -a AGGCACACAGGG -o output.fastq -se input.fastq
 
 The adapter sequences can also be read from a FASTA file. Instead of giving an
 explicit adapter sequence, you need to write ``file:`` followed by the name of
 the FASTA file::
 
-    atropos -a file:adapters.fasta -o output.fastq input.fastq
+    atropos -a file:adapters.fasta -o output.fastq -se input.fastq
 
 All of the sequences in the file ``adapters.fasta`` will be used as 3'
 adapters. The other adapter options ``-b`` and ``-g`` also support this. Again,
 only the best matching adapter is trimmed from each read.
 
-When atropos has multiple adapter sequences to work with, either specified
+When Atropos has multiple adapter sequences to work with, either specified
 explicitly on the command line or via a FASTA file, it decides in the
 following way which adapter should be trimmed:
 
@@ -981,7 +979,7 @@ adapters, they are numbered and the adapter sequence is also printed::
 If you want this to look a bit nicer, you can give each adapter a name in this
 way::
 
-    atropos -a My_Adapter=AACCGGTT -o output.fastq input.fastq
+    atropos -a My_Adapter=AACCGGTT -o output.fastq -se input.fastq
 
 The actual adapter sequence in this example is ``AACCGGTT`` and the name
 assigned to it is ``My_Adapter``. The report will then contain this name in
@@ -1016,7 +1014,7 @@ file in which ``{name}`` is replaced with ``unknown``.
 
 Example::
 
-    atropos -a one=TATA -a two=GCGC -o trimmed-{name}.fastq.gz input.fastq.gz
+    atropos -a one=TATA -a two=GCGC -o trimmed-{name}.fastq.gz -se input.fastq.gz
 
 This command will create the three files ``demulti-one.fastq.gz``,
 ``demulti-two.fastq.gz`` and ``demulti-unknown.fastq.gz``. You can :ref:`also
@@ -1029,7 +1027,7 @@ parameter with a file name. Here is an example that uses both parameters and
 reads the adapters from a FASTA file (note that ``--untrimmed-output`` can be
 abbreviated)::
 
-    atropos -a file:barcodes.fasta --no-trim --untrimmed-o untrimmed.fastq.gz -o trimmed-{name}.fastq.gz input.fastq.gz
+    atropos -a file:barcodes.fasta --no-trim --untrimmed-o untrimmed.fastq.gz -o trimmed-{name}.fastq.gz -se input.fastq.gz
 
 
 .. _more-than-one:
@@ -1052,7 +1050,7 @@ once. So your sequence could look like this::
 To be on the safe side, you assume that there are at most 5 copies of the
 adapter sequence. This command can be used to trim the reads correctly::
 
-    atropos -g ^ADAPTER -n 5 -o output.fastq input.fastq
+    atropos -g ^ADAPTER -n 5 -o output.fastq -se input.fastq
 
 This feature can also be used to search for *5'/3' linked adapters*. For example,
 when the 5' adapter is *FIRST* and the 3' adapter is *SECOND*, then the read
@@ -1084,7 +1082,7 @@ Single-end reads as well as the first reads of paired-end data need to be
 trimmed with ``A`` + the “TruSeq Indexed Adapter”. Use only the prefix of the
 adapter sequence that is common to all Indexed Adapter sequences::
 
-    atropos -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -o trimmed.fastq.gz reads.fastq.gz
+    atropos -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -o trimmed.fastq.gz -se reads.fastq.gz
 
 If you have paired-end data, trim also read 2 with the reverse complement of the
 “TruSeq Universal Adapter”. The full command-line looks as follows::
@@ -1093,7 +1091,7 @@ If you have paired-end data, trim also read 2 with the reverse complement of the
 		-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC \
 		-A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
 		-o trimmed.1.fastq.gz -p trimmed.2.fastq.gz \
-		reads.1.fastq.gz reads.2.fastq.gz
+		-pe1 reads.1.fastq.gz -pe2 reads.2.fastq.gz
 
 See also the :ref:`section about paired-end adapter trimming above <paired-end>`.
 
@@ -1103,7 +1101,7 @@ If you want to simplify this a bit, you can also use the common prefix
     atropos \
 		-a AGATCGGAAGAGC -A AGATCGGAAGAGC \
 		-o trimmed.1.fastq.gz -p trimmed.2.fastq.gz \
-		reads.1.fastq.gz reads.2.fastq.gz
+		-pe1 reads.1.fastq.gz -pe2 reads.2.fastq.gz
 
 The adapter sequences can be found in the document `Illumina TruSeq Adapters
 De-Mystified <http://tucf-genomics.tufts.edu/documents/protocols/TUCF_Understanding_Illumina_TruSeq_Adapters.pdf>`__.
@@ -1114,7 +1112,7 @@ De-Mystified <http://tucf-genomics.tufts.edu/documents/protocols/TUCF_Understand
 Warning about incomplete adapter sequences
 ------------------------------------------
 
-Sometimes atropos' report ends with these lines::
+Sometimes Atropos' report ends with these lines::
 
     WARNING:
         One or more of your adapter sequences may be incomplete.
@@ -1189,7 +1187,7 @@ to trim off the first two bases on the 3' end. Atropos does an additional check 
 ensure that the 3' end of the read is an MspI site. Alternatively, you can use the
 method that was previously recommended for use with Cutadapt:
 
-    atropos -a NNADAPTER -o output.fastq input.fastq
+    atropos -a NNADAPTER -o output.fastq -se input.fastq
 
 * epignome: This was the original paired-end WGBS protocol compatible with Illumina
 sequencing.
@@ -1213,7 +1211,7 @@ processors to speed up read trimming. By default, Atropos uses a single thread t
 read input, process reads, and write output. To use multiple cores, specify the
 ``-T`` (or ``--threads``) option with the number of threads to use for trimming:
 
-  atropos -T 4 -a ADAPTER -o output.fastq input.fastq
+  atropos -T 4 -a ADAPTER -o output.fastq -se input.fastq
 
 It is important to note that, whatever number of threads you give Atropos, it will
 one of those for reading input and, if you use the ``--compression writer`` option
@@ -1304,7 +1302,7 @@ Atropos's output
 How to read the report
 ----------------------
 
-After every run, atropos prints out per-adapter statistics. The output
+After every run, Atropos prints out per-adapter statistics. The output
 starts with something like this::
 
     Sequence: 'ACGTACGTACGTTAGCTAGC'; Length: 20; Trimmed: 2402 times.
@@ -1422,72 +1420,3 @@ concatenation of columns 5-7 be identical to the original read sequence (and
 accordingly for columns 9-11). For subsequent lines, the shown sequence are the
 ones that were used in subsequent rounds of adapter trimming, that is, they get
 successively shorter.
-
-Columns 9-11 have been added in atropos version 1.9.
-
-
-.. _algorithm:
-
-The alignment algorithm
-=======================
-
-Since the publication of the `EMBnet journal application note about
-atropos <http://dx.doi.org/10.14806/ej.17.1.200>`_, the alignment algorithm
-used for finding adapters has changed significantly. An overview of this new
-algorithm is given in this section. An even more detailed description is
-available in Chapter 2 of my PhD thesis `Algorithms and tools for the analysis
-of high-throughput DNA sequencing data <http://hdl.handle.net/2003/31824>`_.
-
-The algorithm is based on *semiglobal alignment*, also called *free-shift*,
-*ends-free* or *overlap* alignment. In a regular (global) alignment, the
-two sequences are compared from end to end and all differences occuring over
-that length are counted. In semiglobal alignment, the sequences are allowed to
-freely shift relative to each other and differences are only penalized in the
-overlapping region between them::
-
-      FANTASTIC
-   ELEFANT
-
-The prefix ``ELE`` and the suffix ``ASTIC`` do not have a counterpart in the
-respective other row, but this is not counted as an error. The overlap ``FANT``
-has a length of four characters.
-
-Traditionally, *alignment scores* are used to find an optimal overlap aligment:
-This means that the scoring function assigns a positive value to matches,
-while mismatches, insertions and deletions get negative values. The optimal
-alignment is then the one that has the maximal total score. Usage of scores
-has the disadvantage that they are not at all intuitive: What does a total score
-of *x* mean? Is that good or bad? How should a threshold be chosen in order to
-avoid finding alignments with too many errors?
-
-For atropos, the adapter alignment algorithm uses *unit costs* instead.
-This means that mismatches, insertions and deletions are counted as one error, which
-is easier to understand and allows to specify a single parameter for the
-algorithm (the maximum error rate) in order to describe how many errors are
-acceptable.
-
-There is a problem with this: When using costs instead of scores, we would like
-to minimize the total costs in order to find an optimal alignment. But then the
-best alignment would always be the one in which the two sequences do not overlap
-at all! This would be correct, but meaningless for the purpose of finding an
-adapter sequence.
-
-The optimization criteria are therefore a bit different. The basic idea is to
-consider the alignment optimal that maximizes the overlap between the two
-sequences, as long as the allowed error rate is not exceeded.
-
-Conceptually, the procedure is as follows:
-
-1. Consider all possible overlaps between the two sequences and compute an
-   alignment for each, minimizing the total number of errors in each one.
-2. Keep only those alignments that do not exceed the specified maximum error
-   rate.
-3. Then, keep only those alignments that have a maximal number of matches
-   (that is, there is no alignment with more matches).
-4. If there are multiple alignments with the same number of matches, then keep
-   only those that have the smallest error rate.
-5. If there are still multiple candidates left, choose the alignment that starts
-   at the leftmost position within the read.
-
-In Step 1, the different adapter types are taken into account: Only those
-overlaps that are actually allowed by the adapter type are actually considered.

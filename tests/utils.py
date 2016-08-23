@@ -46,14 +46,23 @@ def files_equal(path1, path2):
         return False
 
 
-def run(params, expected, inpath, inpath2=None):
+def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input=False, interleaved_output=False):
     if type(params) is str:
         params = params.split()
     with temporary_path(expected) as tmp_fastaq:
-        params += ['-o', tmp_fastaq ] # TODO not parallelizable
-        params += [ datapath(inpath) ]
-        if inpath2:
-            params += [ datapath(inpath2) ]
+        if interleaved_input:
+            params += ['-l', inpath]
+        elif inpath2:
+            params += ['-pe1', datapath(inpath)]
+            params += ['-pe2', datapath(inpath2)]
+        else:
+            params += ['-se', datapath(inpath)]
+            if qualfile:
+                params += ['-sq', datapath(qualfile)]
+        if interleaved_output:
+            params += ['-L', tmp_fastaq]
+        else:
+            params += ['-o', tmp_fastaq] # TODO not parallelizable
         print(params)
         assert atropos.main(params) is None
         # TODO redirect standard output

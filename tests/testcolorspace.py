@@ -64,23 +64,23 @@ def test_decode():
 
 def test_qualtrim_csfastaqual():
 	'''-q with csfasta/qual files'''
-	run("-c -q 10", "solidqual.fastq", "solid.csfasta", 'solid.qual')
+	run("-c -q 10", "solidqual.fastq", "solid.csfasta", qualfile='solid.qual')
 
 
 def test_E3M():
 	'''Read the E3M dataset'''
 	# not really colorspace, but a fasta/qual file pair
-	main(['-o', '/dev/null', datapath("E3M.fasta"), datapath("E3M.qual")])
+	main(['-o', '/dev/null', '-se', datapath("E3M.fasta"), '-sq', datapath("E3M.qual")])
 
 
 def test_bwa():
 	'''MAQ-/BWA-compatible output'''
-	run("-c -e 0.12 -a 330201030313112312 -x 552: --maq", "solidmaq.fastq", "solid.csfasta", 'solid.qual')
+	run("-c -e 0.12 -a 330201030313112312 -x 552: --maq", "solidmaq.fastq", "solid.csfasta", qualfile='solid.qual')
 
 
 def test_bfast():
 	'''BFAST-compatible output'''
-	run("-c -e 0.12 -a 330201030313112312 -x abc: --strip-f3", "solidbfast.fastq", "solid.csfasta", 'solid.qual')
+	run("-c -e 0.12 -a 330201030313112312 -x abc: --strip-f3", "solidbfast.fastq", "solid.csfasta", qualfile='solid.qual')
 
 
 def test_trim_095():

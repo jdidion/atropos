@@ -60,7 +60,7 @@ import time
 
 def main(cmdlineargs=None, default_outfile="-"):
     """
-    Main function that evaluates command-line parameters and iterates over all reads.
+    Main function that evaluates command-line parameters.
     
     :param cmdlineargs: iterable of command line arguments; `None` is equivalent to
     `sys.argv[1:]`
@@ -77,8 +77,25 @@ def main(cmdlineargs=None, default_outfile="-"):
         level = options.log_level or ("ERROR" if options.quiet else "INFO")
         setup_logging(stdout=bool(options.output), level=level)
     
+    logger = logging.getLogger()
+    logger.info("This is Atropos %s with Python %s", __version__, platform.python_version())
+    logger.info("Command line parameters: %s", " ".join(orig_args))
+    
+    # dispatch to subcommands if one is specified
+    if options.command == "detect":
+        try:
+            import atropos.detect
+            atropos.detect.main(options)
+        except:
+            parser.error("Error during adapter detection; do you have khmer installed?")
+            sys.exit(1)
+    # otherwise trim reads
+    else:
+        run_atropos(options, parser, default_outfile="-")
+
+def run_atropos(options, parser, default_outfile="-"):
     paired = validate_options(options, parser)
-    reader, qualities, has_qual_file = create_reader(options.inputs, options, paired, parser)
+    reader, qualities, has_qual_file = create_reader(options, paired, parser)
     modifiers, num_adapters = create_modifiers(options, paired, qualities, has_qual_file, parser)
     min_affected = 2 if options.pair_filter == 'both' else 1
     filters = create_filters(options, paired, min_affected)
@@ -86,8 +103,6 @@ def main(cmdlineargs=None, default_outfile="-"):
     writers = Writers(force_create)
     
     logger = logging.getLogger()
-    logger.info("This is atropos %s with Python %s", __version__, platform.python_version())
-    logger.info("Command line parameters: %s", " ".join(orig_args))
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[paired])
@@ -128,25 +143,35 @@ def main(cmdlineargs=None, default_outfile="-"):
     
 def get_argument_parser():
     parser = argparse.ArgumentParser(usage=__doc__.lstrip().format(version=__version__))
-    parser.add_argument("inputs", nargs=argparse.REMAINDER)
     
     parser.add_argument("--debug", action='store_true', default=False,
         help="Print debugging information. (no)")
-    parser.add_argument("-f", "--format",
-        help="Input file format; can be either 'fasta', 'fastq' or 'sra-fastq'. "
-            "Ignored when reading csfasta/qual files. (auto-detect "
-            "from file name extension)")
-    parser.add_argument("--max-reads", default=None,
-        help="Maximum number of reads/pairs to process (no max)")
     parser.add_argument("--progress", default=None,
-        help="Show progress. bar = show progress bar; msg = show a status "
-             "message. (no)")
+        help="Show progress. bar = show progress bar; msg = show a status message. (no)")
     parser.add_argument("--op-order", default="CGQA",
         help="The order in which trimming operations are be applied. This is a string of "
              "1-4 of the following characters: A = adapter trimming; C = cutting "
              "(unconditional); G = NextSeq trimming; Q = quality trimming. The default is "
              "'CGQA' to maintain compatibility with Cutadapt; however, this is likely to "
              "change to 'GACQ' in the near future.")
+    
+    group = parser.add_argument_group("Input")
+    group.add_argument("-pe1", "--input1", default=None, metavar="FILE1",
+        help="The first (and possibly only) input file.")
+    group.add_argument("-pe2", "--input2",  default=None, metavar="FILE2",
+        help="The second input file.")
+    group.add_argument("-se", "--single-input", default=None, metavar="FILE",
+        help="A single-end read file.")
+    group.add_argument("-sq", "--single-quals", default=None, metavar="FILE",
+        help="A single-end qual file.")
+    group.add_argument("-l", "--interleaved-input", default=None, metavar="FILE",
+        help="Interleaved input file.")
+    group.add_argument("-f", "--format",
+        help="Input file format; can be either 'fasta', 'fastq' or 'sra-fastq'. "
+            "Ignored when reading csfasta/qual files. (auto-detect "
+            "from file name extension)")
+    group.add_argument("--max-reads", default=None,
+        help="Maximum number of reads/pairs to process (no max)")
     
     group = parser.add_argument_group("Finding adapters:",
         description="Parameters -a, -g, -b specify adapters to be removed from "
@@ -363,14 +388,14 @@ def get_argument_parser():
              "(see --cut-min). (no)")
     group.add_argument("-p", "--paired-output", metavar="FILE",
         help="Write second read in a pair to FILE. (no)")
+    group.add_argument("-L", "--interleaved-output", metavar="FILE",
+        help="Write output to interleaved file.")
     # Setting the default for pair_filter to None allows us to find out whether
     # the option was used at all.
     group.add_argument("--pair-filter", metavar='(any|both)', default=None,
         choices=("any", "both"),
         help="Which of the reads in a paired-end read have to match the "
             "filtering criterion in order for it to be filtered. (any)")
-    group.add_argument("--interleaved", action='store_true', default=False,
-        help="Read and write interleaved paired-end reads. (no)")
     group.add_argument("--untrimmed-paired-output", metavar="FILE",
         help="Write second read in a pair to this FILE when no adapter "
             "was found in the first read. Use this option together with "
@@ -421,6 +446,19 @@ def get_argument_parser():
              "system-level compression can be used and (1 < threads < 8), otherwise "
              "defaults to 'worker'.")
     
+    # add subcommands
+    parser.set_defaults(command=None)
+    subparsers = parser.add_subparsers(dest="commands", help='sub-command help')
+    
+    detect_parser = subparsers.add_parser("detect", help="Detect adapter sequences")
+    detect_parser.set_defaults(command='detect', max_reads=10000)
+    detect_parser.add_argument("--kmer-size", type=int, default=12,
+        help="Size of k-mer used to scan reads for adapter sequences. (12)")
+    detect_parser.add_argument("--max-adapters", type=int, default=None,
+        help="The maximum number of candidate adapters to report. (10000)")
+    detect_parser.add_argument("--adapter-report", default=None,
+        help="File in which to write the summary of detected adapters. (stdout)")
+    
     return parser
 
 def setup_logging(stdout=False, level="INFO"):
@@ -449,42 +487,24 @@ def validate_options(options, parser):
     if options.debug and options.threads is not None:
         parser.error("Cannot use debug mode with multiple threads")
     
-    args = options.inputs
-    if len(args) == 0:
-        parser.error("At least one parameter needed: name of a FASTA or FASTQ file.")
-    elif len(args) > 2:
-        parser.error("Too many parameters: {}".format(args))
-    if args[0].endswith('.qual'):
-        parser.error("If a .qual file is given, it must be the second argument.")
-    
     # Find out which 'mode' we need to use.
-    # Default: single-read trimming (neither -p nor -A/-G/-B/-U/--interleaved given)
     paired = False
-    if options.paired_output:
-        # Modify first read only, keep second in sync (-p given, but not -A/-G/-B/-U).
-        # This exists for backwards compatibility ('legacy mode').
-        paired = 'first'
-    # Any of these options switch off legacy mode
-    if (options.adapters2 or options.front2 or options.anywhere2 or
-        options.cut2 or options.cut_min2 or options.interleaved or options.pair_filter or
-        options.too_short_paired_output or options.too_long_paired_output):
-        # Full paired-end trimming when both -p and -A/-G/-B/-U given
-        # Read modifications (such as quality trimming) are applied also to second read.
-        paired = 'both'
-
-    if paired and len(args) == 1 and not options.interleaved:
-        parser.error("When paired-end trimming is enabled via -A/-G/-B/-U or -p, "
-            "two input files are required.")
-    if options.interleaved and len(args) != 1:
-        parser.error("When reading interleaved files, only one input file may "
-            "be given.")
-    if not paired:
+    if options.single_input:
+        if not options.output:
+            parser.error("An output file is required")
+        if options.input1 or options.input2 or options.interleaved_input:
+            parser.error("Cannot use -se together with -pe1, -pe2, or -l")
         if options.untrimmed_paired_output:
             parser.error("Option --untrimmed-paired-output can only be used when "
                 "trimming paired-end reads (with option -p).")
-
-    if paired:
-        if not options.interleaved:
+        options.input1 = options.single_input
+        options.input2 = options.single_quals
+    else:
+        if not options.interleaved_input and (not options.input1 or not options.input2):
+            parser.error("Both '-pe1' and '-pe2' are required for paired-end trimming. If this is an "
+                "interleaved file, use '-l' instead.")
+        
+        if not options.interleaved_output:
             if not options.paired_output:
                 parser.error("When paired-end trimming is enabled via -A/-G/-B/-U, "
                     "a second output file needs to be specified via -p (--paired-output).")
@@ -500,11 +520,19 @@ def validate_options(options, parser):
             if options.too_long_output and not options.too_long_paired_output:
                 parser.error("When using --too-long-output with paired-end "
                     "reads, you also need to use --too-long-paired-output")
-    elif len(args) == 2:
-        if options.format is not None:
-            parser.error("If a pair of .fasta and .qual files is given, the -f/--format "
-                "parameter cannot be used.")
+                
+        # Modify first read only, keep second in sync (-p given, but not -A/-G/-B/-U).
+        # This exists for backwards compatibility ('legacy mode').
+        paired = 'first'
     
+        # Any of these options switch off legacy mode
+        if (options.adapters2 or options.front2 or options.anywhere2 or options.cut2 or
+            options.cut_min2 or options.interleaved_input or options.pair_filter or
+            options.too_short_paired_output or options.too_long_paired_output):
+            # Full paired-end trimming when both -p and -A/-G/-B/-U given
+            # Read modifications (such as quality trimming) are applied also to second read.
+            paired = 'both'
+
     if options.aligner != 'adapter':
         if options.aligner == 'insert' and paired != 'both':
             parser.error("Insert aligner only works with paired-end reads")
@@ -719,21 +747,23 @@ def validate_options(options, parser):
     
     return paired
 
-def create_reader(input_files, options, paired, parser, counter_magnitude="M"):
-    input_filename = input_files[0]
-    input_paired_filename = None
-    quality_filename = None
-    if len(input_files) > 1:
+def create_reader(options, paired, parser, counter_magnitude="M"):
+    input1 = input2 = qualfile = None
+    interleaved = False
+    if options.interleaved_input:
+        input1 = options.interleaved_input
+        interleaved = True
+    else:
+        input1 = options.input1
         if paired:
-            input_paired_filename = input_files[1]
+            input2 = options.input2
         else:
-            quality_filename = input_files[1]
+            qualfile = options.input2
     
     try:
-        reader = open_reader(
-            input_filename, file2=input_paired_filename,
-            qualfile=quality_filename, colorspace=options.colorspace,
-            fileformat=options.format, interleaved=options.interleaved)
+        reader = open_reader(input1, file2=input2, qualfile=qualfile,
+            colorspace=options.colorspace, fileformat=options.format,
+            interleaved=interleaved)
     except (UnknownFileType, IOError) as e:
         parser.error(e)
     
@@ -749,7 +779,7 @@ def create_reader(input_files, options, paired, parser, counter_magnitude="M"):
     elif options.progress == "bar":
         reader = create_progress_reader(reader, options.max_reads, counter_magnitude)
     
-    return (reader, qualities, quality_filename is not None)
+    return (reader, qualities, qualfile is not None)
 
 class BatchIterator(object):
     def __init__(self, reader, size, max_reads=None):
@@ -1042,12 +1072,21 @@ def create_filters(options, paired, min_affected):
     return filters
 
 def create_formatters(options, qualities, default_outfile):
+    output1 = output2 = None
+    interleaved = False
+    if options.interleaved_output:
+        output1 = options.interleaved_output
+        interleaved = True
+    else:
+        output1 = options.output
+        output2 = options.paired_output
+    
     seq_formatter_args = dict(
         qualities=qualities,
         colorspace=options.colorspace,
-        interleaved=options.interleaved
+        interleaved=interleaved
     )
-    formatters = Formatters(options.output, seq_formatter_args)
+    formatters = Formatters(output1, seq_formatter_args)
     force_create = []
         
     if (options.merge_overlapping and options.merged_output):
@@ -1064,13 +1103,12 @@ def create_formatters(options, qualities, default_outfile):
             options.too_long_output, options.too_long_paired_output)
     
     if not formatters.multiplexed:
-        if options.output is not None:
-            formatters.add_seq_formatter(NoFilter,
-                options.output, options.paired_output)
-            if options.output != "-":
-                force_create.append(options.output)
-                if options.paired_output is not None:
-                    force_create.append(options.paired_output)
+        if output1 is not None:
+            formatters.add_seq_formatter(NoFilter, output1, output2)
+            if output1 != "-":
+                force_create.append(output1)
+                if output2 is not None:
+                    force_create.append(output2)
         elif not (options.discard_trimmed and options.untrimmed_output):
             formatters.add_seq_formatter(NoFilter, default_outfile)
             if default_outfile != "-":
@@ -1078,7 +1116,7 @@ def create_formatters(options, qualities, default_outfile):
     
     if not options.discard_untrimmed:
         if formatters.multiplexed:
-            untrimmed = options.untrimmed_output or options.output.format(name='unknown')
+            untrimmed = options.untrimmed_output or output1.format(name='unknown')
             formatters.add_seq_formatter(UntrimmedFilter, untrimmed)
             formatters.add_seq_formatter(NoFilter, untrimmed)
         elif options.untrimmed_output:
