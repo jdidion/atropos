@@ -732,8 +732,9 @@ class Writers(object):
     
     def close(self):
         for path in self.force_create:
-            if path not in self.writers:
+            if path not in self.writers and path != '-':
                 with open_output(path, "w"):
                     pass
         for writer in self.writers.values():
-            writer.close()
+            if writer != sys.stdout:
+                writer.close()
