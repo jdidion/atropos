@@ -8,16 +8,18 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 1. Multi-threading support, including an extremely fast "parallel write" mode.
 2. Implementation of a new insert alignment-based trimming algorith for paired-end reads that is substantially more sensitive and specific than the original Cutadapt adapter alignment-based algorithm.
 3. Options for trimming specific types of data (miRNA, bisulfite-seq).
-4. The ability (currently limited) to merge overlapping reads.
-5. The ability to write the summary report and log messages to separate files.
-6. The ability to write interleaved FASTQ output.
-7. A progress bar, and other minor usability enhancements.
+4. A new command ('detect') that will detect adapter sequences and other potential contaminants (this is experimental).
+5. The ability to merge overlapping reads (this is experimental and the functionality is limited).
+6. The ability to write the summary report and log messages to separate files.
+7. The ability to read and write interleaved FASTQ output.
+8. A progress bar, and other minor usability enhancements.
 
 ## Dependencies
 
 * Python 3.3+ (python 2.x is NOT supported)
 * Cython 0.24+ (`pip install Cython`)
 * progressbar or tqdm (optional, if you want progressbar support)
+* khmer 2.0+ (`pip install khmer`) (optional, if you want adapter detection support)
 
 ## Installation
 
@@ -25,16 +27,16 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 
 ## Usage
 
-Atropos is fully backward-compatible with cutadapt. If you currently use cutadapt, you can simply install Atropos and then substitute the executable name in your command line. For example:
+Atropos is almost fully backward-compatible with cutadapt. If you currently use cutadapt, you can simply install Atropos and then substitute the executable name in your command line, with one key difference: you need to use options to specify input file names. For example:
 
 ```{python}
-atropos -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz reads.fq.gz
+atropos -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz -se reads.fq.gz
 ```
 
 To take advantage of multi-threading, set the `--threads` option:
 
 ```{python}
-atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz reads.fq.gz
+atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz -se reads.fq.gz
 ```
 
 To take advantage of the new aligner (if you have paired-end reads with 3' adatpers), set the `--aligner` option to 'insert':
@@ -42,7 +44,7 @@ To take advantage of the new aligner (if you have paired-end reads with 3' adatp
 ```{python}
 atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
   -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz \
-  reads.1.fq.gz reads.2.fq.gz
+  -pe1 reads.1.fq.gz -pe2 reads.2.fq.gz
 ```
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
@@ -55,9 +57,10 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ## Planned enhancements and experiments
 
-* Implement an auto-detect option for adapters similar to TrimGalore: read the first 1M reads, search for common adapters, and pick the one that appears most frequently.
 * Optional error correction for overlapping pairs (if there are mismatches, change the lower quality base to the higher quality base)
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+* Migrate to [Screed](https://github.com/dib-lab/screed) if there is no performance penalty.
+* MIgrate to Versioneer for version management.
 
 ## Citations
 
