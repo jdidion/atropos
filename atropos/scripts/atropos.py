@@ -2,16 +2,9 @@
 # -*- coding: utf-8 -*-
 # kate: word-wrap off; remove-trailing-spaces all;
 
-"""
-atropos version {version}
+"""Atropos version {version}
 
 Atropos removes adapter sequences from high-throughput sequencing reads.
-
-Usage:
-    atropos -a ADAPTER [options] [-o output.fastq] input.fastq
-
-For paired-end reads:
-    atropos -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq in1.fastq in2.fastq
 
 Replace "ADAPTER" with the actual sequence of your 3' adapter. IUPAC wildcard
 characters are supported. The reverse complement is *not* automatically
@@ -37,6 +30,11 @@ by John Didion, "Atropos: sensitive, specific, and speedy trimming of NGS reads,
 in prep.
 """
 
+__usage__ = """
+atropos -a ADAPTER [options] [-o output.fastq] -se input.fastq
+atropos -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq -pe1 in1.fastq -pe2 in2.fastq
+"""
+
 # Print a helpful error message if the extension modules cannot be imported.
 from atropos import *
 check_importability()
@@ -55,8 +53,10 @@ import copy
 import logging
 import os
 import platform
+import re
 import sys
 import time
+import textwrap
 
 def main(cmdlineargs=None, default_outfile="-"):
     """
@@ -83,12 +83,12 @@ def main(cmdlineargs=None, default_outfile="-"):
     
     # dispatch to subcommands if one is specified
     if options.command == "detect":
-        try:
-            import atropos.detect
-            atropos.detect.main(options)
-        except:
-            parser.error("Error during adapter detection; do you have khmer installed?")
-            sys.exit(1)
+        #try:
+        import atropos.detect
+        atropos.detect.main(options)
+        #except:
+        #    parser.error("Error during adapter detection; do you have khmer installed?")
+        #    sys.exit(1)
     # otherwise trim reads
     else:
         run_atropos(options, parser, default_outfile="-")
@@ -107,7 +107,6 @@ def run_atropos(options, parser, default_outfile="-"):
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[paired])
     if paired == 'first' and (len(modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
-        import textwrap
         logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
             'modifications are applied only to the first '
             'read since backwards compatibility mode is enabled. '
@@ -140,9 +139,21 @@ def run_atropos(options, parser, default_outfile="-"):
         stop_cpu_time - start_cpu_time,
         summary,
         modifiers.get_trimmer_classes())
-    
+
+class ParagraphHelpFormatter(argparse.HelpFormatter):
+    def _fill_text(self, text, width, indent):
+        text = re.sub('[ \t]{2,}', ' ', text)
+        paragraphs = [
+            textwrap.fill(p, width, initial_indent=indent, subsequent_indent=indent)
+            for p in re.split("\n\n", text)
+        ]
+        return "\n\n".join(paragraphs)
+
 def get_argument_parser():
-    parser = argparse.ArgumentParser(usage=__doc__.lstrip().format(version=__version__))
+    parser = argparse.ArgumentParser(
+        usage=__usage__,
+        description=__doc__.format(version=__version__),
+        formatter_class=ParagraphHelpFormatter)
     
     parser.add_argument("--debug", action='store_true', default=False,
         help="Print debugging information. (no)")
@@ -173,7 +184,7 @@ def get_argument_parser():
     group.add_argument("--max-reads", default=None,
         help="Maximum number of reads/pairs to process (no max)")
     
-    group = parser.add_argument_group("Finding adapters:",
+    group = parser.add_argument_group("Finding adapters",
         description="Parameters -a, -g, -b specify adapters to be removed from "
             "each read (or from the first read in a pair if data is paired). "
             "If specified multiple times, only the best matching adapter is "
@@ -448,15 +459,19 @@ def get_argument_parser():
     
     # add subcommands
     parser.set_defaults(command=None)
-    subparsers = parser.add_subparsers(dest="commands", help='sub-command help')
+    subparsers = parser.add_subparsers(
+        dest="commands",
+        help='sub-command help')
     
-    detect_parser = subparsers.add_parser("detect", help="Detect adapter sequences")
+    detect_parser = subparsers.add_parser("detect", help="Detect adapter sequences",
+        usage="\natropos -se input.fastq detect\natropos -pe1 in1.fastq -pe2 in2.fastq detect",
+        description="Detect adapter sequences directly from read sequences.")
     detect_parser.set_defaults(command='detect', max_reads=10000)
     detect_parser.add_argument("--kmer-size", type=int, default=12,
         help="Size of k-mer used to scan reads for adapter sequences. (12)")
     detect_parser.add_argument("--max-adapters", type=int, default=None,
         help="The maximum number of candidate adapters to report. (10000)")
-    detect_parser.add_argument("--adapter-report", default=None,
+    detect_parser.add_argument("--adapter-report", default="-",
         help="File in which to write the summary of detected adapters. (stdout)")
     
     return parser
