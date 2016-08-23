@@ -75,6 +75,9 @@ def main():
     with fileinput.input(args.input) as i:
         rows = summarize_timing(i)
     
+    if len(rows) == 0:
+        print("No results to summarize")
+    
     with fileoutput(args.output) as o:
         w = csv.writer(o, delimiter="\t")
         if args.output_format == 'simple':
