@@ -1,7 +1,12 @@
 # Changes
 
-v1.0.11 (dev)
+v1.0.12 (dev)
 -------------
+
+
+
+v1.0.11 (2016.08.24)
+--------------------
 
 * Clarify and fix issues with bisulfite trimming. Notably, rrbs and non-directional are now allowed independently or in combination.
 
