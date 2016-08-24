@@ -43,7 +43,7 @@ def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_conta
             break
         countgraph.consume_and_tag(read.sequence)
     
-    n_expected = math.ceil(tablesize * (1.0 / float(4**k)))
+    n_expected = math.ceil(tablesize / float(4**k))
     min_count = n_expected * overrep_cutoff
     if min_count >= 2**16:
         raise Exception("The minimum count for an over-represented k-kmer {} "
