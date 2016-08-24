@@ -582,6 +582,7 @@ def validate_options(options, parser):
         if options.error_rate is None:
             options.error_rate = 0.12
     elif options.bisulfite:
+        # TODO: set default adapter sequences
         if options.quality_cutoff is None:
             options.quality_cutoff = "20,20"
         if options.bisulfite == "swift" and paired != "both":
@@ -1028,11 +1029,8 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
                     rrbs=options.bisulfite=="non-directional-rrbs")
             elif options.bisulfite == "rrbs":
                 modifiers.add_modifier(RRBSTrimmer)
-            elif options.bisulfite == "epignome":
-                modifiers.add_modifier(EpiGnomeBisulfiteTrimmer)
-            elif options.bisulfite == "truseq":
-                # TODO: how to trim?
-                pass
+            elif options.bisulfite in ("epignome", "truseq"):
+                modifiers.add_modifier(TruSeqBisulfiteTrimmer)
             elif options.bisulfite == "swift":
                 modifiers.add_modifier(SwiftBisulfiteTrimmer)
         else:

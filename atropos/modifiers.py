@@ -444,13 +444,13 @@ class NonDirectionalBisulfiteTrimmer(object):
     def modified_bases(self):
         return self._rrbs_cutter.trimmed_bases + self._non_directional_cutter.trimmed_bases
 
-class EpiGnomeBisulfiteTrimmer(MinCutter):
-    """EpiGnome reads are trimmed 6 bp on the 5' end."""
+class TruSeqBisulfiteTrimmer(MinCutter):
+    """EpiGnome reads are trimmed at least 6 bp on the 5' end."""
     
-    display_str = "Bisulfite-trimmed (EpiGnome)"
+    display_str = "Bisulfite-trimmed (EpiGnome/TruSeq)"
     
     def __init__(self):
-        super(EpiGnomeBisulfiteTrimmer, self).__init__((6,), count_trimmed=True)
+        super(TruSeqBisulfiteTrimmer, self).__init__((6,), count_trimmed=True, only_trimmed=False)
 
 class SwiftBisulfiteTrimmer(ReadPairModifier):
     """

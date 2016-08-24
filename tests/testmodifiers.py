@@ -165,8 +165,8 @@ def test_non_directional_bisulfite_trimmer():
     assert trimmer(read2).sequence == "CTATCGA"
     assert trimmer(read3).sequence == "CTATCGATCCA"
 
-def test_EpiGnome_trimmer():
-    trimmer = EpiGnomeBisulfiteTrimmer()
+def test_TruSeq_trimmer():
+    trimmer = TruSeqBisulfiteTrimmer()
     read1 = Sequence('read1', "CTATCGATCCACGAGACTAAC")
     assert trimmer(read1).sequence == "ATCCACGAGACTAAC"
 
