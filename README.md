@@ -57,10 +57,17 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ## Planned enhancements and experiments
 
+Note: while we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 1.1, which is planned for early
+2017, and will also include the following enhancements:
+
 * Optional error correction for overlapping pairs (if there are mismatches, change the lower quality base to the higher quality base)
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+* Re-implement the 'detect' command using msbwt (https://github.com/holtjma/msbwt), which will enable k-mer counting as well as reconstruction of longer high-abundance sequence from shorter k-mers.
+* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 * Migrate to [Screed](https://github.com/dib-lab/screed) if there is no performance penalty.
 * MIgrate to Versioneer for version management.
+
+If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
 ## Citations
 
