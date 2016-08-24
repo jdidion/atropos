@@ -398,45 +398,47 @@ class NEndTrimmer(Trimmer):
         end_cut = end_cut.start() if end_cut else len(read)
         return self.subseq(read, start_cut, end_cut)
 
-class BisulfiteTrimmer(MinCutter):
+class RRBSTrimmer(MinCutter):
     """
-    Generic bisulfite trimmer. Sequences that are adapter-trimmed are further
-    trimmed 2 bp on the 3' end to remove potential methylation-biased bases
-    from the end-repair reaction.
+    Sequences that are adapter-trimmed are further trimmed 2 bp on the 3' end to
+    remove potential methylation-biased bases from the end-repair reaction.
     """
     
-    display_str = "Bisulfite-trimmed"
+    display_str = "RRBS-trimmed"
     
     def __init__(self, trim_5p=0, trim_3p=2):
-        super(BisulfiteTrimmer, self).__init__((trim_5p, -1 * trim_3p), count_trimmed=False, only_trimmed=True)
+        super(RRBSTrimmer, self).__init__((trim_5p, -1 * trim_3p), count_trimmed=False, only_trimmed=True)
 
 class NonDirectionalBisulfiteTrimmer(object):
     """
     For non-directional RRBS/WGBS libraries (which implies that they were digested
-    using MspI), sequences starting with either 'CAA' or 'CGA' will have 2 bp
-    trimmed off either end to remove potential methylation-biased bases from the
-    end-repair reaction. Otherwise only the 3' end of adapter-trimmed reads are
-    further trimmed 2 bp.
+    using MspI), sequences that start with either 'CAA' or 'CGA' will have 2 bp
+    trimmed off the 5' end to remove potential methylation-biased bases from the
+    end-repair reaction. Additionally, for RRBS reads, if CAA/CGA is not trimmed
+    *and* the read has been adapter-trimmed, a minimum number of bases is trimmed
+    from the 3' end.
     """
     
     display_str = "Bisulfite-trimmed (Non-directional)"
     _regex = re.compile("^C[AG]A")
     
-    def __init__(self, trim_5p=2, trim_3p=2):
-        self._3pCutter = MinCutter((-1 * trim_3p,), count_trimmed=False, only_trimmed=True)
-        self._bothCutter = MinCutter((trim_5p, -1 * trim_3p), count_trimmed=False)
+    def __init__(self, trim_5p=2, trim_3p=2, rrbs=False):
+        self._non_directional_cutter = MinCutter([trim_5p], count_trimmed=False, only_trimmed=False)
+        self.rrbs = rrbs
+        if rrbs:
+            self._rrbs_cutter = RRBSTrimmer(trim_3p)
     
     def __call__(self, read):
         cutter = None
         if self._regex.match(read.sequence):
-            cutter = self._bothCutter
-        elif read.match:
-            cutter = self._3pCutter
+            cutter = self._non_directional_cutter
+        elif self.rrbs:
+            cutter = self._rrbs_cutter
         return cutter(read) if cutter else read
     
     @property
     def modified_bases(self):
-        return self._3pCutter.trimmed_bases + self._bothCutter.trimmed_bases
+        return self._rrbs_cutter.trimmed_bases + self._non_directional_cutter.trimmed_bases
 
 class EpiGnomeBisulfiteTrimmer(MinCutter):
     """EpiGnome reads are trimmed 6 bp on the 5' end."""

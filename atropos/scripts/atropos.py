@@ -83,12 +83,12 @@ def main(cmdlineargs=None, default_outfile="-"):
     
     # dispatch to subcommands if one is specified
     if options.command == "detect":
-        #try:
-        import atropos.detect
-        atropos.detect.main(options)
-        #except:
-        #    parser.error("Error during adapter detection; do you have khmer installed?")
-        #    sys.exit(1)
+        try:
+            import atropos.detect
+            atropos.detect.main(options)
+        except:
+            parser.error("Error during adapter detection; do you have khmer installed?")
+            sys.exit(1)
     # otherwise trim reads
     else:
         run_atropos(options, parser, default_outfile="-")
@@ -424,12 +424,13 @@ def get_argument_parser():
     group = parser.add_argument_group("Method-specific options")
     group.add_argument("--bisulfite", default=False, metavar="METHOD",
         help="Set default option values for bisulfite-treated data. The argument specifies the "
-             "type of bisulfite library (non-directional, truseq, epignome, or swift) or custom "
-             "parameters for trimming: '<read1>[;<read2>]' where trimming parameters for each "
-             "read are: '<5' cut>,<3' cut>,<include trimmed>,<only trimmed>' where 'include "
-             "trimmed' is 1 or 0 for whether or not the bases already trimmed during/prior to adapter "
-             "trimming should be counted towards the total bases to be cut and 'only trimmed' "
-             "is 1 or 0 for whether or not only trimmed reads should be further cut. (no)")
+             "type of bisulfite library (rrbs, non-directional, non-directional-rrbs, truseq, "
+             "epignome, or swift) or custom parameters for trimming: '<read1>[;<read2>]' where "
+             "trimming parameters for each read are: '<5' cut>,<3' cut>,<include trimmed>,<only trimmed>' "
+             "where 'include trimmed' is 1 or 0 for whether or not the bases already trimmed "
+             "during/prior to adapter trimming should be counted towards the total bases to be "
+             "cut and 'only trimmed' is 1 or 0 for whether or not only trimmed reads should be "
+             "further cut. (no)")
     group.add_argument("--mirna", action="store_true", default=False,
         help="Set default option values for miRNA data. (no)")
     
@@ -583,7 +584,7 @@ def validate_options(options, parser):
     elif options.bisulfite:
         if options.quality_cutoff is None:
             options.quality_cutoff = "20,20"
-        if options.bisulfite not in ("non-directional", "truseq", "epignome", "swift"):
+        if options.bisulfite not in ("rrbs", "non-directional", "truseq", "epignome", "swift"):
             def parse_bisulfite_params(r):
                 try:
                     parts = [int(p) for p in r.split(",")]
@@ -603,8 +604,6 @@ def validate_options(options, parser):
             elif paired != "both" and len(temp) > 1:
                 parser.error("Too many bisulfite parameters for single-end reads")
             options.bisulfite = temp
-        elif not paired and options.bisulfite != "non-directional":
-            parser.error("Single-end bisulfite libraries must be set to 'non-directional'.")
     
     if options.quality_cutoff is not None:
         cutoffs = options.quality_cutoff.split(',')
@@ -1022,8 +1021,11 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
     
     if options.bisulfite:
         if isinstance(options.bisulfite, str):
-            if options.bisulfite == "non_directional":
-                modifiers.add_modifier(NonDirectionalBisulfiteTrimmer)
+            if "non-directional" in options.bisulfite:
+                modifiers.add_modifier(NonDirectionalBisulfiteTrimmer,
+                    rrbs=options.bisulfite=="non-directional-rrbs")
+            elif options.bisulfite == "rrbs":
+                modifiers.add_modifier(RRBSTrimmer)
             elif options.bisulfite == "epignome":
                 modifiers.add_modifier(EpiGnomeBisulfiteTrimmer)
             elif options.bisulfite == "truseq":
