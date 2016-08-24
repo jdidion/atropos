@@ -1,5 +1,6 @@
 # Detect adapter sequences directly from reads based on kmer frequency.
 
+from collections import defaultdict
 import math
 import re
 import statistics as stats
@@ -12,20 +13,29 @@ from .xopen import open_output
 
 def main(options):
     known_contaminants = load_known_contaminants_from_url()
+    if options.known_contaminant:
+        merge_contaminants(
+            known_contaminants,
+            load_known_contaminants_from_option_strings(options.known_contaminant))
+    if options.known_contaminants_file:
+        merge_contaminants(
+            known_contaminants,
+            load_known_contaminants_from_file(options.known_contaminants_file))
     infiles = [f for f in (
         options.single_input, options.input1, options.input2, options.interleaved_input
     ) if f is not None]
+    n_reads = options.max_reads or 10000
     with open_output(options.adapter_report) as o:
         print("Detecting adapters and other potential contaminant sequences based on\n"
-              "{}-mers in {} reads".format(options.kmer_size, options.max_reads), file=o)
+              "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
         for i, f in enumerate(infiles, 1):
             file_header = "File {}: {}".format(i, f)
             print("", file=o)
             print(file_header, file=o)
             print('-' * len(file_header), file=o)
-            contam = detect_contaminants(f, k=options.kmer_size, n_reads=options.max_reads,
+            contam = detect_contaminants(f, k=options.kmer_size, n_reads=n_reads,
                 known_contaminants=known_contaminants)
-            contam = filter_contaminants(contam, known_only=True)
+            contam = filter_contaminants(contam, known_only=not options.include_unknown)
             summarize_contaminants(contam, o)
 
 def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None):
@@ -33,7 +43,6 @@ def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_conta
     read = next(parser)
     n_win = len(read.sequence) - k + 1 # assuming all sequences are same length
     tablesize = n_reads * n_win
-    
     countgraph = khmer.Countgraph(k, tablesize, khmer_args.DEFAULT_N_TABLES)
     countgraph.set_use_bigcount(True)
     
@@ -65,10 +74,10 @@ def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_conta
                 seen.add(kmer)
             return n
         
-        for name, seq in known_contaminants.items():
+        for seq, names in known_contaminants.items():
             l = len(seq)
             if l < k:
-                print("Cannot check {}; sequence is shorter than {}".format(name, k))
+                print("Cannot check {}; sequence is shorter than {}".format(list(names)[0], k))
                 continue
             
             n_kmers = l - k + 1
@@ -87,7 +96,7 @@ def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_conta
             if matches > 0:
                 # not sure what the correct metric is to use here
                 overall_count = sum(match_counts) / float(n_kmers)
-                contam.append((seq, overall_count / float(tablesize), name, float(matches) / n_kmers))
+                contam.append((seq, overall_count / float(tablesize), names, float(matches) / n_kmers))
         
         contam.sort(key=lambda x: x[3], reverse=True)
         
@@ -123,25 +132,36 @@ def summarize_contaminants(contam, outstream):
     for i, row in enumerate(contam):
         print(("{:>" + str(pad) + "}. {}").format(i+1, row[0]), file=outstream)
         if len(row) > 2:
-            print("    Name: {}".format(row[2]), file=outstream)
+            print("    Name(s): {}".format(",\n             ".join(row[2])), file=outstream)
             print("    K-mers that are frequent: {:.2%}".format(row[3]), file=outstream)
         print("    Median frequency of k-mers: {:.2%}".format(row[1]), file=outstream)
 
-def load_known_contaminants(path):
+def load_known_contaminants_from_file(path):
     with open(path, "rt") as i:
         return parse_known_contaminants(i)
+
+def load_known_contaminants_from_option_strings(opt_strings):
+    """Parse contaminants from list of name=seq options supplied on command line."""
+    return parse_known_contaminants(opt_strings, delim='=')
 
 def load_known_contaminants_from_url(url="https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/a6372f21281705ac9031697fcaed3d1f64cea9a5/sequencing_adapters.txt"):
      return parse_known_contaminants(urlopen(url).read().decode().split("\n"))
 
-def parse_known_contaminants(line_iter):
-    regex = re.compile('([^\t]+)\t+(.+)')
-    contam = {}
+def parse_known_contaminants(line_iter, delim='\t'):
+    regex = re.compile("([^{0}]+){0}+(.+)".format(delim))
+    contam = defaultdict(lambda: set())
     for line in line_iter:
         line = line.rstrip()
         if len(line) == 0 or line.startswith('#'):
             continue
         m = regex.match(line)
         if m:
-            contam[m.group(1)] = m.group(2)
+            contam[m.group(2)].add(m.group(1))
     return contam
+
+def merge_contaminants(c1, c2):
+    for k, v in c2.items():
+        if k in c1:
+            c1[k] = c1[k] + c2[k]
+        else:
+            c1[k] = c2[k]

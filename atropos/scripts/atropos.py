@@ -46,6 +46,7 @@ from atropos.adapters import AdapterParser, BACK
 from atropos.modifiers import *
 from atropos.filters import *
 from atropos.report import *
+from atropos.util import int_or_str, MAGNITUDE
 
 import argparse
 from collections import defaultdict
@@ -85,10 +86,10 @@ def main(cmdlineargs=None, default_outfile="-"):
     if options.command == "detect":
         try:
             import atropos.detect
-            atropos.detect.main(options)
         except:
-            parser.error("Error during adapter detection; do you have khmer installed?")
+            parser.error("Error loading adapter detection module; do you have khmer installed?")
             sys.exit(1)
+        atropos.detect.main(options)
     # otherwise trim reads
     else:
         run_atropos(options, parser, default_outfile="-")
@@ -181,7 +182,7 @@ def get_argument_parser():
         help="Input file format; can be either 'fasta', 'fastq' or 'sra-fastq'. "
             "Ignored when reading csfasta/qual files. (auto-detect "
             "from file name extension)")
-    group.add_argument("--max-reads", default=None,
+    group.add_argument("--max-reads", type=int_or_str, default=None,
         help="Maximum number of reads/pairs to process (no max)")
     
     group = parser.add_argument_group("Finding adapters",
@@ -467,13 +468,21 @@ def get_argument_parser():
     detect_parser = subparsers.add_parser("detect", help="Detect adapter sequences",
         usage="\natropos -se input.fastq detect\natropos -pe1 in1.fastq -pe2 in2.fastq detect",
         description="Detect adapter sequences directly from read sequences.")
-    detect_parser.set_defaults(command='detect', max_reads=10000)
+    detect_parser.set_defaults(command='detect')
     detect_parser.add_argument("--kmer-size", type=int, default=12,
         help="Size of k-mer used to scan reads for adapter sequences. (12)")
     detect_parser.add_argument("--max-adapters", type=int, default=None,
-        help="The maximum number of candidate adapters to report. (10000)")
+        help="The maximum number of candidate adapters to report. (none)")
+    detect_parser.add_argument("--include-unknown", action="store_true", default=False,
+        help="Also report sequences that are not in the list of known adapters.")
     detect_parser.add_argument("--adapter-report", default="-",
         help="File in which to write the summary of detected adapters. (stdout)")
+    detect_parser.add_argument("--known-contaminant", action="append", default=None,
+        help="Pass known contaminants in on the commandline as 'name=sequence'. "
+             "Can be specified multiple times.")
+    detect_parser.add_argument("--known-contaminants-file", default=None,
+        help="File with known contaminants, one per line, with name and sequence "
+             "separated by one or more tabs.")
     
     return parser
 
@@ -489,12 +498,6 @@ def setup_logging(stdout=False, level="INFO"):
     stream_handler.setLevel(level)
     logging.getLogger().setLevel(level)
     logging.getLogger().addHandler(stream_handler)
-
-MAGNITUDE = dict(
-    G=(1E9, "000000000"),
-    M=(1E6, "000000"),
-    K=(1E3, "000")
-)
 
 def validate_options(options, parser):
     if sum(int(opt is not False) for opt in (options.mirna, options.bisulfite)) > 1:
@@ -707,21 +710,6 @@ def validate_options(options, parser):
             import progressbar
         except:
             parser.error("The python-progressbar library is required for --progress=bar")
-    
-    # TODO: once we switch to argparse, int_or_str can be passed
-    # as the argument type
-    def int_or_str(x):
-        if x is None or isinstance(x, int):
-            return x
-        elif isinstance(x, str):
-            x = x.upper()
-            for a, mag in MAGNITUDE.items():
-                x = x.replace(a, mag[1])
-            return int(x)
-        else:
-            raise Exception("Unsupported type {}".format(x))
-    
-    options.max_reads = int_or_str(options.max_reads)
     
     if options.threads is not None:
         threads = options.threads

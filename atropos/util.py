@@ -30,3 +30,20 @@ def sequence_complexity(seq):
             d = seq.count(base) / seqlen
             term += d * math.log(d) / log2
     return -term
+
+MAGNITUDE = dict(
+    G=(1E9, "000000000"),
+    M=(1E6, "000000"),
+    K=(1E3, "000")
+)
+
+def int_or_str(x):
+    if x is None or isinstance(x, int):
+        return x
+    elif isinstance(x, str):
+        x = x.upper()
+        for a, mag in MAGNITUDE.items():
+            x = x.replace(a, mag[1])
+        return int(x)
+    else:
+        raise Exception("Unsupported type {}".format(x))
