@@ -1,5 +1,11 @@
 # Changes
 
+v1.0.8 (dev)
+------------
+
+* Removed unnecessary dependency on bitarray.
+* Switched the insert aligner back to the default implementation, as the one that ignores indels is not any faster.
+
 v1.0.7 (8/18/16)
 ----------------
 
