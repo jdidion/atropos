@@ -172,11 +172,12 @@ def test_EpiGnome_trimmer():
 
 def test_Swift_trimmer():
     trimmer = SwiftBisulfiteTrimmer()
-    short_read = Sequence('read1', "ACGTACGTACGTACGT")
-    long_seq = "".join(["ACGT"] * 30)
-    long_read = Sequence('read2', long_seq)
-    assert trimmer(short_read).sequence == "GTACGT"
-    assert trimmer(long_read).sequence == long_seq[10:-10]
+    seq = "".join(["ACGT"] * 30)
+    read1 = Sequence('read1', seq)
+    read2 = Sequence('read2', seq)
+    trimmed = trimmer(read1, read2)
+    assert trimmed[0].sequence == seq[:-10]
+    assert trimmed[1].sequence == seq[10:]
 
 def test_overlapping():
     trimmer = MergeOverlapping(min_overlap=10, error_rate = 0.1)

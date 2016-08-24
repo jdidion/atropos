@@ -584,6 +584,8 @@ def validate_options(options, parser):
     elif options.bisulfite:
         if options.quality_cutoff is None:
             options.quality_cutoff = "20,20"
+        if options.bisulfite == "swift" and paired != "both":
+            parser.error("Swift trimming is only compatible with paired-end reads")
         if options.bisulfite not in ("rrbs", "non-directional", "truseq", "epignome", "swift"):
             def parse_bisulfite_params(r):
                 try:

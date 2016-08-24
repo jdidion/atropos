@@ -255,6 +255,10 @@ class MinCutter(Trimmer):
             else:
                 return read
         
+        # TODO: distinguish between adapter trimming and other trimming.
+        # For things like Methyl-Seq, we want to trim additional bases
+        # after adapter trimming, but we want to count other post-adapter
+        # trimmed bases toward the minimum length
         def to_trim(offset, is_front):
             if self.count_trimmed:
                 trimmed = read.clipped[offset] + read.clipped[offset+2]
@@ -448,25 +452,24 @@ class EpiGnomeBisulfiteTrimmer(MinCutter):
     def __init__(self):
         super(EpiGnomeBisulfiteTrimmer, self).__init__((6,), count_trimmed=True)
 
-class SwiftBisulfiteTrimmer(object):
+class SwiftBisulfiteTrimmer(ReadPairModifier):
     """
-    For WGBS libraries prepared with the Swift Accel-NGS kit, 10 bp are trimmed off the 5' end.
-    Additionally, if the read length is longer than 100 bp, 10 bp ar trimmed off the 3' end.
+    For WGBS libraries prepared with the Swift Accel-NGS kit, 10 bp are trimmed off the end
+    of read1 and the beginning of read2.
     """
     
     display_str = "Bisulfite-trimmed (Swift)"
     
-    def __init__(self):
-        self._shortCutter = MinCutter((10,), count_trimmed=False, only_trimmed=False)
-        self._longCutter = MinCutter((10,-10), count_trimmed=False, only_trimmed=False)
+    def __init__(self, trim_5p1=0, trim_3p1=10, trim_5p2=10, trim_3p2=0):
+        self._read1_cutter = MinCutter((trim_5p1, -1 * trim_3p1), count_trimmed=False, only_trimmed=False)
+        self._read2_cutter = MinCutter((trim_5p2, -1 * trim_3p2), count_trimmed=False, only_trimmed=False)
     
-    def __call__(self, read):
-        cutter = self._longCutter if read.original_length > 100 else self._shortCutter
-        return cutter(read)
+    def __call__(self, read1, read2):
+        return (self._read1_cutter(read1), self._read2_cutter(read2))
 
     @property
     def modified_bases(self):
-        return self._shortCutter.trimmed_bases + self._longCutter.trimmed_bases
+        return self._read1_cutter.trimmed_bases + self._read2_cutter.trimmed_bases
 
 class MergeOverlapping(object):
     def __init__(self, min_overlap=0.9, error_rate=0.1):
