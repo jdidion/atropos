@@ -1,32 +1,49 @@
 # Changes
 
-v1.0.8 (dev)
-------------
+v1.0.11 (dev)
+-------------
 
-* Removed unnecessary dependency on bitarray.
+* Clarify and fix issues with bisulfite trimming. Notably, rrbs and non-directional are now allowed independently or in combination.
+
+v1.0.10 (2016.08.23)
+--------------------
+
+* Introduced new 'detect' command for automatically detecting adapter sequences.
+* Options are now required to specify input files.
+* Major updates to documentation.
+
+v1.0.9 (2016.08.22)
+-------------------
+
+* Bugfix release
+
+v1.0.8 (2016.08.19)
+-------------------
+
+* Reverted previously introduced (and no longer necessary) dependency on bitarray).
 * Switched the insert aligner back to the default implementation, as the one that ignores indels is not any faster.
 
-v1.0.7 (8/18/16)
-----------------
+v1.0.7 (2016.08.18)
+-------------------
 
 * Re-engineered modifiers.py (and all dependent code) to enable use of modifiers that simultaneously edit both reads in a pair.
 * Add --op-order option to enable use to specify order of first four trimming operations.
 * Implemented insert-based alignment for paired-end adapter trimming. This is currently experimental. Benchmarking against SeqPurge and Skewer using simulated reads showed that the method Cutadapt uses to align adapters, while optimal for single-end reads, is much less sensitive and specific than the insert match algorithms used by SeqPurge and Skewer. Our algorithm is similar to the one used by SeqPurge but leverages the dynamic programming model of Cutadapt.
 
-v1.0.6 (8/8/16)
----------------
+v1.0.6 (2016.08.08)
+-------------------
 
 * Based on tests, worker compression is faster than writer compression when more than 8 threads are available, so set this to be the default.
 
-v1.0.5 (8/6/16)
----------------
+v1.0.5 (2016.08.06)
+-------------------
 
 * Interanal code reorganization - compression code moved to separate module
 * Eliminated the --worker-compression option in favor of --compression (whose value is either 'worker' or 'writer')
 * More documentation improvements
 
-v1.0.3 (8/5/16)
----------------
+v1.0.3 (2016.08.05)
+-------------------
 
 * Significant performance improvements:
     * Start an extra worker once the main process is finished loading reads
@@ -36,13 +53,13 @@ v1.0.3 (8/5/16)
 * Disable quality trimming if all cutoffs are set to 0
 * Eliminated the --parallel-environment option
 
-v1.0.1 (8/4/16)
----------------
+v1.0.1 (2016.08.04)
+-------------------
 
 * Fix documentation bugs associated with migration from optparse to argparse
 
-v1.0 (7/29/16)
---------------
+v1.0 (2016.07.29)
+-----------------
 * Initial release (forked from cutadapt 1.10)
 * Re-wrote much of filters.py and modifiers.py to separate modifying/filtering from file writing.
     * File writing is now managed by a separate class (seqio.Writers)
