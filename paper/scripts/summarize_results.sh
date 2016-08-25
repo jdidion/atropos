@@ -5,7 +5,7 @@
 script_dir=`pwd`
 root=`dirname $script_dir`
 outdir='results'
-GB_PER_PROCESS=4
+commands='summarize_commands'
 
 env='local'
 
@@ -32,20 +32,20 @@ then
     mkdir -p $root/results/simulated_accuracy
     for err in 001 005 01
     do
-        for profile in in \
+        for profile in \
           atropos_4_${err}_q0_adapter_writercomp \
           atropos_4_${err}_q0_insert_writercomp \
           seqpurge_4_${err}_q0 \
           skewer_4_${err}_q0-trimmed-pair
         do
-            python summarize_simulated_trimming_accuracy.py \
-              -a1 $root/data/simulated/sim_${err}.1.aln
-              -a2 $root/data/simulated/sim_${err}.2.aln \
-              -r1 $outdir/$profile.1.fq.gz -r2 $outdir/$profile.2.fq.gz \
-              -o $root/results/simulated_accuracy/$profile.txt \
-              -s $root/results/simulated_accuracy/$profile.summary.txt \
-              -t $root/results/simulated_accuracy/table.txt \
-              --name $profile
+          echo "python summarize_simulated_trimming_accuracy.py" \
+          "-a1 $root/data/simulated/sim_${err}.1.aln" \
+          "-a2 $root/data/simulated/sim_${err}.2.aln" \
+          "-r1 $outdir/$profile.1.fq.gz -r2 $outdir/$profile.2.fq.gz" \
+          "-o $root/results/simulated_accuracy/$profile.txt" \
+          "-s $root/results/simulated_accuracy/$profile.summary.txt" \
+          "-t $root/results/simulated_accuracy/table.txt" \
+          "--name $profile" >> $commands
         done
     done
 else
