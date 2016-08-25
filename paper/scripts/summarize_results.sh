@@ -5,7 +5,7 @@
 script_dir=`pwd`
 root=`dirname $script_dir`
 outdir='results'
-commands='summarize_commands'
+commands='summarize_commands.sh'
 
 env='local'
 
@@ -55,3 +55,5 @@ else
       --table-caption "Execution time for programs running on a cluster."
     # summarize accuracy on real data (we only ran this on the cluster)
 fi
+
+chmod +x $commands

@@ -40,7 +40,15 @@ do
     then
         rm -f timing_log_${threads}.txt
         ./commands_t${threads}.sh 2>> ../results/timing_log_${threads}.txt
+        ./rename_outputs.sh
     else
-        swarm --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}.sh
+        swarm --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS \
+          --file commands_t${threads}.sh
+        # rename skewer outputs
+        qsub <dependency> rename_outputs.sh
+        # map reads
+        swarm <dependency> --threads-per-process ${threads} \
+          --gb-per-process $BWAMETH_GB_PER_PROCESS \
+          --file bwameth_commands.sh
     fi
 done
