@@ -97,6 +97,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     non_adapter_reads_trimmed = 0
     num_aln = 0
     num_discarded_adapter_reads = 0
+    num_discarded_adapter_bases = 0
     
     for num_reads, reads in enumerate(read_iter, 1):
         read_id = reads[0][0]
@@ -173,6 +174,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
             w.writerow((read_id, i+1, expected_read_len, '', 'DISCARDED') + ref_info + adapter_info)
             if adapter_info[0] == 1:
                 num_discarded_adapter_reads += 1
+                num_discarded_adapter_bp += adapter_info[1]
     
     num_discarded = len(cache)
     for aln in cache.values():
@@ -194,6 +196,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
         adapter_reads_overtrimmed,
         total_ref_bp,
         total_ref_edit_dist,
+        total_adapter_bp + num_discarded_adapter_bp,
         total_adapter_bp,
         total_adapter_edit_dist,
         overtrimmed_bp,
@@ -237,8 +240,9 @@ def main():
 
             summary_fields = (
                 "retained reads", "mismatch reads", "discarded reads", "total reads", "reads with adapters",
-                "non-adapter reads trimmed", "adapter reads untrimmed", "adapter reads undertrimmed",
-                "adapter reads overtrimmed", "total ref bases", "total ref edit distance", "total adapter bases",
+                "retained reads with adapters", "non-adapter reads trimmed", "adapter reads untrimmed",
+                "adapter reads undertrimmed", "adapter reads overtrimmed", "total ref bases",
+                "total ref edit distance", "total adapter bases", "total retained adapter bases",
                 "total adapter edit dist", "overtrimmed bases", "undertrimmed bases"
             )
                 
