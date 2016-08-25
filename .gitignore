@@ -27,5 +27,6 @@ paper/scripts/skewer
 paper/scripts/seqpurge
 paper/scripts/results*
 paper/scripts/commands*
+paper/scripts/summarize_commands
 paper/scripts/real*
 paper/data/real/

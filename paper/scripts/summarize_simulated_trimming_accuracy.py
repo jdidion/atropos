@@ -167,8 +167,8 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     def handle_discarded(aln):
         read_id = aln[0][0]
         for i in (0, 1):
-            expected_read, adapter_info = summarize_alignment(aln[i])
-            w.writerow((read_id, i+1, len(expected_read), '', 'DISCARDED') + adapter_info)
+            expected_read, expected_read_len, ref_info, adapter_info = summarize_alignment(aln[i])
+            w.writerow((read_id, i+1, expected_read_len, '', 'DISCARDED') + ref_info + adapter_info)
     
     num_discarded = len(cache)
     for aln in cache.values():
