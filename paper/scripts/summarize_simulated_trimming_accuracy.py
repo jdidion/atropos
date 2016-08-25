@@ -5,6 +5,7 @@
 from argparse import ArgumentParser
 from atropos import xopen
 import csv
+import os
 import pylev
 from common import *
 
@@ -29,7 +30,7 @@ def fq_iterator(i, mate):
         name = name[:-2]
         yield (name, mate, read[1].rstrip())
 
-def summarize_accuracy(aln_iter, read_iter, w, s, read_length, adapters):
+def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     adapter_lengths = [len(adapters[i]) for i in (0,1)]
     
     #if read_id != 'chr1-199374': continue
@@ -176,23 +177,23 @@ def summarize_accuracy(aln_iter, read_iter, w, s, read_length, adapters):
         handle_discarded(aln)
         num_discarded += 1
     
-    print("{} retained reads".format(num_reads), file=s)
-    print("{} mismatch reads".format(raw_trimmed_mismatch), file=s)
-    print("{} discarded reads".format(num_discarded), file=s)
-    print("{} total reads".format(num_reads + num_discarded), file=s)
-    
-    print("{} reads with adapters".format(num_adapter_reads), file=s)
-    print("{} non-adapter reads trimmed".format(non_adapter_reads_trimmed), file=s)
-    print("{} adapter reads untrimmed".format(adapter_reads_untrimmed), file=s)
-    print("{} adapter reads undertrimmed".format(adapter_reads_undertrimmed), file=s)
-    print("{} adapter reads overtrimmed".format(adapter_reads_overtrimmed), file=s)
-        
-    print("{} total ref bases".format(total_ref_bp), file=s)
-    print("{} total ref edit distance".format(total_ref_edit_dist), file=s)
-    print("{} total adapter bases".format(total_adapter_bp), file=s)
-    print("{} total adapter edit dist".format(total_adapter_edit_dist), file=s)
-    print("{} overtrimmed bases".format(overtrimmed_bp), file=s)
-    print("{} undertrimmed bases".format(undertrimmed_bp), file=s)
+    return (
+        num_reads,
+        raw_trimmed_mismatch,
+        num_discarded,
+        num_reads + num_discarded,
+        num_adapter_reads,
+        non_adapter_reads_trimmed,
+        adapter_reads_untrimmed,
+        adapter_reads_undertrimmed,
+        adapter_reads_overtrimmed,
+        total_ref_bp,
+        total_ref_edit_dist,
+        total_adapter_bp,
+        total_adapter_edit_dist,
+        overtrimmed_bp,
+        undertrimmed_bp
+    )
 
 def main():
     parser = ArgumentParser()
@@ -203,6 +204,8 @@ def main():
     parser.add_argument('-l', '--read-length', type=int, default=125)
     parser.add_argument('-o', '--output', default='-')
     parser.add_argument('-s', '--summary', default='-')
+    parser.add_argument('-t', '--table', default=None)
+    parser.add_argument("--name", default=None)
     parser.add_argument("--adapters", nargs=2, default=DEFAULT_ADAPTERS)
     parser.add_argument("--no-progress", action="store_true", default=False)
     args = parser.parse_args()
@@ -220,12 +223,31 @@ def main():
                 except:
                     print("tqdm library is required for a progress bar")
             
-            with fileoutput(args.output) as o, fileoutput(args.summary) as s:
+            with fileoutput(args.output) as o:
                 w = csv.writer(o, delimiter="\t")
                 w.writerow((
                     'read_id','mate','expected_len','actual_len','status','has_adapter',
                     'adapter_len','adapter_edit_dist','adapter_ins','adapter_del','polyA'))
-                summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, s, args.read_length, args.adapters)
+                summary = summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, args.read_length, args.adapters)
+
+            summary_fields = (
+                "retained reads", "mismatch reads", "discarded reads", "total reads", "reads with adapters",
+                "non-adapter reads trimmed", "adapter reads untrimmed", "adapter reads undertrimmed",
+                "adapter reads overtrimmed", "total ref bases", "total ref edit distance", "total adapter bases",
+                "total adapter edit dist", "overtrimmed bases", "undertrimmed bases"
+            )
+                
+            with fileoutput(args.summary) as s:
+                for field, value in zip(("{} " + field for field in summary_fields), summary):
+                    print(field.format(value), file=s)
+            
+            if args.table:
+                header = not os.path.exists(args.table)
+                with fileoutput(args.table, "at") as t:
+                    w = csv.writer(t, delimiter="\t")
+                    if header:
+                        w.writerow(("name",) + summary_fields)
+                    w.writerow((args.name,) + summary)
 
 if __name__ == "__main__":
     main()
