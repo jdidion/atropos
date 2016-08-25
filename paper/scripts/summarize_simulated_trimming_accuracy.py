@@ -96,6 +96,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     adapter_reads_overtrimmed = 0
     non_adapter_reads_trimmed = 0
     num_aln = 0
+    num_discarded_adapter_reads = 0
     
     for num_reads, reads in enumerate(read_iter, 1):
         read_id = reads[0][0]
@@ -157,6 +158,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
                 else:
                     adapter_reads_undertrimmed += 1
             if r[2][:common_len] != expected_read[:common_len]:
+                # This happens with Skewer results due to automatic error correction
                 raw_trimmed_mismatch += 1
                 status = 'MISMATCH'
             
@@ -169,6 +171,8 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
         for i in (0, 1):
             expected_read, expected_read_len, ref_info, adapter_info = summarize_alignment(aln[i])
             w.writerow((read_id, i+1, expected_read_len, '', 'DISCARDED') + ref_info + adapter_info)
+            if adapter_info[0] == 1:
+                num_discarded_adapter_reads += 1
     
     num_discarded = len(cache)
     for aln in cache.values():
@@ -182,6 +186,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
         raw_trimmed_mismatch,
         num_discarded,
         num_reads + num_discarded,
+        num_adapter_reads + num_discarded_adapter_reads,
         num_adapter_reads,
         non_adapter_reads_trimmed,
         adapter_reads_untrimmed,
