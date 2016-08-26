@@ -169,22 +169,22 @@ chmod +x $commands
 # Now generate commands to map reads
 if [ "$err" == "real" ]
 then
-    bwameth_commands="bwameth_commands.sh"
-    chmod +x $bwameth_commands
+    bwameth_commands="bwameth_commands_t${threads}.sh"
     for qcut in 0 20
     do
       for profile in \
-        atropos_16_real_q${qcut}_adapter_workercomp \
-        atropos_16_real_q${qcut}_insert_workercomp \
-        seqpurge_16_real_q${qcut} \
-        skewer_16_real_q${qcut} \
+        atropos_${threads}_real_q${qcut}_adapter_workercomp \
+        atropos_${threads}_real_q${qcut}_insert_workercomp \
+        seqpurge_${threads}_real_q${qcut} \
+        skewer_${threads}_real_q${qcut}
       do
           rg="@RG\tID:${profile}\tSM:${profile}\tLB:${profile}\tPL:ILLUMINA"
           fq1=${profile}.1.fq.gz
           fq2=${profile}.2.fq.gz
         
-          echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group $rg" \
-          "--reference $genome $fq1 $fq2" >> $bwameth_commands
+          echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
+          "--reference $GENOME $fq1 $fq2" >> $bwameth_commands
       done
-  done
+    done
+    chmod +x $bwameth_commands
 fi

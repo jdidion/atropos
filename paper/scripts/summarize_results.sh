@@ -24,12 +24,12 @@ shift $((OPTIND-1))
 if [ "$env" == "local" ]
 then
     # summarize timing
-    python summarize_timing_info.py -i ../results/timing_local_t4.txt --output-format latex \
-      -o ../results/timing_local_table.latex --table-name "local-timing" \
+    python summarize_timing_info.py -i $outdir/timing_local_t4.txt --output-format latex \
+      -o $root/results/timing_local_table.latex --table-name "local-timing" \
       --table-caption "Execution time for programs running on desktop with 4 threads."
     # summarize simulated accuracy (we only do this locally since, theoretically,
     # the results should be the same as when run on the cluster).
-    mkdir -p $root/results/simulated_accuracy
+    mkdir -p $outdir/simulated_accuracy
     for err in 001 005 01
     do
         for profile in \
@@ -42,16 +42,16 @@ then
           "-a1 $root/data/simulated/sim_${err}.1.aln" \
           "-a2 $root/data/simulated/sim_${err}.2.aln" \
           "-r1 $outdir/$profile.1.fq.gz -r2 $outdir/$profile.2.fq.gz" \
-          "-o $root/results/simulated_accuracy/$profile.txt" \
-          "-s $root/results/simulated_accuracy/$profile.summary.txt" \
-          "-t $root/results/simulated_accuracy/table.txt" \
+          "-o $outdir/simulated_accuracy/$profile.txt" \
+          "-s $outdir/simulated_accuracy/$profile.summary.txt" \
+          "-t $outdir/simulated_accuracy/table.txt" \
           "--name $profile" >> $commands
         done
     done
 else
     # summarize timing
     cat commands_t*.e* | python summarize_timing_info.py --output-format latex \
-      -o ../results/timing_cluster_table.latex --table-name "cluster-timing" \
+      -o $root/results/timing_cluster_table.latex --table-name "cluster-timing" \
       --table-caption "Execution time for programs running on a cluster."
     # summarize accuracy on real data (we only ran this on the cluster)
 fi
