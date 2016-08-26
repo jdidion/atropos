@@ -97,7 +97,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     non_adapter_reads_trimmed = 0
     num_aln = 0
     num_discarded_adapter_reads = 0
-    num_discarded_adapter_bases = 0
+    num_discarded_adapter_bp = 0
     
     for num_reads, reads in enumerate(read_iter, 1):
         read_id = reads[0][0]
@@ -173,6 +173,7 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
             expected_read, expected_read_len, ref_info, adapter_info = summarize_alignment(aln[i])
             w.writerow((read_id, i+1, expected_read_len, '', 'DISCARDED') + ref_info + adapter_info)
             if adapter_info[0] == 1:
+                nonlocal num_discarded_adapter_reads, num_discarded_adapter_bp
                 num_discarded_adapter_reads += 1
                 num_discarded_adapter_bp += adapter_info[1]
     

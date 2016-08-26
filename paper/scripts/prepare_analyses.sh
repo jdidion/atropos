@@ -171,13 +171,20 @@ if [ "$err" == "real" ]
 then
     bwameth_commands="bwameth_commands.sh"
     chmod +x $bwameth_commands
-    for profile in
+    for qcut in 0 20
     do
-        rg="@RG\tID:${profile}\tSM:${profile}\tLB:${profile}\tPL:ILLUMINA"
-        fq1=
-        fq2=
+      for profile in \
+        atropos_16_real_q${qcut}_adapter_workercomp \
+        atropos_16_real_q${qcut}_insert_workercomp \
+        seqpurge_16_real_q${qcut} \
+        skewer_16_real_q${qcut} \
+      do
+          rg="@RG\tID:${profile}\tSM:${profile}\tLB:${profile}\tPL:ILLUMINA"
+          fq1=${profile}.1.fq.gz
+          fq2=${profile}.2.fq.gz
         
-        echo "$BWAMETH -z -t ${threads} -o $profile.bam --read-group $rg" \
-        "--reference $genome $fq1 $fq2" >> $bwameth_commands
-    done
+          echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group $rg" \
+          "--reference $genome $fq1 $fq2" >> $bwameth_commands
+      done
+  done
 fi
