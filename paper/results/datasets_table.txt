@@ -1,0 +1,13 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Add caption}
+    \begin{tabular}{lccrrr}
+    Data Set & Error Rate & Read Length & \multicolumn{1}{l}{Total Reads} & \multicolumn{1}{c}{Reads w/ Adapters} & \multicolumn{1}{c}{Adapter Bases} \\
+    \midrule
+    Simulated 1 & 0.20\% & 125   & 781,923 & 325,982 & 12,447,262 \\
+    Simulated 2 & 0.60\% & 125   & 780,899 & 325,105 & 12,416,861 \\
+    Simulated 3 & 1.20\% & 125   & 782,237 & 325,860 & 12,464,235 \\
+    GM12878 WGBS & Unknown & 125   & 1,000,000 & 16,999* & 1,020,017* \\
+    \end{tabular}%
+  \label{tab:addlabel}%
+\end{table}%
