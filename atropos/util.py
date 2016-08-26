@@ -47,3 +47,11 @@ def int_or_str(x):
         return int(x)
     else:
         raise Exception("Unsupported type {}".format(x))
+
+def enumerate_range(collection, start, end):
+        'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
+        i = start
+        it = iter(collection)
+        while i < end:
+            yield (i, it.next())
+            i += 1
