@@ -1110,13 +1110,13 @@ def create_formatters(options, qualities, default_outfile):
     if not formatters.multiplexed:
         if output1 is not None:
             formatters.add_seq_formatter(NoFilter, output1, output2)
-            if output1 != "-":
+            if output1 != "-" and not options.no_writer_process:
                 force_create.append(output1)
                 if output2 is not None:
                     force_create.append(output2)
         elif not (options.discard_trimmed and options.untrimmed_output):
             formatters.add_seq_formatter(NoFilter, default_outfile)
-            if default_outfile != "-":
+            if default_outfile != "-" and not options.no_writer_process:
                 force_create.append(default_outfile)
     
     if not options.discard_untrimmed:
