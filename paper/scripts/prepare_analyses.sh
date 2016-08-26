@@ -185,8 +185,8 @@ then
         skewer_${threads}_real_q${qcut}
       do
           rg="@RG\tID:${profile}\tSM:${profile}\tLB:${profile}\tPL:ILLUMINA"
-          fq1=${profile}.1.fq.gz
-          fq2=${profile}.2.fq.gz
+          fq1=$outdir/${profile}.1.fq.gz
+          fq2=$outdir/${profile}.2.fq.gz
         
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
           "--reference $genome $fq1 $fq2" >> $bwameth_commands
