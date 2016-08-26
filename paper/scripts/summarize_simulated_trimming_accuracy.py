@@ -9,27 +9,6 @@ import os
 import pylev
 from common import *
 
-def aln_iterator(i):
-    for line in i:
-        if line[0] in ('@','#'):
-            continue
-        assert line[0] == '>'
-        chrm, name, pos, strand = line[1:].rstrip().split('\t')
-        if name.endswith('-1'):
-            name = name[:-2]
-        mate = name[-1]
-        name = name[:-2]
-        ref = next(i).rstrip()
-        actual = next(i).rstrip()
-        yield (name, mate, chrm, pos, strand, ref, actual)
-
-def fq_iterator(i, mate):
-    for read in zip(*[i] * 4):
-        name = read[0].rstrip()[1:]
-        mate = name[-1]
-        name = name[:-2]
-        yield (name, mate, read[1].rstrip())
-
 def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     adapter_lengths = [len(adapters[i]) for i in (0,1)]
     

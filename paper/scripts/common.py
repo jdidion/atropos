@@ -21,6 +21,28 @@ class fileoutput(object):
         if self.close:
             self.fh.close()
 
+def fq_iterator(i, mate=None):
+    for read in zip(*[i] * 4):
+        name = read[0].rstrip()[1:]
+        if mate is None:
+            mate = name[-1]
+            name = name[:-2]
+        yield (name, mate, read[1].rstrip(), read[3].rstrip())
+
+def aln_iterator(i):
+    for line in i:
+        if line[0] in ('@','#'):
+            continue
+        assert line[0] == '>'
+        chrm, name, pos, strand = line[1:].rstrip().split('\t')
+        if name.endswith('-1'):
+            name = name[:-2]
+        mate = name[-1]
+        name = name[:-2]
+        ref = next(i).rstrip()
+        actual = next(i).rstrip()
+        yield (name, mate, chrm, pos, strand, ref, actual)
+
 def find_best_alignment(ref, query, side, min_match=1, cache=None, start=0, end=0.4, inc=0.01):
     from atropos import align
     best_match = None
