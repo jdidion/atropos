@@ -63,6 +63,7 @@ ATROPOS=atropos
 SEQPURGE=$root/software/bin/SeqPurge
 SKEWER=$root/software/bin/skewer
 BWAMETH=bwameth.py
+SAMTOOLS=samtools
 # minimum read length after trimming
 MIN_LEN=25
 # minimum number of adapter bases that must overlap
@@ -172,6 +173,7 @@ chmod +x $commands
 if [ "$err" == "real" ]
 then
     bwameth_commands="bwameth_commands_t${threads}.sh"
+    sort_commands="sort_commands_t${threads}.sh"
     if [ ! -f $genome.bwameth.c2t ]
     then
       echo "$BWAMETH index $genome" >> $bwameth_commands
@@ -190,7 +192,10 @@ then
         
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
           "--reference $genome $fq1 $fq2" >> $bwameth_commands
+          
+          echo "$SAMTOOLS sort -n -O bam -@ $threads -o $profile.sorted.bam" >> $sort_commands
       done
     done
     chmod +x $bwameth_commands
+    chmod +x $sort_commands
 fi

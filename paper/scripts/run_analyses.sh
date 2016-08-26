@@ -6,6 +6,8 @@ script_dir=`pwd`
 ATROPOS_ROOT=`dirname $script_dir`
 ATROPOS_RESULT='results'
 GB_PER_PROCESS=4
+BWAMETH_GB_PER_PROCESS=32
+SORT_GB_PER_PROCESS=8
 
 export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$ATROPOS_ROOT/software/bin
 
@@ -50,5 +52,8 @@ do
         swarm <dependency> --threads-per-process ${threads} \
           --gb-per-process $BWAMETH_GB_PER_PROCESS \
           --file bwameth_commands.sh
+        # name-sort reads
+        swarm <dependency> --threads-per-process ${threads} \
+          --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands.sh
     fi
 done
