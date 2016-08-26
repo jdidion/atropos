@@ -183,6 +183,14 @@ then
     fi
     for qcut in 0 20
     do
+      # map the untrimmed reads
+      rg="@RG\tID:untrimmed\tSM:untrimmed\tLB:untrimmed\tPL:ILLUMINA"
+      fq1=$root/data/real/GM12878_WGBS.1.fq.gz
+      fq2=$root/data/real/GM12878_WGBS.2.fq.gz
+      echo "$BWAMETH -z -t ${threads} -o ${outdir}/untrimmed.bam --read-group '$rg'" \
+      "--reference $genome $fq1 $fq2" >> $bwameth_commands
+      echo "$SAMTOOLS sort -n -O bam -@ $threads -o $outdir/untrimmed.sorted.bam $outdir/untrimmed.bam" >> $sort_commands
+        
       for profile in \
         atropos_${threads}_real_q${qcut}_adapter_workercomp \
         atropos_${threads}_real_q${qcut}_insert_workercomp \
@@ -192,10 +200,8 @@ then
           rg="@RG\tID:${profile}\tSM:${profile}\tLB:${profile}\tPL:ILLUMINA"
           fq1=$outdir/${profile}.1.fq.gz
           fq2=$outdir/${profile}.2.fq.gz
-        
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
           "--reference $genome $fq1 $fq2" >> $bwameth_commands
-          
           echo "$SAMTOOLS sort -n -O bam -@ $threads -o $outdir/$profile.sorted.bam $outdir/$profile.bam" >> $sort_commands
       done
     done
