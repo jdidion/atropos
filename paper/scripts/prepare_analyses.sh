@@ -21,13 +21,14 @@
 OPTIND=1
 
 # Set default values
-mode="local"
 threads=8
 script_dir=`pwd`
 root=`dirname $script_dir`
 outdir='results'
+# reference genome (for mapping real reads)
+genome=$root/data/ref
 
-while getopts "t:r:o:" opt; do
+while getopts "t:r:o:g:" opt; do
     case "$opt" in
     t)
         threads=$OPTARG
@@ -37,6 +38,9 @@ while getopts "t:r:o:" opt; do
         ;;
     o)
         outdir=$OPTARG
+        ;;
+    g)
+        genome=$OPTARG
         ;;
     esac
 done
@@ -59,8 +63,6 @@ ATROPOS=atropos
 SEQPURGE=$root/software/bin/SeqPurge
 SKEWER=$root/software/bin/skewer
 BWAMETH=bwameth.py
-# reference genome (for mapping real reads)
-GENOME=$root/data/ref.fa
 # minimum read length after trimming
 MIN_LEN=25
 # minimum number of adapter bases that must overlap
@@ -170,6 +172,9 @@ chmod +x $commands
 if [ "$err" == "real" ]
 then
     bwameth_commands="bwameth_commands_t${threads}.sh"
+    if [ ! -f $genome.c2t.fasta ]
+      echo "$BWAMETH index $genome.fa" >> $bwameth_commands
+    fi
     for qcut in 0 20
     do
       for profile in \
@@ -183,7 +188,7 @@ then
           fq2=${profile}.2.fq.gz
         
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
-          "--reference $GENOME $fq1 $fq2" >> $bwameth_commands
+          "--reference $genome.fa $fq1 $fq2" >> $bwameth_commands
       done
     done
     chmod +x $bwameth_commands
