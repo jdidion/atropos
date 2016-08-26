@@ -26,7 +26,7 @@ script_dir=`pwd`
 root=`dirname $script_dir`
 outdir='results'
 # reference genome (for mapping real reads)
-genome=$root/data/ref
+genome=$root/data/ref.fa
 
 while getopts "t:r:o:g:" opt; do
     case "$opt" in
@@ -172,8 +172,9 @@ chmod +x $commands
 if [ "$err" == "real" ]
 then
     bwameth_commands="bwameth_commands_t${threads}.sh"
-    if [ ! -f $genome.c2t.fasta ]
-      echo "$BWAMETH index $genome.fa" >> $bwameth_commands
+    if [ ! -f $genome.bwameth.c2t ]
+    then
+      echo "$BWAMETH index $genome" >> $bwameth_commands
     fi
     for qcut in 0 20
     do
@@ -188,7 +189,7 @@ then
           fq2=${profile}.2.fq.gz
         
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
-          "--reference $genome.fa $fq1 $fq2" >> $bwameth_commands
+          "--reference $genome $fq1 $fq2" >> $bwameth_commands
       done
     done
     chmod +x $bwameth_commands
