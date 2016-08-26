@@ -1,0 +1,9 @@
+atropos adapter q0  83:53
+atropos adapter q0  33:06
+seqpurge q0         34:15 
+skewer q0           45:31
+
+atropos adapter q20 65:56
+atropos adapter q20 28:05
+seqpurge q20        27:19
+skewer q20          32:06
