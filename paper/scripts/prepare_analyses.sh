@@ -193,7 +193,7 @@ then
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam --read-group '$rg'" \
           "--reference $genome $fq1 $fq2" >> $bwameth_commands
           
-          echo "$SAMTOOLS sort -n -O bam -@ $threads -o $profile.sorted.bam" >> $sort_commands
+          echo "$SAMTOOLS sort -n -O bam -@ $threads -o $profile.sorted.bam $profile.bam" >> $sort_commands
       done
     done
     chmod +x $bwameth_commands

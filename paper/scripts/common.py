@@ -77,3 +77,53 @@ def seq(start, end, inc):
     while i <= end:
         yield i
         i += inc
+
+def enumerate_range(collection, start, end):
+    'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
+    i = start
+    it = iter(collection)
+    while i < end:
+        yield (i, next(it))
+        i += 1
+
+class BAMReader(object):
+    def __init__(self, bam_file):
+        import pysam
+        self.bam = iter(pysam.AlignmentFile(bam_file, "rb"))
+        self.cached = None
+        self.done = False
+        self.cur_id = -1
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        self.bam.close()
+            
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        self.cur_id += 1
+        read = self.cached or next(self.bam)
+        name = read.query_name
+        if int(name) == self.cur_id:
+            r1 = []
+            r2 = []
+            def add_read(read):
+                if read.is_read1:
+                    r1.append(read)
+                else:
+                    r2.append(read)
+            
+            add_read(read)
+            add_read(next(self.bam))
+            peek = next(self.bam)
+            while peek.query_name == name:
+                add_read(peek)
+                peek = next(self.bam)
+            self.cached = peek
+            return (r1,r2)
+        else:
+            self.cached = read
+            return (None, None)
