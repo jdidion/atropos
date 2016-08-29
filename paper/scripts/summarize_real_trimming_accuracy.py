@@ -2,36 +2,23 @@
 # Summarize the mapping results of trimmed versus untrimmed reads.
 # This requires that both input bams be name-sorted.
 
+import argparse
 from collections import defaultdict
 from common import *
 import csv
+from glob import glob
+import os
 import pylev
+import tqdm
+from atropos.xopen import open_output
 
 nuc = ('A','C','G','T','N')
-
-class Hist(object):
-    def __init__(self, n_bases):
-        # position base histograms
-        self.hists = [
-            [
-                dict((base, [0] * n_bases) for base in ('A','C','G','T','N'))
-                for i in range(2)
-            ]
-            for j in range(2)
-        ]
-    
-    def add_reads(self, r1, r2):
-        # add start and end bases to histogram
-        for seq, hist in zip((r1.sequence, r2.sequence), (self.hists)):
-            for i, b in enuermate_range(seq, 0, n_bases):
-                hist[b][i] += 1
-            for i, b in enuermate_range(reversed(seq), 0, n_bases):
-                hist[b][i] += 1
 
 pair_fields = [
     ('prog', None),
     ('read_name', None),
     ('read_idx', None),
+    ('failed', False),
     ('discarded', False),
     ('split', False),
     ('skipped', False),
@@ -39,14 +26,14 @@ pair_fields = [
 ]
 read_fields = [
     ('mapped', False),
-    ('quality', None),
-    ('chrm', None),
-    ('start', None),
-    ('end', None),
-    ('trimmed_front', None),
-    ('trimmed_back', None),
-    ('clipped_front', None),
-    ('clipped_back', None)
+    ('quality', -1),
+    ('chrm', -1),
+    ('start', -1),
+    ('end', -1),
+    ('clipped_front', -1),
+    ('clipped_back', -1),
+    ('trimmed_front', 0),
+    ('trimmed_back', 0)
 ]
 
 def write_header(w):
@@ -63,11 +50,12 @@ class TableRead(object):
     def set_from_read(self, r):
         self.mapped = not r.is_unmapped
         self.quality = r.mapping_quality
-        self.chrm = r.reference_name
-        self.start = r.reference_start
-        self.end = r.reference_end
         
         if self.mapped:
+            self.chrm = r.reference_name
+            self.start = r.reference_start
+            self.end = r.reference_end
+        
             def count_soft_clipped(seq):
                 clipped = 0
                 for pos in seq:
@@ -89,7 +77,7 @@ class TableRead(object):
         
         trimmed_front = 0
         if untrimmed_len > trimmed_len:
-            for i in range(untrimmed_len - trimmed_len):
+            for i in range(untrimmed_len - trimmed_len + 1):
                 if untrimmed[i:(i+trimmed_len)] == trimmed:
                     trimmed_front = i
                     break
@@ -98,7 +86,7 @@ class TableRead(object):
                 # untrimmed reads may not match, so in that case we find the closest
                 # match by Levenshtein distance.
                 dist = None
-                for i in range(untrimmed_len - trimmed_len):
+                for i in range(untrimmed_len - trimmed_len + 1):
                     d = pylev.levenshtein(untrimmed[i:(i+trimmed_len)], trimmed)
                     if not dist:
                         dist = d
@@ -108,6 +96,14 @@ class TableRead(object):
         
         self.trimmed_front = trimmed_front
         self.trimmed_back = untrimmed_len - (trimmed_len + trimmed_front)
+        # print(untrimmed)
+        # print(trimmed)
+        # print(self.clipped_front)
+        # print(self.clipped_back)
+        # print(self.trimmed_front)
+        # print(self.trimmed_back)
+        
+        
 
 class TableRow(object):
     def __init__(self, prog, read_name, read_idx):
@@ -134,80 +130,128 @@ class TableRow(object):
             getattr(self.read2, key) for key, val in read_fields
         ])
 
-def summarize(untrimmed, trimmed, ref, ow, hw, n_hist_bases=20):
-    progs = ('untrimmed',) + tuple(trimmed.keys())
-    hists = dict((prog, hist) for prog in progs)
+class Hist(object):
+    def __init__(self, prog, n_bases):
+        # position base histograms
+        self.prog = prog
+        self.n_bases = n_bases
+        self.hists = [
+            [
+                dict((base, [0] * n_bases) for base in ('A','C','G','T','N'))
+                for side in range(2)
+            ]
+            for read in range(2)
+        ]
     
-    for i, (name, u1, u2) in tqdm.tqdm(enumerate(untrimmed), 1):
+    def add_reads(self, r1, r2):
+        # add start and end bases to histogram
+        for seq, hist in zip((r1.query_sequence, r2.query_sequence), (self.hists)):
+            for i, b in enumerate_range(seq, 0, self.n_bases):
+                hist[0][b][i] += 1
+            for i, b in enumerate_range(reversed(seq), 0, self.n_bases):
+                hist[1][b][i] += 1
+    
+    def write(self, w):
+        for read, read_hists in enumerate(self.hists, 1):
+            for side in range(2):
+                for base in nuc:
+                    for pos, count in enumerate(read_hists[side][base], 1):
+                        w.writerow((self.prog, read, side, pos, base, count))
+
+def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20):
+    progs = ('untrimmed',) + tuple(trimmed.keys())
+    hists = dict((prog, Hist(prog, n_hist_bases)) for prog in progs)
+    
+    for i, (name, u1, u2) in tqdm.tqdm(enumerate(untrimmed, 1)):
+    #for i, (name, u1, u2) in enumerate(untrimmed, 1):
         assert len(u1) > 0 and len(u2) > 0
         
         rows = dict(untrimmed=TableRow('untrimmed', name, i))
         valid = {}
+        fail = False
+        skip = False
         
+        if len(u1) > 1 or len(u2) > 1:
+            rows['untrimmed'].split = True
+            skip = True
+        else:
+            u1 = u1[0]
+            u2 = u2[0]
+            if u1.is_qcfail or u2.is_qcfail:
+                rows['untrimmed'].failed = True
+                skip = fail = True
+            else:
+                hists['untrimmed'].add_reads(u1, u2)
+                rows['untrimmed'].set_from_pair(u1, u2)
+        # print(u1)
+        # print(u2)
+        # print(skip)
         for prog, bam in trimmed.items():
+            #print(prog)
             rows[prog] = TableRow(prog, name, i)
-            if bam.peek[0] == name:
+            if skip:
+                rows[prog].skipped = True
+                rows[prog].failed = fail
+            
+            if bam.peek().query_name == name:
                 _, t1, t2 = next(bam)
                 assert len(t1) > 0 and len(t2) > 0
                 if len(t1) > 1 or len(t2) > 1:
+                    #print('split')
                     rows[prog].split = True
-                else:
+                elif not skip:
+                    #print('valid')
                     t1 = t1[0]
                     t2 = t2[0]
                     hists[prog].add_reads(t1, t2)
                     valid[prog] = (t1, t2)
+                #else:
+                    #print('skip')
             else:
+                #print('discarded')
                 rows[prog].discarded = True
         
-        if len(u1) > 1 or len(u2) > 1:
-            rows['untrimmed'].split = True
-            for row in rows.values():
-                row.skipped = True
+        if skip or len(valid) == 0:
+            rows['untrimmed'].skipped = True
         else:
-            u1 = u1[0]
-            u2 = u2[0]
-            hists['untrimmed'].add_reads(u1, u2)
-            rows['untrimmed'].set_from_pair(u1, u2)
-            if len(valid) == 0:
-                rows['untrimmed'].skip = True
-            else:
-                for prog, (r1, r2) in valid.items():
-                    row = rows[prog]
-                    row.set_from_pair(r1, r2)
-                    row.read1.set_trimming(u1, r1)
-                    row.read2.set_trimming(u2, r2)
-            
+            #print(valid)
+            for prog, (r1, r2) in valid.items():
+                row = rows[prog]
+                row.set_from_pair(r1, r2)
+                #print(prog)
+                row.read1.set_trimming(u1, r1)
+                row.read2.set_trimming(u2, r2)
+        
         for prog in progs:
             rows[prog].write(ow)
     
-    for i, h in enumerate(hists, 1):
-        for j in range(2):
-            for b in nuc:
-                for k, count in enumerate(h[j][b], 1):
-                    hw.writerow((i, j, k, b, count))
+    for h in hists.values():
+        h.write(hw)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--trimmed-bam", nargs="+",
-        help="One or more name=file arguments to identify trimmed BAM files. These BAMs "
-             "must be name-sorted.")
-    parser.add_argument("-u", "--untrimmed-bam")
+    parser.add_argument("-d", "--bam-dir")
+    parser.add_argument("-x", "--bam-extension", default=".sorted.bam")
+    parser.add_argument("-u", "--untrimmed-name", default="untrimmed")
     parser.add_argument("-o", "--output", default="-")
-    parser.add_argument("-h", "--hist", default="trimmed_hists.txt")
+    parser.add_argument("-H", "--hist", default="trimmed_hists.txt")
+    
     args = parser.parse_args()
     
-    untrimmed = BAMReader(args.untrimmed_bam)
     trimmed = {}
-    for arg in args.trimmed_bam:
-        name, path = arg.split('=')
-        trimmed[name] = BAMReader(path)
+    for path in glob(os.path.join(args.bam_dir, "*{}".format(args.bam_extension))):
+        name = os.path.basename(path)[:-len(args.bam_extension)]
+        if name == args.untrimmed_name:
+            untrimmed = BAMReader(path)
+        else:
+            trimmed[name] = BAMReader(path)
     
     try:
         with open_output(args.output) as o, open_output(args.hist) as h:
             ow = csv.writer(o, delimiter="\t")
             write_header(ow)
             hw = csv.writer(h, delimiter="\t")
-            hw.writerow(('read', 'side', 'pos', 'base', 'count'))
+            hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
             summarize(untrimmed, trimmed, ow, hw)
     finally:
         untrimmed.close()
