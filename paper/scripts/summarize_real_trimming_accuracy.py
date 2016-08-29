@@ -193,7 +193,7 @@ def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20):
                 rows[prog].skipped = True
                 rows[prog].failed = fail
             
-            if bam.peek().query_name == name:
+            if not bam.finished and bam.peek().query_name == name:
                 _, t1, t2 = next(bam)
                 assert len(t1) > 0 and len(t2) > 0
                 if len(t1) > 1 or len(t2) > 1:

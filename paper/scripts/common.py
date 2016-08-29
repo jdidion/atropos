@@ -92,13 +92,17 @@ class BAMReader(object):
         import pysam
         self.bam = iter(pysam.AlignmentFile(bam_file, "rb"))
         self.cached = None
+        self.finished = False
     
     def close(self):
         self.bam.close()
     
     def peek(self):
         if not self.cached:
-            self.cached = next(self.bam)
+            if self.finished:
+                raise Exception("Iterator is exhausted")
+            else:
+                self.cached = next(self.bam)
         return self.cached
     
     def __enter__(self):
@@ -111,9 +115,6 @@ class BAMReader(object):
         return self
     
     def __next__(self):
-        read = self.cached or next(self.bam)
-        name = read.query_name
-            
         r1 = []
         r2 = []
         def add_read(read):
@@ -121,12 +122,21 @@ class BAMReader(object):
                 r1.append(read)
             else:
                 r2.append(read)
-            
+        
+        if self.finished:
+            raise StopIteration()
+
+        read = self.cached or next(self.bam)
+        name = read.query_name
         add_read(read)
-        peek = next(self.bam)
-        while peek.query_name == name:
-            add_read(peek)
+        try:
             peek = next(self.bam)
+            while peek.query_name == name:
+                add_read(peek)
+                peek = next(self.bam)
+        except StopIteration:
+            self.finished = True
+            peek = None
         self.cached = peek
         
         return (name, r1, r2)
