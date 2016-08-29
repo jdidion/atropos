@@ -93,11 +93,19 @@ class BAMReader(object):
         self.bam = iter(pysam.AlignmentFile(bam_file, "rb"))
         self.cached = None
     
+    def close(self):
+        self.bam.close()
+    
+    def peek(self):
+        if not self.cached:
+            self.cached = next(self.bam)
+        return self.cached
+    
     def __enter__(self):
         return self
     
     def __exit__(self, type, value, traceback):
-        self.bam.close()
+        self.close()
             
     def __iter__(self):
         return self
