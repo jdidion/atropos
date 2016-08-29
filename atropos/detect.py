@@ -6,10 +6,8 @@ import re
 import statistics as stats
 import sys
 from urllib.request import urlopen
-import khmer
-from khmer import khmer_args
-from .util import reverse_complement, sequence_complexity
-from .xopen import open_output
+from .util import reverse_complement, sequence_complexity, enumerate_range
+from .xopen import open_output, xopen
 
 def main(options):
     known_contaminants = load_known_contaminants_from_url()
@@ -33,12 +31,15 @@ def main(options):
             print("", file=o)
             print(file_header, file=o)
             print('-' * len(file_header), file=o)
-            contam = detect_contaminants(f, k=options.kmer_size, n_reads=n_reads,
+            contam = detect_contaminants_khmer(f, k=options.kmer_size, n_reads=n_reads,
                 known_contaminants=known_contaminants)
             contam = filter_contaminants(contam, known_only=not options.include_unknown)
             summarize_contaminants(contam, o)
 
-def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None):
+def detect_contaminants_khmer(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None):
+    import khmer
+    from khmer import khmer_args
+
     parser = khmer.ReadParser(fq)
     read = next(parser)
     n_win = len(read.sequence) - k + 1 # assuming all sequences are same length
@@ -110,6 +111,54 @@ def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_conta
         contam.sort(key=lambda x: x[1], reverse=True)
         return contam
 
+def detect_contaminants_msbwt(fq_file, k=12, n_reads=100000, overrep_cutoff=1000, known_contaminants=None, threads=1):
+    import MUSCython.MultiStringBWTCython as msbwt
+    import tempfile
+    import shutil
+
+    fq = xopen(fq_file)
+    tempdir = tempfile.mkdtemp(dir='.')
+    
+    try:
+        read = next(fq)
+        readlen = len(read.sequence)
+        
+        num_win = readlen - k + 1
+        min_count = math.ceil(n_reads * num_win / float(4**k)) * overrep_cutoff
+        
+        createMSBWTFromFastq(fq, n_reads, tempdir, threads)
+        bwt = msbwt.loadBWT(tempdir)
+        
+        # Test each kmer in each read for abundance. If it is above
+        # the threshold, add it to the seed set.
+        seeds = set()
+        def ingest(read):
+            for i in range(numwin):
+                kmer = read.sequence[i:(i+k)]
+                if kmer in seeds:
+                    continue
+                count = bwt.countOccurrencesOfSeq(kmer)
+                if count >= min_count:
+                    seeds.add(kmer)
+        
+        ingest(read)
+        for i, read in enumerate_range(fq, 1, n_reads - min_count):
+            ingest(read)
+        
+        # Assemble sequences from seeds
+        assembled = {}
+        for kmer in seeds:
+            
+            if known_contaminants:
+                pass
+            else:
+                pass
+        
+        return assembled
+    finally:
+        fq.close()
+        shutil.rmtree(tempdir)
+    
 def filter_contaminants(contam, min_complexity=1.1, min_len=None, min_freq=0.0001, known_only=False, limit=20):
     def _filter(row):
         if min_len is not None and len(row[0]) < min_len:
@@ -165,3 +214,40 @@ def merge_contaminants(c1, c2):
             c1[k] = c1[k] + c2[k]
         else:
             c1[k] = c2[k]
+
+def createMSBWTFromFastq(fastq, num_reads, output_dir, threads=1, logger=None):
+    '''
+    This function builds an msBWT from a fastq, using the first `num_reads` reads.
+    '''
+    import MSBWTGenCython
+    from .seqio import FastqReader
+    
+    MSBWTGenCython.clearAuxiliaryData(outputDir)
+    
+    if logger:
+        logger.info('Loading \''+fastq+'\'...')
+    
+    # load sequences into an array and sort
+    seqs = []
+    seqlen = None
+    uniform = True
+    with FastqReader(fastq) as reader:
+        for i, read in enumerate_range(reader, 0, num_reads):
+            seqs.append(read.sequence + '$')
+            if not seqlen:
+                seqlen = len(read.sequence)
+            elif len(read.sequence) != seqlen:
+                uniform = False
+    seqs.sort()
+        
+    seq_file = output_dir + '/seqs.npy'
+    offset_file = output_dir + '/offsets.npy'
+    bwt_file = output_dir + '/msbwt.npy'
+    
+    # join sequences and write to file
+    MSBWTGen.writeSeqsToFiles(
+        np.fromstring(''.join(seqs), dtype='<u1'),
+        seq_file, offset_file, seqlen if uniform else 0)
+    
+    # create the bwt
+    MSBWTGen.createFromSeqs(seq_file, offset_file, bwt_file, threads, uniform, logger)
