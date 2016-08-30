@@ -41,7 +41,7 @@ mkdir ../software/build/art &&
     cd ../../../scripts
 
 # Install version of Atropos on which manuscript is based
-pip install atropos==1.0.11
+pip install atropos==1.0.12
 
 # Install Skewer
 mkdir ../software/build/skewer &&

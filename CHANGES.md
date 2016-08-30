@@ -1,7 +1,7 @@
 # Changes
 
-v1.0.12 (dev)
--------------
+v1.0.12 (2016.08.30)
+--------------------
 
 * Add ability to correct errors during insert-match adapter trimming.
 * Implement additional adapter-detection algorithms.
