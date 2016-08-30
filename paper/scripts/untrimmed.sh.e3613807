@@ -1,0 +1,35 @@
+/cluster/ifs/projects/collins/jdidion/atropos/paper/scripts
+[M::bwa_idx_load_from_disk] read 0 ALT contigs
+[M::process] read 1280000 sequences (160000000 bp)...
+[M::process] 0 single-end sequences; 1280000 paired-end sequences
+converting reads in /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.1.fq.gz,/cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.2.fq.gz
+[M::process] read 720000 sequences (90000000 bp)...
+[M::mem_pestat] # candidate unique pairs for (FF, FR, RF, RR): (0, 477020, 5, 0)
+[M::mem_pestat] skip orientation FF as there are not enough pairs
+[M::mem_pestat] analyzing insert size distribution for orientation FR...
+[M::mem_pestat] (25, 50, 75) percentile: (150, 175, 191)
+[M::mem_pestat] low and high boundaries for computing mean and std.dev: (68, 273)
+[M::mem_pestat] mean and std.dev: (169.94, 34.30)
+[M::mem_pestat] low and high boundaries for proper pairs: (27, 314)
+[M::mem_pestat] skip orientation RF as there are not enough pairs
+[M::mem_pestat] skip orientation RR as there are not enough pairs
+[M::mem_process_seqs] Processed 1280000 reads in 25635.794 CPU sec, 1677.973 real sec
+[M::process] 0 single-end sequences; 720000 paired-end sequences
+[M::mem_pestat] # candidate unique pairs for (FF, FR, RF, RR): (0, 268589, 4, 0)
+[M::mem_pestat] skip orientation FF as there are not enough pairs
+[M::mem_pestat] analyzing insert size distribution for orientation FR...
+[M::mem_pestat] (25, 50, 75) percentile: (150, 175, 191)
+[M::mem_pestat] low and high boundaries for computing mean and std.dev: (68, 273)
+[M::mem_pestat] mean and std.dev: (169.94, 34.33)
+[M::mem_pestat] low and high boundaries for proper pairs: (27, 314)
+[M::mem_pestat] skip orientation RF as there are not enough pairs
+[M::mem_pestat] skip orientation RR as there are not enough pairs
+[M::mem_process_seqs] Processed 720000 reads in 15259.392 CPU sec, 1034.074 real sec
+[main] Version: 0.7.15-r1142-dirty
+[main] CMD: bwa mem -T 40 -B 2 -L 10 -CM -U 100 -p -R @RG\tID:untrimmed\tSM:untrimmed\tLB:untrimmed\tPL:ILLUMINA -t 16 /cluster/ifs/projects/collins/bwameth_index/hg19+rCRS-YPAR.fasta.bwameth.c2t </home/didionjp/anaconda/envs/py35/bin/python /home/didionjp/anaconda/envs/py35/bin/bwameth.py c2tz /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.1.fq.gz /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.2.fq.gz
+[main] Real time: 4243.614 sec; CPU: 42141.102 sec
+running: bwa mem -T 40 -B 2 -L 10 -CM -U 100 -p -R '@RG\tID:untrimmed\tSM:untrimmed\tLB:untrimmed\tPL:ILLUMINA' -t 16  /cluster/ifs/projects/collins/bwameth_index/hg19+rCRS-YPAR.fasta.bwameth.c2t '</home/didionjp/anaconda/envs/py35/bin/python /home/didionjp/anaconda/envs/py35/bin/bwameth.py c2tz /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.1.fq.gz /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.2.fq.gz'
+writing to:
+sambamba view -S -f bam -h -l 0 /dev/stdin | sambamba sort -m 2415919104 -l 9 --tmpdir results/untrimmed.bam.tmpdir -o results/untrimmed.bam /dev/stdin
+running: rm -Rf results/untrimmed.bam.tmpdir
+running: sambamba index -t 4 results/untrimmed.bam
