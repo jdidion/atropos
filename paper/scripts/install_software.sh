@@ -22,6 +22,9 @@ automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 # If this file doesn't exist, the bwameth index won't be built.
 genome=../data/ref.fa
 
+# We need some python libraries for the benchmarking scripts
+pip install editdistance
+
 # Install modified ART
 mkdir ../software/build/art &&
     cd ../software/build/art &&

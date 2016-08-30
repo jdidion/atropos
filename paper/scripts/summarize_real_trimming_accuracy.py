@@ -8,9 +8,17 @@ from common import *
 import csv
 from glob import glob
 import os
-import pylev
 import tqdm
 from atropos.xopen import open_output
+
+# prefer to use the editdistance package,
+# which is about 25x faster than pylev
+try:
+    import editdistance
+    edit_distance = editdistance.eval
+except:
+    import pylev
+    edit_distance = pylev.levenshtein
 
 nuc = ('A','C','G','T','N')
 
@@ -88,7 +96,7 @@ class TableRead(object):
                 # match by Levenshtein distance.
                 dist = None
                 for i in range(untrimmed_len - trimmed_len + 1):
-                    d = pylev.levenshtein(untrimmed[i:(i+trimmed_len)], trimmed)
+                    d = edit_distance(untrimmed[i:(i+trimmed_len)], trimmed)
                     if not dist:
                         dist = d
                     elif d < dist:
@@ -160,7 +168,7 @@ class Hist(object):
                     for pos, count in enumerate(read_hists[side][base], 1):
                         w.writerow((self.prog, read, side, pos, base, count))
 
-def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20):
+def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20, max_reads=None):
     progs = ('untrimmed',) + tuple(trimmed.keys())
     hists = dict((prog, Hist(prog, n_hist_bases)) for prog in progs)
     
@@ -226,6 +234,9 @@ def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20):
         
         for prog in progs:
             rows[prog].write(ow)
+        
+        if max_reads and i >= max_reads:
+            break
     
     for h in hists.values():
         h.write(hw)
@@ -237,6 +248,7 @@ def main():
     parser.add_argument("-u", "--untrimmed-name", default="untrimmed")
     parser.add_argument("-o", "--output", default="-")
     parser.add_argument("-H", "--hist", default="trimmed_hists.txt")
+    parser.add_argument("-m", "--max-reads", type=int, default=None)
     
     args = parser.parse_args()
     
@@ -254,7 +266,7 @@ def main():
             write_header(ow)
             hw = csv.writer(h, delimiter="\t")
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
-            summarize(untrimmed, trimmed, ow, hw)
+            summarize(untrimmed, trimmed, ow, hw, max_reads=args.max_reads)
     finally:
         untrimmed.close()
         for t in trimmed.values():
