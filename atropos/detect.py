@@ -6,6 +6,7 @@ import re
 import statistics as stats
 import sys
 from urllib.request import urlopen
+from .seqio import FastqReader
 from .util import reverse_complement, sequence_complexity, enumerate_range
 from .xopen import open_output, xopen
 
@@ -19,36 +20,177 @@ def main(options):
         merge_contaminants(
             known_contaminants,
             load_known_contaminants_from_file(options.known_contaminants_file))
+    
     infiles = [f for f in (
         options.single_input, options.input1, options.input2, options.interleaved_input
     ) if f is not None]
+    
     n_reads = options.max_reads or 10000
+    
     with open_output(options.adapter_report) as o:
         print("Detecting adapters and other potential contaminant sequences based on\n"
               "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
         for i, f in enumerate(infiles, 1):
+            fq = FastqReader(f)
+            if options.progress:
+                from .progress import create_progress_reader
+                fq = create_progress_reader(fq, max_items=n_reads, counter_magnitude="k")
             file_header = "File {}: {}".format(i, f)
             print("", file=o)
             print(file_header, file=o)
             print('-' * len(file_header), file=o)
-            contam = detect_contaminants_khmer(f, k=options.kmer_size, n_reads=n_reads,
-                known_contaminants=known_contaminants)
-            contam = filter_contaminants(contam, known_only=not options.include_unknown)
+            contam = detect_contaminants(fq, k=options.kmer_size, n_reads=n_reads,
+                known_contaminants=known_contaminants, include_unknown=options.include_unknown)
             summarize_contaminants(contam, o)
 
-def detect_contaminants_khmer(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None):
+def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include_unknown=True):
+    #if known_contaminants and not include_unknown:
+    #    contam = detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants)
+    #elif n_reads <= 50000:
+    #    contam = detect_contaminants_heuristic(fq, k, n_reads, overrep_cutoff, known_contaminants)
+    #else:
+    contam = detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants)
+    return filter_contaminants(contam, not include_unknown)
+
+def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants):
+    """Test known contaminants against reads."""
+    pass
+
+def detect_contaminants_heuristic(fq, k, n_reads, overrep_cutoff, known_contaminants):
+    """Use a heuristic iterative algorithm to arrive at likely contaminants."""
+    polyA = re.compile('A{8,}.*|A{2,}$')
+
+    def add_to_tree(seq, tree, k):
+        for i in range(len(seq) - k + 1):
+            kmer = seq[i:(i+k)]
+            tree[kmer][0] += 1
+            tree[kmer][1].add(seq)
+
+    tree = defaultdict(lambda: [0, set()])
+    k = 12
+    min_count = 100
+    nreads = 20000
+    readlen = 125
+    overrep_cutoff = 5000
+
+    def expected(k, overrep_cutoff=1):
+        num_win = readlen - k + 1
+        stat_exp = math.ceil(nreads * num_win * overrep_cutoff / float(4**k))
+        return max(0.001 * nreads, stat_exp)
+
+    min_count = math.ceil(expected(k, overrep_cutoff))
+
+    with FastqReader(sys.argv[1]) as fq:
+        for i, read in tqdm.tqdm(enumerate(fq)):
+            if i == nreads:
+                break
+            seq = read.sequence
+            if sequence_complexity(seq) > 1.0:
+                match = polyA.search(seq)
+                if match:
+                    seq = seq[:match.start()]
+                if len(seq) >= k:
+                    add_to_tree(seq, tree, k)
+
+    prev = None
+    cur = {}
+    results = {}
+
+    while True:
+        all_seqs = set()
+        for kmer, (count, seqs) in tree.items():
+            if count > min_count:
+                cur[kmer] = (count, seqs)
+                all_seqs.update(seqs)
+        print("{} {} {}".format(k, min_count, len(all_seqs)))
+        if len(all_seqs) == 0:
+            break
+        if prev:
+            for kmer, (count, seqs) in prev.items():
+                if not any(seq in cur for seq in seqs) and sequence_complexity(kmer) > 1.0:
+                    results[kmer] = count
+        prev = cur
+        cur = {}
+        tree = defaultdict(lambda: [0, set()])
+        k += 1
+        min_count = math.ceil(expected(k, overrep_cutoff))
+        for seq in all_seqs:
+            add_to_tree(seq, tree, k)
+
+    results = list(results.items())
+
+    # First merge, adjacent sequences
+    results.sort(key=lambda i: i[0])
+    cur = results[0]
+    merged = []
+    for i in range(1, len(results)):
+        if results[i][0].startswith(cur[0]):
+            cur = [results[i][0], results[i][1] + cur[1]]
+        else:
+            merged.append(cur)
+            cur = results[i]
+    merged.append(cur)
+    results = merged
+
+    def align(seq1, seq2, min_overlap_frac=0.9):
+        aligner = Aligner(
+            seq1, 0.0,
+            SEMIGLOBAL,
+            False, False)
+        aligner.min_overlap = math.ceil(min(len(seq1), len(seq2)) * min_overlap_frac)
+        aligner.indel_cost = 100000
+        match = aligner.locate(seq2)
+        if match:
+            return seq1[match[0]:match[1]]
+        else:
+            return None
+
+    # Second merge, by frequency
+    results.sort(key=lambda i: i[1], reverse=True)
+    cur = results[0]
+    merged = []
+    unmerged = []
+    while len(results) > 1:
+        seq1, count1 = results[0]
+        for j in range(1, len(results)):
+            seq2, count2 = results[j]
+            if len(seq1) >= len(seq2) and seq2 in seq1:
+                count1 += count2
+            elif seq1 in seq2:
+                # if they are close in count, keep the longer sequence
+                if count1 < (2 * count2):
+                    seq1 = seq2
+                count1 += count2
+            else:
+                unmerged.append(results[j])
+        merged.append([seq1, count1])
+        results = unmerged
+        unmerged = []
+    merged = merged + results
+    merged.sort(key=lambda i: i[1], reverse=True)
+
+    # keep anything that's within 50% of the top hit
+    if len(merged) == 0:
+        print("No hits :(")
+    else:
+        min_count = int(merged[0][1] * 0.5)
+        merged = filter(lambda x: x[1] >= min_count, merged)
+
+    # match to known sequences
+    # TODO
+
+def detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants):
     import khmer
     from khmer import khmer_args
-
-    parser = khmer.ReadParser(fq)
-    read = next(parser)
+    
+    read = next(fq)
     n_win = len(read.sequence) - k + 1 # assuming all sequences are same length
     tablesize = n_reads * n_win
     countgraph = khmer.Countgraph(k, tablesize, khmer_args.DEFAULT_N_TABLES)
     countgraph.set_use_bigcount(True)
     
     countgraph.consume_and_tag(read.sequence)
-    for i, read in enumerate(parser):
+    for i, read in enumerate(fq):
         if i >= n_reads:
             break
         countgraph.consume_and_tag(read.sequence)
@@ -111,54 +253,6 @@ def detect_contaminants_khmer(fq, k=12, n_reads=10000, overrep_cutoff=100, known
         contam.sort(key=lambda x: x[1], reverse=True)
         return contam
 
-def detect_contaminants_msbwt(fq_file, k=12, n_reads=100000, overrep_cutoff=1000, known_contaminants=None, threads=1):
-    import MUSCython.MultiStringBWTCython as msbwt
-    import tempfile
-    import shutil
-
-    fq = xopen(fq_file)
-    tempdir = tempfile.mkdtemp(dir='.')
-    
-    try:
-        read = next(fq)
-        readlen = len(read.sequence)
-        
-        num_win = readlen - k + 1
-        min_count = math.ceil(n_reads * num_win / float(4**k)) * overrep_cutoff
-        
-        createMSBWTFromFastq(fq, n_reads, tempdir, threads)
-        bwt = msbwt.loadBWT(tempdir)
-        
-        # Test each kmer in each read for abundance. If it is above
-        # the threshold, add it to the seed set.
-        seeds = set()
-        def ingest(read):
-            for i in range(numwin):
-                kmer = read.sequence[i:(i+k)]
-                if kmer in seeds:
-                    continue
-                count = bwt.countOccurrencesOfSeq(kmer)
-                if count >= min_count:
-                    seeds.add(kmer)
-        
-        ingest(read)
-        for i, read in enumerate_range(fq, 1, n_reads - min_count):
-            ingest(read)
-        
-        # Assemble sequences from seeds
-        assembled = {}
-        for kmer in seeds:
-            
-            if known_contaminants:
-                pass
-            else:
-                pass
-        
-        return assembled
-    finally:
-        fq.close()
-        shutil.rmtree(tempdir)
-    
 def filter_contaminants(contam, min_complexity=1.1, min_len=None, min_freq=0.0001, known_only=False, limit=20):
     def _filter(row):
         if min_len is not None and len(row[0]) < min_len:
@@ -214,40 +308,3 @@ def merge_contaminants(c1, c2):
             c1[k] = c1[k] + c2[k]
         else:
             c1[k] = c2[k]
-
-def createMSBWTFromFastq(fastq, num_reads, output_dir, threads=1, logger=None):
-    '''
-    This function builds an msBWT from a fastq, using the first `num_reads` reads.
-    '''
-    import MSBWTGenCython
-    from .seqio import FastqReader
-    
-    MSBWTGenCython.clearAuxiliaryData(outputDir)
-    
-    if logger:
-        logger.info('Loading \''+fastq+'\'...')
-    
-    # load sequences into an array and sort
-    seqs = []
-    seqlen = None
-    uniform = True
-    with FastqReader(fastq) as reader:
-        for i, read in enumerate_range(reader, 0, num_reads):
-            seqs.append(read.sequence + '$')
-            if not seqlen:
-                seqlen = len(read.sequence)
-            elif len(read.sequence) != seqlen:
-                uniform = False
-    seqs.sort()
-        
-    seq_file = output_dir + '/seqs.npy'
-    offset_file = output_dir + '/offsets.npy'
-    bwt_file = output_dir + '/msbwt.npy'
-    
-    # join sequences and write to file
-    MSBWTGen.writeSeqsToFiles(
-        np.fromstring(''.join(seqs), dtype='<u1'),
-        seq_file, offset_file, seqlen if uniform else 0)
-    
-    # create the bwt
-    MSBWTGen.createFromSeqs(seq_file, offset_file, bwt_file, threads, uniform, logger)
