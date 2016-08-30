@@ -46,7 +46,7 @@ from atropos.adapters import AdapterParser, BACK
 from atropos.modifiers import *
 from atropos.filters import *
 from atropos.report import *
-from atropos.util import int_or_str, MAGNITUDE
+from atropos.util import int_or_str
 
 import argparse
 from collections import defaultdict
@@ -705,11 +705,6 @@ def validate_options(options, parser):
     
     if options.quiet or options.output is None or options.output == "-":
         options.progress = None
-    elif options.progress == "bar":
-        try:
-            import progressbar
-        except:
-            parser.error("The python-progressbar library is required for --progress=bar")
     
     if options.threads is not None:
         threads = options.threads
@@ -779,10 +774,9 @@ def create_reader(options, paired, parser, counter_magnitude="M"):
     reader = BatchIterator(reader, batch_size, options.max_reads)
     
     # Wrap iterator in progress bar
-    if options.progress == "msg":
-        reader = ProgressMessageReader(reader, batch_size)
-    elif options.progress == "bar":
-        reader = create_progress_reader(reader, options.max_reads, counter_magnitude)
+    if options.progress:
+        from atropos.progress import create_progress_reader
+        reader = create_progress_reader(reader, options.progress, batch_size, options.max_reads, counter_magnitude)
     
     return (reader, qualities, qualfile is not None)
 
@@ -838,106 +832,6 @@ class BatchIterator(object):
     def close(self):
         self.done = True
         self.reader.close()
-
-class ProgressMessageReader(object):
-    def __init__(self, iterable, batch_size, interval=1000000):
-        self.iterable = iterable
-        self.batch_size = batch_size
-        self.interval = interval
-        self.ctr = 0
-    
-    def __next__(self):
-        value = self.iterable.next()
-        if value:
-            self.ctr += value[0]
-            if self.ctr % self.interval < self.batch_size:
-                now = time.time()
-                logging.getLogger().info("Read {0} records in {1:.1f} seconds".format(self.ctr, now - self.start))
-        return value
-    
-    next = __next__
-    def __iter__(self):
-        self.start = time.time()
-        return self
-    
-    def close(self):
-        logging.getLogger().info("Read a total of {} records".format(self.ctr))
-        self.iterable.close()
-        
-def create_progress_reader(reader, max_reads=None, counter_magnitude="M"):
-    try:
-        return create_progressbar_reader(reader, max_reads, counter_magnitude)
-    except:
-        pass
-    
-    try:
-        return create_tqdm_reader(reader)
-    except:
-        pass
-    
-    logging.getLogger().warn("No progress bar library available")
-    return reader
-
-def create_progressbar_reader(reader, max_reads=None, counter_magnitude="M"):
-    import progressbar
-    import progressbar.widgets
-    import math
-
-    class ProgressBarReader(progressbar.ProgressBar):
-        def __init__(self, iterable, widgets, max_value=None):
-            super(ProgressBarReader, self).__init__(
-                widgets=widgets, max_value=max_value or progressbar.UnknownLength)
-            self._iterable = iterable
-            self.done = False
-        
-        def __next__(self):
-            try:
-                value = next(self._iterable)
-                if self.start_time is None:
-                    self.start()
-                self.update(self.value + value[0])
-                return value
-            except StopIteration:
-                self.close()
-                raise
-        
-        def close(self):
-            if not self.done:
-                self.finish()
-                self.done = True
-            if not self._iterable.done:
-                self._iterable.close()
-    
-    class MagCounter(progressbar.widgets.WidgetBase):
-        def __init__(self, magnitude):
-            suffix = ""
-            if magnitude is None:
-                div = 1.0
-            else:
-                div = float(MAGNITUDE[magnitude][0])
-                suffix = magnitude
-        
-            self._format = lambda val: "{:.1f} {}".format(val / div, suffix)
-    
-        def __call__(self, progress, data):
-            return self._format(data["value"])
-        
-    if max_reads:
-        reader = ProgressBarReader(reader, [
-            MagCounter(counter_magnitude), " Reads (", progressbar.Percentage(), ") ",
-            progressbar.Timer(), " ", progressbar.Bar(), progressbar.AdaptiveETA()
-        ], max_reads)
-    else:
-        reader = ProgressBarReader(reader, [
-            MagCounter(counter_magnitude), " Reads", progressbar.Timer(),
-            progressbar.AnimatedMarker()
-        ])
-    
-    return reader
-
-def create_tqdm_reader(reader):
-    import tqdm
-    return tqdm.tqdm(reader)
 
 def create_modifiers(options, paired, qualities, has_qual_file, parser):
     adapter_parser = AdapterParser(

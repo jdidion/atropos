@@ -37,6 +37,15 @@ MAGNITUDE = dict(
     K=(1E3, "000")
 )
 
+def magnitude_formatter(magnitude):
+    suffix = ""
+    if magnitude is None:
+        div = 1.0
+    else:
+        div = float(MAGNITUDE[magnitude][0])
+        suffix = magnitude
+    return lambda val: "{:.1f} {}".format(val / div, suffix)
+
 def int_or_str(x):
     if x is None or isinstance(x, int):
         return x
