@@ -1,21 +1,22 @@
 import logging
 from atropos.util import magnitude_formatter
 
-def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=None, counter_magnitude="M"):
+def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=None,
+                           counter_magnitude="M", **kwargs):
     mag_format = magnitude_formatter(counter_magnitude)
     
     if progress_type == "msg":
-        return ProgressMessageReader(reader, batch_size, max_items, mag_format)
-    elif options.progress != "bar":
+        return ProgressMessageReader(reader, batch_size, max_items, mag_format, **kwargs)
+    elif progress_type != "bar":
         raise Exception("Unsupported progress type {}".format(progress_type))
             
     try:
-        return create_progressbar_reader(reader, max_items, mag_format)
+        return create_progressbar_reader(reader, max_items, mag_format, **kwargs)
     except:
         pass
     
     try:
-        return create_tqdm_reader(reader, max_items)
+        return create_tqdm_reader(reader, max_items, **kwargs)
     except:
         pass
     
@@ -57,16 +58,17 @@ class ProgressMessageReader(object):
         logging.getLogger().info("Read a total of {} records".format(self.ctr))
         self.iterable.close()
 
-def create_progressbar_reader(reader, max_reads=None, mag_format=None):
+def create_progressbar_reader(reader, max_reads=None, mag_format=None, values_have_size=True):
     import progressbar
     import progressbar.widgets
     import math
 
     class ProgressBarReader(progressbar.ProgressBar):
-        def __init__(self, iterable, widgets, max_value=None):
+        def __init__(self, iterable, widgets, max_value=None, values_have_size=True):
             super(ProgressBarReader, self).__init__(
                 widgets=widgets, max_value=max_value or progressbar.UnknownLength)
             self._iterable = iterable
+            self.values_have_size = values_have_size
             self.done = False
         
         def __next__(self):
@@ -74,7 +76,10 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
                 value = next(self._iterable)
                 if self.start_time is None:
                     self.start()
-                self.update(self.value + value[0])
+                if self.values_have_size:
+                    self.update(self.value + value[0])
+                else:
+                    self.update(self.value + 1)
                 return value
             except StopIteration:
                 self.close()
@@ -84,8 +89,10 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
             if not self.done:
                 self.finish()
                 self.done = True
-            if not self._iterable.done:
+            try:
                 self._iterable.close()
+            except:
+                pass
     
     class MagCounter(progressbar.widgets.WidgetBase):
         def __init__(self, mag_format):
@@ -98,12 +105,12 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
         reader = ProgressBarReader(reader, [
             MagCounter(mag_format), " Reads (", progressbar.Percentage(), ") ",
             progressbar.Timer(), " ", progressbar.Bar(), progressbar.AdaptiveETA()
-        ], max_reads)
+        ], max_reads, values_have_size=values_have_size)
     else:
         reader = ProgressBarReader(reader, [
             MagCounter(mag_format), " Reads", progressbar.Timer(),
             progressbar.AnimatedMarker()
-        ])
+        ], values_have_size=values_have_size)
     
     return reader
 

@@ -42,7 +42,7 @@ def magnitude_formatter(magnitude):
     if magnitude is None:
         div = 1.0
     else:
-        div = float(MAGNITUDE[magnitude][0])
+        div = float(MAGNITUDE[magnitude.upper()][0])
         suffix = magnitude
     return lambda val: "{:.1f} {}".format(val / div, suffix)
 
