@@ -13,6 +13,38 @@ from collections import defaultdict
 import copy
 import logging
 
+# Base classes
+
+class ReadPairModifier(object):
+    """Superclass of modifiers that edit a pair of reads simultaneously."""
+    def __call__(self, read1, read2):
+        raise NotImplemented()
+
+class Trimmer(object):
+    def __init__(self):
+        self.trimmed_bases = 0
+    
+    def __call__(self, read):
+        raise NotImplemented()
+    
+    def subseq(self, read, begin=0, end=None):
+        if begin or (end is not None):
+            front_bases, back_bases, new_read = read.subseq(begin, end)
+            self.trimmed_bases += front_bases + back_bases
+            return new_read
+        else:
+            return read
+    
+    def clip(self, read, front=0, back=0):
+        if front or back:
+            front_bases, back_bases, new_read = read.clip(front, back)
+            self.trimmed_bases += front_bases + back_bases
+            return new_read
+        else:
+            return read
+
+# Modifiers
+
 class AdapterCutter(object):
     """
     Repeatedly find one of multiple adapters in reads.
@@ -110,48 +142,51 @@ class AdapterCutter(object):
         self.with_adapters += 1
         return trimmed_read
 
-class ReadPairModifier(object):
-    """Superclass of modifiers that edit a pair of reads simultaneously."""
-    def __call__(self, read1, read2):
-        raise NotImplemented()
-
 class InsertAdapterCutter(ReadPairModifier):
     """
     AdapterCutter that uses InsertAligner to first try to identify
     insert overlap before falling back to semi-global adapter alignment.
     """
-    def __init__(self, adapter1, adapter2, action='trim', symmetric=True, **aligner_args):
+    def __init__(self, adapter1, adapter2, action='trim', mismatch_action=None, symmetric=True, **aligner_args):
         self.adapter1 = adapter1
         self.adapter2 = adapter2
         self.aligner = InsertAligner(adapter1.sequence, adapter2.sequence, **aligner_args)
         self.action = action
+        self.mismatch_action = mismatch_action
         self.symmetric = symmetric
         self.with_adapters = [0, 0]
     
     def __call__(self, read1, read2):
-        match1, match2, insert_match = self.aligner.match_insert(read1.sequence, read2.sequence)
+        insert_match, insert_match_len, adapter_match1, adapter_match2 = self.aligner.match_insert(
+            read1.sequence, read2.sequence)
         
-        if match1 is None and match2 is None:
-            match1 = self.adapter1.match_to(read1)
-            match2 = self.adapter2.match_to(read2)
+        if self.mismatch_action and insert_match and insert_match[5] > 0 and adapter_match1 and adapter_match2:
+            # Correct errors
+            # read2 reverse-complement is the reference, read1 is the query
+            # TODO
+            pass
+        
+        if adapter_match1 is None and adapter_match2 is None:
+            adapter_match1 = self.adapter1.match_to(read1)
+            adapter_match2 = self.adapter2.match_to(read2)
         
         if self.symmetric:
-            if match1 is None and match2:
-                match1 = match2.copy()
-            if match2 is None and match1:
-                match2 = match1.copy()
+            if adapter_match1 is None and adapter_match2:
+                adapter_match1 = adapter_match2.copy()
+            if adapter_match2 is None and adapter_match1:
+                adapter_match2 = adapter_match1.copy()
             
-        if match1 is not None:
-            match1.adapter = self.adapter1
-            match1.read = read1
-            match1.front = False
+        if adapter_match1 is not None:
+            adapter_match1.adapter = self.adapter1
+            adapter_match1.read = read1
+            adapter_match1.front = False
         
-        if match2 is not None:
-            match2.adapter = self.adapter2
-            match2.read = read2
-            match2.front = False
+        if adapter_match2 is not None:
+            adapter_match2.adapter = self.adapter2
+            adapter_match2.read = read2
+            adapter_match2.front = False
         
-        return (self.trim(read1, match1, 0), self.trim(read2, match2, 1))
+        return (self.trim(read1, adapter_match1, 0), self.trim(read2, adapter_match2, 1))
     
     def trim(self, read, match, read_idx):
         if not match:
@@ -182,29 +217,6 @@ class InsertAdapterCutter(ReadPairModifier):
         
         self.with_adapters[read_idx] += 1
         return trimmed_read
-
-class Trimmer(object):
-    def __init__(self):
-        self.trimmed_bases = 0
-    
-    def __call__(self, read):
-        raise NotImplemented()
-    
-    def subseq(self, read, begin=0, end=None):
-        if begin or (end is not None):
-            front_bases, back_bases, new_read = read.subseq(begin, end)
-            self.trimmed_bases += front_bases + back_bases
-            return new_read
-        else:
-            return read
-    
-    def clip(self, read, front=0, back=0):
-        if front or back:
-            front_bases, back_bases, new_read = read.clip(front, back)
-            self.trimmed_bases += front_bases + back_bases
-            return new_read
-        else:
-            return read
 
 class UnconditionalCutter(Trimmer):
     """
@@ -471,7 +483,10 @@ class SwiftBisulfiteTrimmer(ReadPairModifier):
     def modified_bases(self):
         return self._read1_cutter.trimmed_bases + self._read2_cutter.trimmed_bases
 
-class MergeOverlapping(object):
+# TODO: InsertAdapterCutter should save the insert match, and
+# MergeOverlapping should use that rather than doing another alignment
+
+class MergeOverlapping(ReadPairModifier):
     def __init__(self, min_overlap=0.9, error_rate=0.1):
         self.min_overlap = int(min_overlap) if min_overlap > 1 else min_overlap
         self.error_rate = error_rate
@@ -520,11 +535,10 @@ class MergeOverlapping(object):
         return (read1, read2)
 
 class Modifiers(object):
-    def __init__(self, paired, merger=None):
+    def __init__(self, paired):
         self.modifiers = []
         self.modifier_indexes = defaultdict(lambda: [])
         self.paired = paired
-        self.merger = merger
     
     def add_modifier(self, mod_class, read=1|2, **kwargs):
         if issubclass(mod_class, ReadPairModifier):
@@ -585,8 +599,6 @@ class Modifiers(object):
                         read1 = mods[0](read1)
                     if mods[1] is not None:
                         read2 = mods[1](read2)
-            if self.merger:
-                read1, read2 = self.merger.merge(read1, read2)
             reads = [read1, read2]
         else:
             read = record

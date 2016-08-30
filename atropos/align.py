@@ -214,7 +214,7 @@ class InsertAligner(object):
             seq2 = seq1[:l1]
 
         seq2_rc = reverse_complement(seq2)
-        result = [None, None, 0]
+        result = [None, 0, None, None]
         
         aligner = Aligner(
             seq2_rc,
@@ -234,11 +234,12 @@ class InsertAligner(object):
         #aligner.min_overlap = self.min_insert_overlap
         
         insert_match = aligner.locate(seq1)
-
+        
         if insert_match:
             offset = min(insert_match[0], seq_len - insert_match[3])
             insert_match_size = seq_len - offset
-            result[2] = insert_match_size
+            result[0] = insert_match
+            result[1] = insert_match_size
 
             if (offset < self.min_adapter_overlap or
                     self.match_probability(insert_match[4], insert_match_size) > self.max_error_prob):
@@ -258,8 +259,8 @@ class InsertAligner(object):
             adapter_len1 = min(self.adapter1_len, l1 - insert_match_size)
             adapter_len2 = min(self.adapter2_len, l2 - insert_match_size)
             best_adapter_matches, best_adapter_mismatches = (a1_match if a1_prob < a2_prob else a2_match)[4:6]
-            result[0] = Match(0, adapter_len1, insert_match_size, l1, best_adapter_matches, best_adapter_mismatches)
-            result[1] = Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
+            result[2] = Match(0, adapter_len1, insert_match_size, l1, best_adapter_matches, best_adapter_mismatches)
+            result[3] = Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
 
         return result
     

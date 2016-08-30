@@ -252,11 +252,10 @@ def get_argument_parser():
              "it specifies the minimum length as the fraction of the length of the *shorter* read "
              "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
              "with an absolute minimum of 2 bp). (0.9)")
-    # TODO: error correction:
-    #group.add_argument("--merge-mismatches", choices=("best", "N", "random"), default="best",
-    #	help="How to handle mismatches while merging; best: select the base with the best quality; "
-    #		 "N: set the base to N; random: select one of the two bases at random. Note that if "
-    #		 "exactly one base is ambiguous, the non-ambiguous base is always used.")
+    group.add_argument("--correct-mismatches", choices=("best", "N"), default="best",
+        help="How to handle mismatches while aligning/merging; best: select the base with the best "
+             "quality; N: set the base to N. Note that if exactly one base is ambiguous, the "
+             "non-ambiguous base is always used.")
     
     group = parser.add_argument_group("Additional read modifications")
     group.add_argument("-u", "--cut", action='append', default=[], type=int, metavar="LENGTH",
@@ -871,20 +870,15 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
         for adapter in adapters1 + adapters2:
             adapter.enable_debug()
     
-    merger = None
-    if options.merge_overlapping:
-        merger = MergeOverlapping(
-            min_overlap=options.merge_min_overlap,
-            error_rate=options.error_rate)
-    
-    modifiers = Modifiers(paired, merger)
+    modifiers = Modifiers(paired)
     
     for op in options.op_order:
         if op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
                 modifiers.add_modifier(InsertAdapterCutter,
-                    adapter1=adapters1[0], adapter2=adapters2[0], action=options.action)
+                    adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
+                    mismatch_action=options.correct_mismatches)
             else:
                 modifiers.add_modifier_pair(AdapterCutter,
                     dict(adapters=adapters1, times=options.times, action=options.action),
@@ -947,6 +941,11 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
     
     if options.trim_primer:
         modifiers.add_modifier(PrimerTrimmer)
+    
+    if options.merge_overlapping:
+        modifiers.add_modifier(MergeOverlapping,
+            min_overlap=options.merge_min_overlap,
+            error_rate=options.error_rate)
     
     return (modifiers, len(adapters1) + len(adapters2))
 
