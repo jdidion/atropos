@@ -82,6 +82,9 @@ do
       fq1=$root/data/real/GM12878_WGBS.1.fq.gz
       fq2=$root/data/real/GM12878_WGBS.2.fq.gz
       quals='0 20'
+      aligners='insert'
+      ec_atropos='--correct-mismatches best'
+      ec_seqpurge='-ec'
       ADAPTER1="GATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
       # download data
@@ -95,18 +98,21 @@ do
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
       quals='0'
+      aligners='adapter insert'
+      ec_atropos=''
+      ec_seqpurge=''
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG"
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
   fi
   
   for qcut in $quals
   do
-    for aligner in adapter insert
+    for aligner in $aligners
     do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_writercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2" \
+        "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
         "-O $MIN_OVERLAP -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
@@ -118,7 +124,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_workercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2" \
+        "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
         "-O $MIN_OVERLAP -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
@@ -130,7 +136,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_nowriter"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2" \
+        "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
         "-O $MIN_OVERLAP -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
@@ -154,9 +160,9 @@ do
     "$SEQPURGE -in1 $fq1 -in2 $fq2" \
     "-out1 ${outdir}/${profile}.1.fq.gz" \
     "-out2 ${outdir}/${profile}.2.fq.gz" \
-    "-a1 $ADAPTER1 -a2 $ADAPTER2 -threads $threads" \
+    "-a1 $ADAPTER1 -a2 $ADAPTER2 $ec_seqpurge" \
     "-qcut $qcut -ncut $ncut -min_len $MIN_LEN" \
-    "-prefetch $BATCH_SIZE" \
+    "-threads $threads -prefetch $BATCH_SIZE" \
     "-summary ${outdir}/${profile}.summary" >> $commands
     
     profile="skewer_${threads}_${err}_q${qcut}"

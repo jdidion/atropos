@@ -64,7 +64,7 @@ mkdir ../software/build/seqpurge &&
     make build_tools_release &&
     ln -s bin/SeqPurge ../../../bin &&
     cd ../../../scripts &&
-    echo "You may need to 'export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$root/software/build/seqpurge/ngs-bits/bin'"
+    echo "You may need to 'export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$root/software/bin'"
 
 if [ -f $genome ]
 then
