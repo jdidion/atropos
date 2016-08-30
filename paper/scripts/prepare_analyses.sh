@@ -198,7 +198,6 @@ then
       echo "$SAMTOOLS sort -n -O bam -@ $threads -o $outdir/untrimmed.sorted.bam $outdir/untrimmed.bam" >> $sort_commands
         
       for profile in \
-        atropos_${threads}_real_q${qcut}_adapter_workercomp \
         atropos_${threads}_real_q${qcut}_insert_workercomp \
         seqpurge_${threads}_real_q${qcut} \
         skewer_${threads}_real_q${qcut}

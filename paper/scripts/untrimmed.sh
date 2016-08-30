@@ -1,1 +1,0 @@
-bwameth.py -z -t 16 -o results/untrimmed.bam --read-group '@RG\tID:untrimmed\tSM:untrimmed\tLB:untrimmed\tPL:ILLUMINA' --reference /cluster/ifs/projects/collins/bwameth_index/hg19+rCRS-YPAR.fasta /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.1.fq.gz /cluster/ifs/projects/collins/jdidion/atropos/paper/data/real/GM12878_WGBS.2.fq.gz
