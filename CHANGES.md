@@ -3,7 +3,9 @@
 v1.0.12 (dev)
 -------------
 
-
+* Add ability to correct errors during insert-match adapter trimming.
+* Implement additional adapter-detection algorithms.
+* Fix bug where default output file is force-created in parallel-write mode
 
 v1.0.11 (2016.08.24)
 --------------------

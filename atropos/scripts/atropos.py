@@ -252,7 +252,7 @@ def get_argument_parser():
              "it specifies the minimum length as the fraction of the length of the *shorter* read "
              "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
              "with an absolute minimum of 2 bp). (0.9)")
-    group.add_argument("--correct-mismatches", choices=("best", "N"), default="best",
+    group.add_argument("--correct-mismatches", choices=("best", "N"), default=None,
         help="How to handle mismatches while aligning/merging; best: select the base with the best "
              "quality; N: set the base to N. Note that if exactly one base is ambiguous, the "
              "non-ambiguous base is always used.")

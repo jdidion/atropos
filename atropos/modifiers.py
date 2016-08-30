@@ -8,7 +8,7 @@ need to be stored, and as a class with a __call__ method if there are parameters
 import re
 from .qualtrim import quality_trim_index, nextseq_trim_index
 from .align import Aligner, SEMIGLOBAL, InsertAligner
-from .util import reverse_complement
+from .util import complement, reverse_complement
 from collections import defaultdict
 import copy
 import logging
@@ -160,11 +160,9 @@ class InsertAdapterCutter(ReadPairModifier):
         insert_match, insert_match_len, adapter_match1, adapter_match2 = self.aligner.match_insert(
             read1.sequence, read2.sequence)
         
-        if self.mismatch_action and insert_match and insert_match[5] > 0 and adapter_match1 and adapter_match2:
-            # Correct errors
-            # read2 reverse-complement is the reference, read1 is the query
-            # TODO
-            pass
+        if (self.mismatch_action and insert_match and insert_match[5] > 0 and
+                adapter_match1 and adapter_match2):
+            self.correct_errors(read1, read2, insert_match)
         
         if adapter_match1 is None and adapter_match2 is None:
             adapter_match1 = self.adapter1.match_to(read1)
@@ -217,6 +215,65 @@ class InsertAdapterCutter(ReadPairModifier):
         
         self.with_adapters[read_idx] += 1
         return trimmed_read
+    
+    def correct_errors(self, read1, read2, insert_match):
+        # read2 reverse-complement is the reference, read1 is the query
+        r1_seq = list(read1.sequence)
+        r2_seq = list(read2.sequence)
+        l2 = len(r2_seq)
+        
+        has_quals = read1.qualities and read2.qualities
+        if has_quals:
+            r1_qual = list(read1.qualities)
+            r2_qual = list(read2.qualities)
+        elif self.mismatch_action == 'best':
+            raise Exception("Cannot perform quality-based error correction on reads lacking quality information")
+        
+        r1_changed = False
+        r2_changed = False
+        
+        for i, j in zip(
+                range(insert_match[2], insert_match[3]),
+                range(l2 - insert_match[0] - 1, l2 - insert_match[1] - 1, -1)):
+            b1 = r1_seq[i]
+            b2 = complement[r2_seq[j]]
+            if b1 == b2:
+                continue
+            if b1 == 'N':
+                r1_seq[i] = b2
+                if has_quals:
+                    r1_qual[i] = r2_qual[j]
+                r1_changed = True
+            elif b2 == 'N':
+                r2_seq[j] = complement[b1]
+                if has_quals:
+                    r2_qual[j] = r1_qual[i]
+                r2_changed = True
+            elif self.mismatch_action == 'N':
+                r1_seq[i] = 'N'
+                r2_seq[i] = 'N'
+                r1_changed = r2_changed = True
+            elif r1_qual[i] == r2_qual[j]:
+                # default to read1 base
+                r2_seq[j] = complement[b1]
+                r2_changed = True
+            elif r1_qual[i] > r2_qual[j]:
+                r2_seq[j] = complement[b1]
+                r2_qual[j] = r1_qual[i]
+                r2_changed = True
+            else:
+                r1_seq[i] = b2
+                r1_qual[i] = r2_qual[j]
+                r1_changed = True
+        
+        if r1_changed:
+            read1.sequence = ''.join(r1_seq)
+            if has_quals:
+                read1.qualities = ''.join(r1_qual)
+        if r2_changed:
+            read2.sequence = ''.join(r2_seq)
+            if has_quals:
+                read2.qualities = ''.join(r2_qual)
 
 class UnconditionalCutter(Trimmer):
     """
