@@ -22,7 +22,8 @@ pair_fields = [
     ('discarded', False),
     ('split', False),
     ('skipped', False),
-    ('proper', False)
+    ('proper', False),
+    ('valid', False)
 ]
 read_fields = [
     ('mapped', False),
@@ -102,8 +103,6 @@ class TableRead(object):
         # print(self.clipped_back)
         # print(self.trimmed_front)
         # print(self.trimmed_back)
-        
-        
 
 class TableRow(object):
     def __init__(self, prog, read_name, read_idx):
@@ -118,6 +117,9 @@ class TableRow(object):
     def set_from_pair(self, r1, r2):
         assert r1.is_proper_pair == r2.is_proper_pair
         self.proper = r1.is_proper_pair
+        # A valid pair is both proper (i.e. both reads are mapped)
+        # and read1 and read2 are in opposite orientation
+        self.valid = self.proper and (r1.is_reverse != r2.is_reverse)
         self.read1.set_from_read(r1)
         self.read2.set_from_read(r2)
     
