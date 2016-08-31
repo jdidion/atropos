@@ -182,7 +182,7 @@ def test_Swift_trimmer():
 def test_overlapping():
     trimmer = MergeOverlapping(min_overlap=10, error_rate = 0.1)
     a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
+    a2 = reverse_complement('AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA')
     frag = 'CCAAGCAGACATTCACTCAGATTGCA'
     r1 = (frag + a1)[0:40]
     q1 = '#' * 40
@@ -190,7 +190,7 @@ def test_overlapping():
     q2 = '!' * 40
     parser = AdapterParser()
     adapter1 = parser.parse(a1)
-    adapter2 = parser.parse(reverse_complement(a2))
+    adapter2 = parser.parse(a2)
     cutter = AdapterCutter([adapter1, adapter2])
     read1 = Sequence('foo', r1, q1)
     read1 = cutter(read1)
@@ -245,9 +245,38 @@ def test_overlapping():
     assert read1_merged.merged is False
     assert read2 is not None
 
+def test_mismatched_adapter_overlaps():
+    """
+    This is a test case from real data. The adapter overlaps 1 less bp
+    on the fw read than on the reverse read. We want to make sure that
+    the extra 'A' base gets trimmed.
+    adapter                                                                                                                                                          GATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG
+    actual                                                               TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGTAGATCGGAAGAGCACACGTCTGAACTTCAGTCAC
+    actual rc                          TATGTTCTTTCCCTTCACGTCTCTCTTCGGATCTTTATTGTGATGAGTTGAAAATAAAGGTTAAGTATAGATAAAAAAGTTATTATAGTTTAGAGGGTAAGTGTATGATGGAGTAAAATATTGGT
+    adapter rc AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT
+    """
+    r1 = 'TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGTAGATCGGAAGAGCACACGTCTGAACTTCAGTCAC'
+    r2 = 'ACCAATATTTTACTCCATCATACACTTACCCTCTAAACTATAATAACTTTTTTATCTATACTTAACCTTTATTTTCAACTCATCACAATAAAGATCCGAAGAGAGACGTGAAGGGAAAGAACATA'
+    a1 = "GATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
+    a2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
+
+    parser = AdapterParser()
+    adapter1 = parser.parse(a1)
+    adapter2 = parser.parse(a2)
+    # the data has a fairly high error rate
+    cutter = InsertAdapterCutter(adapter1, adapter2,
+        max_insert_mismatch_frac=0.3,
+        min_adapter_match_frac=0.7)
+    read1 = Sequence('foo', r1, '#' * 125)
+    read2 = Sequence('foo', r2, '#' * 125)
+    new_read1, new_read2 = cutter(read1, read2)
+    assert(len(new_read1)) == 91
+    assert(len(new_read2)) == 91
+    assert(new_read1.sequence == 'TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGT')
+    
 def test_error_correction():
     a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
+    a2 = reverse_complement('AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA')
     frag = 'CCAAGCAGACATTCACTCAGATTGCA'
     correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
     
@@ -273,7 +302,7 @@ def test_error_correction():
     
     parser = AdapterParser()
     adapter1 = parser.parse(a1)
-    adapter2 = parser.parse(reverse_complement(a2))
+    adapter2 = parser.parse(a2)
     
     cutter = InsertAdapterCutter(adapter1, adapter2, mismatch_action='best')
     

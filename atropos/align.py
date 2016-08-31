@@ -187,8 +187,9 @@ class InsertAligner(object):
     Implementation of an insert matching algorithm.
     This only works with paired-end reads with 3' adapters.
     """
-    def __init__(self, adapter1, adapter2, max_error_prob=1E-6, min_insert_overlap=1,
-                 max_insert_mismatch_frac=0.2, min_adapter_overlap=1, min_adapter_match_frac=0.8,
+    def __init__(self, adapter1, adapter2, max_error_prob=1E-6,
+                 min_insert_overlap=1, max_insert_mismatch_frac=0.2,
+                 min_adapter_overlap=1, min_adapter_match_frac=0.8,
                  adapter_check_cutoff=9):
         self.adapter1 = adapter1
         self.adapter1_len = len(adapter1)

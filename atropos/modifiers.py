@@ -163,7 +163,7 @@ class InsertAdapterCutter(ReadPairModifier):
             read1.sequence, read2.sequence)
         
         if (self.mismatch_action and insert_match and insert_match[5] > 0 and
-                adapter_match1 and adapter_match2):
+                (adapter_match1 or adapter_match2)):
             self.correct_errors(read1, read2, insert_match)
         
         if adapter_match1 is None and adapter_match2 is None:
@@ -189,6 +189,7 @@ class InsertAdapterCutter(ReadPairModifier):
         return (self.trim(read1, adapter_match1, 0), self.trim(read2, adapter_match2, 1))
     
     def trim(self, read, match, read_idx):
+        # TODO: refactor so that both adapter cutters use the same function
         if not match:
             read.match = None
             read.match_info = None

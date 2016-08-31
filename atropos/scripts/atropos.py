@@ -84,12 +84,11 @@ def main(cmdlineargs=None, default_outfile="-"):
     
     # dispatch to subcommands if one is specified
     if options.command == "detect":
-        try:
-            import atropos.detect
-        except:
-            parser.error("Error loading adapter detection module; do you have khmer installed?")
-            sys.exit(1)
+        import atropos.detect
         atropos.detect.main(options)
+    elif options.command == "error":
+        import atropos.error
+        atropos.error.main(options)
     # otherwise trim reads
     else:
         run_atropos(options, parser, default_outfile="-")
@@ -212,6 +211,14 @@ def get_argument_parser():
             "as with -a. This option is mostly for rescuing failed library "
             "preparations - do not use if you know which end your adapter was "
             "ligated to! (none)")
+    group.add_argument("--no-trim", dest='action', action='store_const', const=None,
+        help="Match and redirect reads to output/untrimmed-output as usual, "
+            "but do not remove adapters. (no)")
+    group.add_argument("--mask-adapter", dest='action', action='store_const', const='mask',
+        help="Mask adapters with 'N' characters instead of trimming them. (no)")
+    
+    ## Arguments specific to the choice of aligner
+    
     group.add_argument("--aligner", choices=('adapter', 'insert'), default='adapter',
         help="Which alignment algorithm to use for identifying adapters. Currently, "
              "you can choose between the semi-global alignment strategy used in Cutdapt "
@@ -219,8 +226,10 @@ def get_argument_parser():
              "Note that insert-based alignment can only be used with paired-end reads "
              "containing 3' adapters. New algorithms are being implemented and the default "
              "is likely to change. (adapter)")
+    
+    # Arguments for adapter match
     group.add_argument("-e", "--error-rate", type=float, default=None,
-        help="Maximum allowed error rate (no. of errors divided by the length "
+        help="Maximum allowed error rate for adapter match (no. of errors divided by the length "
             "of the matching region). (0.1)")
     group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
         help="Allow only mismatches in alignments. "
@@ -236,13 +245,22 @@ def get_argument_parser():
     group.add_argument("-N", "--no-match-adapter-wildcards", action="store_false",
         default=True, dest='match_adapter_wildcards',
         help="Do not interpret IUPAC wildcards in adapters. (no)")
-    group.add_argument("--no-trim", dest='action', action='store_const', const=None,
-        help="Match and redirect reads to output/untrimmed-output as usual, "
-            "but do not remove adapters. (no)")
-    group.add_argument("--mask-adapter", dest='action', action='store_const', const='mask',
-        help="Mask adapters with 'N' characters instead of trimming them. (no)")
+    
+    # Arguments for insert match
+    group.add_argument("--insert-match-error-rate", type=float, default=0.2,
+        help="Maximum allowed error rate for insert match (no. of errors divided by the length "
+            "of the matching region). (0.2)")
+    group.add_argument("--insert-match-adapter-error-rate", type=float, default=0.2,
+        help="Maximum allowed error rate for matching adapters after successful insert match "
+             "(no. of errors divided by the length of the matching region). (0.2)")
+    group.add_argument("--correct-mismatches", choices=("best", "N"), default=None,
+        help="How to handle mismatches while aligning/merging; best: select the base with the best "
+             "quality; N: set the base to N. Note that if exactly one base is ambiguous, the "
+             "non-ambiguous base is always used.")
+    
+    # Merging arguments
     group.add_argument("-R", "--merge-overlapping", action="store_true", default=False,
-        help="Merge read pairs that overlap into a single sequence. This is an experimental "
+        help="Merge read pairs that overlap into a single sequence. This is experimental "
              "and currently only works with read pairs where an adapter match was found at "
              "the 3' ends of both reads. The minimum required overlap is controled by "
              "--merge-min-overlap, and the mimimum error rate in the alignment is controlled "
@@ -252,10 +270,6 @@ def get_argument_parser():
              "it specifies the minimum length as the fraction of the length of the *shorter* read "
              "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
              "with an absolute minimum of 2 bp). (0.9)")
-    group.add_argument("--correct-mismatches", choices=("best", "N"), default=None,
-        help="How to handle mismatches while aligning/merging; best: select the base with the best "
-             "quality; N: set the base to N. Note that if exactly one base is ambiguous, the "
-             "non-ambiguous base is always used.")
     
     group = parser.add_argument_group("Additional read modifications")
     group.add_argument("-u", "--cut", action='append', default=[], type=int, metavar="LENGTH",
@@ -465,7 +479,7 @@ def get_argument_parser():
         help='sub-command help')
     
     detect_parser = subparsers.add_parser("detect", help="Detect adapter sequences",
-        usage="\natropos -se input.fastq detect\natropos -pe1 in1.fastq -pe2 in2.fastq detect",
+        usage="\natropos -se input.fastq detect\natropos -pe1 in1.fq -pe2 in2.fq detect",
         description="Detect adapter sequences directly from read sequences.")
     detect_parser.set_defaults(command='detect')
     detect_parser.add_argument("--kmer-size", type=int, default=12,
@@ -482,6 +496,15 @@ def get_argument_parser():
     detect_parser.add_argument("--known-contaminants-file", default=None,
         help="File with known contaminants, one per line, with name and sequence "
              "separated by one or more tabs.")
+    
+    error_parser = subparsers.add_parser("error", help="Estimate empirical error rate",
+        usage="\natropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error",
+        description="Estimate the error rate from base qualities. This can help to "
+                    "determine the quality of your data, and to decide the value for "
+                    "the max error rate (-e) parameter. Normal error for an Illumina "
+                    "experiment is around 1% or less. We recommend setting -e to "
+                    "10 x the empirical error rate.")
+    error_parser.set_defaults(command='error')
     
     return parser
 
@@ -585,8 +608,10 @@ def validate_options(options, parser):
             options.error_rate = 0.12
     elif options.bisulfite:
         # TODO: set default adapter sequences
-        if options.quality_cutoff is None:
-            options.quality_cutoff = "20,20"
+        # Jury is out on whether quality trimming helps. For aligners like
+        # bwameth, it actually leads to worse results.
+        #if options.quality_cutoff is None:
+        #    options.quality_cutoff = "20,20"
         if options.bisulfite == "swift" and paired != "both":
             parser.error("Swift trimming is only compatible with paired-end reads")
         if options.bisulfite not in ("rrbs", "non-directional", "truseq", "epignome", "swift"):
@@ -876,9 +901,13 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
         if op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
+                aligner_args = dict(
+                    max_insert_mismatch_frac=options.insert_match_error_rate,
+                    min_adapter_match_frac=1.0 - options.insert_match_adapter_error_rate
+                )
                 modifiers.add_modifier(InsertAdapterCutter,
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
-                    mismatch_action=options.correct_mismatches)
+                    mismatch_action=options.correct_mismatches, **aligner_args)
             else:
                 modifiers.add_modifier_pair(AdapterCutter,
                     dict(adapters=adapters1, times=options.times, action=options.action),
