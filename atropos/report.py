@@ -92,7 +92,7 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
         total_bp=total_bp1 + total_bp2,
         written=written,
         written_bp=written_bp,
-        total_written_bp=sum(written_bp)
+        total_written_bp=sum(written_bp),
     ))
     
     stats["too_short"] = None
@@ -111,6 +111,9 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
     insert_cutter = modifiers.get_modifiers(InsertAdapterCutter)
     if len(insert_cutter) > 0:
         stats["with_adapters"] = insert_cutter[0].with_adapters
+        stats["corrected"] = insert_cutter[0].corrected_pairs
+        stats["corrected_bp"] = insert_cutter[0].corrected_bp
+        stats["total_corrected_bp"] = sum(insert_cutter[0].corrected_bp)
     else:
         stats["with_adapters"] = [0, 0]
         for read in (1, 2):
@@ -250,13 +253,19 @@ class Summary(object):
             stats["too_long_fraction"] = stats["too_long"] / N if stats["too_long"] else 0
             stats["too_many_n_fraction"] = stats["too_many_n"] / N if stats["too_many_n"] else 0
             stats["with_adapters_fraction"] = [ (v / N) for v in stats["with_adapters"] ]
-        
+            if "corrected" in stats:
+                stats["corrected_fraction"] = stats["corrected"] / N
+                
         if stats["total_bp"] > 0:
-            stats["total_written_bp_fraction"] = (stats["total_written_bp"] / stats["total_bp"]) if stats["total_written_bp"] else 0
+            N = stats["total_bp"]
+            stats["total_written_bp_fraction"] = (stats["total_written_bp"] / N) if stats["total_written_bp"] else 0
+            if "corrected" in stats:
+                stats["corrected_bp_fraction"] = [ (c / N) for c in stats["corrected_bp"] ]
+                stats["total_corrected_bp_fraction"] = stats["total_corrected_bp"] / N
             for modifier_class in self.trimmer_classes:
                 name = modifier_class.__name__
                 if stats[name]:
-                    stats["{}_fraction".format(name)] = (stats[name] / stats["total_bp"])
+                    stats["{}_fraction".format(name)] = (stats[name] / N)
         
         stats["adapters"] = [
             self.adapter_stats[0].values(),
@@ -405,7 +414,7 @@ def generate_report(stats, trimmer_classes, outfile):
         report += "{pairs_or_reads} that were too long:			   {too_long:13,d} ({too_long_fraction:.1%})\n"
     if stats["too_many_n"] is not None:
         report += "{pairs_or_reads} with too many N:			   {too_many_n:13,d} ({too_many_n_fraction:.1%})\n"
-
+    
     report += textwrap.dedent("""\
     {pairs_or_reads} written (passing filters):			{written:13,d} ({written_fraction:.1%})
 
@@ -428,6 +437,12 @@ def generate_report(stats, trimmer_classes, outfile):
     if stats["paired"]:
         report += "	 Read 1: {written_bp[0]:13,d} bp\n"
         report += "	 Read 2: {written_bp[1]:13,d} bp\n"
+    
+    if "corrected" in stats:
+        report += "Total corrected read pairs:                {corrected:13,d}\n"
+        report += "Total corrected bp:                        {total_corrected_bp:13,d} ({total_corrected_bp_fraction:.1%})\n"
+        report += "	 Read 1:                {corrected_bp[0]:13,d} ({corrected_bp_fraction[0]:.1%})\n"
+        report += "	 Read 2:                {corrected_bp[1]:13,d} ({corrected_bp_fraction[1]:.1%})\n"
     
     try:
         report = report.format(**stats)

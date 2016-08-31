@@ -155,6 +155,8 @@ class InsertAdapterCutter(ReadPairModifier):
         self.mismatch_action = mismatch_action
         self.symmetric = symmetric
         self.with_adapters = [0, 0]
+        self.corrected_pairs = 0
+        self.corrected_bp = [0, 0]
     
     def __call__(self, read1, read2):
         insert_match, insert_match_len, adapter_match1, adapter_match2 = self.aligner.match_insert(
@@ -229,8 +231,8 @@ class InsertAdapterCutter(ReadPairModifier):
         elif self.mismatch_action == 'best':
             raise Exception("Cannot perform quality-based error correction on reads lacking quality information")
         
-        r1_changed = False
-        r2_changed = False
+        r1_changed = 0
+        r2_changed = 0
         
         for i, j in zip(
                 range(insert_match[2], insert_match[3]),
@@ -243,37 +245,44 @@ class InsertAdapterCutter(ReadPairModifier):
                 r1_seq[i] = b2
                 if has_quals:
                     r1_qual[i] = r2_qual[j]
-                r1_changed = True
+                r1_changed += 1
             elif b2 == 'N':
                 r2_seq[j] = complement[b1]
                 if has_quals:
                     r2_qual[j] = r1_qual[i]
-                r2_changed = True
+                r2_changed += 1
             elif self.mismatch_action == 'N':
                 r1_seq[i] = 'N'
                 r2_seq[i] = 'N'
-                r1_changed = r2_changed = True
+                r1_changed += 1
+                r2_changed += 1
             elif r1_qual[i] == r2_qual[j]:
                 # default to read1 base
                 r2_seq[j] = complement[b1]
-                r2_changed = True
+                r2_changed += 1
             elif r1_qual[i] > r2_qual[j]:
                 r2_seq[j] = complement[b1]
                 r2_qual[j] = r1_qual[i]
-                r2_changed = True
+                r2_changed += 1
             else:
                 r1_seq[i] = b2
                 r1_qual[i] = r2_qual[j]
-                r1_changed = True
+                r1_changed += 1
         
-        if r1_changed:
-            read1.sequence = ''.join(r1_seq)
-            if has_quals:
-                read1.qualities = ''.join(r1_qual)
-        if r2_changed:
-            read2.sequence = ''.join(r2_seq)
-            if has_quals:
-                read2.qualities = ''.join(r2_qual)
+        if r1_changed or r2_changed:
+            self.corrected_pairs += 1
+            if r1_changed:
+                self.corrected_bp[0] += r1_changed
+                read1.sequence = ''.join(r1_seq)
+                read1.corrected = r1_changed
+                if has_quals:
+                    read1.qualities = ''.join(r1_qual)
+            if r2_changed:
+                self.corrected_bp[1] += r2_changed
+                read2.sequence = ''.join(r2_seq)
+                read2.corrected = r2_changed
+                if has_quals:
+                    read2.qualities = ''.join(r2_qual)
 
 class UnconditionalCutter(Trimmer):
     """
