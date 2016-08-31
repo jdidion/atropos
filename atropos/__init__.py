@@ -2,7 +2,7 @@
 from __future__ import print_function, division, absolute_import
 import sys
 
-__version__ = '1.0.12'
+__version__ = '1.0.13'
 
 def check_importability():  # pragma: no cover
     try:

@@ -1,5 +1,11 @@
 # Changes
 
+v1.0.13 (2016.08.31)
+--------------------
+
+* Add options to specify max error rates for insert and adapter matching within insert aligner.
+* Add new command to estimate empirical error rate in data set from base qualities.
+
 v1.0.12 (2016.08.30)
 --------------------
 
