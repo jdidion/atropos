@@ -247,10 +247,10 @@ def get_argument_parser():
         help="Do not interpret IUPAC wildcards in adapters. (no)")
     
     # Arguments for insert match
-    group.add_argument("--insert-match-error-rate", type=float, default=0.2,
+    group.add_argument("--insert-match-error-rate", type=float, default=None,
         help="Maximum allowed error rate for insert match (no. of errors divided by the length "
             "of the matching region). (0.2)")
-    group.add_argument("--insert-match-adapter-error-rate", type=float, default=0.2,
+    group.add_argument("--insert-match-adapter-error-rate", type=float, default=None,
         help="Maximum allowed error rate for matching adapters after successful insert match "
              "(no. of errors divided by the length of the matching region). (0.2)")
     group.add_argument("--correct-mismatches", choices=("best", "N"), default=None,
@@ -575,10 +575,15 @@ def validate_options(options, parser):
             paired = 'both'
 
     if options.aligner != 'adapter':
-        if options.aligner == 'insert' and paired != 'both':
-            parser.error("Insert aligner only works with paired-end reads")
-            # TODO: should also be checking that there is exactly one 3' adapter for each read
-            # TODO: have the aligner tell us whether it can be used based on options?
+        if options.aligner == 'insert':
+            if paired != 'both':
+                parser.error("Insert aligner only works with paired-end reads")
+                # TODO: should also be checking that there is exactly one 3' adapter for each read
+                # TODO: have the aligner tell us whether it can be used based on options?
+            if options.insert_match_error_rate is None:
+                options.insert_match_error_rate = options.error_rate or 0.2
+            if options.insert_match_adapter_error_rate is None:
+                options.insert_match_adapter_error_rate = options.error_rate or 0.2
     
     if options.merge_overlapping and (
             paired != "both" or
