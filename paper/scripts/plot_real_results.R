@@ -1,6 +1,6 @@
-tab<-read.table('real_results.txt',sep="\t",header=T,stringsAsFactors=F)
+tab<-read.table('test.txt',sep="\t",header=T,stringsAsFactors=F)
 progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
-for (i in c(4:9,18)) {
+for (i in c(4:10,19)) {
     tab[,i] <- ifelse(tab[,i]=='True', TRUE, FALSE)
 }
 compare_mapping <- function(read, prog) {
@@ -17,11 +17,11 @@ compare_mapping <- function(read, prog) {
         'better_quality'
     }
 }
-outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 9), function(i) {
-    if (((i-1)/9) %% 1000 == 0) print((i-1)/9)
-    read <- tab[i:(i+8),]
+outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 7), function(i) {
+    if (((i-1)/7) %% 1000 == 0) print((i-1)/7)
+    read <- tab[i:(i+6),]
     read <- read[match(progs, read[,1]),]
-    sapply(2:9, function(prog) {
+    sapply(2:7, function(prog) {
         if (read[1, 'skipped']) {
             'skipped'
         }
@@ -32,8 +32,20 @@ outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 9), function(i) {
             'split'
         }
         else {
+            # untrimmed and trimmed have different validity
+            if (read[1, 'valid'] != read[prog, 'valid']) {
+                if (read[1, 'valid']) {
+                    'valid->invalid'
+                }
+                else {
+                    'invalid->valid'
+                }
+            }
+            else if (!read[1, 'valid']) {
+                'both_invalid'
+            }
             # untrimmed is mapped
-            if (read[1, 'proper']) {
+            else if (read[1, 'proper']) {
                 if (read[prog, 'proper']) {
                     compare_mapping(read, prog)
                 }
@@ -65,3 +77,4 @@ outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 9), function(i) {
         }
     })
 }))
+tapply(tab$read1_quality, tab$read_name)
