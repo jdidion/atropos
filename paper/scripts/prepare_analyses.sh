@@ -90,7 +90,6 @@ do
       atropos_extra='--correct-mismatches best -e 0.3'
       seqpurge_extra='-ec -match_perc 70'
       skewer_extra='-r 0.3'
-      err_rate='0.3' # real data has fairly high error
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
       # download data
@@ -140,7 +139,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2" \
-        "-O 7 -q $qcut --trim-n -e $err_rate" \
+        "-O 7 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -152,7 +151,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2" \
-        "-O 7 -q $qcut --trim-n -e $err_rate" \
+        "-O 7 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -164,7 +163,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2" \
-        "-O 7 -q $qcut --trim-n -e $err_rate" \
+        "-O 7 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
