@@ -474,9 +474,7 @@ def get_argument_parser():
     
     # add subcommands
     parser.set_defaults(command=None)
-    subparsers = parser.add_subparsers(
-        dest="commands",
-        help='sub-command help')
+    subparsers = parser.add_subparsers(dest="commands", help='sub-command help')
     
     detect_parser = subparsers.add_parser("detect", help="Detect adapter sequences",
         usage="\natropos -se input.fastq detect\natropos -pe1 in1.fq -pe2 in2.fq detect",
@@ -486,8 +484,9 @@ def get_argument_parser():
         help="Size of k-mer used to scan reads for adapter sequences. (12)")
     detect_parser.add_argument("--max-adapters", type=int, default=None,
         help="The maximum number of candidate adapters to report. (none)")
-    detect_parser.add_argument("--include-unknown", action="store_true", default=False,
-        help="Also report sequences that are not in the list of known adapters.")
+    detect_parser.add_argument("--include-contaminants", choices=('all','known','unknown'), default='all',
+        help="What conaminants to search for: all, only known adapters/contaminants ('known'), "
+             "or only unknown contaminants ('unknown').")
     detect_parser.add_argument("--adapter-report", default="-",
         help="File in which to write the summary of detected adapters. (stdout)")
     detect_parser.add_argument("--known-contaminant", action="append", default=None,
