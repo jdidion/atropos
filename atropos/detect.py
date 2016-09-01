@@ -11,16 +11,26 @@ from .seqio import FastqReader
 from .util import reverse_complement, sequence_complexity, enumerate_range
 from .xopen import open_output, xopen
 
+# TODO: Test whether using rc=True in parse_known_contaminants is as fast
+# and as accurate as testing both the forward and reverse complement
+# read sequence against only the forward-orientation known contaminants.
+# Also, offer an option of whether to test the reverse complement, with
+# the default being false.
+
+# TODO: whether and where to cache list of known contaminants?
+
 def main(options):
-    known_contaminants = load_known_contaminants_from_url()
-    if options.known_contaminant:
-        merge_contaminants(
-            known_contaminants,
-            load_known_contaminants_from_option_strings(options.known_contaminant))
-    if options.known_contaminants_file:
-        merge_contaminants(
-            known_contaminants,
-            load_known_contaminants_from_file(options.known_contaminants_file))
+    known_contaminants = None
+    if options.include_contaminants != 'unknown':
+        known_contaminants = load_known_contaminants_from_url()
+        if options.known_contaminant:
+            merge_contaminants(
+                known_contaminants,
+                load_known_contaminants_from_option_strings(options.known_contaminant))
+        if options.known_contaminants_file:
+            merge_contaminants(
+                known_contaminants,
+                load_known_contaminants_from_file(options.known_contaminants_file))
     
     infiles = [f for f in (
         options.single_input, options.input1, options.input2, options.interleaved_input
@@ -29,7 +39,7 @@ def main(options):
     n_reads = options.max_reads or 10000
     
     with open_output(options.adapter_report) as o:
-        print("Detecting adapters and other potential contaminant sequences based on\n"
+        print("\nDetecting adapters and other potential contaminant sequences based on"
               "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
         for i, f in enumerate(infiles, 1):
             fq = FastqReader(f)
@@ -44,19 +54,25 @@ def main(options):
                 print(file_header, file=o)
                 print('-' * len(file_header), file=o)
                 contam = detect_contaminants(fq_iter, k=options.kmer_size, n_reads=n_reads,
-                    known_contaminants=known_contaminants, include_unknown=options.include_unknown)
+                    known_contaminants=known_contaminants, include=options.include_contaminants)
                 summarize_contaminants(contam, o)
             finally:
                 fq.close()
 
-def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include_unknown=False):
-    if known_contaminants and not include_unknown:
+def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include=False):
+    if known_contaminants and include == 'known':
+        logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
         contam = detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants)
+        min_freq = 0.1
     elif n_reads <= 50000:
+        logging.getLogger().debug("Detecting contaminants using the heuristic algorithm")
         contam = detect_contaminants_heuristic(fq, k, n_reads, overrep_cutoff, known_contaminants)
+        min_freq = 0.1 * n_reads
     else:
+        logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
         contam = detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants)
-    return filter_contaminants(contam, not include_unknown)
+        min_freq = 0.0001
+    return filter_and_sort_contaminants(contam, include, min_freq)
 
 def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants, min_match_frac=0.5):
     """
@@ -72,8 +88,7 @@ def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants, m
         seq = read.sequence
         seqrc = reverse_complement(seq)
         for contam in contaminants:
-            if (contam.match(seq)[0] > min_match_frac
-                    or contam.match(seqrc)[0] > min_match_frac):
+            if (contam.match(seq)[0] > min_match_frac):
                 counts[contam] += 1
     
     counts = defaultdict(lambda: 0)
@@ -86,7 +101,6 @@ def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants, m
     num_win = readlen - k + 1
     min_count = math.ceil(n_reads * num_win * overrep_cutoff / float(4**k))
     contaminants = filter(lambda x: x[1] >= min_count, counts.items())
-    contaminants = sorted(contaminants, key=lambda x: x[1] * len(x[0].seq), reverse=True)
     return list((c[0].seq, int(c[0].matches), c[0].names, float(c[1]) / n_reads) for c in contaminants)
 
 def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_contaminants,
@@ -164,21 +178,9 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
     # Now merge overlapping sequences to eliminate redundancy in the
     # set of candidate kmers.
     
-    # First merge adjacent sequences
-    results.sort(key=lambda i: i[0])
-    cur = results[0]
-    merged = []
-    for i in range(1, len(results)):
-        if results[i][0].startswith(cur[0]):
-            cur = [results[i][0], results[i][1] + cur[1]]
-        else:
-            merged.append(cur)
-            cur = results[i]
-    merged.append(cur)
-    results = merged
-
-    # Second merge, by frequency
-    results.sort(key=lambda i: i[1], reverse=True)
+    # First merge by length and frequency. This sorting
+    # gives preferences to longer sequences.
+    results.sort(key=lambda i: len(i[0]) * math.log(i[1]), reverse=True)
     cur = results[0]
     merged = []
     unmerged = []
@@ -198,26 +200,39 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
         merged.append([seq1, count1])
         results = unmerged
         unmerged = []
-    merged = merged + results
+    results = merged + results
     
-    if len(merged) == 0:
+    # Second merge adjacent sequences
+    results.sort(key=lambda i: i[0])
+    cur = results[0]
+    merged = []
+    for i in range(1, len(results)):
+        if results[i][0].startswith(cur[0]):
+            cur = [results[i][0], results[i][1] + cur[1]]
+        else:
+            merged.append(cur)
+            cur = results[i]
+    merged.append(cur)
+    results = merged
+    
+    if len(results) == 0:
         return []
         
     # Re-sort by frequency
-    merged.sort(key=lambda i: i[1], reverse=True)
+    results.sort(key=lambda i: i[1], reverse=True)
     # Keep anything that's within 50% of the top hit
-    min_count = int(merged[0][1] * 0.5)
-    merged = filter(lambda x: x[1] >= min_count, merged)
+    min_count = int(results[0][1] * 0.5)
+    results = filter(lambda x: x[1] >= min_count, results)
 
     if not known_contaminants:
-        return list(merged)
+        return list(results)
     
     # Match to known sequences
     contaminants = create_contaminant_matchers(known_contaminants, k_start)
     known = {}
     unknown = []
     
-    for seq, count in merged:
+    for seq, count in results:
         best_matches = {}
         best_match_frac = (min_contaminant_match_frac, 0)
         for contam in contaminants:
@@ -250,7 +265,6 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
             unknown.append((seq, count))
     
     known = list(known.values())
-    known.sort(key=lambda x: (x[3], x[4]), reverse=True)
     return known + unknown
 
 # First build a kmer profile
@@ -358,32 +372,37 @@ def detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants
                 overall_count = sum(match_counts) / float(n_kmers)
                 contam.append((seq, overall_count / float(tablesize), names, float(matches) / n_kmers))
         
-        contam.sort(key=lambda x: x[3], reverse=True)
-        
         # Add remaining tags
         extra = [(tag, candidates[tag] / float(tablesize)) for tag in set(candidates.keys()) - seen]
-        extra.sort(key=lambda x: x[1], reverse=True)
         
         return contam + extra
     else:
-        contam = [(tag, count / float(tablesize)) for tag, count in candidates.items()]
-        contam.sort(key=lambda x: x[1], reverse=True)
-        return contam
-
-def filter_contaminants(contam, min_complexity=1.1, min_len=None, min_freq=0.0001, known_only=False, limit=20):
+        return [(tag, count / float(tablesize)) for tag, count in candidates.items()]
+        
+def filter_and_sort_contaminants(contam, include='all', min_freq=0.01, min_complexity=1.1,
+                                 min_match_frac=0.1, limit=20):
     def _filter(row):
-        if min_len is not None and len(row[0]) < min_len:
+        if min_len and len(row[0]) < min_len:
             return False
-        if min_freq is not None and row[1] < min_freq:
+        if min_freq and row[1] < min_freq:
             return False
-        if min_complexity is not None and sequence_complexity(row[0]) < min_complexity:
+        if min_complexity and sequence_complexity(row[0]) < min_complexity:
             return False
-        if known_only and len(row) == 2:
+        if include == 'known' and len(row) == 2:
+            return False
+        elif include == 'unknown' and len(row) > 2:
+            return False
+        if min_match_frac and len(row) > 2 and row[3] < min_match_frac:
             return False
         return True
-    contam = list(filter(_filter, contam))
+    #contam = list(filter(_filter, contam))
+    
+    contam.sort(key=lambda x: x[1] * len(x[0]), reverse=True)
+    #known.sort(key=lambda x: (x[3], x[4]), reverse=True)
+    
     if limit is not None:
         contam = contam[:limit]
+        
     return contam
 
 def summarize_contaminants(contam, outstream):
@@ -408,10 +427,10 @@ def load_known_contaminants_from_option_strings(opt_strings):
     return parse_known_contaminants(opt_strings, delim='=')
 
 def load_known_contaminants_from_url(url="https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/a6372f21281705ac9031697fcaed3d1f64cea9a5/sequencing_adapters.txt"):
-    logging.getLogger().info("Downloading list of known contaminants from {}".format(url))
+    logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
     return parse_known_contaminants(urlopen(url).read().decode().split("\n"))
 
-def parse_known_contaminants(line_iter, delim='\t'):
+def parse_known_contaminants(line_iter, delim='\t', rc=False):
     regex = re.compile("([^{0}]+){0}+(.+)".format(delim))
     contam = defaultdict(lambda: set())
     for line in line_iter:
@@ -420,7 +439,11 @@ def parse_known_contaminants(line_iter, delim='\t'):
             continue
         m = regex.match(line)
         if m:
-            contam[m.group(2)].add(m.group(1))
+            seq = m.group(2)
+            name = m.group(1)
+            contam[seq].add(name)
+            if rc:
+                contam[reverse_complement(seq)] = "{}_rc".format(name)
     return contam
 
 def merge_contaminants(c1, c2):
