@@ -1,8 +1,12 @@
-tab<-read.table('test.txt',sep="\t",header=T,stringsAsFactors=F)
+library(reshpae2)
+library(ggplot2)
+
+tab<-read.table('real_results.txt',sep="\t",header=T,stringsAsFactors=F)
 progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
 for (i in c(4:10,19)) {
     tab[,i] <- ifelse(tab[,i]=='True', TRUE, FALSE)
 }
+
 compare_mapping <- function(read, prog) {
     quals <- read[c(1, prog), c('read1_quality', 'read2_quality')] + 1
     untrimmed <- prod(quals[1,])
@@ -77,4 +81,23 @@ outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 7), function(i) {
         }
     })
 }))
-tapply(tab$read1_quality, tab$read_name)
+
+sample_tabs <- lapply(1:7, function(i) tab[seq(i,nrow(tab),7),])
+names(sample_tabs) <- unlist(lapply(sample_tabs, function(x) x[1,1]))
+quals <- rbind(
+    data.frame(read_id=1:1000000, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_quality))),
+    data.frame(read_id=1:1000000, read=2, do.call(cbind, lapply(sample_tabs, function(x) x$read2_quality)))
+)
+quals$maxq <- apply(quals[,3:ncol(quals)], 1, max)
+pts <- melt(as.data.frame(t(sapply(c(1,seq(5,60,5)), function(th) {
+    c(
+        th=th,
+        x=sum(quals$maxq >= th),
+        sapply(progs, function(p) {
+            sum(quals[,p] >= th)
+        })
+    )
+}))), id.vars=c('th', 'x'), measure.vars=progs, variable.name='prog', value.name='y')
+ggplot(pts, aes(x=x, y=y, colour=prog, shape=prog)) + geom_line() + geom_point()
+
+
