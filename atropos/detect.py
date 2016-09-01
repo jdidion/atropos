@@ -59,7 +59,7 @@ def main(options):
             finally:
                 fq.close()
 
-def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include=False):
+def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include="all"):
     if known_contaminants and include == 'known':
         logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
         contam = detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants)
@@ -101,7 +101,7 @@ def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants, m
     num_win = readlen - k + 1
     min_count = math.ceil(n_reads * num_win * overrep_cutoff / float(4**k))
     contaminants = filter(lambda x: x[1] >= min_count, counts.items())
-    return list((c[0].seq, int(c[0].matches), c[0].names, float(c[1]) / n_reads) for c in contaminants)
+    return list(Match(c[0], match_frac=float(c[1]) / n_reads) for c in contaminants)
 
 def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_contaminants,
                                   min_freq=0.001, min_contaminant_match_frac=0.9):
@@ -224,25 +224,27 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
     # Keep anything that's within 50% of the top hit
     min_count = int(results[0][1] * 0.5)
     results = filter(lambda x: x[1] >= min_count, results)
-
+    # Convert to matches
+    results = list(Match(x[0], x[1]) for x in results)
+    
     if not known_contaminants:
-        return list(results)
+        return results
     
     # Match to known sequences
     contaminants = create_contaminant_matchers(known_contaminants, k_start)
     known = {}
     unknown = []
     
-    for seq, count in results:
+    for match in results:
         best_matches = {}
         best_match_frac = (min_contaminant_match_frac, 0)
         for contam in contaminants:
-            match_frac_fw = contam.match(seq)
-            seqrc = reverse_complement(seq)
+            match_frac_fw = contam.match(match.seq)
+            seqrc = reverse_complement(match.seq)
             match_frac_rv = contam.match(seqrc)
             if match_frac_fw[0] >= match_frac_rv[0]:
                 match_frac = match_frac_fw
-                compare_seq = seq
+                compare_seq = match.seq
             else:
                 match_frac = match_frac_rv
                 compare_seq = seqrc
@@ -250,61 +252,47 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
                 continue
             if (contam.seq in compare_seq or
                     align(compare_seq, contam.seq, min_contaminant_match_frac)):
-                match = (contam.seq, count, contam.names) + match_frac
                 if (match_frac[0] > best_match_frac[0] or (
                         match_frac[0] == best_match_frac[0] and
                         match_frac[1] > best_match_frac[1])):
                     best_matches = {}
                     best_match_frac = match_frac
-                best_matches[contam] = match
+                best_matches[contam] = (match, match_frac)
         
         if best_matches:
             for contam, match in best_matches.items():
-                if contam not in known or match[3] > known[contam][3]:
+                if contam not in known or match[1] > known[contam][1]:
                     known[contam] = match
         else:
-            unknown.append((seq, count))
+            unknown.append(match)
     
-    known = list(known.values())
+    # resolve many-many relationships
+    
+    matches = defaultdict(lambda: [])
+    for contam, (match, match_frac) in known.items():
+        matches[match].append((contam, match_frac))
+    
+    known = []
+    for match, contams in matches.items():
+        if len(contams) == 1:
+            contam, match_frac = contams[0]
+            match.set_contaminant(contam, *match_frac)
+        else:
+            contams.sort(key=lambda x: x[1], reverse=True)
+            contam, match_frac = equiv[0]
+            equiv = [c for c in contams[1:] if c[1] == match_frac]
+            if len(equiv) == 0:
+                match.set_contaminant(contam, *match_frac)
+            else:
+                names = list(contam.names)
+                seqs = [contam.seq]
+                for e in equiv:
+                    names.extend(e[0].names)
+                    seqs.append(e[0].seq)
+                match.set_known(names, seqs, *match_frac)
+        known.append(match)
+    
     return known + unknown
-
-# First build a kmer profile
-class ContaminantMatcher(object):
-    def __init__(self, seq, names, k):
-        self.seq = seq
-        self.names = names
-        self.kmers = set(seq[i:(i+k)] for i in range(len(seq) - k + 1))
-        self.n_kmers = len(self.kmers)
-        self.k = k
-        self.matches = 0
-        
-    def match(self, seq):
-        """
-        Returns (num_matches, num_contam_kmers, num_seq_kmers).
-        """
-        kmers = set(seq[i:(i+self.k)] for i in range(len(seq) - self.k + 1))
-        n_matches = float(len(self.kmers & kmers))
-        self.matches += n_matches
-        return (n_matches / self.n_kmers, n_matches / len(kmers))
-
-def create_contaminant_matchers(contaminants, k):
-    return [
-        ContaminantMatcher(seq, names, k)
-        for seq, names in contaminants.items()
-    ]
-
-def align(seq1, seq2, min_overlap_frac=0.9):
-    aligner = Aligner(
-        seq1, 0.0,
-        SEMIGLOBAL,
-        False, False)
-    aligner.min_overlap = math.ceil(min(len(seq1), len(seq2)) * min_overlap_frac)
-    aligner.indel_cost = 100000
-    match = aligner.locate(seq2)
-    if match:
-        return seq1[match[0]:match[1]]
-    else:
-        return None
         
 def detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants):
     """
@@ -371,53 +359,139 @@ def detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants
             if matches > 0:
                 # not sure what the correct metric is to use here
                 overall_count = sum(match_counts) / float(n_kmers)
-                contam.append((seq, overall_count / float(tablesize), names, float(matches) / n_kmers))
+                contam.append(Match(
+                    seq, overall_count / float(tablesize), names, float(matches) / n_kmers))
         
         # Add remaining tags
-        extra = [(tag, candidates[tag] / float(tablesize)) for tag in set(candidates.keys()) - seen]
+        extra = [
+            Match(tag, candidates[tag] / float(tablesize))
+            for tag in set(candidates.keys()) - seen
+        ]
         
         return contam + extra
     else:
-        return [(tag, count / float(tablesize)) for tag, count in candidates.items()]
-        
-def filter_and_sort_contaminants(contam, include='all', min_freq=0.01, min_len=0,
+        return [Match(tag, count / float(tablesize)) for tag, count in candidates.items()]
+
+def align(seq1, seq2, min_overlap_frac=0.9):
+    aligner = Aligner(
+        seq1, 0.0,
+        SEMIGLOBAL,
+        False, False)
+    aligner.min_overlap = math.ceil(min(len(seq1), len(seq2)) * min_overlap_frac)
+    aligner.indel_cost = 100000
+    match = aligner.locate(seq2)
+    if match:
+        return seq1[match[0]:match[1]]
+    else:
+        return None
+
+def filter_and_sort_contaminants(matches, include='all', min_freq=0.01, min_len=0,
                                  min_complexity=1.1, min_match_frac=0.1, limit=20):
-    def _filter(row):
-        if min_len and len(row[0]) < min_len:
+    def _filter(match):
+        if min_len and len(match) < min_len:
             return False
-        if min_freq and row[1] < min_freq:
+        if min_freq and match.count < min_freq:
             return False
-        if min_complexity and sequence_complexity(row[0]) < min_complexity:
+        if min_complexity and match.seq_complexity < min_complexity:
             return False
-        if include == 'known' and len(row) == 2:
+        if include == 'known' and not match.is_known:
             return False
-        elif include == 'unknown' and len(row) > 2:
+        elif include == 'unknown' and match.is_known:
             return False
-        if min_match_frac and len(row) > 2 and row[3] < min_match_frac:
+        if min_match_frac and match.is_known and match.match_frac < min_match_frac:
             return False
         return True
-    contam = list(filter(_filter, contam))
+    matches = list(filter(_filter, matches))
     
-    contam.sort(key=lambda x: len(x[0]) * math.log(x[1]), reverse=True)
-    #known.sort(key=lambda x: (x[3], x[4]), reverse=True)
+    matches.sort(key=lambda x: len(x) * math.log(x.count), reverse=True)
     
     if limit is not None:
-        contam = contam[:limit]
+        matches = matches[:limit]
         
-    return contam
+    return matches
 
-def summarize_contaminants(contam, outstream):
-    print("Detected {} adapters/contaminants:".format(len(contam)), file=outstream)
-    pad = len(str(len(contam)))
-    for i, row in enumerate(contam):
-        print(("{:>" + str(pad) + "}. {}").format(i+1, row[0]), file=outstream)
-        if len(row) > 2:
-            print("    Name(s): {}".format(",\n             ".join(row[2])), file=outstream)
-            print("    K-mers that match: {:.2%}".format(row[3]), file=outstream)
-        if isinstance(row[1], float):
-            print("    Frequency of k-mers: {:.2%}".format(row[1]), file=outstream)
+def summarize_contaminants(matches, outstream):
+    print("Detected {} adapters/contaminants:".format(len(matches)), file=outstream)
+    pad = len(str(len(matches)))
+    for i, match in enumerate(matches):
+        print(("{:>" + str(pad) + "}. {}").format(i+1, match.seq), file=outstream)
+        if match.is_known:
+            print("    Name(s): {}".format(",\n             ".join(match.names)), file=outstream)
+            print("    Known sequence(s): {}".format(",\n             ".join(match.known_seqs)), file=outstream)
+            print("    K-mers that match: {:.2%}".format(match.match_frac), file=outstream)
+        if match.count_is_frequency:
+            print("    Frequency of k-mers: {:.2%}".format(match.count), file=outstream)
         else:
-            print("    Frequency of k-mers: {}".format(row[1]), file=outstream)
+            print("    Number of k-mer matches: {}".format(match.count), file=outstream)
+
+class Match(object):
+    def __init__(self, seq_or_contam, count=0, names=None, match_frac=None, match_frac2=None):
+        if isinstance(seq_or_contam, ContaminantMatcher):
+            self.seq = seq_or_contam.seq
+            self.count = seq_or_contam.matches
+            self.names = tuple(seq_or_contam.names)
+            self.known_seqs = [seq_or_contam.seq]
+        else:
+            self.seq = seq_or_contam
+            self.count = count
+            self.names = names
+            self.known_seqs = None
+        self.match_frac = match_frac
+        self.match_frac2 = match_frac2
+    
+    def __len__(self):
+        return len(self.seq)
+    
+    def __repr__(self):
+        if self.is_known:
+            return "{} => {} ({}))".format(self.seq, self.names, self.known_seqs)
+        else:
+            return self.seq
+    
+    @property
+    def seq_complexity(self):
+        return sequence_complexity(self.seq)
+    
+    @property
+    def count_is_frequency(self):
+        return isinstance(self.count, float)
+    
+    def set_contaminant(self, contam, match_frac, match_frac2=None):
+        self.set_known(contam.names, [contam.seq], match_frac, match_frac2)
+    
+    def set_known(self, names, seqs, match_frac, match_frac2=None):
+        self.names = names
+        self.known_seqs = seqs
+        self.match_frac = match_frac
+        self.match_frac2 = match_frac2
+    
+    @property
+    def is_known(self):
+        return self.known_seqs is not None
+
+class ContaminantMatcher(object):
+    def __init__(self, seq, names, k):
+        self.seq = seq
+        self.names = names
+        self.kmers = set(seq[i:(i+k)] for i in range(len(seq) - k + 1))
+        self.n_kmers = len(self.kmers)
+        self.k = k
+        self.matches = 0
+        
+    def match(self, seq):
+        """
+        Returns (num_matches, num_contam_kmers, num_seq_kmers).
+        """
+        kmers = set(seq[i:(i+self.k)] for i in range(len(seq) - self.k + 1))
+        n_matches = float(len(self.kmers & kmers))
+        self.matches += n_matches
+        return (n_matches / self.n_kmers, n_matches / len(kmers))
+
+def create_contaminant_matchers(contaminants, k):
+    return [
+        ContaminantMatcher(seq, names, k)
+        for seq, names in contaminants.items()
+    ]
         
 def load_known_contaminants_from_file(path):
     with open(path, "rt") as i:
