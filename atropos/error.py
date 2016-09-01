@@ -34,7 +34,7 @@ def main(options):
                 cum_qual += sum(qual2prob(qchar) for qchar in read.qualities)
                 cum_len += len(read.qualities)
             
-            print("  Error rate: {:.2%}".format(cum_qual / cum_len))
+            print("\n  Error rate: {:.2%}".format(cum_qual / cum_len))
             total_qual += cum_qual
             total_len += cum_len
         finally:

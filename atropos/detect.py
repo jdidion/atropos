@@ -418,7 +418,9 @@ def summarize_contaminants(matches, outstream):
         if match.is_known:
             print("    Name(s): {}".format(",\n             ".join(match.names)), file=outstream)
             print("    Known sequence(s): {}".format(",\n             ".join(match.known_seqs)), file=outstream)
-            print("    K-mers that match: {:.2%}".format(match.match_frac), file=outstream)
+            print("    Known sequence K-mers that match detected contaminant: {:.2%}".format(match.match_frac), file=outstream)
+        if match.match_frac2:
+            print("    Detected contaminant kmers that match known sequence: {:.2%}".format(match.match_frac2), file=outstream)
         if match.count_is_frequency:
             print("    Frequency of k-mers: {:.2%}".format(match.count), file=outstream)
         else:
