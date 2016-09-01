@@ -227,7 +227,7 @@ class InsertAligner(object):
         
         # In practice, this is only faster at relatively high error rates. I want to
         # write more unit tests, and possible try a different algorithm instead, before
-        # enable this.
+        # enabling this.
         #aligner = NoIndelAligner(
         #    seq2_rc,
         #    self.max_insert_mismatch_frac,
@@ -245,7 +245,12 @@ class InsertAligner(object):
             if (offset < self.min_adapter_overlap or
                     self.match_probability(insert_match[4], insert_match_size) > self.max_error_prob):
                 return result
-
+            
+            # TODO: this is very sensitive to the exact correct choice of adapter.
+            # For example, if you specifiy GATCGGAA... and the correct adapter is
+            # AGATCGGAA..., the prefixes will not match exactly and the alignment
+            # will fail. We need to use a comparison that is a bit more forgiving.
+            
             a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
             a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
             adapter_len = min(offset, self.adapter1_len, self.adapter2_len)

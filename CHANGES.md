@@ -1,5 +1,10 @@
 # Changes
 
+v1.0.14 (dev)
+-------------
+
+* Major improvements to the accuracy of the 'detect' command.
+
 v1.0.13 (2016.08.31)
 --------------------
 
