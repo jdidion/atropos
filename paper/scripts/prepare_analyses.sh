@@ -67,8 +67,6 @@ BWAMETH=bwameth.py
 SAMTOOLS=samtools
 # minimum read length after trimming
 MIN_LEN=25
-# minimum number of adapter bases that must overlap
-MIN_OVERLAP=7
 # number of reads to process in a batch
 # (also used as prefetch size for SeqPurge)
 BATCH_SIZE=5000
@@ -77,6 +75,12 @@ BATCH_SIZE=5000
 
 for err in 001 005 01 real
 do
+  # In the simulated data, we don't do error correction in Atropos
+  # or SeqPurge because it shouldn't affect the outcome of adapter
+  # trimming and increases the processing time of the benchmarking
+  # scripts (error correction can't be turned off in Skewer). Also,
+  # the simulated data has a lower max error rate than the real data.
+  
   if [ "$err" == "real" ]
   then
       fq1=$root/data/real/GM12878_WGBS.1.fq.gz
@@ -100,23 +104,37 @@ do
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
       quals='0'
-      atropos_extra=''
-      seqpurge_extra=''
-      skewer_extra=''
+      atropos_extra='-e 0.15'
+      seqpurge_extra='-match_perc 85'
+      skewer_extra='-r 0.15'
       aligners='adapter insert'
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG"
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
   fi
   
+  # Other data sets:
+  # Amplicon data from SeqPurge paper uses a TruSeq indexed adapter
+  # with custom 8 bp index:
+  # ADAPTER1="GATCGGAAGAGCACACGTCTGAACTCCAGTCACAACGTGATATCTCGTATGCCGTCTTCTGCTTG"
+
   for qcut in $quals
   do
     for aligner in $aligners
     do
+        # For Atropos, we provide the -O 7 argument, which requires
+        # a minimum overlap between adapter and read of 7 bp
+        # *only when performing adapter-match*. This is different than
+        # the skewer -k arg, which places an absolute minimum threshold
+        # on the adapter-read overlap, which Atropos currently does
+        # not do. It is unclear how to set this parameter in skewer for
+        # a fair comparison, so I just leave it as the default. SeqPurge
+        # does not provide any parameter for setting the minimum overlap.
+        
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_writercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
-        "-O $MIN_OVERLAP -q $qcut --trim-n -e $err_rate" \
+        "-O 7 -q $qcut --trim-n -e $err_rate" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -128,7 +146,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
-        "-O $MIN_OVERLAP -q $qcut --trim-n -e $err_rate" \
+        "-O 7 -q $qcut --trim-n -e $err_rate" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -140,7 +158,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
-        "-O $MIN_OVERLAP -q $qcut --trim-n -e $err_rate" \
+        "-O 7 -q $qcut --trim-n -e $err_rate" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -171,7 +189,7 @@ do
     
     profile="skewer_${threads}_${err}_q${qcut}"
     echo ">&2 echo $profile && /usr/bin/time -p" \
-    "$SKEWER -m pe -l $MIN_LEN -k $MIN_OVERLAP" \
+    "$SKEWER -m pe -l $MIN_LEN" \
     "-o ${outdir}/${profile} -z --quiet" \
     "-x $ADAPTER1 -y $ADAPTER2 -t $threads" \
     "$skewer_extra" \
