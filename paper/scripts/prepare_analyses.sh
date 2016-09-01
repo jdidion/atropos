@@ -117,9 +117,11 @@ do
   # with custom 8 bp index:
   # ADAPTER1="GATCGGAAGAGCACACGTCTGAACTCCAGTCACAACGTGATATCTCGTATGCCGTCTTCTGCTTG"
   # ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
+  # err=0.15
   # Accel-NGS Methyl (i.e. Swift) data:
   # ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCGCTCATTATCTCGTATGCCGTCTTCTGCTTG"
   # ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGGCTATAGTGTAGATCTCGGTGGTCGCCGTATC"
+  # err=0.2
               
   for qcut in $quals
   do
@@ -137,7 +139,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_writercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
+        "-a $ADAPTER1 -A $ADAPTER2" \
         "-O 7 -q $qcut --trim-n -e $err_rate" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
@@ -149,7 +151,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_workercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
+        "-a $ADAPTER1 -A $ADAPTER2" \
         "-O 7 -q $qcut --trim-n -e $err_rate" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
@@ -161,7 +163,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_nowriter"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2 $ec_atropos" \
+        "-a $ADAPTER1 -A $ADAPTER2" \
         "-O 7 -q $qcut --trim-n -e $err_rate" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
@@ -185,7 +187,7 @@ do
     "$SEQPURGE -in1 $fq1 -in2 $fq2" \
     "-out1 ${outdir}/${profile}.1.fq.gz" \
     "-out2 ${outdir}/${profile}.2.fq.gz" \
-    "-a1 $ADAPTER1 -a2 $ADAPTER2 $ec_seqpurge" \
+    "-a1 $ADAPTER1 -a2 $ADAPTER2" \
     "-qcut $qcut -ncut $ncut -min_len $MIN_LEN" \
     "-threads $threads -prefetch $BATCH_SIZE" \
     "$seqpurge_extra" \
@@ -193,10 +195,9 @@ do
     
     profile="skewer_${threads}_${err}_q${qcut}"
     echo ">&2 echo $profile && /usr/bin/time -p" \
-    "$SKEWER -m pe -l $MIN_LEN" \
+    "$SKEWER -m pe -l $MIN_LEN $skewer_extra" \
     "-o ${outdir}/${profile} -z --quiet" \
     "-x $ADAPTER1 -y $ADAPTER2 -t $threads" \
-    "$skewer_extra" \
     "-q $qcut $n $fq1 $fq2 > ${outdir}/${profile}.summary.txt" >> $commands
   done
 done
