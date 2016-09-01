@@ -279,7 +279,7 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
             match.set_contaminant(contam, *match_frac)
         else:
             contams.sort(key=lambda x: x[1], reverse=True)
-            contam, match_frac = equiv[0]
+            contam, match_frac = contams[0]
             equiv = [c for c in contams[1:] if c[1] == match_frac]
             if len(equiv) == 0:
                 match.set_contaminant(contam, *match_frac)
