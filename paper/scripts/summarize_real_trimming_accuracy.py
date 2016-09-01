@@ -10,15 +10,7 @@ from glob import glob
 import os
 import tqdm
 from atropos.xopen import open_output
-
-# prefer to use the editdistance package,
-# which is about 25x faster than pylev
-try:
-    import editdistance
-    edit_distance = editdistance.eval
-except:
-    import pylev
-    edit_distance = pylev.levenshtein
+import editdistance
 
 nuc = ('A','C','G','T','N')
 
@@ -96,7 +88,7 @@ class TableRead(object):
                 # match by Levenshtein distance.
                 dist = None
                 for i in range(untrimmed_len - trimmed_len + 1):
-                    d = edit_distance(untrimmed[i:(i+trimmed_len)], trimmed)
+                    d = editdistance.eval(untrimmed[i:(i+trimmed_len)], trimmed)
                     if not dist:
                         dist = d
                     elif d < dist:
