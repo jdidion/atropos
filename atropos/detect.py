@@ -284,12 +284,12 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
             if len(equiv) == 0:
                 match.set_contaminant(contam, *match_frac)
             else:
-                names = list(contam.names)
-                seqs = [contam.seq]
+                names = set(contam.names)
+                seqs = set((contam.seq,))
                 for e in equiv:
-                    names.extend(e[0].names)
-                    seqs.append(e[0].seq)
-                match.set_known(names, seqs, *match_frac)
+                    names.update(e[0].names)
+                    seqs.add(e[0].seq)
+                match.set_known(list(names), list(seqs), *match_frac)
         known.append(match)
     
     return known + unknown
