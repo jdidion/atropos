@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from atropos import xopen
 import csv
 import os
-import pylev
+import editdistance
 from common import *
 
 def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
@@ -52,9 +52,8 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
             if adapter_ref_len > adapter_lengths[i]:
                 adapter_ins = adapter_ref_len - adapter_lengths[i]
         
-        #ref_edit_dist = pylev.levenshtein(ref_seq, read_ref)
-        ref_edit_dist=0
-        adapter_edit_dist = pylev.levenshtein(adapters[i][:adapter_len], "".join(adapter_seq))
+        ref_edit_dist = editdistance.eval(ref_seq, read_ref)
+        adapter_edit_dist = editdistance.eval(adapters[i][:adapter_len], "".join(adapter_seq))
         return [expected_read, expected_read_len,
             (ref_len, ref_edit_dist),
             (int(has_adapter), adapter_len, adapter_edit_dist, adapter_ins, adapter_del, polyA)
