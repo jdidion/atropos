@@ -39,7 +39,7 @@ def main(options):
     n_reads = options.max_reads or 10000
     
     with open_output(options.adapter_report) as o:
-        print("\nDetecting adapters and other potential contaminant sequences based on"
+        print("\nDetecting adapters and other potential contaminant sequences based on "
               "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
         for i, f in enumerate(infiles, 1):
             fq = FastqReader(f)
@@ -72,7 +72,7 @@ def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_conta
         logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
         contam = detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants)
         min_freq = 0.0001
-    return filter_and_sort_contaminants(contam, include, min_freq)
+    return filter_and_sort_contaminants(contam, include=include, min_freq=min_freq, min_len=k)
 
 def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants, min_match_frac=0.5):
     """
@@ -202,18 +202,19 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
         unmerged = []
     results = merged + results
     
-    # Second merge adjacent sequences
-    results.sort(key=lambda i: i[0])
-    cur = results[0]
-    merged = []
-    for i in range(1, len(results)):
-        if results[i][0].startswith(cur[0]):
-            cur = [results[i][0], results[i][1] + cur[1]]
-        else:
-            merged.append(cur)
-            cur = results[i]
-    merged.append(cur)
-    results = merged
+    # Merge adjacent sequences
+    # This doesn't seem to help, so commenting out
+    # results.sort(key=lambda i: i[0])
+    # cur = results[0]
+    # merged = []
+    # for i in range(1, len(results)):
+    #     if results[i][0].startswith(cur[0]):
+    #         cur = [results[i][0], results[i][1] + cur[1]]
+    #     else:
+    #         merged.append(cur)
+    #         cur = results[i]
+    # merged.append(cur)
+    # results = merged
     
     if len(results) == 0:
         return []
@@ -379,8 +380,8 @@ def detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants
     else:
         return [(tag, count / float(tablesize)) for tag, count in candidates.items()]
         
-def filter_and_sort_contaminants(contam, include='all', min_freq=0.01, min_complexity=1.1,
-                                 min_match_frac=0.1, limit=20):
+def filter_and_sort_contaminants(contam, include='all', min_freq=0.01, min_len=0,
+                                 min_complexity=1.1, min_match_frac=0.1, limit=20):
     def _filter(row):
         if min_len and len(row[0]) < min_len:
             return False
@@ -395,9 +396,9 @@ def filter_and_sort_contaminants(contam, include='all', min_freq=0.01, min_compl
         if min_match_frac and len(row) > 2 and row[3] < min_match_frac:
             return False
         return True
-    #contam = list(filter(_filter, contam))
+    contam = list(filter(_filter, contam))
     
-    contam.sort(key=lambda x: x[1] * len(x[0]), reverse=True)
+    contam.sort(key=lambda x: len(x[0]) * math.log(x[1]), reverse=True)
     #known.sort(key=lambda x: (x[3], x[4]), reverse=True)
     
     if limit is not None:
