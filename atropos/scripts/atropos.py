@@ -96,13 +96,15 @@ def main(cmdlineargs=None, default_outfile="-"):
 def run_atropos(options, parser, default_outfile="-"):
     paired = validate_options(options, parser)
     reader, qualities, has_qual_file = create_reader(options, paired, parser)
-    modifiers, num_adapters = create_modifiers(options, paired, qualities, has_qual_file, parser)
+    adapters1, adapters2 = create_adapters(options, paired, qualities, has_qual_file, parser)
+    modifiers = create_modifiers(options, paired, qualities, adapters1, adapters2)
     min_affected = 2 if options.pair_filter == 'both' else 1
     filters = create_filters(options, paired, min_affected)
     formatters, force_create = create_formatters(options, qualities, default_outfile)
     writers = Writers(force_create)
     
     logger = logging.getLogger()
+    num_adapters = len(adapters1) + len(adapters2)
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[paired])
@@ -247,6 +249,9 @@ def get_argument_parser():
         help="Do not interpret IUPAC wildcards in adapters. (no)")
     
     # Arguments for insert match
+    group.add_argument("--adapter-pair", default=None, metavar="NAME1,NAME2",
+        help="When adapters are specified in files, this option selects a single pair to use "
+             "for insert-based adapter matching.")
     group.add_argument("--insert-match-error-rate", type=float, default=None,
         help="Maximum allowed error rate for insert match (no. of errors divided by the length "
             "of the matching region). (0.2)")
@@ -864,7 +869,7 @@ class BatchIterator(object):
         self.done = True
         self.reader.close()
 
-def create_modifiers(options, paired, qualities, has_qual_file, parser):
+def create_adapters(options, paired, qualities, has_qual_file, parser):
     adapter_parser = AdapterParser(
         colorspace=options.colorspace,
         max_error_rate=options.error_rate,
@@ -889,19 +894,25 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
             options.cut_min == [] and options.cut_min2 == [] and \
             (options.minimum_length is None or options.minimum_length <= 0) and \
             options.maximum_length == sys.maxsize and \
-            not has_qual_file and \
-            options.max_n == -1 and not options.trim_n:
+            not has_qual_file and options.max_n == -1 and not options.trim_n:
         parser.error("You need to provide at least one adapter sequence.")
     
-    if options.aligner == 'insert' and (
-            not adapters1 or len(adapters1) > 1 or adapters1[0].where != BACK or
-            not adapters2 or len(adapters2) > 1 or adapters2[0].where != BACK):
-        parser.error("Insert aligner requires a single 3' adapter for each read")
+    if options.aligner == 'insert':
+        if options.adapter_pair and adapters1 and adapters2:
+            name1, name2 = options.adapter_pair.split(",")
+            adapters1 = [a for a in adapters1 if a.name == name1]
+            adapters2 = [a for a in adapters2 if a.name == name2]
+        if not adapters1 or len(adapters1) != 1 or adapters1[0].where != BACK or \
+                not adapters2 or len(adapters2) != 1 or adapters2[0].where != BACK:
+            parser.error("Insert aligner requires a single 3' adapter for each read")
     
     if options.debug:
         for adapter in adapters1 + adapters2:
             adapter.enable_debug()
     
+    return (adapters1, adapters2)
+
+def create_modifiers(options, paired, qualities, adapters1, adapters2):
     modifiers = Modifiers(paired)
     
     for op in options.op_order:
@@ -983,7 +994,7 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
             min_overlap=options.merge_min_overlap,
             error_rate=options.error_rate)
     
-    return (modifiers, len(adapters1) + len(adapters2))
+    return modifiers
 
 def create_filters(options, paired, min_affected):
     filters = Filters(FilterFactory(paired, min_affected))
