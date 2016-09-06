@@ -537,6 +537,7 @@ DEF OVERHANG_MULTIPLIER = 100000
 cdef class NoIndelAligner:
     """
     Same as Aligner above, but does not allow indels or wildcards.
+    TODO: implement quality-weighted mismatches as in Skewer.
     """
     cdef int m
     cdef _Entry* column  # one column of the DP matrix
@@ -692,6 +693,10 @@ cdef class NoIndelAligner:
                 
                 for i in range(1, last + 1):
                     characters_equal = (s1[i-1] == s2[j-1])
+                    
+                    # TODO: this is where we can do qulity-based weighting
+                    # (i.e., add some transformation of Q, rather than 1)
+                    
                     if characters_equal:
                         # Characters match: This cannot be an indel.
                         cost = tmp_entry.cost

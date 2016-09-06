@@ -253,10 +253,13 @@ def get_argument_parser():
     group.add_argument("--insert-match-adapter-error-rate", type=float, default=None,
         help="Maximum allowed error rate for matching adapters after successful insert match "
              "(no. of errors divided by the length of the matching region). (0.2)")
-    group.add_argument("--correct-mismatches", choices=("best", "N"), default=None,
-        help="How to handle mismatches while aligning/merging; best: select the base with the best "
-             "quality; N: set the base to N. Note that if exactly one base is ambiguous, the "
-             "non-ambiguous base is always used.")
+    group.add_argument("--correct-mismatches", choices=("liberal", "conservative", "N"), default=None,
+        help="How to handle mismatches while aligning/merging. 'Liberal' and 'conservative' error "
+             "correction both involve setting the base to the one with the best quality. They differ "
+             "only when the qualities are equal -- liberal means set it to the base from the read with "
+             "the overall best median base quality, while conservative means to leave it unchanged. "
+             "'N' means to set the base to N. If exactly one base is ambiguous, the non-ambiguous base "
+             "is always used. (no error correction)")
     
     # Merging arguments
     group.add_argument("-R", "--merge-overlapping", action="store_true", default=False,

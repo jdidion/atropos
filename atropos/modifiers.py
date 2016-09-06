@@ -5,13 +5,14 @@ A modifier must be callable. It is implemented as a function if no parameters
 need to be stored, and as a class with a __call__ method if there are parameters
 (or statistics).
 """
-import re
-from .qualtrim import quality_trim_index, nextseq_trim_index
-from .align import Aligner, SEMIGLOBAL, InsertAligner
-from .util import complement, reverse_complement
 from collections import defaultdict
 import copy
 import logging
+import re
+from statistics import median
+from .qualtrim import quality_trim_index, nextseq_trim_index
+from .align import Aligner, SEMIGLOBAL, InsertAligner
+from .util import complement, reverse_complement
 
 # Base classes
 
@@ -229,15 +230,17 @@ class InsertAdapterCutter(ReadPairModifier):
         if has_quals:
             r1_qual = list(read1.qualities)
             r2_qual = list(read2.qualities)
-        elif self.mismatch_action == 'best':
+        elif self.mismatch_action in ('liberal', 'conservative'):
             raise Exception("Cannot perform quality-based error correction on reads lacking quality information")
         
+        r1_start, r1_end = insert_match[2:4]
         r1_changed = 0
+        r2_end = l2 - insert_match[0] - 1
+        r2_start = l2 - insert_match[1] - 1
         r2_changed = 0
+        quals_equal = []
         
-        for i, j in zip(
-                range(insert_match[2], insert_match[3]),
-                range(l2 - insert_match[0] - 1, l2 - insert_match[1] - 1, -1)):
+        for i, j in zip(range(r1_start, r1_end), range(r2_end, r2_start, -1)):
             b1 = r1_seq[i]
             b2 = complement[r2_seq[j]]
             if b1 == b2:
@@ -254,21 +257,31 @@ class InsertAdapterCutter(ReadPairModifier):
                 r2_changed += 1
             elif self.mismatch_action == 'N':
                 r1_seq[i] = 'N'
-                r2_seq[i] = 'N'
+                r2_seq[j] = 'N'
                 r1_changed += 1
-                r2_changed += 1
-            elif r1_qual[i] == r2_qual[j]:
-                # default to read1 base
-                r2_seq[j] = complement[b1]
                 r2_changed += 1
             elif r1_qual[i] > r2_qual[j]:
                 r2_seq[j] = complement[b1]
                 r2_qual[j] = r1_qual[i]
                 r2_changed += 1
-            else:
+            elif r2_qual[j] > r1_qual[i]:
                 r1_seq[i] = b2
                 r1_qual[i] = r2_qual[j]
                 r1_changed += 1
+            elif self.mismatch_action == 'liberal':
+                quals_equal.append((i, j, b1, b2))
+        
+        if quals_equal:
+            med_qual1 = median(ord(b) for b in r1_qual[r1_start:r1_end])
+            med_qual2 = median(ord(b) for b in r2_qual[r2_start:r2_end])
+            if med_qual1 > med_qual2:
+                for i, j, b1, b2 in quals_equal:
+                    r2_seq[j] = b1
+                    r2_changed += 1
+            elif med_qual2 > med_qual1:
+                for i, j, b1, b2 in quals_equal:
+                    r1_seq[i] = b2
+                    r1_changed += 1
         
         if r1_changed or r2_changed:
             self.corrected_pairs += 1
