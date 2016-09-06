@@ -9,10 +9,9 @@ from collections import defaultdict
 import copy
 import logging
 import re
-from statistics import median
 from .qualtrim import quality_trim_index, nextseq_trim_index
 from .align import Aligner, SEMIGLOBAL, InsertAligner
-from .util import complement, reverse_complement
+from .util import complement, reverse_complement, median
 
 # Base classes
 
@@ -272,8 +271,8 @@ class InsertAdapterCutter(ReadPairModifier):
                 quals_equal.append((i, j, b1, b2))
         
         if quals_equal:
-            med_qual1 = median(ord(b) for b in r1_qual[r1_start:r1_end])
-            med_qual2 = median(ord(b) for b in r2_qual[r2_start:r2_end])
+            med_qual1 = median([ord(b) for b in r1_qual[r1_start:r1_end]])
+            med_qual2 = median([ord(b) for b in r2_qual[r2_start:r2_end]])
             if med_qual1 > med_qual2:
                 for i, j, b1, b2 in quals_equal:
                     r2_seq[j] = b1

@@ -64,3 +64,20 @@ def enumerate_range(collection, start, end):
         while i < end:
             yield (i, it.next())
             i += 1
+
+def median(data):
+    """
+    Median function borrowed from python statistics module, and sped up by
+    in-place sorting of the array.
+    """
+    n = len(data)
+    if n == 0:
+        raise StatisticsError("no median for empty data")
+    
+    data.sort()
+    
+    if n%2 == 1:
+        return data[n//2]
+    else:
+        i = n//2
+        return (data[i - 1] + data[i])/2
