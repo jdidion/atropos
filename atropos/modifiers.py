@@ -232,7 +232,8 @@ class InsertAdapterCutter(ReadPairModifier):
         elif self.mismatch_action in ('liberal', 'conservative'):
             raise Exception("Cannot perform quality-based error correction on reads lacking quality information")
         
-        r1_start, r1_end = insert_match[2:4]
+        r1_start = insert_match[2]
+        r1_end = insert_match[3]
         r1_changed = 0
         r2_end = l2 - insert_match[0] - 1
         r2_start = l2 - insert_match[1] - 1
@@ -275,11 +276,13 @@ class InsertAdapterCutter(ReadPairModifier):
             med_qual2 = median([ord(b) for b in r2_qual[r2_start:r2_end]])
             if med_qual1 > med_qual2:
                 for i, j, b1, b2 in quals_equal:
-                    r2_seq[j] = b1
+                    r2_seq[j] = complement[b1]
+                    r2_qual[j] = r1_qual[i]
                     r2_changed += 1
             elif med_qual2 > med_qual1:
                 for i, j, b1, b2 in quals_equal:
                     r1_seq[i] = b2
+                    r1_qual[i] = r2_qual[j]
                     r1_changed += 1
         
         if r1_changed or r2_changed:
