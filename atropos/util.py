@@ -72,7 +72,7 @@ def median(data):
     """
     n = len(data)
     if n == 0:
-        raise StatisticsError("no median for empty data")
+        raise Exception("no median for empty data")
     
     data.sort()
     

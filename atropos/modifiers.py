@@ -235,12 +235,12 @@ class InsertAdapterCutter(ReadPairModifier):
         r1_start = insert_match[2]
         r1_end = insert_match[3]
         r1_changed = 0
-        r2_end = l2 - insert_match[0] - 1
-        r2_start = l2 - insert_match[1] - 1
+        r2_start = l2 - insert_match[1]
+        r2_end = l2 - insert_match[0]
         r2_changed = 0
         quals_equal = []
         
-        for i, j in zip(range(r1_start, r1_end), range(r2_end, r2_start, -1)):
+        for i, j in zip(range(r1_start, r1_end), range(r2_end - 1, r2_start, -1)):
             b1 = r1_seq[i]
             b2 = complement[r2_seq[j]]
             if b1 == b2:
