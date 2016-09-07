@@ -4,6 +4,10 @@ v1.0.14 (dev)
 -------------
 
 * Major improvements to the accuracy of the 'detect' command.
+* Added options for how to correct mismatched bases for which qualities are equal.
+* Added option to select a single pair of adapters from multiple sequences in a fasta file.
+* Fixed report when insert-match is used.
+* Several additional bugfixes.
 
 v1.0.13 (2016.08.31)
 --------------------
