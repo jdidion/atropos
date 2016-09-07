@@ -1,16 +1,17 @@
 library(reshpae2)
 library(ggplot2)
+library(readr)
 
-tab<-read.table('real_results.txt',sep="\t",header=T,stringsAsFactors=F)
+#tab <- read_tsv('real_results.txt')
+tab <- read.table('real_results.txt', header=T, sep="\t", stringsAsFactors = FALSE)
 progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
 for (i in c(4:10,19)) {
     tab[,i] <- ifelse(tab[,i]=='True', TRUE, FALSE)
 }
 
 compare_mapping <- function(read, prog) {
-    quals <- read[c(1, prog), c('read1_quality', 'read2_quality')] + 1
-    untrimmed <- prod(quals[1,])
-    trimmed <- prod(quals[2,])
+    untrimmed <- (read[1, 'read1_quality']+1) * (read[1, 'read2_quality']+1)
+    trimmed <- (read[prog, 'read1_quality']+1) * (read[prog, 'read2_quality']+1)
     if (untrimmed == trimmed) {
         'same_quality'
     }
@@ -24,7 +25,7 @@ compare_mapping <- function(read, prog) {
 outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 7), function(i) {
     if (((i-1)/7) %% 1000 == 0) print((i-1)/7)
     read <- tab[i:(i+6),]
-    read <- read[match(progs, read[,1]),]
+    #read <- read[match(progs, read[,1]),]
     sapply(2:7, function(prog) {
         if (read[1, 'skipped']) {
             'skipped'
@@ -99,5 +100,3 @@ pts <- melt(as.data.frame(t(sapply(c(1,seq(5,60,5)), function(th) {
     )
 }))), id.vars=c('th', 'x'), measure.vars=progs, variable.name='prog', value.name='y')
 ggplot(pts, aes(x=x, y=y, colour=prog, shape=prog)) + geom_line() + geom_point()
-
-
