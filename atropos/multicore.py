@@ -167,7 +167,7 @@ class WorkerProcess(Process):
                 process_stats = collect_process_statistics(
                     self.processed_reads, self.total_bp1, self.total_bp2,
                     self.modifiers, self.filters, self.formatters)
-                adapter_stats = summarize_adapters(self.modifiers.get_modifiers(AdapterCutter))
+                adapter_stats = summarize_adapters(self.modifiers.get_adapters())
             enqueue(
                 self.summary_queue,
                 (self.index, self.seen_batches, process_stats, adapter_stats),

@@ -40,12 +40,13 @@ from atropos import *
 check_importability()
 
 from atropos import __version__
-from atropos.seqio import (open_reader, UnknownFileType, Formatters, RestFormatter,
-                            InfoFormatter, WildcardFormatter, FormatError, Writers)
+from atropos.seqio import (
+    open_reader, UnknownFileType, Formatters, RestFormatter,
+    InfoFormatter, WildcardFormatter, Writers, BatchIterator)
 from atropos.adapters import AdapterParser, BACK
 from atropos.modifiers import *
 from atropos.filters import *
-from atropos.report import *
+from atropos.report import print_report
 from atropos.util import int_or_str
 
 import argparse
@@ -120,7 +121,9 @@ def run_atropos(options, parser, default_outfile="-"):
     
     if options.threads is None:
         # Run single-threaded version
-        rc, summary = run_serial(reader, modifiers, filters, formatters, writers)
+        import atropos.serial
+        rc, summary = atropos.serial.run_serial(
+            reader, modifiers, filters, formatters, writers)
     else:
         # Run multiprocessing version
         import atropos.multicore
@@ -816,59 +819,6 @@ def create_reader(options, paired, parser, counter_magnitude="M"):
     
     return (reader, qualities, qualfile is not None)
 
-class BatchIterator(object):
-    def __init__(self, reader, size, max_reads=None):
-        self.reader = reader
-        self.iterable = enumerate(reader, 1)
-        self.size = size
-        self.max_reads = max_reads
-        self.done = False
-        self._empty_batch = [None] * size
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        if self.done:
-            raise StopIteration()
-        
-        try:
-            read_index, record = next(self.iterable)
-        except StopIteration:
-            self.close()
-            raise
-        
-        batch = copy.copy(self._empty_batch)
-        batch[0] = record
-        batch_index = 1
-        max_size = self.size
-        if self.max_reads:
-            max_size = min(max_size, self.max_reads - read_index + 1)
-        
-        while batch_index < max_size:
-            try:
-                read_index, record = next(self.iterable)
-                batch[batch_index] = record
-                batch_index += 1
-            except StopIteration:
-                self.close()
-                break
-        
-        if self.max_reads and read_index >= self.max_reads:
-            self.close()
-        
-        if batch_index == self.size:
-            return (batch_index, batch)
-        else:
-            return (batch_index, batch[0:batch_index])
-    
-    # py2x alias
-    next = __next__
-    
-    def close(self):
-        self.done = True
-        self.reader.close()
-
 def create_adapters(options, paired, qualities, has_qual_file, parser):
     adapter_parser = AdapterParser(
         colorspace=options.colorspace,
@@ -927,10 +877,12 @@ def create_modifiers(options, paired, qualities, adapters1, adapters2):
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
                     mismatch_action=options.correct_mismatches, **aligner_args)
             else:
-                modifiers.add_modifier_pair(AdapterCutter,
-                    dict(adapters=adapters1, times=options.times, action=options.action),
-                    dict(adapters=adapters2, times=options.times, action=options.action)
-                )
+                a1_args = a2_args = None
+                if adapters1:
+                    a1_args = dict(adapters=adapters1, times=options.times, action=options.action)
+                if adapters2:
+                    a2_args = dict(adapters=adapters2, times=options.times, action=options.action)
+                modifiers.add_modifier_pair(AdapterCutter, a1_args, a2_args)
         elif op == 'C' and (options.cut or options.cut2):
             modifiers.add_modifier_pair(UnconditionalCutter,
                 dict(lengths=options.cut),
@@ -1076,45 +1028,6 @@ def create_formatters(options, qualities, default_outfile):
         formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
     
     return (formatters, force_create)
-
-def run_serial(reader, modifiers, filters, formatters, writers):
-    try:
-        n = 0
-        total_bp1 = 0
-        total_bp2 = 0
-        
-        for batch_size, batch in reader:
-            n += batch_size
-            result = defaultdict(lambda: [])
-            for record in batch:
-                reads, bp = modifiers.modify(record)
-                total_bp1 += bp[0]
-                total_bp2 += bp[1]
-                dest = filters.filter(*reads)
-                formatters.format(result, dest, *reads)
-            result = dict((path, "".join(strings))
-                for path, strings in result.items())
-            writers.write_result(result)
-        
-        return (0, Summary(
-            collect_process_statistics(n, total_bp1, total_bp2, modifiers, filters, formatters),
-            summarize_adapters(modifiers.get_modifiers(AdapterCutter)),
-            modifiers.get_trimmer_classes()
-        ).finish())
-    
-    except KeyboardInterrupt as e:
-        logging.getLogger().error("Interrupted")
-        return (130, None)
-    except IOError as e:
-        if e.errno == errno.EPIPE:
-            return (1, None)
-        raise
-    except (FormatError, EOFError) as e:
-        logging.getLogger().error("Atropos error", exc_info=True)
-        return(1, None)
-    finally:
-        reader.close()
-        writers.close()
 
 if __name__ == '__main__':
     main()

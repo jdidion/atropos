@@ -5,7 +5,6 @@ A modifier must be callable. It is implemented as a function if no parameters
 need to be stored, and as a class with a __call__ method if there are parameters
 (or statistics).
 """
-from collections import defaultdict
 import copy
 import logging
 import re
@@ -620,7 +619,7 @@ class MergeOverlapping(ReadPairModifier):
 class Modifiers(object):
     def __init__(self, paired):
         self.modifiers = []
-        self.modifier_indexes = defaultdict(lambda: [])
+        self.modifier_indexes = {}
         self.paired = paired
     
     def add_modifier(self, mod_class, read=1|2, **kwargs):
@@ -650,17 +649,39 @@ class Modifiers(object):
     def _add_modifiers(self, mod_class, mods):
         i = len(self.modifiers)
         self.modifiers.append(mods)
-        self.modifier_indexes[mod_class].append(i)
+        if mod_class in self.modifier_indexes:
+            self.modifier_indexes[mod_class].append(i)
+        else:
+            self.modifier_indexes[mod_class] = [i]
         return i
     
     def get_modifiers(self, mod_class=None, read=None):
         if mod_class is None:
             mods = copy.copy(self.modifiers)
-        else:
+        elif mod_class in self.modifier_indexes:
             mods = [self.modifiers[i] for i in self.modifier_indexes[mod_class]]
-        if read is not None:
+        else:
+            mods = []
+        if mods and read:
             mods = [m[read-1] for m in mods if m[read-1] is not None]
         return mods
+    
+    def has_modifier(self, mod_class):
+        return mod_class in self.modifier_indexes
+    
+    def get_adapters(self):
+        adapters = [None, None]
+        if self.has_modifier(AdapterCutter):
+            m1, m2 = self.get_modifiers(AdapterCutter)[0]
+            if m1:
+                adapters[0] = m1.adapters
+            if m2:
+                adapters[1] = m2.adapters
+        elif self.has_modifier(InsertAdapterCutter):
+            m = self.get_modifiers(InsertAdapterCutter)[0]
+            adapters[0] = [m.adapter1]
+            adapters[1] = [m.adapter2]
+        return adapters
     
     def get_trimmer_classes(self):
         return [

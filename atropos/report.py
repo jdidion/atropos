@@ -12,6 +12,8 @@ from .filters import *
 
 # TODO: Would be good to have a more generic way for filters
 # and modifiers to report summary information
+# TODO: Rewrite this to use a templating engine.
+# TODO: Need a better way to line things up in columns.
 
 def check_equal_merger(dest, src):
     assert dest == src
@@ -108,17 +110,19 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
         stats["too_many_n"] = filters[NContentFilter].filtered
     
     # TODO: generalize this
-    insert_cutter = modifiers.get_modifiers(InsertAdapterCutter)
-    if len(insert_cutter) > 0:
-        stats["with_adapters"] = insert_cutter[0].with_adapters
-        stats["corrected"] = insert_cutter[0].corrected_pairs
-        stats["corrected_bp"] = insert_cutter[0].corrected_bp
-        stats["total_corrected_bp"] = sum(insert_cutter[0].corrected_bp)
+    if modifiers.has_modifier(InsertAdapterCutter):
+        insert_cutter = modifiers.get_modifiers(InsertAdapterCutter)[0]
+        stats["with_adapters"] = insert_cutter.with_adapters
+        stats["corrected"] = insert_cutter.corrected_pairs
+        stats["corrected_bp"] = insert_cutter.corrected_bp
+        stats["total_corrected_bp"] = sum(insert_cutter.corrected_bp)
     else:
         stats["with_adapters"] = [0, 0]
-        for read in (1, 2):
-            for modifier in modifiers.get_modifiers(AdapterCutter, read):
-                stats["with_adapters"][read-1] += modifier.with_adapters
+        if modifiers.has_modifier(AdapterCutter):
+            adapter_cutters = modifiers.get_modifiers(AdapterCutter)[0]
+            for read, modifier in enumerate(adapter_cutters):
+                if modifier:
+                    stats["with_adapters"][read] += modifier.with_adapters
             
     for modifier_class in modifiers.get_trimmer_classes():
         for modifier in modifiers.get_modifiers(modifier_class, 1):
@@ -134,19 +138,12 @@ def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, form
     
     return dict(stats)
 
-def summarize_adapters(mods):
+def summarize_adapters(adapters):
     summary = [{}, {}]
-    for a1, a2 in mods:
-        if a1 is not None:
-            if len(summary[0]) == 0:
-                summary[0] = collect_adapter_statistics(a1.adapters)
-            else:
-                raise Exception("Did not expect multiple read1 adapter modfiers")
-        if a2 is not None:
-            if len(summary[1]) == 0:
-                summary[1] = collect_adapter_statistics(a2.adapters)
-            else:
-                raise Exception("Did not expect multiple read2 adapter modfiers")
+    if adapters[0]:
+        summary[0] = collect_adapter_statistics(adapters[0])
+    if adapters[1]:
+        summary[1] = collect_adapter_statistics(adapters[1])
     return summary
 
 def collect_adapter_statistics(adapters):
@@ -417,9 +414,13 @@ def generate_report(stats, trimmer_classes, outfile):
     
     report += textwrap.dedent("""\
     {pairs_or_reads} written (passing filters):			{written:13,d} ({written_fraction:.1%})
-
-    Total basepairs processed:               {total_bp:13,d} bp
     """)
+    
+    if "corrected" in stats:
+        report += "Pairs corrected:			{corrected:13,d} ({corrected_fraction:.1%})\n"
+    
+    report += "\nTotal basepairs processed:			{total_bp:13,d} bp\n"
+    
     if stats["paired"]:
         report += "	 Read 1: {total_bp1:13,d} bp\n"
         report += "	 Read 2: {total_bp2:13,d} bp\n"
@@ -439,18 +440,12 @@ def generate_report(stats, trimmer_classes, outfile):
         report += "	 Read 2: {written_bp[1]:13,d} bp\n"
     
     if "corrected" in stats:
-        report += "Total corrected read pairs:                {corrected:13,d}\n"
         report += "Total corrected bp:                        {total_corrected_bp:13,d} ({total_corrected_bp_fraction:.1%})\n"
         report += "	 Read 1:                {corrected_bp[0]:13,d} ({corrected_bp_fraction[0]:.1%})\n"
         report += "	 Read 2:                {corrected_bp[1]:13,d} ({corrected_bp_fraction[1]:.1%})\n"
     
-    try:
-        report = report.format(**stats)
-    except ValueError:
-        # Python 2.6 does not support the comma format specifier (PEP 378)
-        report = report.replace(",d}", "d}").format(**stats)
-    _print(report)
-
+    _print(report.format(**stats))
+    
     warning = False
     for which_in_pair in (0, 1):
         for adapter in stats["adapters"][which_in_pair]:

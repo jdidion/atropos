@@ -7,10 +7,12 @@ TODO
 - Sequence.name should be Sequence.description or so (reserve .name for the part
   before the first space)
 """
-import re
-import sys
+import copy
 import io
 from os.path import splitext
+import re
+import sys
+
 from .filters import NoFilter
 from .xopen import xopen, open_output
 
@@ -341,6 +343,56 @@ class InterleavedSequenceReader(object):
 
     def __exit__(self, *args):
         self.close()
+
+class BatchIterator(object):
+    def __init__(self, reader, size, max_reads=None):
+        self.reader = reader
+        self.iterable = enumerate(reader, 1)
+        self.size = size
+        self.max_reads = max_reads
+        self.done = False
+        self._empty_batch = [None] * size
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.done:
+            raise StopIteration()
+        
+        try:
+            read_index, record = next(self.iterable)
+        except StopIteration:
+            self.close()
+            raise
+        
+        batch = copy.copy(self._empty_batch)
+        batch[0] = record
+        batch_index = 1
+        max_size = self.size
+        if self.max_reads:
+            max_size = min(max_size, self.max_reads - read_index + 1)
+        
+        while batch_index < max_size:
+            try:
+                read_index, record = next(self.iterable)
+                batch[batch_index] = record
+                batch_index += 1
+            except StopIteration:
+                self.close()
+                break
+        
+        if self.max_reads and read_index >= self.max_reads:
+            self.close()
+        
+        if batch_index == self.size:
+            return (batch_index, batch)
+        else:
+            return (batch_index, batch[0:batch_index])
+    
+    def close(self):
+        self.done = True
+        self.reader.close()
 
 def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=None,
                 interleaved=False, qualities=None):
