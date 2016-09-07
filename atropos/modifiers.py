@@ -245,7 +245,12 @@ class InsertAdapterCutter(ReadPairModifier):
             b2 = complement[r2_seq[j]]
             if b1 == b2:
                 continue
-            if b1 == 'N':
+            if self.mismatch_action == 'N':
+                r1_seq[i] = 'N'
+                r2_seq[j] = 'N'
+                r1_changed += 1
+                r2_changed += 1
+            elif b1 == 'N':
                 r1_seq[i] = b2
                 if has_quals:
                     r1_qual[i] = r2_qual[j]
@@ -255,21 +260,17 @@ class InsertAdapterCutter(ReadPairModifier):
                 if has_quals:
                     r2_qual[j] = r1_qual[i]
                 r2_changed += 1
-            elif self.mismatch_action == 'N':
-                r1_seq[i] = 'N'
-                r2_seq[j] = 'N'
-                r1_changed += 1
-                r2_changed += 1
-            elif r1_qual[i] > r2_qual[j]:
-                r2_seq[j] = complement[b1]
-                r2_qual[j] = r1_qual[i]
-                r2_changed += 1
-            elif r2_qual[j] > r1_qual[i]:
-                r1_seq[i] = b2
-                r1_qual[i] = r2_qual[j]
-                r1_changed += 1
-            elif self.mismatch_action == 'liberal':
-                quals_equal.append((i, j, b1, b2))
+            elif has_quals:
+                if r1_qual[i] > r2_qual[j]:
+                    r2_seq[j] = complement[b1]
+                    r2_qual[j] = r1_qual[i]
+                    r2_changed += 1
+                elif r2_qual[j] > r1_qual[i]:
+                    r1_seq[i] = b2
+                    r1_qual[i] = r2_qual[j]
+                    r1_changed += 1
+                elif self.mismatch_action == 'liberal':
+                    quals_equal.append((i, j, b1, b2))
         
         if quals_equal:
             med_qual1 = median([ord(b) for b in r1_qual[r1_start:r1_end]])
