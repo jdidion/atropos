@@ -81,3 +81,55 @@ def median(data):
     else:
         i = n//2
         return (data[i - 1] + data[i])/2
+
+class RandomMatchProbability(object):
+    """
+    Class for computing random match probability for DNA sequences
+    based on binomial expectation. Maintains a cache of factorials
+    to speed computation.
+    """
+    def __init__(self, init_size=150):
+        self.factorials = [1] * init_size
+        self.max_n = 1
+        self.cur_array_size = init_size
+    
+    def __call__(self, matches, size):
+        # When there are no mismatches, the probability is
+        # just that of observing a specific sequence of the
+        # given length by chance.
+        if matches == size:
+            return 0.25 ** matches
+        
+        nfac = self.factorial(size)
+        p = 0.0
+        i = matches
+
+        while i <= size:
+            j = size - i
+            p += (
+                (0.75 ** j) *
+                (0.25 ** i) *
+                nfac /
+                self.factorial(i) /
+                self.factorial(j)
+            )
+            i += 1
+
+        return p
+    
+    def factorial(self, n):
+        if n > self.max_n:
+            self._fill_upto(n)
+        return self.factorials[n]
+
+    def _fill_upto(self, n):
+        if n >= self.cur_array_size:
+            extension_size = n - self.cur_array_size + 1
+            self.factorials += [1] * extension_size
+        i = self.max_n
+        next_i = i + 1
+        while i < n:
+            self.factorials[next_i] = next_i * self.factorials[i]
+            i = next_i
+            next_i += 1
+        self.max_n = i
