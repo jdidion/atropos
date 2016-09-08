@@ -2,9 +2,10 @@ library(reshpae2)
 library(ggplot2)
 library(readr)
 
-#tab <- read_tsv('real_results.txt')
-tab <- read.table('real_results.txt', header=T, sep="\t", stringsAsFactors = FALSE)
+tab <- read_tsv('real_results.txt')
+#tab <- read.table('real_results.txt', header=T, sep="\t", stringsAsFactors = FALSE)
 progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
+num.progs <- length(progs)
 for (i in c(4:10,19)) {
     tab[,i] <- ifelse(tab[,i]=='True', TRUE, FALSE)
 }
@@ -22,11 +23,11 @@ compare_mapping <- function(read, prog) {
         'better_quality'
     }
 }
-outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 7), function(i) {
-    if (((i-1)/7) %% 1000 == 0) print((i-1)/7)
-    read <- tab[i:(i+6),]
+outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), num.progs), function(i) {
+    if (((i-1)/num.progs) %% 1000 == 0) print((i-1)/num.progs)
+    read <- tab[i:(i+num.progs-1),]
     #read <- read[match(progs, read[,1]),]
-    sapply(2:7, function(prog) {
+    sapply(2:num.progs, function(prog) {
         if (read[1, 'skipped']) {
             'skipped'
         }
@@ -83,7 +84,7 @@ outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), 7), function(i) {
     })
 }))
 
-sample_tabs <- lapply(1:7, function(i) tab[seq(i,nrow(tab),7),])
+sample_tabs <- lapply(1:num.progs, function(i) tab[seq(i,nrow(tab),num.progs),])
 names(sample_tabs) <- unlist(lapply(sample_tabs, function(x) x[1,1]))
 quals <- rbind(
     data.frame(read_id=1:1000000, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_quality))),
