@@ -159,13 +159,13 @@ class InsertAdapterCutter(ReadPairModifier):
         self.corrected_bp = [0, 0]
     
     def __call__(self, read1, read2):
-        insert_match, insert_match_len, adapter_match1, adapter_match2 = self.aligner.match_insert(
-            read1.sequence, read2.sequence)
+        match = self.aligner.match_insert(read1.sequence, read2.sequence)
         
-        if self.mismatch_action and insert_match and insert_match[5] > 0:
-            self.correct_errors(read1, read2, insert_match)
-        
-        if adapter_match1 is None and adapter_match2 is None:
+        if match:
+            insert_match, adapter_match1, adapter_match2 = match
+            if self.mismatch_action and insert_match and insert_match[5] > 0:
+                self.correct_errors(read1, read2, insert_match)
+        else:
             adapter_match1 = self.adapter1.match_to(read1)
             adapter_match2 = self.adapter2.match_to(read2)
         

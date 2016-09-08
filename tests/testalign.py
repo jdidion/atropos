@@ -150,12 +150,11 @@ def test_insert_align():
     aligner = InsertAligner(a1_seq, a2_seq)
     r1 = 'AGTCGAGCCCATTGCAGACT' + a1_seq[0:10]
     r2 = 'AGTCTGCAATGGGCTCGACT' + a2_seq[0:10]
-    insert_match, insert_match_len, match1, match2 = aligner.match_insert(r1, r2)
+    insert_match, match1, match2 = aligner.match_insert(r1, r2)
     assert match1.rstart == 20
     assert match1.length == 10
     assert match2.rstart == 20
     assert match2.length == 10
-    assert insert_match_len == 20
     
 def test_short_adapter_overlap():
     a1_seq = 'TTAGACATAT'
@@ -163,7 +162,7 @@ def test_short_adapter_overlap():
     seq1 = 'GACAGGCCGTTTGAATGTTGACGGGATGTT'
     seq2 = 'CATCCCGTCAACATTCAAACGGCCTGTCCA'
     aligner = InsertAligner(a1_seq, a2_seq)
-    insert_match, insert_match_len, match1, match2 = aligner.match_insert(seq1, seq2)
+    insert_match, match1, match2 = aligner.match_insert(seq1, seq2)
     assert match1.rstart == 28
     assert match1.length == 2
     assert match2.rstart == 28

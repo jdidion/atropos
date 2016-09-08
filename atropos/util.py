@@ -26,8 +26,9 @@ def sequence_complexity(seq):
     seqlen = float(len(seq))
     term = 0
     for base in ('A','C','G','T'):
-        if base in seq:
-            d = seq.count(base) / seqlen
+        c = seq.count(base)
+        if c > 0:
+            d = c / seqlen
             term += d * math.log(d) / log2
     return -term
 
@@ -76,11 +77,11 @@ def median(data):
     
     data.sort()
     
-    if n%2 == 1:
-        return data[n//2]
+    i = n // 2
+    if n % 2 == 1:
+        return data[i]
     else:
-        i = n//2
-        return (data[i - 1] + data[i])/2
+        return (data[i - 1] + data[i]) / 2
 
 class RandomMatchProbability(object):
     """

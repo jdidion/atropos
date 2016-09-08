@@ -203,7 +203,6 @@ class InsertAligner(object):
             seq2 = seq1[:l1]
 
         seq2_rc = reverse_complement(seq2)
-        result = [None, 0, None, None]
         
         aligner = Aligner(
             seq2_rc,
@@ -224,39 +223,39 @@ class InsertAligner(object):
         
         insert_match = aligner.locate(seq1)
         
-        if insert_match:
-            offset = min(insert_match[0], seq_len - insert_match[3])
-            insert_match_size = seq_len - offset
+        if not insert_match:
+            return None
             
-            if self.insert_is_random_match(insert_match[4], insert_match_size):
-                return result
-            
-            result[0] = insert_match
-            result[1] = insert_match_size
-            
-            if offset < self.min_adapter_overlap:
-                return result
-            
-            # TODO: this is very sensitive to the exact correct choice of adapter.
-            # For example, if you specifiy GATCGGAA... and the correct adapter is
-            # AGATCGGAA..., the prefixes will not match exactly and the alignment
-            # will fail. We need to use a comparison that is a bit more forgiving.
-            
-            a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
-            a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
-            adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
-            min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
-            if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
-                return result
-            a1_prob, a2_prob, adapter_is_random_match = self.adapter_match_probabilities(
-                a1_match[4], a2_match[4], adapter_len)
-            if adapter_len > self.adapter_check_cutoff and adapter_is_random_match:
-                return result
+        offset = min(insert_match[0], seq_len - insert_match[3])
+        if offset < self.min_adapter_overlap:
+            return None
+        
+        insert_match_size = seq_len - offset
+        if self.insert_is_random_match(insert_match[4], insert_match_size):
+            return None
+        
+        # TODO: this is very sensitive to the exact correct choice of adapter.
+        # For example, if you specifiy GATCGGAA... and the correct adapter is
+        # AGATCGGAA..., the prefixes will not match exactly and the alignment
+        # will fail. We need to use a comparison that is a bit more forgiving.
+        
+        a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
+        a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
+        adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
+        min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
+        if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
+            return None
+        a1_prob, a2_prob, adapter_is_random_match = self.adapter_match_probabilities(
+            a1_match[4], a2_match[4], adapter_len)
+        if adapter_len > self.adapter_check_cutoff and adapter_is_random_match:
+            return None
 
-            adapter_len1 = min(self.adapter1_len, l1 - insert_match_size)
-            adapter_len2 = min(self.adapter2_len, l2 - insert_match_size)
-            best_adapter_matches, best_adapter_mismatches = (a1_match if a1_prob < a2_prob else a2_match)[4:6]
-            result[2] = Match(0, adapter_len1, insert_match_size, l1, best_adapter_matches, best_adapter_mismatches)
-            result[3] = Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
-
-        return result
+        adapter_len1 = min(self.adapter1_len, l1 - insert_match_size)
+        adapter_len2 = min(self.adapter2_len, l2 - insert_match_size)
+        best_adapter_matches, best_adapter_mismatches = (a1_match if a1_prob < a2_prob else a2_match)[4:6]
+        
+        return (
+            insert_match,
+            Match(0, adapter_len1, insert_match_size, l1, best_adapter_matches, best_adapter_mismatches),
+            Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
+        )
