@@ -9,6 +9,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 2. Implementation of a new insert alignment-based trimming algorithm for paired-end reads that is substantially more sensitive and specific than the original Cutadapt adapter alignment-based algorithm.
 3. Options for trimming specific types of data (miRNA, bisulfite-seq).
 4. A new command ('detect') that will detect adapter sequences and other potential contaminants (this is experimental).
+5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
 5. The ability to merge overlapping reads (this is experimental and the functionality is limited).
 6. The ability to write the summary report and log messages to separate files.
 7. The ability to read and write interleaved FASTQ output.
