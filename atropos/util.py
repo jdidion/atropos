@@ -62,7 +62,7 @@ def enumerate_range(collection, start, end):
         i = start
         it = iter(collection)
         while i < end:
-            yield (i, it.next())
+            yield (i, next(it))
             i += 1
 
 def median(data):
