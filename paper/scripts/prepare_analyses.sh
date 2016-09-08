@@ -139,7 +139,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2" \
-        "-O 7 -q $qcut --trim-n" \
+        "--adapter-max-rmp 0.001 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -151,7 +151,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2" \
-        "-O 7 -q $qcut --trim-n" \
+        "--adapter-max-rmp 0.001 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -163,7 +163,7 @@ do
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
         "-a $ADAPTER1 -A $ADAPTER2" \
-        "-O 7 -q $qcut --trim-n" \
+        "--adapter-max-rmp 0.001 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
