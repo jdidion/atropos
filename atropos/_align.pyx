@@ -420,12 +420,15 @@ cdef class Aligner:
                     column[i].cost = cost
                     column[i].origin = origin
                     column[i].matches = matches
+                
                 if self.debug:
                     with gil:
                         for i in range(last + 1):
                             self._dpmatrix.set_entry(i, j, column[i].cost)
+                
                 while last >= 0 and column[last].cost > k:
                     last -= 1
+                
                 # last can be -1 here, but will be incremented next.
                 # TODO if last is -1, can we stop searching?
                 if last < m:
@@ -436,7 +439,10 @@ cdef class Aligner:
                     length = m + min(column[m].origin, 0)
                     cost = column[m].cost
                     matches = column[m].matches
-                    if length >= self._min_overlap and cost <= length * max_error_rate and (matches > best.matches or (matches == best.matches and cost < best.cost)):
+                    if (length >= self._min_overlap and
+                            cost <= length * max_error_rate and
+                            (matches > best.matches or
+                                (matches == best.matches and cost < best.cost))):
                         # update
                         best.matches = matches
                         best.cost = cost
@@ -462,6 +468,7 @@ cdef class Aligner:
                     best.origin = column[i].origin
                     best.ref_stop = i
                     best.query_stop = n
+        
         if best.cost == m + n:
             # best.cost was initialized with this value.
             # If it is unchanged, no alignment was found that has
@@ -534,68 +541,34 @@ def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_
 
 DEF OVERHANG_MULTIPLIER = 100000
 
-cdef class NoIndelAligner:
+cdef class MultiAligner:
     """
-    Same as Aligner above, but does not allow indels or wildcards.
+    Same as Aligner above, but 1) returns up to 'max_matches' matches
+    rather than a single best match, and 2) does not allow indels or
+    wildcards.
     TODO: implement quality-weighted mismatches as in Skewer.
     """
-    cdef int m
     cdef _Entry* column  # one column of the DP matrix
     cdef double max_error_rate
     cdef int flags
     cdef int _min_overlap
-    cdef bint debug
-    cdef object _dpmatrix
-    cdef bytes _reference  # TODO rename to translated_reference or so
-    cdef str str_reference
-
-    def __cinit__(self, str reference, double max_error_rate, int flags=SEMIGLOBAL):
+    cdef int _numcols
+    
+    def __cinit__(self, double max_error_rate, int flags=SEMIGLOBAL, int min_overlap=1):
         self.max_error_rate = max_error_rate
         self.flags = flags
-        self.str_reference = reference
-        self.reference = reference
-        self._min_overlap = 1
-        self.debug = False
-        self._dpmatrix = None
-
-    property min_overlap:
-        def __get__(self):
-            return self._min_overlap
-
-        def __set__(self, int value):
-            if value < 1:
-                raise ValueError('Minimum overlap must be at least 1')
-            self._min_overlap = value
-
-    property reference:
-        def __get__(self):
-            return self._reference
-
-        def __set__(self, str reference):
-            mem = <_Entry*> PyMem_Realloc(self.column, (len(reference) + 1) * sizeof(_Entry))
+        self._min_overlap = min_overlap
+        self._numcols = 0
+    
+    def _resize(self, size):
+        if size > self._numcols:
+            mem = <_Entry*> PyMem_Realloc(self.column, (size + 1) * sizeof(_Entry))
             if not mem:
                 raise MemoryError()
             self.column = mem
-            self._reference = reference.encode('ascii')
-            self.m = len(reference)
-            self.str_reference = reference
-
-    property dpmatrix:
-        """
-        The dynamic programming matrix as a DPMatrix object. This attribute is
-        usually None, unless debugging has been enabled with enable_debug().
-        """
-        def __get__(self):
-            return self._dpmatrix
-
-    def enable_debug(self):
-        """
-        Store the dynamic programming matrix while running the locate() method
-        and make it available in the .dpmatrix attribute.
-        """
-        self.debug = True
-
-    def locate(self, str query):
+            self._numcols = size
+    
+    def locate(self, str reference, str query, int max_matches=10):
         """
         locate(query) -> (refstart, refstop, querystart, querystop, matches, errors)
 
@@ -609,11 +582,23 @@ cdef class NoIndelAligner:
 
         The alignment itself is not returned.
         """
-        cdef char* s1 = self._reference
+        cdef bytes reference_bytes = reference.encode('ascii')
+        cdef char* s1 = reference_bytes
+        cdef int m = len(reference)
+        self._resize(m)
+        
         cdef bytes query_bytes = query.encode('ascii')
         cdef char* s2 = query_bytes
-        cdef int m = self.m
         cdef int n = len(query)
+        
+        mem = <_Match*> PyMem_Malloc((max_matches + 1) * sizeof(_Match))
+        if not mem:
+            raise MemoryError()
+        cdef _Match* match_array = mem
+        cdef int num_matches = 0
+        cdef int exact_match = -1
+        cdef int max_cost = m + n
+        
         cdef _Entry* column = self.column
         cdef double max_error_rate = self.max_error_rate
         cdef bint start_in_ref = self.flags & START_WITHIN_SEQ1
@@ -656,18 +641,6 @@ cdef class NoIndelAligner:
                 column[i].matches = 0
                 column[i].cost = min(i, min_n) * OVERHANG_MULTIPLIER
                 column[i].origin = min_n - i
-
-        if self.debug:
-            self._dpmatrix = DPMatrix(self.str_reference, query)
-            for i in range(m + 1):
-                self._dpmatrix.set_entry(i, min_n, column[i].cost)
-
-        cdef _Match best
-        best.ref_stop = m
-        best.query_stop = n
-        best.cost = m + n
-        best.origin = 0
-        best.matches = 0
 
         # Ukkonen's trick: index of the last cell that is less than k.
         cdef int last = min(m, k + 1)
@@ -714,12 +687,7 @@ cdef class NoIndelAligner:
                     column[i].cost = cost
                     column[i].origin = origin
                     column[i].matches = matches
-                
-                if self.debug:
-                    with gil:
-                        for i in range(last + 1):
-                            self._dpmatrix.set_entry(i, j, column[i].cost)
-                
+                                
                 while last >= 0 and column[last].cost > k:
                     last -= 1
                 # last can be -1 here, but will be incremented next.
@@ -732,51 +700,60 @@ cdef class NoIndelAligner:
                     length = m + min(column[m].origin, 0)
                     cost = column[m].cost
                     matches = column[m].matches
-                    if (length >= self._min_overlap and cost <= length * max_error_rate and
-                            (matches > best.matches or (matches == best.matches and cost < best.cost))):
-                        # update
-                        best.matches = matches
-                        best.cost = cost
-                        best.origin = column[m].origin
-                        best.ref_stop = m
-                        best.query_stop = j
+                    if length >= self._min_overlap and cost <= length * max_error_rate:
+                        match_array[num_matches].ref_stop = m
+                        match_array[num_matches].query_stop = j
+                        match_array[num_matches].cost = cost
+                        match_array[num_matches].origin = column[m].origin
+                        match_array[num_matches].matches = matches
+                        
+                        num_matches += 1
+                        if num_matches >= max_matches:
+                            break
+                        
                         if cost == 0 and matches == m:
                             # exact match, stop early
+                            exact_match = num_matches - 1
                             break
-                # column finished
 
-        if max_n == n:
+        if max_n == n and exact_match == -1 and num_matches < max_matches:
             first_i = 0 if stop_in_ref else m
             # search in last column # TODO last?
             for i in range(first_i, m+1):
                 length = i + min(column[i].origin, 0)
                 cost = column[i].cost
                 matches = column[i].matches
-                if (length >= self._min_overlap and cost <= length * max_error_rate and
-                        (matches > best.matches or (matches == best.matches and cost < best.cost))):
+                if length >= self._min_overlap and cost <= length * max_error_rate:
                     # update best
-                    best.matches = matches
-                    best.cost = cost
-                    best.origin = column[i].origin
-                    best.ref_stop = i
-                    best.query_stop = n
+                    match_array[num_matches].ref_stop = i
+                    match_array[num_matches].query_stop = n
+                    match_array[num_matches].cost = cost
+                    match_array[num_matches].origin = column[i].origin
+                    match_array[num_matches].matches = matches
+                    num_matches += 1
         
-        if best.cost == m + n:
-            # best.cost was initialized with this value.
-            # If it is unchanged, no alignment was found that has
-            # an error rate within the allowed range.
-            return None
-
-        cdef int start1, start2
-        if best.origin >= 0:
-            start1 = 0
-            start2 = best.origin
+        if num_matches == 0:
+            result = None
+        elif exact_match >= 0:
+            result = [self._create_match(match_array[exact_match])]
         else:
-            start1 = -best.origin
-            start2 = 0
+            result = [self._create_match(match_array[i]) for i in range(num_matches)]
+        
+        # TODO: is this strictly necessary since it's a local variable?
+        PyMem_Free(match_array)
+        
+        return result
 
-        assert best.ref_stop - start1 > 0  # Do not return empty alignments.
-        return (start1, best.ref_stop, start2, best.query_stop, best.matches, best.cost)
+    def _create_match(self, _Match _match):
+        cdef int start1, start2
+        if _match.origin >= 0:
+            start1 = 0
+            start2 = _match.origin
+        else:
+            start1 = -_match.origin
+            start2 = 0
+        assert _match.ref_stop - start1 > 0  # Do not return empty alignments.
+        return (start1, _match.ref_stop, start2, _match.query_stop, _match.matches, _match.cost)
 
     def __dealloc__(self):
         PyMem_Free(self.column)

@@ -4,7 +4,7 @@ Alignment module.
 """
 from collections import namedtuple
 import math
-from ._align import Aligner, NoIndelAligner, compare_prefixes, locate
+from ._align import Aligner, compare_prefixes, locate#, MultiAligner
 from .util import reverse_complement, RandomMatchProbability
 
 # flags for global alignment
@@ -182,6 +182,14 @@ class InsertAligner(object):
         self.min_adapter_match_frac = float(min_adapter_match_frac)
         self.max_adapter_mismatch_frac = 1.0 - self.min_adapter_match_frac
         self.adapter_check_cutoff = adapter_check_cutoff
+        
+        # In practice, this is only faster at relatively high error rates. I want to
+        # write more unit tests, and possible try a different algorithm instead, before
+        # enabling this.
+        # self.aligner = MultiAligner(
+        #     self.max_insert_mismatch_frac,
+        #     START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+        #     min_insert_overlap)
     
     def insert_is_random_match(self, matches, size):
         return self.match_probability(matches, size) > self.insert_max_rmp
@@ -212,14 +220,7 @@ class InsertAligner(object):
         aligner.min_overlap = self.min_insert_overlap
         aligner.indel_cost = 100000
         
-        # In practice, this is only faster at relatively high error rates. I want to
-        # write more unit tests, and possible try a different algorithm instead, before
-        # enabling this.
-        #aligner = NoIndelAligner(
-        #    seq2_rc,
-        #    self.max_insert_mismatch_frac,
-        #    START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2)
-        #aligner.min_overlap = self.min_insert_overlap
+        #insert_matches = self.aligner.locate(seq2_rc, seq1)
         
         insert_match = aligner.locate(seq1)
         
