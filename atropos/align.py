@@ -227,11 +227,14 @@ class InsertAligner(object):
         if insert_match:
             offset = min(insert_match[0], seq_len - insert_match[3])
             insert_match_size = seq_len - offset
+            
+            if self.insert_is_random_match(insert_match[4], insert_match_size):
+                return result
+            
             result[0] = insert_match
             result[1] = insert_match_size
-
-            if (offset < self.min_adapter_overlap or
-                    self.insert_is_random_match(insert_match[4], insert_match_size)):
+            
+            if offset < self.min_adapter_overlap:
                 return result
             
             # TODO: this is very sensitive to the exact correct choice of adapter.

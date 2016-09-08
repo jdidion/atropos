@@ -138,7 +138,6 @@ def test_unmatched_read_names():
             with open(swapped, 'w') as f:
                 f.writelines(lines)
             with redirect_stderr():
-                print('here')
                 atropos.main('-a XX -o out1.fastq -p out2.fastq'.split() + ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
         finally:
             os.remove('out1.fastq')
@@ -287,4 +286,21 @@ def test_custom_bisulfite_2():
         in1='paired_bis_{aligner}.1.fastq', in2='paired_bis_{aligner}.2.fastq',
         expected1='paired_bis2_{aligner}.1.fastq', expected2='paired_bis2_{aligner}.2.fastq',
         aligners=BACK_ALIGNERS
+    )
+
+def test_no_insert_match():
+    # with -O
+    # Note: this fails if you set -e 0.3 because the higher error rate enables a
+    # match of 7 bp, even though it has 2 errors. This illustrates while using
+    # --adapter-max-rmp is better.
+    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -O 7 -m 25 -q 0 --trim-n',
+        in1='insert.1.fastq', in2='insert.2.fastq',
+        expected1='insert.1.fastq', expected2='insert.2.fastq',
+        aligners=('insert',)
+    )
+    # with --adapter-max-rmp
+    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -e 0.3 --adapter-max-rmp 0.001 -m 25 -q 0 --trim-n',
+        in1='insert.1.fastq', in2='insert.2.fastq',
+        expected1='insert.1.fastq', expected2='insert.2.fastq',
+        aligners=('insert',)
     )
