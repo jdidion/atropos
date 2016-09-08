@@ -1,8 +1,8 @@
 # coding: utf-8
 from __future__ import print_function, division, absolute_import
 
-from atropos.align import (locate, compare_prefixes, compare_suffixes, Aligner,
-    InsertAligner, FactorialCache)
+from atropos.align import locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
+from atropos.util import RandomMatchProbability
 from atropos.adapters import BACK
 
 
@@ -125,8 +125,8 @@ def test_no_match():
 import math
 from .utils import approx_equal
 
-def test_factorial_cache():
-    f = FactorialCache()
+def test_factorial():
+    f = RandomMatchProbability()
     # simple test
     assert f.factorial(0) == 1
     assert f.factorial(1) == 1
