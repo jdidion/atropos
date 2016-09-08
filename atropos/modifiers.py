@@ -146,7 +146,8 @@ class InsertAdapterCutter(ReadPairModifier):
     AdapterCutter that uses InsertAligner to first try to identify
     insert overlap before falling back to semi-global adapter alignment.
     """
-    def __init__(self, adapter1, adapter2, action='trim', mismatch_action=None, symmetric=True, **aligner_args):
+    def __init__(self, adapter1, adapter2, action='trim', mismatch_action=None,
+                 symmetric=True, **aligner_args):
         self.adapter1 = adapter1
         self.adapter2 = adapter2
         self.aligner = InsertAligner(adapter1.sequence, adapter2.sequence, **aligner_args)
@@ -161,8 +162,7 @@ class InsertAdapterCutter(ReadPairModifier):
         insert_match, insert_match_len, adapter_match1, adapter_match2 = self.aligner.match_insert(
             read1.sequence, read2.sequence)
         
-        if (self.mismatch_action and insert_match and insert_match[5] > 0 and
-                (adapter_match1 or adapter_match2)):
+        if self.mismatch_action and insert_match and insert_match[5] > 0:
             self.correct_errors(read1, read2, insert_match)
         
         if adapter_match1 is None and adapter_match2 is None:

@@ -5,7 +5,7 @@ Alignment module.
 from collections import namedtuple
 import math
 from ._align import Aligner, NoIndelAligner, compare_prefixes, locate
-from .util import reverse_complement
+from .util import reverse_complement, RandomMatchProbability
 
 # flags for global alignment
 
@@ -159,35 +159,13 @@ MatchInfo = namedtuple("MatchInfo", (
 #    http://www.nature.com/articles/srep01746
 #    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
 
-class FactorialCache(object):
-    def __init__(self, init_size=150):
-        self.factorials = [1] * init_size
-        self.max_n = 1
-        self.cur_array_size = init_size
-
-    def factorial(self, n):
-        if n > self.max_n:
-            self._fill_upto(n)
-        return self.factorials[n]
-
-    def _fill_upto(self, n):
-        if n >= self.cur_array_size:
-            extension_size = n - self.cur_array_size + 1
-            self.factorials += [1] * extension_size
-        i = self.max_n
-        next_i = i + 1
-        while i < n:
-            self.factorials[next_i] = next_i * self.factorials[i]
-            i = next_i
-            next_i += 1
-        self.max_n = i
-
 class InsertAligner(object):
     """
     Implementation of an insert matching algorithm.
     This only works with paired-end reads with 3' adapters.
     """
-    def __init__(self, adapter1, adapter2, max_error_prob=1E-6,
+    def __init__(self, adapter1, adapter2, match_probability=RandomMatchProbability(),
+                 insert_max_rmp=1E-6, adapter_max_rmp=0.001,
                  min_insert_overlap=1, max_insert_mismatch_frac=0.2,
                  min_adapter_overlap=1, min_adapter_match_frac=0.8,
                  adapter_check_cutoff=9):
@@ -195,15 +173,25 @@ class InsertAligner(object):
         self.adapter1_len = len(adapter1)
         self.adapter2 = adapter2
         self.adapter2_len = len(adapter2)
-        self.max_error_prob = max_error_prob
+        self.match_probability = match_probability
+        self.insert_max_rmp = insert_max_rmp
+        self.adapter_max_rmp = adapter_max_rmp
         self.min_insert_overlap = min_insert_overlap
         self.max_insert_mismatch_frac = float(max_insert_mismatch_frac)
         self.min_adapter_overlap = min_adapter_overlap
         self.min_adapter_match_frac = float(min_adapter_match_frac)
         self.max_adapter_mismatch_frac = 1.0 - self.min_adapter_match_frac
         self.adapter_check_cutoff = adapter_check_cutoff
-        self.factorial_cache = FactorialCache()
-
+    
+    def insert_is_random_match(self, matches, size):
+        return self.match_probability(matches, size) > self.insert_max_rmp
+    
+    def adapter_match_probabilities(self, a1_matches, a2_matches, size):
+        a1_prob = self.match_probability(a1_matches, size)
+        a2_prob = self.match_probability(a2_matches, size)
+        is_random_match = (a1_prob * a2_prob) > self.adapter_max_rmp
+        return (a1_prob, a2_prob, is_random_match)
+    
     def match_insert(self, seq1, seq2):
         """Use cutadapt aligner for insert and adapter matching"""
         l1 = len(seq1)
@@ -243,7 +231,7 @@ class InsertAligner(object):
             result[1] = insert_match_size
 
             if (offset < self.min_adapter_overlap or
-                    self.match_probability(insert_match[4], insert_match_size) > self.max_error_prob):
+                    self.insert_is_random_match(insert_match[4], insert_match_size)):
                 return result
             
             # TODO: this is very sensitive to the exact correct choice of adapter.
@@ -257,9 +245,9 @@ class InsertAligner(object):
             min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
             if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
                 return result
-            a1_prob = self.match_probability(a1_match[4], adapter_len)
-            a2_prob = self.match_probability(a2_match[4], adapter_len)
-            if adapter_len > self.adapter_check_cutoff and (a1_prob * a2_prob) > self.max_error_prob:
+            a1_prob, a2_prob, adapter_is_random_match = self.adapter_match_probabilities(
+                a1_match[4], a2_match[4], adapter_len)
+            if adapter_len > self.adapter_check_cutoff and adapter_is_random_match:
                 return result
 
             adapter_len1 = min(self.adapter1_len, l1 - insert_match_size)
@@ -269,20 +257,3 @@ class InsertAligner(object):
             result[3] = Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
 
         return result
-    
-    def match_probability(self, matches, size):
-        nfac = self.factorial_cache.factorial(size)
-        p = 0.0
-        i = matches
-
-        while i <= size:
-            p += (
-                (0.75 ** (size - i)) *
-                (0.25 ** i) *
-                nfac /
-                self.factorial_cache.factorial(i) /
-                self.factorial_cache.factorial(size - i)
-            )
-            i += 1
-
-        return p

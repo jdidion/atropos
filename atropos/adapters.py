@@ -198,7 +198,8 @@ class Adapter(object):
         unique number.
     """
     def __init__(self, sequence, where, max_error_rate=0.1, min_overlap=3,
-                 read_wildcards=False, adapter_wildcards=True, name=None, indels=True):
+                 read_wildcards=False, adapter_wildcards=True, name=None, indels=True,
+                 match_probability=None, max_rmp=None):
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
         self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
@@ -206,6 +207,10 @@ class Adapter(object):
         self.where = where
         self.max_error_rate = max_error_rate
         self.min_overlap = min(min_overlap, len(self.sequence))
+        self.match_probability = None
+        if match_probability and max_rmp is not None:
+            self.match_probability = match_probability
+            self.max_rmp = max_rmp
         self.indels = indels
         self.adapter_wildcards = adapter_wildcards and not set(self.sequence) <= set('ACGT')
         self.read_wildcards = read_wildcards
@@ -252,7 +257,10 @@ class Adapter(object):
         """
         self.debug = True
         self.aligner.enable_debug()
-
+    
+    def is_not_random_match(self, matches, size):
+        return self.match_probability is None or self.match_probability(matches, size) <= self.max_rmp
+    
     def match_to(self, read):
         """
         Attempt to match this adapter to the given read.
@@ -262,8 +270,9 @@ class Adapter(object):
         overlap length, maximum error rate).
         """
         read_seq = read.sequence.upper()
-        pos = -1
+        
         # try to find an exact match first unless wildcards are allowed
+        pos = -1
         if not self.adapter_wildcards:
             if self.where == PREFIX:
                 pos = 0 if read_seq.startswith(self.sequence) else -1
@@ -271,39 +280,37 @@ class Adapter(object):
                 pos = (len(read_seq) - len(self.sequence)) if read_seq.endswith(self.sequence) else -1
             else:
                 pos = read_seq.find(self.sequence)
+        
         if pos >= 0:
-            match = Match(
-                0, len(self.sequence), pos, pos + len(self.sequence),
-                len(self.sequence), 0, self._front_flag, self, read)
-        else:
-            # try approximate matching
-            if not self.indels and self.where in (PREFIX, SUFFIX):
-                if self.where == PREFIX:
-                    alignment = align.compare_prefixes(self.sequence, read_seq,
-                        wildcard_ref=self.adapter_wildcards, wildcard_query=self.read_wildcards)
-                else:
-                    alignment = align.compare_suffixes(self.sequence, read_seq,
-                        wildcard_ref=self.adapter_wildcards, wildcard_query=self.read_wildcards)
-                astart, astop, rstart, rstop, matches, errors = alignment
-                if astop - astart >= self.min_overlap and errors / (astop - astart) <= self.max_error_rate:
-                    match = Match(*(alignment + (self._front_flag, self, read)))
-                else:
-                    match = None
+            l = len(self.sequence)
+            if self.is_not_random_match(l, l):
+                return Match(0, l, pos, pos + l, l, 0, self._front_flag, self, read)
+        
+        # try approximate matching
+        alignment = None
+        if not self.indels and self.where in (PREFIX, SUFFIX):
+            if self.where == PREFIX:
+                alignment = align.compare_prefixes(self.sequence, read_seq,
+                    wildcard_ref=self.adapter_wildcards, wildcard_query=self.read_wildcards)
             else:
-                alignment = self.aligner.locate(read_seq)
-                if self.debug:
-                    print(self.aligner.dpmatrix)  # pragma: no cover
-                if alignment is None:
-                    match = None
-                else:
-                    astart, astop, rstart, rstop, matches, errors = alignment
-                    match = Match(astart, astop, rstart, rstop, matches, errors, self._front_flag, self, read)
-
-        if match is None:
-            return None
-        assert match.length > 0 and match.errors / match.length <= self.max_error_rate, match
-        assert match.length >= self.min_overlap
-        return match
+                alignment = align.compare_suffixes(self.sequence, read_seq,
+                    wildcard_ref=self.adapter_wildcards, wildcard_query=self.read_wildcards)
+        else:
+            alignment = self.aligner.locate(read_seq)
+            if self.debug:
+                print(self.aligner.dpmatrix)  # pragma: no cover
+        
+        if alignment:
+            astart, astop, rstart, rstop, matches, errors = alignment
+            size = astop - astart
+            if (size >= self.min_overlap and
+                    errors / size <= self.max_error_rate and
+                    self.is_not_random_match(matches, size)):
+                return Match(
+                    astart, astop, rstart, rstop, matches, errors,
+                    self._front_flag, self, read)
+        
+        return None
 
     def _trimmed_anywhere(self, match):
         """Return a trimmed read"""

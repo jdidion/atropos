@@ -47,7 +47,7 @@ from atropos.adapters import AdapterParser, BACK
 from atropos.modifiers import *
 from atropos.filters import *
 from atropos.report import print_report
-from atropos.util import int_or_str
+from atropos.util import int_or_str, RandomMatchProbability
 
 import argparse
 from collections import defaultdict
@@ -97,8 +97,8 @@ def main(cmdlineargs=None, default_outfile="-"):
 def run_atropos(options, parser, default_outfile="-"):
     paired = validate_options(options, parser)
     reader, qualities, has_qual_file = create_reader(options, paired, parser)
-    adapters1, adapters2 = create_adapters(options, paired, qualities, has_qual_file, parser)
-    modifiers = create_modifiers(options, paired, qualities, adapters1, adapters2)
+    modifiers, adapters1, adapters2 = create_modifiers(
+        options, paired, qualities, has_qual_file, parser)
     min_affected = 2 if options.pair_filter == 'both' else 1
     filters = create_filters(options, paired, min_affected)
     formatters, force_create = create_formatters(options, qualities, default_outfile)
@@ -232,6 +232,9 @@ def get_argument_parser():
              "containing 3' adapters. New algorithms are being implemented and the default "
              "is likely to change. (adapter)")
     
+    # TODO: all the different matching options are pretty confusing. Either explain their
+    # usage better in the docs or find a way to simplify the choices.
+    
     # Arguments for adapter match
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate for adapter match (no. of errors divided by the length "
@@ -241,10 +244,13 @@ def get_argument_parser():
             "(allow both mismatches and indels)")
     group.add_argument("-n", "--times", type=int, metavar="COUNT", default=1,
         help="Remove up to COUNT adapters from each read. (1)")
-    group.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=3,
+    group.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=None,
         help="If the overlap between the read and the adapter is shorter than "
             "MINLENGTH, the read is not modified. Reduces the no. of bases "
             "trimmed due to random adapter matches. (3)")
+    group.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
+        help="If no minimum overlap (-O) is specified, then adapters are only matched "
+             "when the probabilty of observing k out of n matching bases is <= PROB. (0.001)")
     group.add_argument("--match-read-wildcards", action="store_true", default=False,
         help="Interpret IUPAC wildcards in reads. (no)")
     group.add_argument("-N", "--no-match-adapter-wildcards", action="store_false",
@@ -255,6 +261,9 @@ def get_argument_parser():
     group.add_argument("--adapter-pair", default=None, metavar="NAME1,NAME2",
         help="When adapters are specified in files, this option selects a single pair to use "
              "for insert-based adapter matching.")
+    group.add_argument("--insert-max-rmp", type=float, metavar="PROB", default=1E-6,
+        help="Overlapping inserts only match when the probablity of observing k of n "
+             "matching bases is <= PROB. (1E-6)")
     group.add_argument("--insert-match-error-rate", type=float, default=None,
         help="Maximum allowed error rate for insert match (no. of errors divided by the length "
             "of the matching region). (0.2)")
@@ -583,7 +592,19 @@ def validate_options(options, parser):
             # Full paired-end trimming when both -p and -A/-G/-B/-U given
             # Read modifications (such as quality trimming) are applied also to second read.
             paired = 'both'
-
+    
+    # If the user specifies a max rmp, that is used for determining the
+    # minimum overlap and -O is set to 1, otherwise -O is set to the old
+    # default of 3.
+    # TODO: This is pretty confusing logic - need to simplify
+    if options.adapter_max_rmp:
+        if options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0:
+            parser.error("--adapter-max-rmp must be between [0,1].")
+    elif options.overlap is None:
+        options.overlap = 3
+    elif options.overlap < 1:
+        parser.error("The overlap must be at least 1.")
+    
     if options.aligner != 'adapter':
         if options.aligner == 'insert':
             if paired != 'both':
@@ -594,6 +615,8 @@ def validate_options(options, parser):
                 options.insert_match_error_rate = options.error_rate or 0.2
             if options.insert_match_adapter_error_rate is None:
                 options.insert_match_adapter_error_rate = options.error_rate or 0.2
+            if options.insert_max_rmp < 0 or options.insert_max_rmp > 1.0:
+                parser.error("--insert-max-rmp must be between [0,1].")
     
     if options.merge_overlapping and (
             paired != "both" or
@@ -707,12 +730,9 @@ def validate_options(options, parser):
     
     if options.error_rate is None:
         options.error_rate = 0.1
-    elif not (0 <= options.error_rate <= 1.):
+    elif not (0 <= options.error_rate <= 1.0):
         parser.error("The maximum error rate must be between 0 and 1.")
     
-    if options.overlap < 1:
-        parser.error("The overlap must be at least 1.")
-
     if options.cut:
         if len(options.cut) > 2:
             parser.error("You cannot remove bases from more than two ends.")
@@ -819,14 +839,22 @@ def create_reader(options, paired, parser, counter_magnitude="M"):
     
     return (reader, qualities, qualfile is not None)
 
-def create_adapters(options, paired, qualities, has_qual_file, parser):
+def create_modifiers(options, paired, qualities, has_qual_file, parser):
+    adapters_use_rmp = options.overlap is None
+    match_probability = None
+    if adapters_use_rmp or options.aligner == 'insert':
+        match_probability = RandomMatchProbability()
+    
+    # Create adapters
     adapter_parser = AdapterParser(
         colorspace=options.colorspace,
         max_error_rate=options.error_rate,
-        min_overlap=options.overlap,
+        min_overlap=options.overlap or 1,
         read_wildcards=options.match_read_wildcards,
         adapter_wildcards=options.match_adapter_wildcards,
-        indels=options.indels)
+        indels=options.indels,
+        match_probability=match_probability if adapters_use_rmp else None,
+        max_rmp=options.adapter_max_rmp)
 
     try:
         adapters1 = adapter_parser.parse_multi(options.adapters, options.anywhere, options.front)
@@ -860,22 +888,20 @@ def create_adapters(options, paired, qualities, has_qual_file, parser):
         for adapter in adapters1 + adapters2:
             adapter.enable_debug()
     
-    return (adapters1, adapters2)
-
-def create_modifiers(options, paired, qualities, adapters1, adapters2):
+    # Create modifiers
     modifiers = Modifiers(paired)
-    
+            
     for op in options.op_order:
         if op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
-                aligner_args = dict(
-                    max_insert_mismatch_frac=options.insert_match_error_rate,
-                    min_adapter_match_frac=1.0 - options.insert_match_adapter_error_rate
-                )
                 modifiers.add_modifier(InsertAdapterCutter,
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
-                    mismatch_action=options.correct_mismatches, **aligner_args)
+                    mismatch_action=options.correct_mismatches,
+                    max_insert_mismatch_frac=options.insert_match_error_rate,
+                    min_adapter_match_frac=1.0 - options.insert_match_adapter_error_rate,
+                    match_probability=match_probability, insert_max_rmp=options.insert_max_rmp,
+                    adapter_max_rmp=options.adapter_max_rmp or options.insert_max_rmp)
             else:
                 a1_args = a2_args = None
                 if adapters1:
@@ -946,7 +972,7 @@ def create_modifiers(options, paired, qualities, adapters1, adapters2):
             min_overlap=options.merge_min_overlap,
             error_rate=options.error_rate)
     
-    return modifiers
+    return (modifiers, adapters1, adapters2)
 
 def create_filters(options, paired, min_affected):
     filters = Filters(FilterFactory(paired, min_affected))
