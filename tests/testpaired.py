@@ -291,7 +291,7 @@ def test_custom_bisulfite_2():
 def test_no_insert_match():
     # with -O
     # Note: this fails if you set -e 0.3 because the higher error rate enables a
-    # match of 7 bp, even though it has 2 errors. This illustrates while using
+    # match of 7 bp, even though it has 2 errors. This illustrates why using
     # --adapter-max-rmp is better.
     run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -O 7 -m 25 -q 0 --trim-n',
         in1='insert.1.fastq', in2='insert.2.fastq',

@@ -182,16 +182,10 @@ class InsertAligner(object):
         self.min_adapter_match_frac = float(min_adapter_match_frac)
         self.max_adapter_mismatch_frac = 1.0 - self.min_adapter_match_frac
         self.adapter_check_cutoff = adapter_check_cutoff
-        
-        if False:
-            self.aligner = MultiAligner(
-                max_insert_mismatch_frac,
-                START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
-                min_insert_overlap)
-    
-    def adapter_match_probabilities(self, a1_matches, a2_matches, size):
-        
-        return (a1_prob, a2_prob, is_random_match)
+        self.aligner = MultiAligner(
+            max_insert_mismatch_frac,
+            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+            min_insert_overlap)
     
     def match_insert(self, seq1, seq2):
         """Use cutadapt aligner for insert and adapter matching"""
@@ -241,62 +235,60 @@ class InsertAligner(object):
                 Match(0, adapter_len2, insert_match_size, l2, best_adapter_matches, best_adapter_mismatches)
             )
         
-        if True:
-            # This is the old way of doing things, where we use the built-in
-            # Aligner to do a single match.
-            aligner = Aligner(
-                seq2_rc,
-                self.max_insert_mismatch_frac,
-                START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
-                False, False)
-            aligner.min_overlap = self.min_insert_overlap
-            aligner.indel_cost = 100000
-            
-            insert_match = aligner.locate(seq1)
-            
-            if not insert_match:
-                return None
-            
-            offset = min(insert_match[0], seq_len - insert_match[3])
-            insert_match_size = seq_len - offset
-            prob = self.match_probability(insert_match[4], insert_match_size)
-            
-            if prob > self.insert_max_rmp:
-                return None
-            
-            return _match(insert_match, offset, insert_match_size, prob)
+        # # This is the old way of doing things, where we use the built-in
+        # # Aligner to do a single match.
+        # aligner = Aligner(
+        #     seq2_rc,
+        #     self.max_insert_mismatch_frac,
+        #     START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+        #     False, False)
+        # aligner.min_overlap = self.min_insert_overlap
+        # aligner.indel_cost = 100000
+        #
+        # insert_match = aligner.locate(seq1)
+        #
+        # if not insert_match:
+        #     return None
+        #
+        # offset = min(insert_match[0], seq_len - insert_match[3])
+        # insert_match_size = seq_len - offset
+        # prob = self.match_probability(insert_match[4], insert_match_size)
+        #
+        # if prob > self.insert_max_rmp:
+        #     return None
+        #
+        # return _match(insert_match, offset, insert_match_size, prob)
         
-        else:
-            # This is the new way of doing things, where we use an
-            # ligner that returns all matches that satisfy the overlap
-            # and error rate thresholds. We sort by matches and then
-            # mismatches, and then check each in turn until we find
-            # one with an adapter match (if any).
+        # Use an aligner that returns all matches that satisfy the
+        # overlap and error rate thresholds. We sort by matches and
+        # then mismatches, and then check each in turn until we find
+        # one with an adapter match (if any).
+        
+        insert_matches = self.aligner.locate(seq2_rc, seq1)
+        
+        if insert_matches:
+            # Filter by random-match probability
+            filtered_matches = []
+            for insert_match in insert_matches:
+                offset = min(insert_match[0], seq_len - insert_match[3])
+                insert_match_size = seq_len - offset
+                prob = self.match_probability(insert_match[4], insert_match_size)
+                if prob <= self.insert_max_rmp:
+                    filtered_matches.append((insert_match, offset, insert_match_size, prob))
             
-            insert_matches = self.aligner.locate(seq2_rc, seq1)
+            if filtered_matches:
+                if len(filtered_matches) == 1:
+                    return _match(*filtered_matches[0])
+                else:
+                    # This is how SeqPurge works - testing insert matches
+                    # from longest to shortest. We could also test in
+                    # order of random-match probability:
+                    #filtered_matches.sort(key=lambda x: x[3])
+                    filtered_matches.sort(key=lambda x: x[2], reverse=True)
+                    
+                    for m in filtered_matches:
+                        match = _match(*m)
+                        if match:
+                            return match
             
-            if insert_matches:
-                # Filter by random-match probability
-                filtered_matches = []
-                for insert_match in insert_matches:
-                    offset = min(insert_match[0], seq_len - insert_match[3])
-                    insert_match_size = seq_len - offset
-                    prob = self.match_probability(insert_match[4], insert_match_size)
-                    if prob <= self.insert_max_rmp:
-                        filtered_matches.append((insert_match, offset, insert_match_size, prob))
-                
-                if filtered_matches:
-                    if len(filtered_matches) == 1:
-                        return _match(*filtered_matches[0])
-                    else:
-                        # This is how SeqPurge works - testing insert matches
-                        # from longest to shortest. We could also test in
-                        # order of random-match probability:
-                        #filtered_matches.sort(key=lambda x: x[3])
-                        filtered_matches.sort(key=lambda x: x[2], reverse=True)
-                        for m in filtered_matches:
-                            match = _match(*m)
-                            if match:
-                                return match
-                
-                return None
+            return None
