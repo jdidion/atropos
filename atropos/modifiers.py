@@ -10,7 +10,7 @@ import logging
 import re
 from .qualtrim import quality_trim_index, nextseq_trim_index
 from .align import Aligner, SEMIGLOBAL, InsertAligner
-from .util import complement, reverse_complement, median
+from .util import complement, reverse_complement, mean
 
 # Base classes
 
@@ -264,14 +264,21 @@ class InsertAdapterCutter(ReadPairModifier):
                     quals_equal.append((i, j, b1, b2))
         
         if quals_equal:
-            med_qual1 = median([ord(b) for b in r1_qual[r1_start:r1_end]])
-            med_qual2 = median([ord(b) for b in r2_qual[r2_start:r2_end]])
-            if med_qual1 > med_qual2:
+            mean_qual1 = mean([ord(b) for b in r1_qual[r1_start:r1_end]])
+            mean_qual2 = mean([ord(b) for b in r2_qual[r2_start:r2_end]])
+            # Only make the corrections if one read is significantly better
+            # than the other.
+            # TODO: this method of determining whether one read is better
+            # than the other is crude - come up with something better.
+            diff = mean_qual1 - mean_qual2
+            if diff > 1:
+                # read1 is better than read2
                 for i, j, b1, b2 in quals_equal:
                     r2_seq[j] = complement[b1]
                     r2_qual[j] = r1_qual[i]
                     r2_changed += 1
-            elif med_qual2 > med_qual1:
+            elif diff < -1:
+                # read2 is better than read1
                 for i, j, b1, b2 in quals_equal:
                     r1_seq[i] = b2
                     r1_qual[i] = r2_qual[j]
