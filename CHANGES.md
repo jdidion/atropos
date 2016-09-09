@@ -3,6 +3,7 @@
 v1.0.14 (dev)
 -------------
 
+* Implemented \_align.MultiAligner, which returns all matches that satisfy the overlap and error thresholds. align.InsertAligner now uses MultiAligner for insert matching, and tests all matches in decreasing size order until it finds one with adapter matches (if any).
 * Major improvements to the accuracy of the 'detect' command.
 * Added options for how to correct mismatched bases for which qualities are equal.
 * Added option to select a single pair of adapters from multiple sequences in a fasta file.
