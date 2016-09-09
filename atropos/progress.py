@@ -1,4 +1,5 @@
 import logging
+import time
 from atropos.util import magnitude_formatter
 
 def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=None,
