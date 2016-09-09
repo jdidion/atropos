@@ -668,7 +668,7 @@ cdef class MultiAligner:
             for j in range(min_n + 1, max_n + 1):
                 # remember first entry
                 tmp_entry = column[0]
-
+                
                 # fill in first entry in this column
                 if start_in_query:
                     column[0].origin = j
@@ -694,7 +694,7 @@ cdef class MultiAligner:
                     
                     # remember current cell for next iteration
                     tmp_entry = column[i]
-
+                    
                     column[i].cost = cost
                     column[i].origin = origin
                     column[i].matches = matches
@@ -732,24 +732,24 @@ cdef class MultiAligner:
                             num_matches += 1
                             if num_matches >= max_matches:
                                 break
-
-        if max_n == n and exact_match == -1 and num_matches < max_matches:
-            first_i = 0 if stop_in_ref else m
-            # search in last column # TODO last?
-            for i in range(first_i, m+1):
-                cost = column[i].cost
-                if cost > max_cost:
-                    continue
-                
-                length = i + min(column[i].origin, 0)
-                if length >= self._min_overlap and cost <= length * max_error_rate:
-                    # update best
-                    match_array[num_matches].ref_stop = i
-                    match_array[num_matches].query_stop = n
-                    match_array[num_matches].cost = cost
-                    match_array[num_matches].origin = column[i].origin
-                    match_array[num_matches].matches = column[i].matches
-                    num_matches += 1
+            else:
+                if max_n == n:
+                    first_i = 0 if stop_in_ref else m
+                    # search in last column # TODO last?
+                    for i in range(first_i, m+1):
+                        cost = column[i].cost
+                        if cost > max_cost:
+                            continue
+                        
+                        length = i + min(column[i].origin, 0)
+                        if length >= self._min_overlap and cost <= length * max_error_rate:
+                            # update best
+                            match_array[num_matches].ref_stop = i
+                            match_array[num_matches].query_stop = n
+                            match_array[num_matches].cost = cost
+                            match_array[num_matches].origin = column[i].origin
+                            match_array[num_matches].matches = column[i].matches
+                            num_matches += 1
         
         if num_matches == 0:
             result = None

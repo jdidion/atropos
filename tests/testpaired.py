@@ -293,13 +293,13 @@ def test_no_insert_match():
     # Note: this fails if you set -e 0.3 because the higher error rate enables a
     # match of 7 bp, even though it has 2 errors. This illustrates why using
     # --adapter-max-rmp is better.
-    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -O 7 -m 25 -q 0 --trim-n',
-        in1='insert.1.fastq', in2='insert.2.fastq',
-        expected1='insert.1.fastq', expected2='insert.2.fastq',
-        aligners=('insert',)
-    )
+    # run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -O 7 -m 25 -q 0 --trim-n',
+    #     in1='insert.1.fastq', in2='insert.2.fastq',
+    #     expected1='insert.1.fastq', expected2='insert.2.fastq',
+    #     aligners=('insert',)
+    # )
     # with --adapter-max-rmp
-    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -e 0.3 --adapter-max-rmp 0.001 -m 25 -q 0 --trim-n',
+    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT --bisulfite truseq -e 0.3 --adapter-max-rmp 0.001 -m 25 -q 0 --trim-n',
         in1='insert.1.fastq', in2='insert.2.fastq',
         expected1='insert.1.fastq', expected2='insert.2.fastq',
         aligners=('insert',)
