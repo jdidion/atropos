@@ -163,7 +163,7 @@ class InsertAdapterCutter(ReadPairModifier):
         
         if match:
             insert_match, adapter_match1, adapter_match2 = match
-            if self.mismatch_action and insert_match and insert_match[5] > 0:
+            if self.mismatch_action and insert_match[5] > 0:
                 self.correct_errors(read1, read2, insert_match)
         else:
             adapter_match1 = self.adapter1.match_to(read1)
@@ -175,42 +175,34 @@ class InsertAdapterCutter(ReadPairModifier):
             if adapter_match2 is None and adapter_match1:
                 adapter_match2 = adapter_match1.copy()
             
-        if adapter_match1 is not None:
-            adapter_match1.adapter = self.adapter1
-            adapter_match1.read = read1
-            adapter_match1.front = False
-        
-        if adapter_match2 is not None:
-            adapter_match2.adapter = self.adapter2
-            adapter_match2.read = read2
-            adapter_match2.front = False
-        
-        return (self.trim(read1, adapter_match1, 0), self.trim(read2, adapter_match2, 1))
+        return (
+            self.trim(read1, self.adapter1, adapter_match1, 0),
+            self.trim(read2, self.adapter2, adapter_match2, 1)
+        )
     
-    def trim(self, read, match, read_idx):
-        # TODO: refactor so that both adapter cutters use the same function
+    def trim(self, read, adapter, match, read_idx):
         if not match:
             read.match = None
             read.match_info = None
             return read
         
-        if match.rstart < len(read):
-            trimmed_read = match.adapter.trimmed(match)
+        match.adapter = adapter
+        match.read = read
+        match.front = False
+    
+        if self.action is None or match.rstart >= len(read):
+            trimmed_read = read
+        
+        else:
+            trimmed_read = adapter.trimmed(match)
             
-            if self.action == 'trim':
-                # read is already trimmed, nothing to do
-                pass
-            elif self.action == 'mask':
+            if self.action == 'mask':
                 # add N from last modification
                 masked_sequence = trimmed_read.sequence
                 masked_sequence += ('N' * len(read) - len(trimmed_read))
                 # set masked sequence as sequence with original quality
                 trimmed_read.sequence = masked_sequence
                 trimmed_read.qualities = read.qualities
-            elif self.action is None:
-                trimmed_read = read
-        else:
-            trimmed_read = read
         
         trimmed_read.match = match
         trimmed_read.match_info = [match.get_info_record()]

@@ -189,13 +189,8 @@ class InsertAligner(object):
                 START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
                 min_insert_overlap)
     
-    def insert_is_random_match(self, matches, size):
-        return self.match_probability(matches, size) > self.insert_max_rmp
-    
     def adapter_match_probabilities(self, a1_matches, a2_matches, size):
-        a1_prob = self.match_probability(a1_matches, size)
-        a2_prob = self.match_probability(a2_matches, size)
-        is_random_match = (a1_prob * a2_prob) > self.adapter_max_rmp
+        
         return (a1_prob, a2_prob, is_random_match)
     
     def match_insert(self, seq1, seq2):
@@ -211,6 +206,14 @@ class InsertAligner(object):
         seq2_rc = reverse_complement(seq2)
         
         def _match(insert_match, offset, insert_match_size, prob):
+            if offset < self.min_adapter_overlap:
+                # The reads are mostly overlapping, to the point where
+                # there's not enough overhang to do a confident adapter
+                # match. We return just the insert match to signal that
+                # error correction can be done even though no adapter
+                # trimming is required.
+                return (insert_match, None, None)
+            
             # TODO: this is very sensitive to the exact correct choice of adapter.
             # For example, if you specifiy GATCGGAA... and the correct adapter is
             # AGATCGGAA..., the prefixes will not match exactly and the alignment
@@ -222,9 +225,10 @@ class InsertAligner(object):
             min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
             if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
                 return None
-            a1_prob, a2_prob, adapter_is_random_match = self.adapter_match_probabilities(
-                a1_match[4], a2_match[4], adapter_len)
-            if adapter_len > self.adapter_check_cutoff and adapter_is_random_match:
+            
+            a1_prob = self.match_probability(a1_match[4], adapter_len)
+            a2_prob = self.match_probability(a2_match[4], adapter_len)
+            if (adapter_len > self.adapter_check_cutoff) and ((a1_prob * a2_prob) > self.adapter_max_rmp):
                 return None
 
             adapter_len1 = min(self.adapter1_len, l1 - insert_match_size)
@@ -238,6 +242,8 @@ class InsertAligner(object):
             )
         
         if True:
+            # This is the old way of doing things, where we use the built-in
+            # Aligner to do a single match.
             aligner = Aligner(
                 seq2_rc,
                 self.max_insert_mismatch_frac,
@@ -252,40 +258,42 @@ class InsertAligner(object):
                 return None
             
             offset = min(insert_match[0], seq_len - insert_match[3])
-            if offset < self.min_adapter_overlap:
-                return None
-            
             insert_match_size = seq_len - offset
             prob = self.match_probability(insert_match[4], insert_match_size)
+            
             if prob > self.insert_max_rmp:
                 return None
             
             return _match(insert_match, offset, insert_match_size, prob)
         
         else:
-            # This returns all matches that satisfy the overlap and
-            # error rate thresholds. We sort by matches and then
+            # This is the new way of doing things, where we use an
+            # ligner that returns all matches that satisfy the overlap
+            # and error rate thresholds. We sort by matches and then
             # mismatches, and then check each in turn until we find
             # one with an adapter match (if any).
+            
             insert_matches = self.aligner.locate(seq2_rc, seq1)
+            
             if insert_matches:
+                # Filter by random-match probability
                 filtered_matches = []
                 for insert_match in insert_matches:
                     offset = min(insert_match[0], seq_len - insert_match[3])
-                    if offset < self.min_adapter_overlap:
-                        continue
-                    
                     insert_match_size = seq_len - offset
                     prob = self.match_probability(insert_match[4], insert_match_size)
-                    if prob > self.insert_max_rmp:
-                        continue
-                    
-                    filtered_matches.append((insert_match, offset, insert_match_size, prob))
+                    if prob <= self.insert_max_rmp:
+                        filtered_matches.append((insert_match, offset, insert_match_size, prob))
                 
-                filtered_matches.sort(key=lambda x: x[3])
-                for m in filtered_matches:
-                    match = _match(*m)
-                    if match:
-                        return match
-                else:
-                    return None
+                if filtered_matches:
+                    if len(filtered_matches) == 1:
+                        return _match(*filtered_matches[0])
+                    else:
+                        # Sort by random-match probability
+                        filtered_matches.sort(key=lambda x: x[3])
+                        for m in filtered_matches:
+                            match = _match(*m)
+                            if match:
+                                return match
+                
+                return None
