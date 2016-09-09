@@ -90,32 +90,38 @@ class RandomMatchProbability(object):
     to speed computation.
     """
     def __init__(self, init_size=150):
+        self.cache = {}
         self.factorials = [1] * init_size
         self.max_n = 1
         self.cur_array_size = init_size
     
     def __call__(self, matches, size):
+        # First see if we have the result in the cache
+        key = (matches, size)
+        p = self.cache.get(key, None)
+        if p:
+            return p
+        
         # When there are no mismatches, the probability is
         # just that of observing a specific sequence of the
         # given length by chance.
         if matches == size:
-            return 0.25 ** matches
+            p = 0.25 ** matches
         
-        nfac = self.factorial(size)
-        p = 0.0
-        i = matches
+        else:
+            nfac = self.factorial(size)
+            p = 0.0
+            for i in range(matches, size+1):
+                j = size - i
+                p += (
+                    (0.75 ** j) *
+                    (0.25 ** i) *
+                    nfac /
+                    self.factorial(i) /
+                    self.factorial(j)
+                )
 
-        while i <= size:
-            j = size - i
-            p += (
-                (0.75 ** j) *
-                (0.25 ** i) *
-                nfac /
-                self.factorial(i) /
-                self.factorial(j)
-            )
-            i += 1
-
+        self.cache[key] = p
         return p
     
     def factorial(self, n):

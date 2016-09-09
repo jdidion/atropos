@@ -289,8 +289,11 @@ class InsertAligner(object):
                     if len(filtered_matches) == 1:
                         return _match(*filtered_matches[0])
                     else:
-                        # Sort by random-match probability
-                        filtered_matches.sort(key=lambda x: x[3])
+                        # This is how SeqPurge works - testing insert matches
+                        # from longest to shortest. We could also test in
+                        # order of random-match probability:
+                        #filtered_matches.sort(key=lambda x: x[3])
+                        filtered_matches.sort(key=lambda x: x[2], reverse=True)
                         for m in filtered_matches:
                             match = _match(*m)
                             if match:
