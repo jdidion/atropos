@@ -895,13 +895,16 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
         if op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
+                # Use different base probabilities if we're trimming bisulfite data.
+                base_probs = dict(p1=0.33, p2=0.67) if options.bisulfite else dict(p1=0.25, p2=0.75)
                 modifiers.add_modifier(InsertAdapterCutter,
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
                     mismatch_action=options.correct_mismatches,
                     max_insert_mismatch_frac=options.insert_match_error_rate,
                     min_adapter_match_frac=1.0 - options.insert_match_adapter_error_rate,
                     match_probability=match_probability, insert_max_rmp=options.insert_max_rmp,
-                    adapter_max_rmp=options.adapter_max_rmp or options.insert_max_rmp)
+                    adapter_max_rmp=options.adapter_max_rmp or options.insert_max_rmp,
+                    base_probs=base_probs)
             else:
                 a1_args = a2_args = None
                 if adapters1:
@@ -931,7 +934,9 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
             elif options.bisulfite == "rrbs":
                 modifiers.add_modifier(RRBSTrimmer)
             elif options.bisulfite in ("epignome", "truseq"):
-                modifiers.add_modifier(TruSeqBisulfiteTrimmer)
+                # Trimming leads to worse results
+                #modifiers.add_modifier(TruSeqBisulfiteTrimmer)
+                pass
             elif options.bisulfite == "swift":
                 modifiers.add_modifier(SwiftBisulfiteTrimmer)
         else:

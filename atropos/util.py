@@ -117,8 +117,8 @@ class RandomMatchProbability(object):
             for i in range(matches, size+1):
                 j = size - i
                 p += (
-                    (self.p2 ** j) *
-                    (self.p1 ** i) *
+                    (p2 ** j) *
+                    (p1 ** i) *
                     nfac /
                     self.factorial(i) /
                     self.factorial(j)

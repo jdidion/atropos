@@ -3,7 +3,6 @@
 Alignment module.
 """
 from collections import namedtuple
-import math
 from ._align import Aligner, compare_prefixes, locate, MultiAligner
 from .util import reverse_complement, RandomMatchProbability
 
@@ -168,7 +167,7 @@ class InsertAligner(object):
                  insert_max_rmp=1E-6, adapter_max_rmp=0.001,
                  min_insert_overlap=1, max_insert_mismatch_frac=0.2,
                  min_adapter_overlap=1, min_adapter_match_frac=0.8,
-                 adapter_check_cutoff=9):
+                 adapter_check_cutoff=9, base_probs=dict(p1=0.25, p2=0.75)):
         self.adapter1 = adapter1
         self.adapter1_len = len(adapter1)
         self.adapter2 = adapter2
@@ -182,6 +181,7 @@ class InsertAligner(object):
         self.min_adapter_match_frac = float(min_adapter_match_frac)
         self.max_adapter_mismatch_frac = 1.0 - self.min_adapter_match_frac
         self.adapter_check_cutoff = adapter_check_cutoff
+        self.base_probs = base_probs
         self.aligner = MultiAligner(
             max_insert_mismatch_frac,
             START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
@@ -216,7 +216,7 @@ class InsertAligner(object):
             a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
             a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
             adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
-            min_adapter_matches = math.ceil(adapter_len * self.min_adapter_match_frac)
+            min_adapter_matches = round(adapter_len * self.min_adapter_match_frac)
             if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
                 return None
             
@@ -272,7 +272,7 @@ class InsertAligner(object):
             for insert_match in insert_matches:
                 offset = min(insert_match[0], seq_len - insert_match[3])
                 insert_match_size = seq_len - offset
-                prob = self.match_probability(insert_match[4], insert_match_size)
+                prob = self.match_probability(insert_match[4], insert_match_size, **self.base_probs)
                 if prob <= self.insert_max_rmp:
                     filtered_matches.append((insert_match, offset, insert_match_size, prob))
             
@@ -280,12 +280,11 @@ class InsertAligner(object):
                 if len(filtered_matches) == 1:
                     return _match(*filtered_matches[0])
                 else:
-                    # This is how SeqPurge works - testing insert matches
-                    # from longest to shortest. We could also test in
-                    # order of random-match probability:
-                    #filtered_matches.sort(key=lambda x: x[3])
-                    filtered_matches.sort(key=lambda x: x[2], reverse=True)
-                    
+                    # Test matches in order of random-match probability.
+                    # TODO: compare against sorting by length (which is how
+                    # SeqPurge essentially does it).
+                    #filtered_matches.sort(key=lambda x: x[2], reverse=True)
+                    filtered_matches.sort(key=lambda x: x[3])
                     for m in filtered_matches:
                         match = _match(*m)
                         if match:
