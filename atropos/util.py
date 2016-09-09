@@ -66,6 +66,9 @@ def enumerate_range(collection, start, end):
             yield (i, next(it))
             i += 1
 
+def mean(data):
+    return sum(data) / len(data)
+
 def median(data):
     """
     Median function borrowed from python statistics module, and sped up by
@@ -95,7 +98,7 @@ class RandomMatchProbability(object):
         self.max_n = 1
         self.cur_array_size = init_size
     
-    def __call__(self, matches, size):
+    def __call__(self, matches, size, p1=0.25, p2=0.75):
         # First see if we have the result in the cache
         key = (matches, size)
         p = self.cache.get(key, None)
@@ -106,7 +109,7 @@ class RandomMatchProbability(object):
         # just that of observing a specific sequence of the
         # given length by chance.
         if matches == size:
-            p = 0.25 ** matches
+            p = p1 ** matches
         
         else:
             nfac = self.factorial(size)
@@ -114,8 +117,8 @@ class RandomMatchProbability(object):
             for i in range(matches, size+1):
                 j = size - i
                 p += (
-                    (0.75 ** j) *
-                    (0.25 ** i) *
+                    (self.p2 ** j) *
+                    (self.p1 ** i) *
                     nfac /
                     self.factorial(i) /
                     self.factorial(j)
