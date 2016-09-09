@@ -175,11 +175,8 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
     
     results = list(results.items())
     
-    # Now merge overlapping sequences to eliminate redundancy in the
-    # set of candidate kmers.
-    
-    # First merge by length and frequency. This sorting
-    # gives preferences to longer sequences.
+    # Now merge overlapping sequences by length and frequency to eliminate
+    # redundancy in the set of candidate kmers.
     results.sort(key=lambda i: len(i[0]) * math.log(i[1]), reverse=True)
     cur = results[0]
     merged = []
