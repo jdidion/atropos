@@ -30,7 +30,7 @@ class ProgressMessageReader(object):
         self.batch_size = batch_size
         self.interval = interval
         self.ctr = 0
-        self.mat_format = mag_format
+        self.mag_format = mag_format
         if max_items:
             if mag_format:
                 max_items = mag_format(max_items)
@@ -41,7 +41,7 @@ class ProgressMessageReader(object):
             self.msg = "Read {0} records in {1:.1f} seconds"
         
     def __next__(self):
-        value = self.iterable.next()
+        value = next(self.iterable)
         if value:
             self.ctr += value[0]
             if self.ctr % self.interval < self.batch_size:
