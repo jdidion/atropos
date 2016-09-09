@@ -168,7 +168,7 @@ def test_short_adapter_overlap():
     assert match2.rstart == 28
     assert match2.length == 2
 
-def test_multi_aligner():
+def test_multi_aligner_no_mismatches():
     from atropos._align import MultiAligner
     a = MultiAligner(max_error_rate=0, min_overlap=3)
     matches = a.locate('AGAGATCAGATGACAGATC', 'GATCA')
@@ -189,3 +189,26 @@ def test_multi_aligner():
     assert matches[1][3] == 4
     assert matches[1][4] == 4
     assert matches[1][5] == 0
+
+def test_multi_aligner_with_mismatches():
+    from atropos._align import MultiAligner
+    a = MultiAligner(max_error_rate=0.1, min_overlap=10)
+    matches = a.locate('GATATCAGATGACAGATCAGAGATCAGAT', 'GAGATCAGATGA')
+    
+    assert len(matches) == 2
+    
+    matches.sort(key=lambda x: x[5])
+    
+    assert matches[0][0] == 19
+    assert matches[0][1] == 29
+    assert matches[0][2] == 0
+    assert matches[0][3] == 10
+    assert matches[0][4] == 10
+    assert matches[0][5] == 0
+    
+    assert matches[1][0] == 0
+    assert matches[1][1] == 12
+    assert matches[1][2] == 0
+    assert matches[1][3] == 12
+    assert matches[1][4] == 11
+    assert matches[1][5] == 1

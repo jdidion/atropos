@@ -548,27 +548,38 @@ cdef class MultiAligner:
     wildcards.
     TODO: implement quality-weighted mismatches as in Skewer.
     """
-    cdef _Entry* column  # one column of the DP matrix
+    cdef _Entry* column
+    cdef _Match* match_array
     cdef double max_error_rate
     cdef int flags
     cdef int _min_overlap
-    cdef int _numcols
+    cdef int _num_cols
+    cdef int _num_matches
     
     def __cinit__(self, double max_error_rate, int flags=SEMIGLOBAL, int min_overlap=1):
         self.max_error_rate = max_error_rate
         self.flags = flags
         self._min_overlap = min_overlap
-        self._numcols = 0
+        self._num_cols = 0
+        self._num_matches = 0
     
-    def _resize(self, size):
-        if size > self._numcols:
+    def _resize_matrix(self, size):
+        if size > self._num_cols:
             mem = <_Entry*> PyMem_Realloc(self.column, (size + 1) * sizeof(_Entry))
             if not mem:
                 raise MemoryError()
             self.column = mem
-            self._numcols = size
+            self._num_cols = size
     
-    def locate(self, str reference, str query, int max_matches=10):
+    def _resize_matches(self, size):
+        if size > self._num_matches:
+            mem = <_Match*> PyMem_Realloc(self.match_array, (size + 1) * sizeof(_Match))
+            if not mem:
+                raise MemoryError()
+            self.match_array = mem
+            self._num_matches = size
+    
+    def locate(self, str reference, str query, int max_matches=100):
         """
         locate(query) -> (refstart, refstop, querystart, querystop, matches, errors)
 
@@ -582,19 +593,19 @@ cdef class MultiAligner:
 
         The alignment itself is not returned.
         """
+        cdef int m = len(reference)
+        
+        self._resize_matrix(m)
+        self._resize_matches(max_matches)
+        
         cdef bytes reference_bytes = reference.encode('ascii')
         cdef char* s1 = reference_bytes
-        cdef int m = len(reference)
-        self._resize(m)
         
         cdef bytes query_bytes = query.encode('ascii')
         cdef char* s2 = query_bytes
         cdef int n = len(query)
         
-        mem = <_Match*> PyMem_Malloc((max_matches + 1) * sizeof(_Match))
-        if not mem:
-            raise MemoryError()
-        cdef _Match* match_array = mem
+        cdef _Match* match_array = self.match_array
         cdef int num_matches = 0
         cdef int exact_match = -1
         cdef int max_cost = m + n
@@ -690,6 +701,7 @@ cdef class MultiAligner:
                                 
                 while last >= 0 and column[last].cost > k:
                     last -= 1
+                
                 # last can be -1 here, but will be incremented next.
                 # TODO if last is -1, can we stop searching?
                 if last < m:
@@ -697,39 +709,46 @@ cdef class MultiAligner:
                 elif stop_in_query:
                     # Found a match. If requested, find best match in last row.
                     # length of the aligned part of the reference
-                    length = m + min(column[m].origin, 0)
                     cost = column[m].cost
-                    matches = column[m].matches
+                    if cost > max_cost:
+                        continue
+                    
+                    length = m + min(column[m].origin, 0)
                     if length >= self._min_overlap and cost <= length * max_error_rate:
+                        matches = column[m].matches
+                        
                         match_array[num_matches].ref_stop = m
                         match_array[num_matches].query_stop = j
                         match_array[num_matches].cost = cost
                         match_array[num_matches].origin = column[m].origin
                         match_array[num_matches].matches = matches
                         
-                        num_matches += 1
-                        if num_matches >= max_matches:
-                            break
-                        
                         if cost == 0 and matches == m:
                             # exact match, stop early
-                            exact_match = num_matches - 1
+                            exact_match = num_matches
+                            num_matches += 1
                             break
+                        else:
+                            num_matches += 1
+                            if num_matches >= max_matches:
+                                break
 
         if max_n == n and exact_match == -1 and num_matches < max_matches:
             first_i = 0 if stop_in_ref else m
             # search in last column # TODO last?
             for i in range(first_i, m+1):
-                length = i + min(column[i].origin, 0)
                 cost = column[i].cost
-                matches = column[i].matches
+                if cost > max_cost:
+                    continue
+                
+                length = i + min(column[i].origin, 0)
                 if length >= self._min_overlap and cost <= length * max_error_rate:
                     # update best
                     match_array[num_matches].ref_stop = i
                     match_array[num_matches].query_stop = n
                     match_array[num_matches].cost = cost
                     match_array[num_matches].origin = column[i].origin
-                    match_array[num_matches].matches = matches
+                    match_array[num_matches].matches = column[i].matches
                     num_matches += 1
         
         if num_matches == 0:
@@ -738,9 +757,6 @@ cdef class MultiAligner:
             result = [self._create_match(match_array[exact_match])]
         else:
             result = [self._create_match(match_array[i]) for i in range(num_matches)]
-        
-        # TODO: is this strictly necessary since it's a local variable?
-        PyMem_Free(match_array)
         
         return result
 
@@ -757,3 +773,4 @@ cdef class MultiAligner:
 
     def __dealloc__(self):
         PyMem_Free(self.column)
+        PyMem_Free(self.match_array)
