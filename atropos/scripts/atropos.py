@@ -251,12 +251,12 @@ def get_argument_parser():
         help="Do not interpret IUPAC wildcards in adapters. (no)")
     # These two options are mutually exclusive. Currently, we give preference to -O to maintain
     # compatibility with Cutadapt.
-    adapter_mismatches = group.add_mutually_exclusive_group()
-    adapter_mismatches.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=None,
+    #adapter_mismatches = group.add_mutually_exclusive_group()
+    group.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=None,
         help="If the overlap between the read and the adapter is shorter than "
             "MINLENGTH, the read is not modified. Reduces the no. of bases "
             "trimmed due to random adapter matches. (3)")
-    adapter_mismatches.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
+    group.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
         help="If no minimum overlap (-O) is specified, then adapters are only matched "
              "when the probabilty of observing k out of n matching bases is <= PROB. (0.001)")
     

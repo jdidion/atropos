@@ -262,7 +262,7 @@ class Adapter(object):
     def is_not_random_match(self, matches, errors, size):
         if size < self.min_overlap:
             return False
-        if matches == size:
+        if errors == 0:
             return True
         if errors / size > self.max_error_rate:
             return False
