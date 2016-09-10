@@ -901,7 +901,7 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
                     mismatch_action=options.correct_mismatches,
                     max_insert_mismatch_frac=options.insert_match_error_rate,
-                    min_adapter_match_frac=1.0 - options.insert_match_adapter_error_rate,
+                    max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
                     match_probability=match_probability, insert_max_rmp=options.insert_max_rmp,
                     adapter_max_rmp=options.adapter_max_rmp or options.insert_max_rmp,
                     base_probs=base_probs)

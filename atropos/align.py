@@ -166,7 +166,7 @@ class InsertAligner(object):
     def __init__(self, adapter1, adapter2, match_probability=RandomMatchProbability(),
                  insert_max_rmp=1E-6, adapter_max_rmp=0.001,
                  min_insert_overlap=1, max_insert_mismatch_frac=0.2,
-                 min_adapter_overlap=1, min_adapter_match_frac=0.8,
+                 min_adapter_overlap=1, max_adapter_mismatch_frac=0.2,
                  adapter_check_cutoff=9, base_probs=dict(p1=0.25, p2=0.75)):
         self.adapter1 = adapter1
         self.adapter1_len = len(adapter1)
@@ -178,8 +178,7 @@ class InsertAligner(object):
         self.min_insert_overlap = min_insert_overlap
         self.max_insert_mismatch_frac = float(max_insert_mismatch_frac)
         self.min_adapter_overlap = min_adapter_overlap
-        self.min_adapter_match_frac = float(min_adapter_match_frac)
-        self.max_adapter_mismatch_frac = 1.0 - self.min_adapter_match_frac
+        self.max_adapter_mismatch_frac = float(max_adapter_mismatch_frac)
         self.adapter_check_cutoff = adapter_check_cutoff
         self.base_probs = base_probs
         self.aligner = MultiAligner(
@@ -216,8 +215,8 @@ class InsertAligner(object):
             a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
             a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
             adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
-            min_adapter_matches = round(adapter_len * self.min_adapter_match_frac)
-            if a1_match[4] < min_adapter_matches and a2_match[4] < min_adapter_matches:
+            max_adapter_mismatches = round(adapter_len * self.max_adapter_mismatch_frac)
+            if a1_match[5] > max_adapter_mismatches and a2_match[5] > max_adapter_mismatches:
                 return None
             
             a1_prob = self.match_probability(a1_match[4], adapter_len)

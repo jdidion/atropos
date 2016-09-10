@@ -266,7 +266,7 @@ def test_mismatched_adapter_overlaps():
     # the data has a fairly high error rate
     cutter = InsertAdapterCutter(adapter1, adapter2,
         max_insert_mismatch_frac=0.3,
-        min_adapter_match_frac=0.7)
+        max_adapter_mismatch_frac=0.3)
     read1 = Sequence('foo', r1, '#' * 125)
     read2 = Sequence('foo', r2, '#' * 125)
     new_read1, new_read2 = cutter(read1, read2)
