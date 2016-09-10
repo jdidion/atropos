@@ -244,18 +244,21 @@ def get_argument_parser():
             "(allow both mismatches and indels)")
     group.add_argument("-n", "--times", type=int, metavar="COUNT", default=1,
         help="Remove up to COUNT adapters from each read. (1)")
-    group.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=None,
-        help="If the overlap between the read and the adapter is shorter than "
-            "MINLENGTH, the read is not modified. Reduces the no. of bases "
-            "trimmed due to random adapter matches. (3)")
-    group.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
-        help="If no minimum overlap (-O) is specified, then adapters are only matched "
-             "when the probabilty of observing k out of n matching bases is <= PROB. (0.001)")
     group.add_argument("--match-read-wildcards", action="store_true", default=False,
         help="Interpret IUPAC wildcards in reads. (no)")
     group.add_argument("-N", "--no-match-adapter-wildcards", action="store_false",
         default=True, dest='match_adapter_wildcards',
         help="Do not interpret IUPAC wildcards in adapters. (no)")
+    # These two options are mutually exclusive. Currently, we give preference to -O to maintain
+    # compatibility with Cutadapt.
+    adapter_mismatches = group.add_mutually_exclusive_group()
+    adapter_mismatches.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=None,
+        help="If the overlap between the read and the adapter is shorter than "
+            "MINLENGTH, the read is not modified. Reduces the no. of bases "
+            "trimmed due to random adapter matches. (3)")
+    adapter_mismatches.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
+        help="If no minimum overlap (-O) is specified, then adapters are only matched "
+             "when the probabilty of observing k out of n matching bases is <= PROB. (0.001)")
     
     # Arguments for insert match
     group.add_argument("--adapter-pair", default=None, metavar="NAME1,NAME2",
@@ -600,6 +603,7 @@ def validate_options(options, parser):
     if options.adapter_max_rmp:
         if options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0:
             parser.error("--adapter-max-rmp must be between [0,1].")
+        options.overlap = 1
     elif options.overlap is None:
         options.overlap = 3
     elif options.overlap < 1:
@@ -840,21 +844,22 @@ def create_reader(options, paired, parser, counter_magnitude="M"):
     return (reader, qualities, qualfile is not None)
 
 def create_modifiers(options, paired, qualities, has_qual_file, parser):
-    adapters_use_rmp = options.overlap is None
-    match_probability = None
-    if adapters_use_rmp or options.aligner == 'insert':
+    if options.adapter_max_rmp or options.aligner == 'insert':
         match_probability = RandomMatchProbability()
     
     # Create adapters
-    adapter_parser = AdapterParser(
+    parser_args = dict(
         colorspace=options.colorspace,
         max_error_rate=options.error_rate,
-        min_overlap=options.overlap or 1,
+        min_overlap=options.overlap,
         read_wildcards=options.match_read_wildcards,
         adapter_wildcards=options.match_adapter_wildcards,
-        indels=options.indels,
-        match_probability=match_probability if adapters_use_rmp else None,
-        max_rmp=options.adapter_max_rmp)
+        indels=options.indels
+    )
+    if options.adapter_max_rmp:
+        parser_args['match_probability'] = match_probability
+        parser_args['max_rmp'] = options.adapter_max_rmp
+    adapter_parser = AdapterParser(**parser_args)
 
     try:
         adapters1 = adapter_parser.parse_multi(options.adapters, options.anywhere, options.front)
@@ -903,7 +908,6 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
                     max_insert_mismatch_frac=options.insert_match_error_rate,
                     max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
                     match_probability=match_probability, insert_max_rmp=options.insert_max_rmp,
-                    adapter_max_rmp=options.adapter_max_rmp or options.insert_max_rmp,
                     base_probs=base_probs)
             else:
                 a1_args = a2_args = None

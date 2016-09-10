@@ -199,7 +199,7 @@ class Adapter(object):
     """
     def __init__(self, sequence, where, max_error_rate=0.1, min_overlap=3,
                  read_wildcards=False, adapter_wildcards=True, name=None, indels=True,
-                 match_probability=None, max_rmp=None):
+                 match_probability=None, max_rmp=None, rmp_check_cutoff=9):
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
         self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
@@ -211,6 +211,7 @@ class Adapter(object):
         if match_probability and max_rmp is not None:
             self.match_probability = match_probability
             self.max_rmp = max_rmp
+            self.rmp_check_cutoff = rmp_check_cutoff
         self.indels = indels
         self.adapter_wildcards = adapter_wildcards and not set(self.sequence) <= set('ACGT')
         self.read_wildcards = read_wildcards
@@ -258,8 +259,19 @@ class Adapter(object):
         self.debug = True
         self.aligner.enable_debug()
     
-    def is_not_random_match(self, matches, size):
-        return self.match_probability is None or self.match_probability(matches, size) <= self.max_rmp
+    def is_not_random_match(self, matches, errors, size):
+        if size < self.min_overlap:
+            return False
+        if matches == size:
+            return True
+        if errors / size > self.max_error_rate:
+            return False
+        if self.match_probability is None:
+            return True
+        # If indels are not allowed, then we bypass the rmp check for short matches
+        if not self.indels and size <= self.rmp_check_cutoff:
+            return True
+        return self.match_probability(matches, size) <= self.max_rmp
     
     def match_to(self, read):
         """
@@ -283,7 +295,7 @@ class Adapter(object):
         
         if pos >= 0:
             l = len(self.sequence)
-            if self.is_not_random_match(l, l):
+            if self.is_not_random_match(l, 0, l):
                 return Match(0, l, pos, pos + l, l, 0, self._front_flag, self, read)
         
         # try approximate matching
@@ -302,10 +314,7 @@ class Adapter(object):
         
         if alignment:
             astart, astop, rstart, rstop, matches, errors = alignment
-            size = astop - astart
-            if (size >= self.min_overlap and
-                    errors / size <= self.max_error_rate and
-                    self.is_not_random_match(matches, size)):
+            if self.is_not_random_match(matches, errors, astop - astart):
                 return Match(
                     astart, astop, rstart, rstop, matches, errors,
                     self._front_flag, self, read)
