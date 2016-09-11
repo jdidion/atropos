@@ -194,19 +194,19 @@ cdef class Aligner:
     cdef bytes _reference  # TODO rename to translated_reference or so
     cdef str str_reference
 
-    def __cinit__(self, str reference, double max_error_rate, int flags=SEMIGLOBAL, bint wildcard_ref=False, bint wildcard_query=False):
+    def __cinit__(self, str reference, double max_error_rate, int flags=SEMIGLOBAL, bint wildcard_ref=False,
+                  bint wildcard_query=False, int min_overlap=1, int indel_cost=1):
         self.max_error_rate = max_error_rate
         self.flags = flags
         self.wildcard_ref = wildcard_ref
         self.wildcard_query = wildcard_query
         self.str_reference = reference
         self.reference = reference
-        self._min_overlap = 1
+        self.min_overlap = min_overlap
+        self.indel_cost = indel_cost
         self.debug = False
         self._dpmatrix = None
-        self._insertion_cost = 1
-        self._deletion_cost = 1
-
+    
     property min_overlap:
         def __get__(self):
             return self._min_overlap

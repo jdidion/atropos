@@ -199,7 +199,7 @@ class Adapter(object):
     """
     def __init__(self, sequence, where, max_error_rate=0.1, min_overlap=3,
                  read_wildcards=False, adapter_wildcards=True, name=None, indels=True,
-                 match_probability=None, max_rmp=None):
+                 indel_cost=1, match_probability=None, max_rmp=None):
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
         self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
@@ -237,7 +237,9 @@ class Adapter(object):
         self.aligner = align.Aligner(self.sequence, self.max_error_rate,
             flags=self.where, wildcard_ref=self.adapter_wildcards, wildcard_query=self.read_wildcards)
         self.aligner.min_overlap = self.min_overlap
-        if not self.indels:
+        if self.indels:
+            self.aligner.indel_cost = indel_cost
+        else:
             # TODO
             # When indels are disallowed, an entirely different algorithm
             # should be used.

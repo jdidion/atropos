@@ -239,6 +239,9 @@ def get_argument_parser():
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate for adapter match (no. of errors divided by the length "
             "of the matching region). (0.1)")
+    group.add_argument("--indel-cost", type=int, metavar="COST", default=1,
+        help="Integer cost of insertions and deletions during adapter match. Substitutions always "
+             "have a cost of 1.")
     group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
         help="Allow only mismatches in alignments. "
             "(allow both mismatches and indels)")
@@ -546,6 +549,9 @@ def setup_logging(stdout=False, level="INFO"):
     logging.getLogger().addHandler(stream_handler)
 
 def validate_options(options, parser):
+    # TODO: most of these validation checks can be specified using
+    # functions passed to the 'type' parameter of add_argument
+    
     if sum(int(opt is not False) for opt in (options.mirna, options.bisulfite)) > 1:
         parser.error("Cannot specify more than one method-specific option")
     
@@ -734,6 +740,9 @@ def validate_options(options, parser):
         parser.error("Using --anywhere with colorspace reads is currently not supported (if you "
             "think this may be useful, contact the author).")
     
+    if options.indels and options.indel_cost < 0:
+        parser.error("--indel-cost must be >= 0")
+    
     if options.error_rate is None:
         options.error_rate = 0.1
     elif not (0 <= options.error_rate <= 1.0):
@@ -856,7 +865,7 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
         min_overlap=options.overlap,
         read_wildcards=options.match_read_wildcards,
         adapter_wildcards=options.match_adapter_wildcards,
-        indels=options.indels
+        indels=options.indels, indel_cost=options.indel_cost
     )
     if options.adapter_max_rmp:
         parser_args['match_probability'] = match_probability
