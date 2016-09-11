@@ -172,22 +172,13 @@ do
         "--no-writer-process -pe1 $fq1 -pe2 $fq2" >> $commands
     done
     
-    if [ "$qcut" -eq "0" ]
-    then
-      n=''
-      ncut=0
-    else
-      n='-n'
-      ncut=7
-    fi
-    
     profile="seqpurge_${threads}_${err}_q${qcut}"
     echo ">&2 echo $profile && /usr/bin/time -p" \
     "$SEQPURGE -in1 $fq1 -in2 $fq2" \
     "-out1 ${outdir}/${profile}.1.fq.gz" \
     "-out2 ${outdir}/${profile}.2.fq.gz" \
     "-a1 $ADAPTER1 -a2 $ADAPTER2" \
-    "-qcut $qcut -ncut $ncut -min_len $MIN_LEN" \
+    "-qcut $qcut -min_len $MIN_LEN" \
     "-threads $threads -prefetch $BATCH_SIZE" \
     "$seqpurge_extra" \
     "-summary ${outdir}/${profile}.summary" >> $commands
