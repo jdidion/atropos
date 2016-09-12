@@ -239,9 +239,9 @@ def get_argument_parser():
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate for adapter match (no. of errors divided by the length "
             "of the matching region). (0.1)")
-    group.add_argument("--indel-cost", type=int, metavar="COST", default=1,
+    group.add_argument("--indel-cost", type=int, metavar="COST", default=3,
         help="Integer cost of insertions and deletions during adapter match. Substitutions always "
-             "have a cost of 1.")
+             "have a cost of 1. (3)")
     group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
         help="Allow only mismatches in alignments. "
             "(allow both mismatches and indels)")
@@ -263,7 +263,7 @@ def get_argument_parser():
             "trimmed due to random adapter matches. (3)")
     group.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
         help="If no minimum overlap (-O) is specified, then adapters are only matched "
-             "when the probabilty of observing k out of n matching bases is <= PROB. (0.001)")
+             "when the probabilty of observing k out of n matching bases is <= PROB. (1E-6)")
     
     # Arguments for insert match
     group.add_argument("--adapter-pair", default=None, metavar="NAME1,NAME2",
@@ -608,14 +608,15 @@ def validate_options(options, parser):
     # minimum overlap and -O is set to 1, otherwise -O is set to the old
     # default of 3.
     # TODO: This is pretty confusing logic - need to simplify
-    if options.adapter_max_rmp:
-        if options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0:
+    if options.overlap:
+        if options.overlap < 1:
+            parser.error("The overlap must be at least 1.")
+    else:
+        if not options.adapter_max_rmp:
+            options.adapter_max_rmp = 1E-6
+        elif options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0:
             parser.error("--adapter-max-rmp must be between [0,1].")
         options.overlap = 1
-    elif options.overlap is None:
-        options.overlap = 3
-    elif options.overlap < 1:
-        parser.error("The overlap must be at least 1.")
     
     if options.aligner != 'adapter':
         if options.aligner == 'insert':
@@ -912,14 +913,15 @@ def create_modifiers(options, paired, qualities, has_qual_file, parser):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
                 # Use different base probabilities if we're trimming bisulfite data.
-                base_probs = dict(p1=0.33, p2=0.67) if options.bisulfite else dict(p1=0.25, p2=0.75)
+                # TODO: this doesn't seem to help things, so commenting it out for now
+                #base_probs = dict(p1=0.33, p2=0.67) if options.bisulfite else dict(p1=0.25, p2=0.75)
                 modifiers.add_modifier(InsertAdapterCutter,
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
                     mismatch_action=options.correct_mismatches,
                     max_insert_mismatch_frac=options.insert_match_error_rate,
                     max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
-                    match_probability=match_probability, insert_max_rmp=options.insert_max_rmp,
-                    base_probs=base_probs)
+                    match_probability=match_probability,
+                    insert_max_rmp=options.insert_max_rmp)
             else:
                 a1_args = a2_args = None
                 if adapters1:
