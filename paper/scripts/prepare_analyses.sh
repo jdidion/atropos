@@ -73,7 +73,7 @@ BATCH_SIZE=5000
 
 ## simulated reads
 
-for err in 001 005 01 real
+for err in 001 005 01 real_ngs real_wgbs
 do
   # In the simulated data, we don't do error correction in Atropos
   # or SeqPurge because it shouldn't affect the outcome of adapter
@@ -81,13 +81,31 @@ do
   # scripts (error correction can't be turned off in Skewer). Also,
   # the simulated data has a lower max error rate than the real data.
   
-  if [ "$err" == "real" ]
+  if [ "$err" == "real_ngs" ]
+  then
+      fq1=$root/data/real/NA12878_03_AACGTGAT_L001_R1_001.fastq.gz
+      fq2=$root/data/real/NA12878_03_AACGTGAT_L001_R2_001.fastq.gz
+      quals='0 20'
+      aligners='insert'
+      atropos_extra='--insert-match-error 0.2 -e 0.1 --correct-mismatches liberal'
+      seqpurge_extra='-ec -match_perc 80'
+      skewer_extra='-r 0.2'
+      ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACAACGTGATATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
+      ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
+      # download data
+      if [ ! -f $fq1 ]
+      then
+        mkdir -p $root/data/real
+        wget -S -O ftp://ftp.sra.ebi.ac.uk/vol1/ERA494/ERA494451/fastq/NA12878_03_AACGTGAT_L001_R1_001.fastq.gz > $fq1
+        wget -S -O ftp://ftp.sra.ebi.ac.uk/vol1/ERA494/ERA494451/fastq/NA12878_03_AACGTGAT_L001_R2_001.fastq.gz > $fq2
+      fi
+  elif [ "$err" == "real_wgbs" ]
   then
       fq1=$root/data/real/GM12878_WGBS.1.fq.gz
       fq2=$root/data/real/GM12878_WGBS.2.fq.gz
       quals='0 20'
       aligners='insert'
-      atropos_extra='--correct-mismatches best -e 0.3'
+      atropos_extra='--insert-match-error 0.3 -e 0.2 --correct-mismatches liberal'
       seqpurge_extra='-ec -match_perc 70'
       skewer_extra='-r 0.3'
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
@@ -103,9 +121,9 @@ do
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
       quals='0'
-      atropos_extra='-e 0.15'
-      seqpurge_extra='-match_perc 85'
-      skewer_extra='-r 0.15'
+      atropos_extra='--insert-match-error 0.20 -e 0.10'
+      seqpurge_extra='-match_perc 80'
+      skewer_extra='-r 0.20'
       aligners='adapter insert'
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG"
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
@@ -138,8 +156,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_writercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2" \
-        "--adapter-max-rmp 0.001 -q $qcut --trim-n" \
+        "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -150,8 +167,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_workercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2" \
-        "--adapter-max-rmp 0.001 -q $qcut --trim-n" \
+        "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
@@ -162,8 +178,7 @@ do
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_nowriter"
         echo ">&2 echo $profile && /usr/bin/time -p" \
         "$ATROPOS -T $threads --aligner $aligner" \
-        "-a $ADAPTER1 -A $ADAPTER2" \
-        "--adapter-max-rmp 0.001 -q $qcut --trim-n" \
+        "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
