@@ -174,7 +174,7 @@ def test_paired_end_qualtrim():
 
 def test_paired_end_qualtrim_swapped():
     '''single-pass paired-end with -q and -m, but files swapped'''
-    run_paired('-q 20 -a CAGTGGAGTA -A TTAGACATAT -m 14',
+    run_paired('-q 20 -a CAGTGGAGTA -A TTAGACATAT -m 14 --adapter-max-rmp 0.001',
         in1='paired.2.fastq', in2='paired.1.fastq',
         expected1='pairedq.2.fastq', expected2='pairedq.1.fastq',
         aligners=BACK_ALIGNERS

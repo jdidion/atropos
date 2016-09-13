@@ -239,9 +239,9 @@ def get_argument_parser():
     group.add_argument("-e", "--error-rate", type=float, default=None,
         help="Maximum allowed error rate for adapter match (no. of errors divided by the length "
             "of the matching region). (0.1)")
-    group.add_argument("--indel-cost", type=int, metavar="COST", default=3,
+    group.add_argument("--indel-cost", type=int, metavar="COST", default=None,
         help="Integer cost of insertions and deletions during adapter match. Substitutions always "
-             "have a cost of 1. (3)")
+             "have a cost of 1. (1)")
     group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
         help="Allow only mismatches in alignments. "
             "(allow both mismatches and indels)")
@@ -608,28 +608,38 @@ def validate_options(options, parser):
     # minimum overlap and -O is set to 1, otherwise -O is set to the old
     # default of 3.
     # TODO: This is pretty confusing logic - need to simplify
-    if options.overlap:
-        if options.overlap < 1:
-            parser.error("The overlap must be at least 1.")
-    else:
-        if not options.adapter_max_rmp:
-            options.adapter_max_rmp = 1E-6
-        elif options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0:
-            parser.error("--adapter-max-rmp must be between [0,1].")
-        options.overlap = 1
+    if options.overlap is not None and options.overlap < 1:
+        parser.error("The overlap must be at least 1.")
+    if options.indels and options.indel_cost is not None and options.indel_cost < 0:
+        parser.error("--indel-cost must be >= 0")
+    if options.adapter_max_rmp is not None and (options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0):
+        parser.error("--adapter-max-rmp must be between [0,1].")
     
-    if options.aligner != 'adapter':
-        if options.aligner == 'insert':
-            if paired != 'both':
-                parser.error("Insert aligner only works with paired-end reads")
-                # TODO: should also be checking that there is exactly one 3' adapter for each read
-                # TODO: have the aligner tell us whether it can be used based on options?
-            if options.insert_match_error_rate is None:
-                options.insert_match_error_rate = options.error_rate or 0.2
-            if options.insert_match_adapter_error_rate is None:
-                options.insert_match_adapter_error_rate = options.insert_match_error_rate
-            if options.insert_max_rmp < 0 or options.insert_max_rmp > 1.0:
-                parser.error("--insert-max-rmp must be between [0,1].")
+    if options.aligner == 'adapter':
+        if options.indels and options.indel_cost is None:
+            options.indel_cost = 1
+        if options.overlap is None:
+            if options.adapter_max_rmp is None:
+                options.overlap = 3
+            else:
+                options.overlap = 1
+    elif options.aligner == 'insert':
+        if paired != 'both':
+            parser.error("Insert aligner only works with paired-end reads")
+            # TODO: should also be checking that there is exactly one 3' adapter for each read
+            # TODO: have the aligner tell us whether it can be used based on options?
+        if options.insert_max_rmp < 0 or options.insert_max_rmp > 1.0:
+            parser.error("--insert-max-rmp must be between [0,1].")
+        if options.indels and options.indel_cost is None:
+            options.indel_cost = 3
+        if options.overlap is None:
+            options.overlap = 1
+            if options.adapter_max_rmp is None:
+                options.adapter_max_rmp = 1E-6
+        if options.insert_match_error_rate is None:
+            options.insert_match_error_rate = options.error_rate or 0.2
+        if options.insert_match_adapter_error_rate is None:
+            options.insert_match_adapter_error_rate = options.insert_match_error_rate
     
     if options.merge_overlapping and (
             paired != "both" or
@@ -740,9 +750,6 @@ def validate_options(options, parser):
     if options.anywhere and options.colorspace:
         parser.error("Using --anywhere with colorspace reads is currently not supported (if you "
             "think this may be useful, contact the author).")
-    
-    if options.indels and options.indel_cost < 0:
-        parser.error("--indel-cost must be >= 0")
     
     if options.error_rate is None:
         options.error_rate = 0.1
