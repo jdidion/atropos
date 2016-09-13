@@ -102,7 +102,7 @@ do
       atropos_extra='--insert-match-error 0.2 -e 0.1 --correct-mismatches liberal'
       seqpurge_extra='-ec -match_perc 80'
       skewer_extra='-r 0.2'
-      ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACAACGTGATATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
+      ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACAACGTGATATCTCGTATGCCGTCTTCTGCTTG" # custom
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
   elif [ "$err" == "real_wgbs" ]
   then
