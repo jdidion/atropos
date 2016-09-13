@@ -35,7 +35,7 @@ class Trimmer(object):
             return read
     
     def clip(self, read, front=0, back=0):
-        if front or back:
+        if (front or back) and len(read) > 0:
             front_bases, back_bases, new_read = read.clip(front, back)
             self.trimmed_bases += front_bases + back_bases
             return new_read
@@ -93,6 +93,9 @@ class AdapterCutter(object):
 
         Cut found adapters from a single read. Return modified read.
         """
+        if len(read) == 0:
+            return read
+        
         matches = []
 
         # try at most self.times times to remove an adapter
@@ -466,6 +469,8 @@ class NextseqQualityTrimmer(Trimmer):
         self.base = base
     
     def __call__(self, read):
+        if len(read) == 0:
+            return read
         stop = nextseq_trim_index(read, self.cutoff, self.base)
         return self.subseq(read, end=stop)
 
@@ -479,6 +484,8 @@ class QualityTrimmer(Trimmer):
         self.base = base
 
     def __call__(self, read):
+        if len(read) == 0:
+            return read
         start, stop = quality_trim_index(read.qualities, self.cutoff_front, self.cutoff_back, self.base)
         return self.subseq(read, start, stop)
 
@@ -493,6 +500,8 @@ class NEndTrimmer(Trimmer):
         self.end_trim = re.compile(r'N+$')
 
     def __call__(self, read):
+        if len(read) == 0:
+            return read
         sequence = read.sequence
         start_cut = self.start_trim.match(sequence)
         end_cut = self.end_trim.search(sequence)
@@ -531,6 +540,8 @@ class NonDirectionalBisulfiteTrimmer(object):
             self._rrbs_cutter = RRBSTrimmer(trim_3p)
     
     def __call__(self, read):
+        if len(read) == 0:
+            return read
         cutter = None
         if self._regex.match(read.sequence):
             cutter = self._non_directional_cutter
@@ -579,12 +590,15 @@ class MergeOverlapping(ReadPairModifier):
     
     def __call__(self, read1, read2):
         if read1.match and not read1.match.front and read2.match and not read2.match.front:
-            min_overlap = self.min_overlap
             l1 = len(read1.sequence)
             l2 = len(read2.sequence)
+            min_overlap = self.min_overlap
             if min_overlap <= 1:
                 min_overlap = max(2, round(self.min_overlap * min(l1, l2)))
-                
+            
+            if l1 < min_overlap or l2 < min_overlap:
+                return (read1, read2)
+            
             aligner = Aligner(read1.sequence, self.error_rate, SEMIGLOBAL)
             read2_rc = reverse_complement(read2.sequence)
             # TODO: Resolve overlap. We offer the user the choice to set mismatching bases to
