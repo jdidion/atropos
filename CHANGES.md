@@ -1,7 +1,12 @@
 # Changes
 
-v1.0.14 (dev)
+v1.0.15 (dev)
 -------------
+
+
+
+v1.0.14 (2016.09.13)
+--------------------
 
 * Implemented \_align.MultiAligner, which returns all matches that satisfy the overlap and error thresholds. align.InsertAligner now uses MultiAligner for insert matching, and tests all matches in decreasing size order until it finds one with adapter matches (if any).
 * Major improvements to the accuracy of the 'detect' command.
