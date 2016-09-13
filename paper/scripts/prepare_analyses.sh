@@ -203,7 +203,7 @@ do
   # Now generate commands to map reads
   if [ "$err" == "real_wgs" ]
   then
-    if [ ! -f $genome.bwameth.c2t ]
+    if [ ! -f $genome.bwt ]
     then
       echo "$BWA index $genome" >> $bwa_commands
     fi
@@ -230,7 +230,7 @@ do
     
   elif [ "$err" == "real_wgbs" ]
   then
-    if [ ! -f $methylome.bwameth.c2t ]
+    if [ ! -f $genome.bwameth.c2t ]
     then
       echo "$BWAMETH index $genome" >> $bwa_commands
     fi

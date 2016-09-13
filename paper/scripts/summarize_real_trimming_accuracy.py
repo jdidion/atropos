@@ -237,6 +237,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--bam-dir")
     parser.add_argument("-x", "--bam-extension", default=".sorted.bam")
+    parser.add_argument("-p", "--bam-pattern", default=None)
     parser.add_argument("-u", "--untrimmed-name", default="untrimmed")
     parser.add_argument("-o", "--output", default="-")
     parser.add_argument("-H", "--hist", default="trimmed_hists.txt")
@@ -245,7 +246,8 @@ def main():
     args = parser.parse_args()
     
     trimmed = {}
-    for path in glob(os.path.join(args.bam_dir, "*{}".format(args.bam_extension))):
+    pattern = args.bam_pattern or "*{}".format(args.bam_extension)
+    for path in glob(os.path.join(args.bam_dir, pattern)):
         name = os.path.basename(path)[:-len(args.bam_extension)]
         if name == args.untrimmed_name:
             untrimmed = BAMReader(path)
