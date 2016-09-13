@@ -7,7 +7,7 @@ def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=
     mag_format = magnitude_formatter(counter_magnitude)
     
     if progress_type == "msg":
-        return ProgressMessageReader(reader, batch_size, max_items, mag_format, **kwargs)
+        return ProgressMessageReader(reader, batch_size, max_items=max_items, mag_format=mag_format, **kwargs)
     elif progress_type != "bar":
         raise Exception("Unsupported progress type {}".format(progress_type))
             
