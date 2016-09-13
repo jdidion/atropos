@@ -51,9 +51,10 @@ do
         # map reads
         swarm <dependency> --threads-per-process ${threads} \
           --gb-per-process $BWAMETH_GB_PER_PROCESS \
-          --file bwameth_commands.sh
+          --file bwa_commands_t${threads}.sh
         # name-sort reads
         swarm <dependency> --threads-per-process ${threads} \
-          --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands.sh
+          --gb-per-process $SORT_GB_PER_PROCESS \
+          --file sort_commands_t${threads}.sh
     fi
 done

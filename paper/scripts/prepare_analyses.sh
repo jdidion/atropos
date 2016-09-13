@@ -149,7 +149,7 @@ do
         
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_writercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
-        "$ATROPOS -T $threads --aligner $aligner" \
+        "$ATROPOS -T $threads --aligner $aligner --op-order GACQ" \
         "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_writer.report.txt" \
@@ -160,7 +160,7 @@ do
         
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_workercomp"
         echo ">&2 echo $profile && /usr/bin/time -p" \
-        "$ATROPOS -T $threads --aligner $aligner" \
+        "$ATROPOS -T $threads --aligner $aligner --op-order GACQ" \
         "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
@@ -171,7 +171,7 @@ do
         
         profile="atropos_${threads}_${err}_q${qcut}_${aligner}_nowriter"
         echo ">&2 echo $profile && /usr/bin/time -p" \
-        "$ATROPOS -T $threads --aligner $aligner" \
+        "$ATROPOS -T $threads --aligner $aligner --op-order GACQ" \
         "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
         "--report-file ${outdir}/${profile}_nowriter.report.txt" \
