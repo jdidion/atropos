@@ -8,7 +8,9 @@ v1.0.14 (dev)
 * Added options for how to correct mismatched bases for which qualities are equal.
 * Added option to select a single pair of adapters from multiple sequences in a fasta file.
 * Fixed report when insert-match is used.
-* Several additional bugfixes.
+* Fixed several bugs when using the "message" progress bar (thanks to Thomas Cokelaer!).
+* Fixed a segmentation fault that occurs when trying to trim zero-length reads with the insert aligner.
+* Sevaral other bugfixes.
 
 v1.0.13 (2016.08.31)
 --------------------
