@@ -147,10 +147,12 @@ class InsertAdapterCutter(ReadPairModifier):
     insert overlap before falling back to semi-global adapter alignment.
     """
     def __init__(self, adapter1, adapter2, action='trim', mismatch_action=None,
-                 symmetric=True, **aligner_args):
+                 symmetric=True, min_insert_overlap=1, **aligner_args):
         self.adapter1 = adapter1
         self.adapter2 = adapter2
-        self.aligner = InsertAligner(adapter1.sequence, adapter2.sequence, **aligner_args)
+        self.aligner = InsertAligner(adapter1.sequence, adapter2.sequence,
+            min_insert_overlap=min_insert_overlap, **aligner_args)
+        self.min_insert_len = min_insert_overlap
         self.action = action
         self.mismatch_action = mismatch_action
         self.symmetric = symmetric
@@ -159,6 +161,9 @@ class InsertAdapterCutter(ReadPairModifier):
         self.corrected_bp = [0, 0]
     
     def __call__(self, read1, read2):
+        if len(read1) < self.min_insert_len or len(read2) < self.min_insert_len:
+            return (read1, read2)
+        
         match = self.aligner.match_insert(read1.sequence, read2.sequence)
         
         if match:
