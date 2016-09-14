@@ -1,6 +1,7 @@
 library(reshpae2)
 library(ggplot2)
 library(readr)
+library(cowplot)
 
 compare_mapping <- function(read, prog) {
     untrimmed <- (read[1, 'read1_quality']+1) * (read[1, 'read2_quality']+1)
@@ -76,7 +77,7 @@ outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), num.progs), function(i) {
     })
 }))
 
-process <- function(tab) {
+process <- function(tab, exclude.discarded=TRUE) {
     progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
     N <- max(tab$read_idx)
     num.progs <- length(progs)
@@ -89,8 +90,13 @@ process <- function(tab) {
         data.frame(read_id=1:N, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_quality))),
         data.frame(read_id=1:N, read=2, do.call(cbind, lapply(sample_tabs, function(x) x$read2_quality)))
     )
+    if (exclude.discarded) {
+        w <- apply(quals[,3:ncol(quals)], 1, function(x) any(x==-1))
+        quals <- quals[!w,]
+    }
     quals$maxq <- apply(quals[,3:ncol(quals)], 1, max)
-    pts <- melt(as.data.frame(t(sapply(c(1,seq(5,60,5)), function(th) {
+    th_values <- c(1,seq(5,60,5))
+    pts <- melt(as.data.frame(t(sapply(th_values, function(th) {
         c(
             th=th,
             x=sum(quals$maxq >= th),
@@ -99,11 +105,29 @@ process <- function(tab) {
             })
         )
     }))), id.vars=c('th', 'x'), measure.vars=progs, variable.name='prog', value.name='y')
+    pts$delta <- NA
+    for (th in th_values) {
+        for (prog in progs) {
+            pts[pts$prog == prog & pts$th == th, 'delta'] <- pts[pts$prog == prog & pts$th == th, 'y'] - pts[pts$prog == 'untrimmed' & pts$th == th, 'y']
+        }
+    }
     list(progs=progs, quals=quals, pts=pts)
 }
 
-plot.data <- function(data) {
-    ggplot(data$pts, aes(x=x, y=y, colour=prog, shape=prog)) + geom_line() + geom_point()
+plot.data <- function(data, prog.labels) {
+    pts <- data$pts
+    progs <- data$progs
+    pts$prog <- as.character(pts$prog)
+    colnames(pts) <- c("MAPQ", "x", "Program", "y", "Delta")
+    for (i in 1:length(prog.labels)) {
+        pts[pts$Program == progs[i], 'Program'] <- prog.labels[i]
+    }
+    pts$Q <- 0
+    pts[grep(pts$Program, pattern = 'Q20'), 'Q'] <- 20
+    pts$Q <- factor(pts$Q)
+    ggplot(pts[pts$Program != 'Untrimmed',], aes(x=MAPQ, y=Delta, colour=Program, shape=Q)) + 
+        geom_line() + geom_point() +
+        labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
 }
 
 wgs <- read_tsv('wgs_results.txt')
