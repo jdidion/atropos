@@ -540,7 +540,7 @@ def load_known_contaminants(options):
     cache_file = ".contaminants"
     if not options.no_cache_contaminants and os.path.exists(cache_file):
         with open(cache_file, "rb") as cache:
-            known_contaminants = pickle.load(cache)
+            return pickle.load(cache)
     else:
         known_contaminants = load_known_contaminants_from_url()
         if options.known_contaminant:
@@ -558,7 +558,8 @@ def load_known_contaminants(options):
                 temp[seq] = list(names)
             with open(cache_file, "wb") as cache:
                 pickle.dump(temp, cache)
-        
+        return known_contaminants
+
 def load_known_contaminants_from_file(path):
     with open(path, "rt") as i:
         return parse_known_contaminants(i)
