@@ -3,7 +3,9 @@
 v1.0.15 (dev)
 -------------
 
-
+* Fixed missing import bug in 'detect' command.
+* Added estimate of fraction of contaminated reads to output of 'detect' command.
+* Optionally cache list of known contaminants rather than re-download it every time.
 
 v1.0.14 (2016.09.13)
 --------------------

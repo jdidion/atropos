@@ -3,10 +3,13 @@
 from collections import defaultdict
 import logging
 import math
+import os
+import pickle
 import re
 import statistics as stats
 import sys
 from urllib.request import urlopen
+from .align import Aligner, SEMIGLOBAL
 from .seqio import FastqReader
 from .util import reverse_complement, sequence_complexity, enumerate_range
 from .xopen import open_output, xopen
@@ -20,44 +23,46 @@ from .xopen import open_output, xopen
 # TODO: whether and where to cache list of known contaminants?
 
 def main(options):
-    known_contaminants = None
-    if options.include_contaminants != 'unknown':
-        known_contaminants = load_known_contaminants_from_url()
-        if options.known_contaminant:
-            merge_contaminants(
-                known_contaminants,
-                load_known_contaminants_from_option_strings(options.known_contaminant))
-        if options.known_contaminants_file:
-            merge_contaminants(
-                known_contaminants,
-                load_known_contaminants_from_file(options.known_contaminants_file))
-    
     infiles = [f for f in (
         options.single_input, options.input1, options.input2, options.interleaved_input
     ) if f is not None]
     
     n_reads = options.max_reads or 10000
     
+    known_contaminants = None
+    if options.include_contaminants != 'unknown':
+        known_contaminants = load_known_contaminants(options)
+    
     with open_output(options.adapter_report) as o:
         print("\nDetecting adapters and other potential contaminant sequences based on "
               "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
         for i, f in enumerate(infiles, 1):
+            # First pass - detect contaminants
             fq = FastqReader(f)
-            fq_iter = iter(fq)
             try:
-                if options.progress:
-                    from .progress import create_progress_reader
-                    fq_iter = create_progress_reader(fq_iter, max_items=n_reads, counter_magnitude="K",
-                        values_have_size=False)
-                file_header = "File {}: {}".format(i, f)
-                print("", file=o)
-                print(file_header, file=o)
-                print('-' * len(file_header), file=o)
+                fq_iter = wrap_progress(fq, options)
                 contam = detect_contaminants(fq_iter, k=options.kmer_size, n_reads=n_reads,
                     known_contaminants=known_contaminants, include=options.include_contaminants)
-                summarize_contaminants(contam, o)
             finally:
                 fq.close()
+            
+            # Second pass - estimate abundance
+            fq = FastqReader(f)
+            try:
+                fq_iter = wrap_progress(fq, options)
+                num_contaminated = estimate_abundance(contam, fq_iter, n_reads)
+            finally:
+                fq.close()
+            
+            summarize_contaminants(o, contam, n_reads, num_contaminated, "File {}: {}".format(i, f))
+
+def wrap_progress(fq, options):
+    fq_iter = iter(fq)
+    if options.progress:
+        from .progress import create_progress_reader
+        fq_iter = create_progress_reader(fq_iter, max_items=n_reads, counter_magnitude="K",
+            values_have_size=False)
+    return fq_iter
 
 def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include="all"):
     if known_contaminants and include == 'known':
@@ -407,8 +412,34 @@ def filter_and_sort_contaminants(matches, include='all', min_freq=0.01, min_len=
         
     return matches
 
-def summarize_contaminants(matches, outstream):
+def estimate_abundance(matches, fq, n_reads):
+    """
+    Add abundance information to matches,
+    """
+    num_contaminated = 0
+    for i, read in enumerate_range(fq, 1, n_reads):
+        read_seq = read.sequence
+        contaminated = False
+        for match in matches:
+            if match.match_to(read_seq):
+                contaminated = True
+        if contaminated:
+            num_contaminated += 1
+    return num_contaminated
+
+def summarize_contaminants(outstream, matches, n_reads, num_contaminated=None, header=None):
+    print("", file=outstream)
+    
+    if header:
+        print(header, file=outstream)
+        print('-' * len(header), file=outstream)
+    
     print("Detected {} adapters/contaminants:".format(len(matches)), file=outstream)
+    
+    if num_contaminated:
+        print("Full-length contaminant(s) found in {} out of {} reads ({:.1%})".format(
+            num_contaminated, n_reads, num_contaminated / n_reads), file=outstream)
+    
     pad = len(str(len(matches)))
     for i, match in enumerate(matches):
         print(("{:>" + str(pad) + "}. {}").format(i+1, match.seq), file=outstream)
@@ -416,6 +447,8 @@ def summarize_contaminants(matches, outstream):
             print("    Name(s): {}".format(",\n             ".join(match.names)), file=outstream)
             print("    Known sequence(s): {}".format(",\n             ".join(match.known_seqs)), file=outstream)
             print("    Known sequence K-mers that match detected contaminant: {:.2%}".format(match.match_frac), file=outstream)
+        if match.abundance:
+            print("    Abundance (full-length) in {} reads: {} ({:.1%})".format(n_reads, match.abundance, match.abundance / n_reads))
         if match.match_frac2:
             print("    Detected contaminant kmers that match known sequence: {:.2%}".format(match.match_frac2), file=outstream)
         if match.count_is_frequency:
@@ -437,6 +470,7 @@ class Match(object):
             self.known_seqs = None
         self.match_frac = match_frac
         self.match_frac2 = match_frac2
+        self.abundance = 0
     
     def __len__(self):
         return len(self.seq)
@@ -467,6 +501,16 @@ class Match(object):
     @property
     def is_known(self):
         return self.known_seqs is not None
+    
+    def match_to(self, seq):
+        """
+        Determine whether this match's sequence is within 'seq'
+        by simple exact string comparison.
+        """
+        if self.seq in seq:
+            self.abundance += 1
+            return True
+        return False
 
 class ContaminantMatcher(object):
     def __init__(self, seq, names, k):
@@ -491,6 +535,29 @@ def create_contaminant_matchers(contaminants, k):
         ContaminantMatcher(seq, names, k)
         for seq, names in contaminants.items()
     ]
+
+def load_known_contaminants(options):
+    cache_file = ".contaminants"
+    if not options.no_cache_contaminants and os.path.exists(cache_file):
+        with open(cache_file, "rb") as cache:
+            known_contaminants = pickle.load(cache)
+    else:
+        known_contaminants = load_known_contaminants_from_url()
+        if options.known_contaminant:
+            merge_contaminants(
+                known_contaminants,
+                load_known_contaminants_from_option_strings(options.known_contaminant))
+        if options.known_contaminants_file:
+            merge_contaminants(
+                known_contaminants,
+                load_known_contaminants_from_file(options.known_contaminants_file))
+        if not options.no_cache_contaminants:
+            # need to make it pickleable
+            temp = {}
+            for seq, names in known_contaminants.items():
+                temp[seq] = list(names)
+            with open(cache_file, "wb") as cache:
+                pickle.dump(temp, cache)
         
 def load_known_contaminants_from_file(path):
     with open(path, "rt") as i:
@@ -517,7 +584,7 @@ def parse_known_contaminants(line_iter, delim='\t', rc=False):
             name = m.group(1)
             contam[seq].add(name)
             if rc:
-                contam[reverse_complement(seq)] = "{}_rc".format(name)
+                contam[reverse_complement(seq)].add("{}_rc".format(name))
     return contam
 
 def merge_contaminants(c1, c2):

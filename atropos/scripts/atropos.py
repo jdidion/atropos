@@ -523,6 +523,8 @@ def get_argument_parser():
     detect_parser.add_argument("--known-contaminants-file", default=None,
         help="File with known contaminants, one per line, with name and sequence "
              "separated by one or more tabs.")
+    detect_parser.add_argument("--no-cache-contaminants", action="store_true", default=False,
+        help="Don't cache contaminant list as '.contaminants' in the working directory.")
     
     error_parser = subparsers.add_parser("error", help="Estimate empirical error rate",
         usage="\natropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error",
