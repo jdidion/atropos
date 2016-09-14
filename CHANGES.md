@@ -1,7 +1,12 @@
 # Changes
 
-v1.0.15 (dev)
+v1.0.16 (dev)
 -------------
+
+
+
+v1.0.15 (2016.09.14)
+--------------------
 
 * Fixed missing import bug in 'detect' command.
 * Added estimate of fraction of contaminated reads to output of 'detect' command.
