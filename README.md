@@ -63,8 +63,6 @@ Note: while we consider the command-line interface to be stable, the internal co
 
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
-* Migrate to [Screed](https://github.com/dib-lab/screed) if there is no performance penalty.
-* Migrate to Versioneer for version management.
 * Look at bugs/requests in https://github.com/marcelm/cutadapt/issues and see which need to be fixed in Atropos (also submit these fixes back to Cutadapt when possible).
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
@@ -78,5 +76,3 @@ The citation for the original Cutadapt paper is:
 Atropos is currently published as a pre-print on PeerJ, and will be submitted for peer review shortly. For now, you can cite it as:
 
 > John P Didion and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/
-
-

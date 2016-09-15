@@ -3,7 +3,7 @@
 v1.0.16 (dev)
 -------------
 
-
+* Migrate to Versioneer for version management.
 
 v1.0.15 (2016.09.14)
 --------------------
