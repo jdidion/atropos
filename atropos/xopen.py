@@ -25,10 +25,10 @@ def open_output(filename, mode='w', context_wrapper=False):
         raise ValueError("the filename must be a string")
 
     # standard input and standard output handling
-    if filename == '-':
-        fh = dict(
-            wt=sys.stdout,
-            wb=sys.stdout.buffer)[mode]
+    if filename in ('-', '_'):
+        fh = sys.stdout if filename == '-' else sys.stderr
+        if mode == 'wb':
+            fh = fh.buffer
         if context_wrapper:
             class StdWrapper(object):
                 def __init__(self, fh):
@@ -72,12 +72,14 @@ def xopen(filename, mode='r', use_system=True):
         raise ValueError("the filename must be a string")
 
     # standard input and standard output handling
-    if filename == '-':
-        return dict(
-            rt=sys.stdin,
-            wt=sys.stdout,
-            rb=sys.stdin.buffer,
-            wb=sys.stdout.buffer)[mode]
+    if filename in ('-', '_'):
+        if 'r' in mode:
+            fh = sys.stdin
+        else:
+            fh = sys.stdout if filename == '-' else sys.stderr
+        if 'b' in mode:
+            fh = fh.buffer
+        return fh
     
     file_opener = get_file_opener(filename)
     if file_opener:
