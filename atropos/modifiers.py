@@ -211,6 +211,11 @@ class InsertAdapterCutter(ReadPairModifier):
                 # set masked sequence as sequence with original quality
                 trimmed_read.sequence = masked_sequence
                 trimmed_read.qualities = read.qualities
+            elif self.action == 'lower':
+                # TODO: offer option to mask with lower-case of trimmed base
+                # This will happen as part of the refactoring to modify
+                # Sequences in-place.
+                pass
         
         trimmed_read.match = match
         trimmed_read.match_info = [match.get_info_record()]

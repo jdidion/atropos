@@ -59,11 +59,21 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 ## Planned enhancements and experiments
 
 Note: while we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 1.1, which is planned for early
-2017, and will also include the following enhancements:
+2017. The following enhancements are also being considered:
 
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
-* Look at bugs/requests in https://github.com/marcelm/cutadapt/issues and see which need to be fixed in Atropos (also submit these fixes back to Cutadapt when possible).
+* Provide option for RNA-seq data that will 1) trim polyA sequence, 2)
+* Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120)
+* Expand the list of contaminants that are detected by default.
+* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
+  * https://github.com/marcelm/cutadapt/issues/112
+  * Also look at the QCML used in ngs-bits
+* Support for paired-end demultiplexing (i.e. when barcodes are used in both paired-end adapters): https://github.com/marcelm/cutadapt/issues/118
+* General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107
+* Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53
+* Autodetection of compressed files from stdin by "magic numbers" (similar to how screed does it)
+* Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
