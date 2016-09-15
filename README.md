@@ -75,6 +75,8 @@ The citation for the original Cutadapt paper is:
  
 > Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
 
-A manuscript for Atropos is currently in preparation. For now, you can cite it as:
+Atropos is currently in published as a pre-print on PeerJ, and will be submitted for peer review shortly. For now, you can cite it as:
 
-> John P Didion. "Atropos." 2016. https://github.com/jdidion/atropos
+> John P Didion and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/
+
+
