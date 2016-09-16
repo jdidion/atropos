@@ -182,7 +182,9 @@ class InsertAdapterCutter(ReadPairModifier):
                 adapter_match1 = adapter_match2.copy()
             if adapter_match2 is None and adapter_match1:
                 adapter_match2 = adapter_match1.copy()
-            
+        
+        # TODO: optionally merge overlapping reads
+        
         return (
             self.trim(read1, self.adapter1, adapter_match1, 0),
             self.trim(read2, self.adapter2, adapter_match2, 1)
@@ -222,7 +224,7 @@ class InsertAdapterCutter(ReadPairModifier):
         
         self.with_adapters[read_idx] += 1
         return trimmed_read
-    
+
     def correct_errors(self, read1, read2, insert_match):
         # read2 reverse-complement is the reference, read1 is the query
         r1_seq = list(read1.sequence)

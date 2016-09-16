@@ -74,6 +74,7 @@ Note: while we consider the command-line interface to be stable, the internal co
 * Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53
 * Autodetection of compressed files from stdin by "magic numbers" (similar to how screed does it)
 * Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+* Accept name-sorted BAM files as input.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
