@@ -14,18 +14,13 @@ from distutils.version import LooseVersion
 from distutils.command.sdist import sdist as _sdist
 from distutils.command.build_ext import build_ext as _build_ext
 
+import versioneer
+
 MIN_CYTHON_VERSION = '0.24'
 
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
-
-# set __version__
-with open(os.path.join(os.path.dirname(__file__), 'atropos', '__init__.py')) as f:
-    for line in f:
-        if line.startswith('__version__'):
-            exec(line)
-            break
 
 def out_of_date(extensions):
     """
@@ -90,7 +85,11 @@ extensions = [
     Extension('atropos._seqio', sources=['atropos/_seqio.pyx']),
 ]
 
-class build_ext(_build_ext):
+cmdclass = versioneer.get_cmdclass()
+versioneer_build_ext = cmdclass.get('build_ext', _build_ext)
+versioneer_sdist = cmdclass.get('sdist', _sdist)
+
+class build_ext(versioneer_build_ext):
     def run(self):
         # If we encounter a PKG-INFO file, then this is likely a .tar.gz/.zip
         # file retrieved from PyPI that already includes the pre-cythonized
@@ -105,7 +104,9 @@ class build_ext(_build_ext):
             self.extensions = cythonize(self.extensions)
         _build_ext.run(self)
 
-class sdist(_sdist):
+cmdclass['build_ext'] = build_ext
+
+class sdist(versioneer_sdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
@@ -113,15 +114,17 @@ class sdist(_sdist):
         cythonize(extensions)
         _sdist.run(self)
 
+cmdclass['sdist'] = sdist
+
 setup(
     name = 'atropos',
-    version = __version__,
+    version = versioneer.get_version(),
     author = 'John Didion',
     author_email = 'john.didion@nih.gov',
     url = 'https://atropos.readthedocs.org/',
     description = 'trim adapters from high-throughput sequencing reads',
     license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
-    cmdclass = {'sdist': sdist, 'build_ext': build_ext},
+    cmdclass = cmdclass,
     ext_modules = extensions,
     packages = ['atropos', 'atropos.scripts'],
     scripts = ['bin/atropos'],

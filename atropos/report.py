@@ -14,6 +14,7 @@ from .filters import *
 # and modifiers to report summary information
 # TODO: Rewrite this to use a templating engine.
 # TODO: Need a better way to line things up in columns.
+# TODO: https://github.com/marcelm/cutadapt/issues/128
 
 def check_equal_merger(dest, src):
     assert dest == src
