@@ -148,7 +148,7 @@ def open_lzma_file(filename, mode, use_system=False):
 file_openers = {
     ".gz"  : open_gzip_file,
     ".bz2" : open_bzip_file,
-    ".xz"  : open_lzma_file
+    ".xz"  : open_lzma_file,
 }
 
 def can_use_system_compression():

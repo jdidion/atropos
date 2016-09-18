@@ -12,7 +12,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
 5. The ability to merge overlapping reads (this is experimental and the functionality is limited).
 6. The ability to write the summary report and log messages to separate files.
-7. The ability to read and write interleaved FASTQ output.
+7. The ability to read and write interleaved FASTQ files.
 8. A progress bar, and other minor usability enhancements.
 
 ## Dependencies
@@ -20,6 +20,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 * Python 3.3+ (python 2.x is NOT supported)
 * Cython 0.24+ (`pip install Cython`)
 * progressbar or tqdm (optional, if you want progressbar support)
+* pysam (optional, if you want support for SAM/BAM input)
 * khmer 2.0+ (`pip install khmer`) (optional, for detecting low-frequency adapter contamination)
 
 ## Installation
@@ -74,7 +75,7 @@ Note: while we consider the command-line interface to be stable, the internal co
 * Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53
 * Autodetection of compressed files from stdin by "magic numbers" (similar to how screed does it)
 * Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
-* Accept name-sorted BAM files as input.
+* Accept multiple input files.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 

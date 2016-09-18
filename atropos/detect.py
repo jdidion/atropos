@@ -10,7 +10,7 @@ import statistics as stats
 import sys
 from urllib.request import urlopen
 from .align import Aligner, SEMIGLOBAL
-from .seqio import FastqReader
+from .seqio import open_reader
 from .util import reverse_complement, sequence_complexity, enumerate_range
 from .xopen import open_output, xopen
 
@@ -21,48 +21,6 @@ from .xopen import open_output, xopen
 # the default being false.
 
 # TODO: whether and where to cache list of known contaminants?
-
-def main(options):
-    infiles = [f for f in (
-        options.single_input, options.input1, options.input2, options.interleaved_input
-    ) if f is not None]
-    
-    n_reads = options.max_reads or 10000
-    
-    known_contaminants = None
-    if options.include_contaminants != 'unknown':
-        known_contaminants = load_known_contaminants(options)
-    
-    with open_output(options.adapter_report) as o:
-        print("\nDetecting adapters and other potential contaminant sequences based on "
-              "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
-        for i, f in enumerate(infiles, 1):
-            # First pass - detect contaminants
-            fq = FastqReader(f)
-            try:
-                fq_iter = wrap_progress(fq, options)
-                contam = detect_contaminants(fq_iter, k=options.kmer_size, n_reads=n_reads,
-                    known_contaminants=known_contaminants, include=options.include_contaminants)
-            finally:
-                fq.close()
-            
-            # Second pass - estimate abundance
-            fq = FastqReader(f)
-            try:
-                fq_iter = wrap_progress(fq, options)
-                num_contaminated = estimate_abundance(contam, fq_iter, n_reads)
-            finally:
-                fq.close()
-            
-            summarize_contaminants(o, contam, n_reads, num_contaminated, "File {}: {}".format(i, f))
-
-def wrap_progress(fq, options):
-    fq_iter = iter(fq)
-    if options.progress:
-        from .progress import create_progress_reader
-        fq_iter = create_progress_reader(fq_iter, max_items=n_reads, counter_magnitude="K",
-            values_have_size=False)
-    return fq_iter
 
 def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include="all"):
     if known_contaminants and include == 'known':

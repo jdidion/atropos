@@ -40,7 +40,7 @@ class SequenceReader(object):
     """Read possibly compressed files containing sequences"""
     _close_on_exit = False
 
-    def __init__(self, file):
+    def __init__(self, file, mode='r'):
         """
         file is a path or a file-like object. In both cases, the file may
         be compressed (.gz, .bz2, .xz).
@@ -344,6 +344,44 @@ class InterleavedSequenceReader(object):
     def __exit__(self, *args):
         self.close()
 
+class SAMReader(object):
+    """
+    Reader for SAM/BAM files. Paired-end files must be name-sorted. Does
+    not support secondary/supplementary reads.
+    """
+    def __init__(self, file, sequence_class=Sequence):
+        """
+        file is a filename or a file-like object.
+        If file is a filename, then .gz files are supported.
+        """
+        super(SAMReader, self).__init__(file, 'rb')
+        self.sequence_class = sequence_class
+        self.delivers_qualities = True
+
+    def __iter__(self):
+        import pysam
+        return self._iter(pysam.AlignmentFile(self._file))
+
+    def _as_sequence(read):
+        self.sequence_class(
+            read.query_name,
+            read.query_sequence,
+            read.query_qualities)
+
+class SingleEndSAMReader(SequenceReader, SAMReader):
+    def _iter(self, sam):
+        for read in sam:
+            yield self.as_sequence(read)
+
+class PairedEndSAMReader(PairedSequenceReader, SAMReader):
+    def _iter(self, sam):
+        for read1, read2 in zip(sam, sam):
+            assert read1.query_name == read2.query_name
+            yield (
+                self.as_sequence(read1),
+                self.as_sequence(read2)
+            )
+
 class BatchIterator(object):
     def __init__(self, reader, size, max_reads=None):
         self.reader = reader
@@ -414,8 +452,9 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
         are returned.
 
     fileformat -- If set to None, file format is autodetected from the file name
-        extension. Set to 'fasta', 'fastq', or 'sra-fastq' to not auto-detect.
-        Colorspace is not auto-detected and must always be requested explicitly.
+        extension. Set to 'fasta', 'fastq', 'sra-fastq', 'sam', or 'bam' to not
+        auto-detect. Colorspace is not auto-detected and must always be requested
+        explicitly.
 
     qualities -- When mode is 'w' and fileformat is None, this can be set to
         True or False to specify whether the written sequences will have quality
@@ -434,11 +473,14 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
     
     if file2 is not None:
         return PairedSequenceReader(file1, file2, colorspace, fileformat)
-
-    if interleaved:
+    elif fileformat in ("sam", "bam"):
+        if interleaved:
+            return PairedEndSAMReader(file1)
+        else:
+            return SingleEndSAMReader(file1)
+    elif interleaved:
         return InterleavedSequenceReader(file1, colorspace, fileformat)
-        
-    if qualfile is not None:
+    elif qualfile is not None:
         if colorspace:
             # read from .(CS)FASTA/.QUAL
             return ColorspaceFastaQualReader(file1, qualfile)
