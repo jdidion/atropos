@@ -687,15 +687,23 @@ class Modifiers(object):
             mods = [self.modifiers[i] for i in self.modifier_indexes[mod_class]]
         else:
             mods = []
-        if mods and read:
-            mods = [m[read-1] for m in mods if m[read-1] is not None]
-        return mods
+        
+        if not (mods and read):
+            return mods
+        
+        read_mods = []
+        for m in mods:
+            if isinstance(m, ReadPairModifier):
+                read_mods.append(m)
+            elif m[read-1] is not None:
+                read_mods.append(m[read-1])
+        return read_mods
     
     def has_modifier(self, mod_class):
         return mod_class in self.modifier_indexes
     
     def get_adapters(self):
-        adapters = [None, None]
+        adapters = [[], []]
         if self.has_modifier(AdapterCutter):
             m1, m2 = self.get_modifiers(AdapterCutter)[0]
             if m1:

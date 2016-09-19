@@ -1,22 +1,7 @@
 import logging
 import sys
 
-from .seqio import open_reader
-
-def setup_logging(stdout=False, level="INFO"):
-    """
-    Attach handler to the global logger object
-    """
-    # Due to backwards compatibility, logging output is sent to standard output
-    # instead of standard error if the -o option is used.
-    level = getattr(logging, level)
-    stream_handler = logging.StreamHandler(sys.stdout if stdout else sys.stderr)
-    stream_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-    stream_handler.setLevel(level)
-    logging.getLogger().setLevel(level)
-    logging.getLogger().addHandler(stream_handler)
-
-def detect(options):
+def detect(options, parser):
     from .detect import create_detector, summarize_contaminants
     from .util import enumerate_range
     
@@ -27,28 +12,27 @@ def detect(options):
     include = options.include_contaminants or "all"
     if include != 'unknown':
         known_contaminants = load_known_contaminants(options)
+    if known_contaminants and include == 'known':
+        logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
+        detector_class = KnownContaminantDetector
+    elif n_reads <= 50000:
+        logging.getLogger().debug("Detecting contaminants using the heuristic algorithm")
+        detector_class = HeuristicDetector
+    else:
+        logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
+        detector_class = KhmerDetector
     
     reader = create_reader(options, parser, counter_magnitude="K", values_have_size=False)[0]
     try:
-        with open_output(options.adapter_report) as o:
+        with open_output(options.output) as o:
             print("\nDetecting adapters and other potential contaminant sequences based on "
                   "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
             
-            if known_contaminants and include == 'known':
-                logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
-                detector_class = KnownContaminantDetector
-            elif n_reads <= 50000:
-                logging.getLogger().debug("Detecting contaminants using the heuristic algorithm")
-                detector_class = HeuristicDetector
-            else:
-                logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
-                detector_class = KhmerDetector
-        
             if options.paired:
                 d1, d2 = (detector_class(k, n_reads, overrep_cutoff, known_contaminants) for i in (1,2))
                 read1, read2 = next(reader)
                 d1.consume_first(read1)
-                d2.consume_first(read2s)
+                d2.consume_first(read2)
                 for read1, read2 in enumerate_range(reader, 1, n_reads):
                     d1.consume(read1)
                     d2.consume(read2)
@@ -58,9 +42,7 @@ def detect(options):
                 
             else:
                 d = detector_class(k, n_reads, overrep_cutoff, known_contaminants)
-                for read in enumerate_range(reader, 1, n_reads):
-                    d.consume(read)
-                
+                d.consume_all(reader)
                 summarize_contaminants(o, d.filter_and_sort(include), n_reads, "File: {}".format(reader.name))
     finally:
         reader.close()
@@ -81,10 +63,10 @@ def error(options, parser):
                     e2.consume(read2.sequence)
                 
                 print("File 1: {}".format(reader.reader1.name))
-                print("\n  Error rate: {:.2%}".format(e1.estimate())
+                print("\n  Error rate: {:.2%}".format(e1.estimate()))
                 
                 print("File 2: {}".format(reader.reader2.name))
-                print("\n  Error rate: {:.2%}".format(e2.estimate())
+                print("\n  Error rate: {:.2%}".format(e2.estimate()))
                 
                 print("Overall error rate: {:.2%}".format(
                     (e1.total_qual + e2.total_qual) / (e1.total_len / e2.total_len)))
@@ -94,36 +76,23 @@ def error(options, parser):
                     e.consume(read.sequence)
                 
                 print("File: {}".format(reader.name))
-                print("\n  Error rate: {:.2%}".format(e.estimate())
+                print("\n  Error rate: {:.2%}".format(e.estimate()))
     finally:
         reader.close()
 
-def atropos(options, parser, default_outfile="-"):
+def trim(options, parser):
     import time
     import textwrap
-    from atropos.seqio import (
-        UnknownFileType, Formatters, RestFormatter,
-        InfoFormatter, WildcardFormatter, Writers, BatchIterator)
-    from atropos.adapters import AdapterParser, BACK
-    from atropos.modifiers import *
-    from atropos.filters import *
-    from atropos.report import print_report
-    from atropos.util import int_or_str, RandomMatchProbability
+    from .report import print_report
     
-    reader, qualities, has_qual_file = create_reader(options, parser)
-    modifiers, adapters1, adapters2 = create_modifiers(options, qualities, has_qual_file, parser)
-    min_affected = 2 if options.pair_filter == 'both' else 1
-    filters = create_filters(options, min_affected)
-    formatters, force_create = create_formatters(options, qualities, default_outfile)
-    writers = Writers(force_create)
+    params = create_atropos_params(options, parser, options.default_outfile)
+    num_adapters = sum(len(a) for a in params.modifiers.get_adapters())
     
     logger = logging.getLogger()
-    paired = options.paired
-    num_adapters = len(adapters1) + len(adapters2)
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
-        { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[paired])
-    if paired == 'first' and (len(modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
+        { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[options.paired])
+    if options.paired == 'first' and (len(params.modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
         logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
             'modifications are applied only to the first '
             'read since backwards compatibility mode is enabled. '
@@ -136,14 +105,12 @@ def atropos(options, parser, default_outfile="-"):
     if options.threads is None:
         # Run single-threaded version
         import atropos.serial
-        rc, summary = atropos.serial.run_serial(
-            reader, modifiers, filters, formatters, writers)
+        rc, summary = atropos.serial.run_serial(*params)
     else:
         # Run multiprocessing version
         import atropos.multicore
-        rc, summary = atropos.multicore.run_parallel(
-            reader, modifiers, filters, formatters, writers, options.threads,
-            options.process_timeout, options.preserve_order, options.read_queue_size,
+        rc, summary = atropos.multicore.run_parallel(*params,
+            options.threads, options.process_timeout, options.preserve_order, options.read_queue_size,
             options.result_queue_size, not options.no_writer_process, options.compression)
     
     if rc != 0:
@@ -152,14 +119,15 @@ def atropos(options, parser, default_outfile="-"):
     stop_wallclock_time = time.time()
     stop_cpu_time = time.clock()
     report = print_report(
-        paired,
         options,
         stop_wallclock_time - start_wallclock_time,
         stop_cpu_time - start_cpu_time,
         summary,
-        modifiers.get_trimmer_classes())
+        params.modifiers.get_trimmer_classes())
 
 def create_reader(options, parser, counter_magnitude="M", values_have_size=True):
+    from .seqio import UnknownFileType, BatchIterator, open_reader
+    
     input1 = input2 = qualfile = None
     interleaved = False
     if options.interleaved_input:
@@ -187,18 +155,38 @@ def create_reader(options, parser, counter_magnitude="M", values_have_size=True)
     
     # Wrap iterator in progress bar
     if options.progress:
-        from atropos.progress import create_progress_reader
+        from .progress import create_progress_reader
         reader = create_progress_reader(
             reader, options.progress, batch_size, options.max_reads,
             counter_magnitude, values_have_size)
     
     return (reader, qualities, qualfile is not None)
 
-def create_modifiers(options, qualities, has_qual_file, parser):
+from collections import namedtuple
+AtroposParams = namedtuple("AtroposParams", ("reader", "modifiers", "filters", "formatters", "writers"))
+
+def create_atropos_params(options, parser, default_outfile):
+    from .adapters import AdapterParser, BACK
+    from .modifiers import (
+        Modifiers, AdapterCutter, InsertAdapterCutter, UnconditionalCutter,
+        NextseqQualityTrimmer, QualityTrimmer, NonDirectionalBisulfiteTrimmer,
+        RRBSTrimmer, SwiftBisulfiteTrimmer, MinCutter, NEndTrimmer,
+        LengthTagModifier, SuffixRemover, PrefixSuffixAdder, DoubleEncoder,
+        ZeroCapper, PrimerTrimmer, MergeOverlapping)
+    from .filters import (
+        Filters, FilterFactory, TooShortReadFilter, TooLongReadFilter,
+        NContentFilter, TrimmedFilter, UntrimmedFilter, NoFilter,
+        MergedReadFilter)
+    from .seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
+    from .util import RandomMatchProbability
+    
+    reader, qualities, has_qual_file = create_reader(options, parser)
+    
     if options.adapter_max_rmp or options.aligner == 'insert':
         match_probability = RandomMatchProbability()
     
-    # Create adapters
+    # Create Adapters
+    
     parser_args = dict(
         colorspace=options.colorspace,
         max_error_rate=options.error_rate,
@@ -222,6 +210,8 @@ def create_modifiers(options, qualities, has_qual_file, parser):
     except ValueError as e:
         parser.error(e)
     
+    # Create Modifiers
+    
     if not adapters1 and not adapters2 and not options.quality_cutoff and \
             options.nextseq_trim is None and \
             options.cut == [] and options.cut2 == [] and \
@@ -244,7 +234,6 @@ def create_modifiers(options, qualities, has_qual_file, parser):
         for adapter in adapters1 + adapters2:
             adapter.enable_debug()
     
-    # Create modifiers
     modifiers = Modifiers(options.paired)
             
     for op in options.op_order:
@@ -333,29 +322,11 @@ def create_modifiers(options, qualities, has_qual_file, parser):
             min_overlap=options.merge_min_overlap,
             error_rate=options.error_rate)
     
-    return (modifiers, adapters1, adapters2)
-
-def create_filters(options, min_affected):
+    # Create Filters and Formatters
+    
+    min_affected = 2 if options.pair_filter == 'both' else 1
     filters = Filters(FilterFactory(options.paired, min_affected))
     
-    if options.minimum_length is not None and options.minimum_length > 0:
-        filters.add_filter(TooShortReadFilter, options.minimum_length)
-    
-    if options.maximum_length < sys.maxsize:
-        filters.add_filter(TooLongReadFilter, options.maximum_length)
-    
-    if options.max_n >= 0:
-        filters.add_filter(NContentFilter, options.max_n)
-    
-    if options.discard_trimmed:
-        filters.add_filter(TrimmedFilter)
-    
-    if options.discard_untrimmed or options.untrimmed_output:
-        filters.add_filter(UntrimmedFilter)
-    
-    return filters
-
-def create_formatters(options, qualities, default_outfile):
     output1 = output2 = None
     interleaved = False
     if options.interleaved_output:
@@ -376,16 +347,24 @@ def create_formatters(options, qualities, default_outfile):
     if (options.merge_overlapping and options.merged_output):
         formatters.add_seq_formatter(MergedReadFilter, options.merged_output)
         
-    if (options.minimum_length is not None
-            and options.minimum_length > 0
-            and options.too_short_output):
-        formatters.add_seq_formatter(TooShortReadFilter,
-            options.too_short_output, options.too_short_paired_output)
+    if options.minimum_length is not None and options.minimum_length > 0:
+        filters.add_filter(TooShortReadFilter, options.minimum_length)
+        if options.too_short_output:
+            formatters.add_seq_formatter(TooShortReadFilter,
+                options.too_short_output, options.too_short_paired_output)
 
-    if options.maximum_length < sys.maxsize and options.too_long_output is not None:
-        formatters.add_seq_formatter(TooLongReadFilter,
-            options.too_long_output, options.too_long_paired_output)
-    
+    if options.maximum_length < sys.maxsize:
+        filters.add_filter(TooLongReadFilter, options.maximum_length)
+        if options.too_long_output is not None:
+            formatters.add_seq_formatter(TooLongReadFilter,
+                options.too_long_output, options.too_long_paired_output)
+
+    if options.max_n >= 0:
+        filters.add_filter(NContentFilter, options.max_n)
+
+    if options.discard_trimmed:
+        filters.add_filter(TrimmedFilter)
+
     if not formatters.multiplexed:
         if output1 is not None:
             formatters.add_seq_formatter(NoFilter, output1, output2)
@@ -398,6 +377,9 @@ def create_formatters(options, qualities, default_outfile):
             if default_outfile != "-" and not options.no_writer_process:
                 force_create.append(default_outfile)
     
+    if options.discard_untrimmed or options.untrimmed_output:
+        filters.add_filter(UntrimmedFilter)
+
     if not options.discard_untrimmed:
         if formatters.multiplexed:
             untrimmed = options.untrimmed_output or output1.format(name='unknown')
@@ -414,13 +396,6 @@ def create_formatters(options, qualities, default_outfile):
     if options.wildcard_file:
         formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
     
-    return (formatters, force_create)
-
-COMMANDS = dict(
-    detect=detect,
-    error=error
-)
-
-def dispatch(options, parser):
-    command = COMMANDS.get(options.command, atropos)
-    command(options, parser)
+    writers = Writers(force_create)
+    
+    return AtroposParams(reader, modifiers, filters, formatters, writers)
