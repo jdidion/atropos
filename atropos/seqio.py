@@ -49,7 +49,11 @@ class SequenceReader(object):
             file = xopen(file)
             self._close_on_exit = True
         self._file = file
-
+    
+    @property
+    def name(self):
+        return self._file.name
+    
     def close(self):
         if self._close_on_exit and self._file is not None:
             self._file.close()

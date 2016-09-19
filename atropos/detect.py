@@ -20,51 +20,270 @@ from .xopen import open_output, xopen
 # Also, offer an option of whether to test the reverse complement, with
 # the default being false.
 
-# TODO: whether and where to cache list of known contaminants?
-
-def detect_contaminants(fq, k=12, n_reads=10000, overrep_cutoff=100, known_contaminants=None, include="all"):
-    if known_contaminants and include == 'known':
-        logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
-        contam = detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants)
-        min_freq = 0.1
-    elif n_reads <= 50000:
-        logging.getLogger().debug("Detecting contaminants using the heuristic algorithm")
-        contam = detect_contaminants_heuristic(fq, k, n_reads, overrep_cutoff, known_contaminants)
-        min_freq = 0.1 * n_reads
+def load_known_contaminants(options):
+    cache_file = ".contaminants"
+    if not options.no_cache_contaminants and os.path.exists(cache_file):
+        with open(cache_file, "rb") as cache:
+            return pickle.load(cache)
     else:
-        logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
-        contam = detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants)
-        min_freq = 0.0001
-    return filter_and_sort_contaminants(contam, include=include, min_freq=min_freq, min_len=k)
+        known_contaminants = load_known_contaminants_from_url()
+        if options.known_contaminant:
+            merge_contaminants(
+                known_contaminants,
+                load_known_contaminants_from_option_strings(options.known_contaminant))
+        if options.known_contaminants_file:
+            merge_contaminants(
+                known_contaminants,
+                load_known_contaminants_from_file(options.known_contaminants_file))
+        if not options.no_cache_contaminants:
+            # need to make it pickleable
+            temp = {}
+            for seq, names in known_contaminants.items():
+                temp[seq] = list(names)
+            with open(cache_file, "wb") as cache:
+                pickle.dump(temp, cache)
+        return known_contaminants
 
-def detect_known_contaminants(fq, n_reads, overrep_cutoff, known_contaminants, min_match_frac=0.5):
+def load_known_contaminants_from_file(path):
+    with open(path, "rt") as i:
+        return parse_known_contaminants(i)
+
+def load_known_contaminants_from_option_strings(opt_strings):
+    """Parse contaminants from list of name=seq options supplied on command line."""
+    return parse_known_contaminants(opt_strings, delim='=')
+
+def load_known_contaminants_from_url(url="https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/a6372f21281705ac9031697fcaed3d1f64cea9a5/sequencing_adapters.txt"):
+    logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
+    return parse_known_contaminants(urlopen(url).read().decode().split("\n"))
+
+def parse_known_contaminants(line_iter, delim='\t', rc=False):
+    regex = re.compile("([^{0}]+){0}+(.+)".format(delim))
+    contam = defaultdict(lambda: set())
+    for line in line_iter:
+        line = line.rstrip()
+        if len(line) == 0 or line.startswith('#'):
+            continue
+        m = regex.match(line)
+        if m:
+            seq = m.group(2)
+            name = m.group(1)
+            contam[seq].add(name)
+            if rc:
+                contam[reverse_complement(seq)].add("{}_rc".format(name))
+    return contam
+
+def merge_contaminants(c1, c2):
+    for k, v in c2.items():
+        if k in c1:
+            c1[k] = c1[k] + c2[k]
+        else:
+            c1[k] = c2[k]
+
+class Match(object):
+    def __init__(self, seq_or_contam, count=0, names=None, match_frac=None, match_frac2=None):
+        if isinstance(seq_or_contam, ContaminantMatcher):
+            self.seq = seq_or_contam.seq
+            self.count = seq_or_contam.matches
+            self.names = tuple(seq_or_contam.names)
+            self.known_seqs = [seq_or_contam.seq]
+        else:
+            self.seq = seq_or_contam
+            self.count = count
+            self.names = names
+            self.known_seqs = None
+        self.match_frac = match_frac
+        self.match_frac2 = match_frac2
+        self.abundance = 0
+    
+    def __len__(self):
+        return len(self.seq)
+    
+    def __repr__(self):
+        if self.is_known:
+            return "{} => {} ({}))".format(self.seq, self.names, self.known_seqs)
+        else:
+            return self.seq
+    
+    @property
+    def seq_complexity(self):
+        return sequence_complexity(self.seq)
+    
+    @property
+    def count_is_frequency(self):
+        return isinstance(self.count, float)
+    
+    def set_contaminant(self, contam, match_frac, match_frac2=None):
+        self.set_known(contam.names, [contam.seq], match_frac, match_frac2)
+    
+    def set_known(self, names, seqs, match_frac, match_frac2=None):
+        self.names = names
+        self.known_seqs = seqs
+        self.match_frac = match_frac
+        self.match_frac2 = match_frac2
+    
+    @property
+    def is_known(self):
+        return self.known_seqs is not None
+    
+    def match_to(self, seq):
+        """
+        Determine whether this match's sequence is within 'seq'
+        by simple exact string comparison.
+        """
+        if self.seq in seq:
+            self.abundance += 1
+            return True
+        return False
+
+class ContaminantMatcher(object):
+    def __init__(self, seq, names, k):
+        self.seq = seq
+        self.names = names
+        self.kmers = set(seq[i:(i+k)] for i in range(len(seq) - k + 1))
+        self.n_kmers = len(self.kmers)
+        self.k = k
+        self.matches = 0
+        
+    def match(self, seq):
+        """
+        Returns (num_matches, num_contam_kmers, num_seq_kmers).
+        """
+        fw_kmers = set(seq[i:(i+self.k)] for i in range(len(seq) - self.k + 1))
+        fw_matches = float(len(self.kmers & fw_kmers))
+        
+        seqrc = reverse_complement(match.seq)
+        rv_kmers = set(seqrc[i:(i+self.k)] for i in range(len(seqrc) - self.k + 1))
+        rv_matches = float(len(self.kmers & rv_kmers))
+        
+        if fw_matches >= rv_matches:
+            n_matches = fw_matches
+            kmers = fw_kmers
+            compare_seq = seq
+        else:
+            n_matches = rv_matches
+            kmers = rv_kmers
+            compare_seq = seqrc
+        
+        self.matches += n_matches
+        return (n_matches / self.n_kmers, n_matches / len(kmers), compare_seq)
+
+def create_contaminant_matchers(contaminants, k):
+    return [
+        ContaminantMatcher(seq, names, k)
+        for seq, names in contaminants.items()
+    ]
+
+class Detector(object):
+    def __init__(self, k=12, n_reads=10000, read_length=None, overrep_cutoff=100,
+                 known_contaminants=None, estimate_abundance=True):
+        self.k = k
+        self.n_reads = n_reads
+        self.read_length = read_length
+        self.overrep_cutoff = overrep_cutoff
+        self.known_contaminants = known_contaminants
+        self.estimate_abundance = estimate_abundance
+    
+    def consume_all(self, reader):
+        """
+        Consume up to self.n_reads reads from the reader.
+        """
+        read = next(reader)
+        self.consume_first(read)
+        for read in enumerate_range(reader, 1, n_reads):
+            self.consume(read)
+    
+    def consume_first(self, read):
+        self.read_length = len(read.sequence)
+        self.consume(read)
+    
+    def consume(self, read):
+        """
+        Consumes a single read.
+        """
+        raise NotImplemented()
+    
+    def filter_and_sort(self, include="all", min_len=None, min_complexity=1.1, min_match_frac=0.1, limit=20):
+        """
+        Returns list of contaminants.
+        """
+        if min_len is None:
+            min_len = self.k
+        
+        matches = self.get_matches()
+        
+        def _filter(match):
+            if min_len and len(match) < min_len:
+                return False
+            if min_freq and match.count < self.min_freq:
+                return False
+            if min_complexity and match.seq_complexity < min_complexity:
+                return False
+            if include == 'known' and not match.is_known:
+                return False
+            elif include == 'unknown' and match.is_known:
+                return False
+            if min_match_frac and match.is_known and match.match_frac < min_match_frac:
+                return False
+            return True
+        
+        matches = list(filter(_filter, matches))
+        matches.sort(key=lambda x: len(x) * math.log(x.count), reverse=True)
+        
+        if limit is not None:
+            matches = matches[:limit]
+            
+        return matches
+    
+    def estimate_abundance(matches, seqs):
+        """
+        Add abundance information to matches,
+        """
+        num_contaminated = 0
+        for read_seq in seqs:
+            contaminated = False
+            for match in matches:
+                if match.match_to(read_seq):
+                    contaminated = True
+            if contaminated:
+                num_contaminated += 1
+        return num_contaminated
+
+class KnownContaminantDetector(Detector):
     """
     Test known contaminants against reads.
     This has linear complexity and is more specific than the khmer matcher, but
     less specific than the heuristic matcher. It's also less sensitive since
     it does not try to detect unknown contaminants.
     """
-    k = min(len(s) for s in known_contaminants.keys())
-    contaminants = create_contaminant_matchers(known_contaminants, k)
+    def __init__(self, known_contaminants, min_match_frac=0.5, **kwargs):
+        super(KnownContaminantDetector, self).__init__(known_contaminants=known_contaminants, **kwargs)
+        self.min_k = min(len(s) for s in known_contaminants.keys())
+        self.contaminant_matchers = create_contaminant_matchers(known_contaminants, k)
+        self.min_match_frac = min_match_frac
+        self.counts = defaultdict(lambda: 0)
     
-    def ingest_read(read, counts):
+    @property
+    def min_freq(self):
+        return 0.1
+    
+    def consume(self, read):
         seq = read.sequence
         seqrc = reverse_complement(seq)
-        for contam in contaminants:
-            if (contam.match(seq)[0] > min_match_frac):
-                counts[contam] += 1
+        for contam in self.contaminant_matchers:
+            if contam.match(seq)[0] > self.min_match_frac:
+                self.counts[contam] += 1
     
-    counts = defaultdict(lambda: 0)
-    read = next(fq)
-    readlen = len(read.sequence)
-    ingest_read(read, counts)
-    for i, read in enumerate_range(fq, 1, n_reads):
-        ingest_read(read, counts)
-    
-    num_win = readlen - k + 1
-    min_count = math.ceil(n_reads * num_win * overrep_cutoff / float(4**k))
-    contaminants = filter(lambda x: x[1] >= min_count, counts.items())
-    return list(Match(c[0], match_frac=float(c[1]) / n_reads) for c in contaminants)
+    def get_matches(self):
+        num_win = self.read_length - self.min_k + 1
+        min_count = math.ceil(self.n_reads * num_win * self.overrep_cutoff / float(4**self.min_k))
+        contaminants = filter(lambda x: x[1] >= min_count, self.counts.items())
+        return list(Match(c[0], match_frac=float(c[1]) / self.n_reads) for c in contaminants)
+
+
+class HeuristicDetector(Detector):
+    @property
+    def min_freq(self):
+        return 0.1 * self.n_reads
 
 def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_contaminants,
                                   min_freq=0.001, min_contaminant_match_frac=0.9):
@@ -199,15 +418,7 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
         best_matches = {}
         best_match_frac = (min_contaminant_match_frac, 0)
         for contam in contaminants:
-            match_frac_fw = contam.match(match.seq)
-            seqrc = reverse_complement(match.seq)
-            match_frac_rv = contam.match(seqrc)
-            if match_frac_fw[0] >= match_frac_rv[0]:
-                match_frac = match_frac_fw
-                compare_seq = match.seq
-            else:
-                match_frac = match_frac_rv
-                compare_seq = seqrc
+            match_frac, compare_seq = contam.match(match.seq)
             if match_frac[0] < best_match_frac[0]:
                 continue
             if (contam.seq in compare_seq or
@@ -253,7 +464,12 @@ def detect_contaminants_heuristic(fq, k_start, n_reads, overrep_cutoff, known_co
         known.append(match)
     
     return known + unknown
-        
+
+class KhmerDetector
+    @property
+    def min_freq(self):
+        return 0.0001
+
 def detect_contaminants_khmer(fq, k, n_reads, overrep_cutoff, known_contaminants):
     """
     Identify contaminants based on kmer frequency using a fast kmer counting
@@ -345,46 +561,6 @@ def align(seq1, seq2, min_overlap_frac=0.9):
     else:
         return None
 
-def filter_and_sort_contaminants(matches, include='all', min_freq=0.01, min_len=0,
-                                 min_complexity=1.1, min_match_frac=0.1, limit=20):
-    def _filter(match):
-        if min_len and len(match) < min_len:
-            return False
-        if min_freq and match.count < min_freq:
-            return False
-        if min_complexity and match.seq_complexity < min_complexity:
-            return False
-        if include == 'known' and not match.is_known:
-            return False
-        elif include == 'unknown' and match.is_known:
-            return False
-        if min_match_frac and match.is_known and match.match_frac < min_match_frac:
-            return False
-        return True
-    matches = list(filter(_filter, matches))
-    
-    matches.sort(key=lambda x: len(x) * math.log(x.count), reverse=True)
-    
-    if limit is not None:
-        matches = matches[:limit]
-        
-    return matches
-
-def estimate_abundance(matches, fq, n_reads):
-    """
-    Add abundance information to matches,
-    """
-    num_contaminated = 0
-    for i, read in enumerate_range(fq, 1, n_reads):
-        read_seq = read.sequence
-        contaminated = False
-        for match in matches:
-            if match.match_to(read_seq):
-                contaminated = True
-        if contaminated:
-            num_contaminated += 1
-    return num_contaminated
-
 def summarize_contaminants(outstream, matches, n_reads, num_contaminated=None, header=None):
     print("", file=outstream)
     
@@ -413,142 +589,3 @@ def summarize_contaminants(outstream, matches, n_reads, num_contaminated=None, h
             print("    Frequency of k-mers: {:.2%}".format(match.count), file=outstream)
         else:
             print("    Number of k-mer matches: {}".format(match.count), file=outstream)
-
-class Match(object):
-    def __init__(self, seq_or_contam, count=0, names=None, match_frac=None, match_frac2=None):
-        if isinstance(seq_or_contam, ContaminantMatcher):
-            self.seq = seq_or_contam.seq
-            self.count = seq_or_contam.matches
-            self.names = tuple(seq_or_contam.names)
-            self.known_seqs = [seq_or_contam.seq]
-        else:
-            self.seq = seq_or_contam
-            self.count = count
-            self.names = names
-            self.known_seqs = None
-        self.match_frac = match_frac
-        self.match_frac2 = match_frac2
-        self.abundance = 0
-    
-    def __len__(self):
-        return len(self.seq)
-    
-    def __repr__(self):
-        if self.is_known:
-            return "{} => {} ({}))".format(self.seq, self.names, self.known_seqs)
-        else:
-            return self.seq
-    
-    @property
-    def seq_complexity(self):
-        return sequence_complexity(self.seq)
-    
-    @property
-    def count_is_frequency(self):
-        return isinstance(self.count, float)
-    
-    def set_contaminant(self, contam, match_frac, match_frac2=None):
-        self.set_known(contam.names, [contam.seq], match_frac, match_frac2)
-    
-    def set_known(self, names, seqs, match_frac, match_frac2=None):
-        self.names = names
-        self.known_seqs = seqs
-        self.match_frac = match_frac
-        self.match_frac2 = match_frac2
-    
-    @property
-    def is_known(self):
-        return self.known_seqs is not None
-    
-    def match_to(self, seq):
-        """
-        Determine whether this match's sequence is within 'seq'
-        by simple exact string comparison.
-        """
-        if self.seq in seq:
-            self.abundance += 1
-            return True
-        return False
-
-class ContaminantMatcher(object):
-    def __init__(self, seq, names, k):
-        self.seq = seq
-        self.names = names
-        self.kmers = set(seq[i:(i+k)] for i in range(len(seq) - k + 1))
-        self.n_kmers = len(self.kmers)
-        self.k = k
-        self.matches = 0
-        
-    def match(self, seq):
-        """
-        Returns (num_matches, num_contam_kmers, num_seq_kmers).
-        """
-        kmers = set(seq[i:(i+self.k)] for i in range(len(seq) - self.k + 1))
-        n_matches = float(len(self.kmers & kmers))
-        self.matches += n_matches
-        return (n_matches / self.n_kmers, n_matches / len(kmers))
-
-def create_contaminant_matchers(contaminants, k):
-    return [
-        ContaminantMatcher(seq, names, k)
-        for seq, names in contaminants.items()
-    ]
-
-def load_known_contaminants(options):
-    cache_file = ".contaminants"
-    if not options.no_cache_contaminants and os.path.exists(cache_file):
-        with open(cache_file, "rb") as cache:
-            return pickle.load(cache)
-    else:
-        known_contaminants = load_known_contaminants_from_url()
-        if options.known_contaminant:
-            merge_contaminants(
-                known_contaminants,
-                load_known_contaminants_from_option_strings(options.known_contaminant))
-        if options.known_contaminants_file:
-            merge_contaminants(
-                known_contaminants,
-                load_known_contaminants_from_file(options.known_contaminants_file))
-        if not options.no_cache_contaminants:
-            # need to make it pickleable
-            temp = {}
-            for seq, names in known_contaminants.items():
-                temp[seq] = list(names)
-            with open(cache_file, "wb") as cache:
-                pickle.dump(temp, cache)
-        return known_contaminants
-
-def load_known_contaminants_from_file(path):
-    with open(path, "rt") as i:
-        return parse_known_contaminants(i)
-
-def load_known_contaminants_from_option_strings(opt_strings):
-    """Parse contaminants from list of name=seq options supplied on command line."""
-    return parse_known_contaminants(opt_strings, delim='=')
-
-def load_known_contaminants_from_url(url="https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/a6372f21281705ac9031697fcaed3d1f64cea9a5/sequencing_adapters.txt"):
-    logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
-    return parse_known_contaminants(urlopen(url).read().decode().split("\n"))
-
-def parse_known_contaminants(line_iter, delim='\t', rc=False):
-    regex = re.compile("([^{0}]+){0}+(.+)".format(delim))
-    contam = defaultdict(lambda: set())
-    for line in line_iter:
-        line = line.rstrip()
-        if len(line) == 0 or line.startswith('#'):
-            continue
-        m = regex.match(line)
-        if m:
-            seq = m.group(2)
-            name = m.group(1)
-            contam[seq].add(name)
-            if rc:
-                contam[reverse_complement(seq)].add("{}_rc".format(name))
-    return contam
-
-def merge_contaminants(c1, c2):
-    for k, v in c2.items():
-        if k in c1:
-            c1[k] = c1[k] + c2[k]
-        else:
-            c1[k] = c2[k]

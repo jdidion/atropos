@@ -1,6 +1,8 @@
 import logging
 import sys
 
+from .seqio import open_reader
+
 def setup_logging(stdout=False, level="INFO"):
     """
     Attach handler to the global logger object
@@ -14,58 +16,93 @@ def setup_logging(stdout=False, level="INFO"):
     logging.getLogger().setLevel(level)
     logging.getLogger().addHandler(stream_handler)
 
-def dispatch(options, parser):
-    # dispatch to subcommands if one is specified
-    if options.command == "detect":
-        detect(options)
-    elif options.command == "error":
-        error(options)
-    # otherwise trim reads
-    else:
-        atropos(options, parser, default_outfile="-")
-
 def detect(options):
-    from atropos.detect import *
-    from atropos.seqio import open_reader
+    from .detect import create_detector, summarize_contaminants
+    from .util import enumerate_range
     
+    k = options.kmer_size or 12
     n_reads = options.max_reads or 10000
-        
+    overrep_cutoff = 100
     known_contaminants = None
-    if options.include_contaminants != 'unknown':
+    include = options.include_contaminants or "all"
+    if include != 'unknown':
         known_contaminants = load_known_contaminants(options)
     
+    reader = create_reader(options, parser, counter_magnitude="K", values_have_size=False)[0]
+    try:
+        with open_output(options.adapter_report) as o:
+            print("\nDetecting adapters and other potential contaminant sequences based on "
+                  "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
+            
+            if known_contaminants and include == 'known':
+                logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
+                detector_class = KnownContaminantDetector
+            elif n_reads <= 50000:
+                logging.getLogger().debug("Detecting contaminants using the heuristic algorithm")
+                detector_class = HeuristicDetector
+            else:
+                logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
+                detector_class = KhmerDetector
+        
+            if options.paired:
+                d1, d2 = (detector_class(k, n_reads, overrep_cutoff, known_contaminants) for i in (1,2))
+                read1, read2 = next(reader)
+                d1.consume_first(read1)
+                d2.consume_first(read2s)
+                for read1, read2 in enumerate_range(reader, 1, n_reads):
+                    d1.consume(read1)
+                    d2.consume(read2)
+                
+                summarize_contaminants(o, d1.filter_and_sort(include), n_reads, "File 1: {}".format(reader.reader1.name))
+                summarize_contaminants(o, d2.filter_and_sort(include), n_reads, "File 2: {}".format(reader.reader2.name))
+                
+            else:
+                d = detector_class(k, n_reads, overrep_cutoff, known_contaminants)
+                for read in enumerate_range(reader, 1, n_reads):
+                    d.consume(read)
+                
+                summarize_contaminants(o, d.filter_and_sort(include), n_reads, "File: {}".format(reader.name))
+    finally:
+        reader.close()
+
+def error(options, parser):
     reader, qualities, has_qual_file = create_reader(options, parser, counter_magnitude="K", values_have_size=False)
-    
-    with open_output(options.adapter_report) as o:
-        print("\nDetecting adapters and other potential contaminant sequences based on "
-              "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
+    try:
+        if not qualities:
+            parser.error("Cannot estimate error rate without base qualities")
         
+        n_reads = options.max_reads or 10000
         
-        
-            # First pass - detect contaminants
-            fq = FastqReader(f)
-            try:
-                fq_iter = wrap_progress(fq, options)
-                contam = detect_contaminants(fq_iter, k=options.kmer_size, n_reads=n_reads,
-                    known_contaminants=known_contaminants, include=options.include_contaminants)
-            finally:
-                fq.close()
+        with open_output(options.error_report) as o:
+            if options.paired:
+                e1, e1 = (ErrorEstimator() for i in (1,2))
+                for read1, read2 in enumerate_range(reader, 1, n_reads):
+                    e1.consume(read1.sequence)
+                    e2.consume(read2.sequence)
+                
+                print("File 1: {}".format(reader.reader1.name))
+                print("\n  Error rate: {:.2%}".format(e1.estimate())
+                
+                print("File 2: {}".format(reader.reader2.name))
+                print("\n  Error rate: {:.2%}".format(e2.estimate())
+                
+                print("Overall error rate: {:.2%}".format(
+                    (e1.total_qual + e2.total_qual) / (e1.total_len / e2.total_len)))
             
-            # Second pass - estimate abundance
-            fq = FastqReader(f)
-            try:
-                fq_iter = wrap_progress(fq, options)
-                num_contaminated = estimate_abundance(contam, fq_iter, n_reads)
-            finally:
-                fq.close()
-            
-            summarize_contaminants(o, contam, n_reads, num_contaminated, "File {}: {}".format(i, f))
+            else:
+                for read in enumerate_range(reader, 1, n_reads):
+                    e.consume(read.sequence)
+                
+                print("File: {}".format(reader.name))
+                print("\n  Error rate: {:.2%}".format(e.estimate())
+    finally:
+        reader.close()
 
 def atropos(options, parser, default_outfile="-"):
     import time
     import textwrap
     from atropos.seqio import (
-        open_reader, UnknownFileType, Formatters, RestFormatter,
+        UnknownFileType, Formatters, RestFormatter,
         InfoFormatter, WildcardFormatter, Writers, BatchIterator)
     from atropos.adapters import AdapterParser, BACK
     from atropos.modifiers import *
@@ -378,3 +415,12 @@ def create_formatters(options, qualities, default_outfile):
         formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
     
     return (formatters, force_create)
+
+COMMANDS = dict(
+    detect=detect,
+    error=error
+)
+
+def dispatch(options, parser):
+    command = COMMANDS.get(options.command, atropos)
+    command(options, parser)

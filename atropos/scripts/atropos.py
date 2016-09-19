@@ -467,6 +467,8 @@ def get_argument_parser():
                     "experiment is around 1% or less. We recommend setting -e to "
                     "10 x the empirical error rate.")
     error_parser.set_defaults(command='error')
+    error_parser.add_argument("--error-report", default="-",
+        help="File in which to write the summary of the estimated error rates. (stdout)")
     
     return parser
 
