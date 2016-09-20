@@ -1,6 +1,8 @@
 import logging
 import sys
 
+from .xopen import STDOUT, STDERR
+
 def detect(options, parser):
     from .detect import create_detector, summarize_contaminants
     from .util import enumerate_range
@@ -111,7 +113,7 @@ def trim(options, parser):
         import atropos.multicore
         rc, summary = atropos.multicore.run_parallel(*params,
             options.threads, options.process_timeout, options.preserve_order, options.read_queue_size,
-            options.result_queue_size, not options.no_writer_process, options.compression)
+            options.result_queue_size, options.writer_process, options.compression)
     
     if rc != 0:
         sys.exit(rc)
@@ -218,12 +220,12 @@ def create_atropos_params(options, parser, default_outfile):
             options.cut_min == [] and options.cut_min2 == [] and \
             (options.minimum_length is None or options.minimum_length <= 0) and \
             options.maximum_length == sys.maxsize and \
-            not has_qual_file and options.max_n == -1 and not options.trim_n:
+            not has_qual_file and options.max_n is None and not options.trim_n:
         parser.error("You need to provide at least one adapter sequence.")
     
     if options.aligner == 'insert':
         if options.adapter_pair and adapters1 and adapters2:
-            name1, name2 = options.adapter_pair.split(",")
+            name1, name2 = options.adapter_pair
             adapters1 = [a for a in adapters1 if a.name == name1]
             adapters2 = [a for a in adapters2 if a.name == name2]
         if not adapters1 or len(adapters1) != 1 or adapters1[0].where != BACK or \
@@ -359,7 +361,7 @@ def create_atropos_params(options, parser, default_outfile):
             formatters.add_seq_formatter(TooLongReadFilter,
                 options.too_long_output, options.too_long_paired_output)
 
-    if options.max_n >= 0:
+    if options.max_n is not None:
         filters.add_filter(NContentFilter, options.max_n)
 
     if options.discard_trimmed:
@@ -368,13 +370,13 @@ def create_atropos_params(options, parser, default_outfile):
     if not formatters.multiplexed:
         if output1 is not None:
             formatters.add_seq_formatter(NoFilter, output1, output2)
-            if output1 != "-" and not options.no_writer_process:
+            if output1 != STDOUT and options.writer_process:
                 force_create.append(output1)
                 if output2 is not None:
                     force_create.append(output2)
         elif not (options.discard_trimmed and options.untrimmed_output):
             formatters.add_seq_formatter(NoFilter, default_outfile)
-            if default_outfile != "-" and not options.no_writer_process:
+            if default_outfile != STDOUT and options.writer_process:
                 force_create.append(default_outfile)
     
     if options.discard_untrimmed or options.untrimmed_output:

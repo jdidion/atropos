@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 # kate: word-wrap off; remove-trailing-spaces all;
 
-import argparse
+from argparse import ArgumentParser, HelpFormatter
+from collections import OrderedDict
 import copy
 import logging
+import operator
+import os
 import platform
 import re
 import sys
@@ -16,31 +19,13 @@ from atropos import *
 check_importability()
 
 from atropos import __version__
-from atropos.util import int_or_str
+import atropos.commands
+from atropos.util import MAGNITUDE
+from atropos.xopen import STDOUT, STDERR, existing_path, check_path, check_writeable
 
-def main(cmdlineargs=None):
-    """
-    Main function that evaluates command-line parameters.
-    
-    :param cmdlineargs: iterable of command line arguments; `None` is equivalent to
-    `sys.argv[1:]`
-    """
-    args = cmdlineargs or sys.argv[1:]
-    if args[0] in ('-h', '--help'):
-        print_subcommands()
-        return
-    
-    if args[0][0] == '-':
-        command_name = "trim"
-    else:
-        command_name = args[0]
-        del args[0]
-    
-    command_class = COMMANDS[command_name]
-    command = command_class(args)
-    command.execute()
+# Extensions to argparse
 
-class ParagraphHelpFormatter(argparse.HelpFormatter):
+class ParagraphHelpFormatter(HelpFormatter):
     def _fill_text(self, text, width, indent):
         text = re.sub('[ \t]{2,}', ' ', text)
         paragraphs = [
@@ -48,6 +33,121 @@ class ParagraphHelpFormatter(argparse.HelpFormatter):
             for p in re.split("\n\n", text)
         ]
         return "\n\n".join(paragraphs)
+
+class TypeWithArgs(object):
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, string):
+        return self._do_call(string, *self.args, **self.kwargs) or string
+
+class CompositeType(object):
+    def __init__(self, *types):
+        self.types = types
+
+    def __call__(self, string):
+        result = string
+        for t in self.types:
+            result = t(result)
+        return result
+
+class ComparisonValidator(TypeWithArgs):
+    def _do_call(self, lhs, rhs, oper, expected=True):
+        assert oper(lhs, rhs) == expected, "{}({}, {}) != {}".format(oper, lhs, rhs, expected)
+
+class char_list(object):
+    def __init__(self, choices):
+        self.choices = set(choices)
+    
+    def __call__(self, string):
+        l = list(string)
+        assert all(c in self.choices for c in l)
+        return l
+
+class delimited(TypeWithArgs):
+    """Splits a string argument using a delimiter."""
+    def _do_call(self, string, delim=",", data_type=None, choices=None, min_len=None, max_len=None):
+        if isinstance(string, str):
+            vals = string.split(delim) if delim else (string,)
+        else:
+            vals = string
+        
+        if vals[0] == "*" and choices is not None:
+            vals = choices
+        
+        if data_type:
+            vals = [data_type(v) for v in vals]
+        
+        if min_len and len(vals) < min_len:
+            raise ArgumentError(self, "there must be at least {} values".format(min_len))
+        
+        if max_len and len(vals) > max_len:
+            raise ArgumentError(self, "there can be at most {} values".format(max_len))
+        
+        return vals
+
+ACCESS = dict(r=os.R_OK, rU=os.R_OK, rb=os.R_OK, w=os.W_OK, wb=os.W_OK, x=os.X_OK)
+
+class accessible_path(TypeWithArgs):
+    """Test that a path is accessible"""
+    def _do_call(self, path, type_, mode):
+        if type_ == 'f' and path in (STDOUT, STDERR):
+            return path
+        if 'w' in mode:
+            return check_writeable(path, type_)
+        else:
+            return check_path(path, type_, ACCESS[mode])
+
+readable_file = CompositeType(existing_path, accessible_path('f', 'r'))
+"""Test that a file exists and is readable."""
+
+writeable_file = accessible_path('f', 'w')
+"""
+Test that a file 1) exists and is writelable, or 2) does not exist but
+is in a writeable directory.
+"""
+
+str_list = delimited(data_type=str)
+"""Comma-delimited list of strings."""
+
+int_or_str_re = re.compile("([\d\.]+)([KkMmGg]?)")
+def int_or_str(x):
+    """Similar to int(), but accepts K, M, and G abbreviations"""
+    if x is None or isinstance(x, int):
+        return x
+    elif isinstance(x, str):
+        match = int_fmt_re.match(x.upper())
+        num, mult = match.groups()
+        if mult is None:
+            return int(num)
+        else:
+            return int(float(num) * MAGNITUDE[mult])
+    else:
+        raise Exception("Unsupported type {}".format(x))
+
+def positive(type_=int, inclusive=False):
+    """Test that a number is greater than (or equal to, if ``inclusive=True``) zero."""
+    return ge(0, type_) if inclusive else gt(0, type_)
+
+def gt(x, type_=int):
+    """Test that a number is greater than another number."""
+    return CompositeType(type_, ComparisonValidator(x, operator.gt))
+
+def ge(x, type_=int):
+    """Test that a number is greater than another number."""
+    return CompositeType(type_, ComparisonValidator(x, operator.ge))
+
+def between(min_val=None, max_val=None, type_=int):
+    return CompositeType(
+        type_,
+        ComparisonValidator(min_val, operator.ge),
+        ComparisonValidator(max_val, operator.le))
+
+probability = between(0, 1, float)
+"""A float between 0-1 (inclusive)."""
+
+# Commands
 
 class Command(object):
     def __init__(self, args):
@@ -61,43 +161,72 @@ class Command(object):
         self.validate_command_options()
     
     def create_parser(self):
-        self.parser = argparse.ArgumentParser(
+        self.parser = ArgumentParser(
             usage=self.usage,
             description=self.description.format(version=__version__),
             formatter_class=ParagraphHelpFormatter)
     
     def add_common_options(self):
         # Add common options
-        self.parser.set_defaults(paired=False, default_outfile="-")
-        self.parser.add_argument("--debug", action='store_true', default=False,
+        self.parser.set_defaults(paired=False, default_outfile=STDOUT)
+        self.parser.add_argument(
+            "--debug",
+            action='store_true', default=False,
             help="Print debugging information. (no)")
-        self.parser.add_argument("--progress", default=None,
+        self.parser.add_argument(
+            "--progress",
+            choices=('bar', 'msg'), default=None,
             help="Show progress. bar = show progress bar; msg = show a status message. (no)")
-        self.parser.add_argument("--quiet", default=False, action='store_true',
+        self.parser.add_argument(
+            "--quiet",
+            action='store_true', default=False,
             help="Print only error messages. (no)")
-        self.parser.add_argument("--log-level", default=None,
-            choices=("DEBUG", "INFO", "WARN", "ERROR"),
+        self.parser.add_argument(
+            "--log-level",
+            choices=('DEBUG', 'INFO', 'WARN', 'ERROR'), default=None,
             help="Logging level. (ERROR when --quiet else INFO)")
         
         group = self.parser.add_argument_group("Input")
-        group.add_argument("-pe1", "--input1", default=None, metavar="FILE1",
+        group.add_argument(
+            "-pe1",
+            "--input1",
+            type=readable_file, default=None, metavar="FILE1",
             help="The first (and possibly only) input file.")
-        group.add_argument("-pe2", "--input2",  default=None, metavar="FILE2",
+        group.add_argument(
+            "-pe2",
+            "--input2",
+            type=readable_file, default=None, metavar="FILE2",
             help="The second input file.")
-        group.add_argument("-l", "--interleaved-input", default=None, metavar="FILE",
+        group.add_argument(
+            "-l",
+            "--interleaved-input",
+            type=readable_file, default=None, metavar="FILE",
             help="Interleaved input file.")
-        group.add_argument("-se", "--single-input", default=None, metavar="FILE",
+        group.add_argument(
+            "-se",
+            "--single-input",
+            type=readable_file, default=None, metavar="FILE",
             help="A single-end read file.")
-        group.add_argument("-sq", "--single-quals", default=None, metavar="FILE",
+        group.add_argument(
+            "-sq",
+            "--single-quals",
+            type=readable_file, default=None, metavar="FILE",
             help="A single-end qual file.")
-        group.add_argument("-f", "--format", default=None,
-            choices=('fasta','fastq','sra-fastq','sam','bam'),
+        group.add_argument(
+            "-f",
+            "--format",
+            choices=('fasta','fastq','sra-fastq','sam','bam'), default=None,
             help="Input file format. Ignored when reading csfasta/qual files. (auto-detect from "
                  "file name extension)")
-        group.add_argument("-c", "--colorspace", action='store_true', default=False,
+        group.add_argument(
+            "-c",
+            "--colorspace",
+            action='store_true', default=False,
             help="Enable colorspace mode: Also trim the color that is adjacent to "
                  "the found adapter. (no)")
-        group.add_argument("--max-reads", type=int_or_str, default=None,
+        group.add_argument(
+            "--max-reads",
+            type=int_or_str, default=None,
             help="Maximum number of reads/pairs to process (no max)")
     
     def add_command_options(self):
@@ -123,10 +252,11 @@ class Command(object):
         
         logger = logging.getLogger()
         logger.info("This is Atropos %s with Python %s", __version__, platform.python_version())
-        logger.info("Command line parameters: %s %s", command_name, " ".join(self.orig_args))
+        logger.info("Command line parameters: %s %s", self.name, " ".join(self.orig_args))
     
     def validate_common_options(self):
         options = self.options
+        parser = self.parser
         
         if options.format in ("sam", "bam") and options.colorspace:
             parser.error("SAM/BAM format is not currently supported for colorspace reads")
@@ -147,14 +277,14 @@ class Command(object):
                     "interleaved file, use '-l' instead.")
             options.paired = True
         
-        if options.quiet or options.output is None or options.output == "-":
+        if options.quiet or options.output is None or options.output == STDOUT:
             options.progress = None
     
     def validate_command_options(self):
         pass
     
     def execute(self):
-        cmd = __import__("atropos.commands.{}".format(self.name))
+        cmd = getattr(atropos.commands, self.name)
         cmd(self.options, self.parser)
 
 class TrimCommand(Command):
@@ -183,6 +313,8 @@ standard input/output. Without the -o option, output is sent to standard output.
     
     def add_command_options(self):
         parser = self.parser
+        parser.set_defaults(zero_cap=None, action='trim')
+        
         group = parser.add_argument_group("Finding adapters",
             description="Parameters -a, -g, -b specify adapters to be removed from "
                 "each read (or from the first read in a pair if data is paired). "
@@ -190,19 +322,27 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "trimmed (but see the --times option). When the special notation "
                 "'file:FILE' is used, adapter sequences are read from the given "
                 "FASTA file.")
-        group.add_argument("-a", "--adapter", action="append", default=[], metavar="ADAPTER",
-            dest="adapters",
+        group.add_argument(
+            "-a",
+            "--adapter",
+            action="append", default=[], metavar="ADAPTER", dest="adapters",
             help="Sequence of an adapter ligated to the 3' end (paired data: of the "
                 "first read). The adapter and subsequent bases are trimmed. If a "
                 "'$' character is appended ('anchoring'), the adapter is only "
                 "found if it is a suffix of the read. (none)")
-        group.add_argument("-g", "--front", action="append", default=[], metavar="ADAPTER",
+        group.add_argument(
+            "-g",
+            "--front",
+            action="append", default=[], metavar="ADAPTER",
             help="Sequence of an adapter ligated to the 5' end (paired data: of the "
                 "first read). The adapter and any preceding bases are trimmed. "
                 "Partial matches at the 5' end are allowed. If a '^' character is "
                 "prepended ('anchoring'), the adapter is only found if it is a "
                 "prefix of the read. (none)")
-        group.add_argument("-b", "--anywhere", action="append", default=[], metavar="ADAPTER",
+        group.add_argument(
+            "-b",
+            "--anywhere",
+            action="append", default=[], metavar="ADAPTER",
             help="Sequence of an adapter that may be ligated to the 5' or 3' end "
                 "(paired data: of the first read). Both types of matches as "
                 "described under -a und -g are allowed. If the first base of the "
@@ -210,10 +350,14 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "as with -a. This option is mostly for rescuing failed library "
                 "preparations - do not use if you know which end your adapter was "
                 "ligated to! (none)")
-        group.add_argument("--no-trim", dest='action', action='store_const', const=None,
+        group.add_argument(
+            "--no-trim",
+            action='store_const', dest='action', const=None,
             help="Match and redirect reads to output/untrimmed-output as usual, "
                 "but do not remove adapters. (no)")
-        group.add_argument("--mask-adapter", dest='action', action='store_const', const='mask',
+        group.add_argument(
+            "--mask-adapter",
+            action='store_const', dest='action', const='mask',
             help="Mask adapters with 'N' characters instead of trimming them. (no)")
         
         ## Arguments specific to the choice of aligner
@@ -230,44 +374,72 @@ standard input/output. Without the -o option, output is sent to standard output.
         # usage better in the docs or find a way to simplify the choices.
         
         # Arguments for adapter match
-        group.add_argument("-e", "--error-rate", type=float, default=None,
+        group.add_argument(
+            "-e",
+            "--error-rate",
+            type=probability, default=None,
             help="Maximum allowed error rate for adapter match (no. of errors divided by the length "
                 "of the matching region). (0.1)")
-        group.add_argument("--indel-cost", type=int, metavar="COST", default=None,
+        group.add_argument(
+            "--indel-cost",
+            type=positive(int, True), default=None, metavar="COST",
             help="Integer cost of insertions and deletions during adapter match. Substitutions always "
                  "have a cost of 1. (1)")
-        group.add_argument("--no-indels", action='store_false', dest='indels', default=True,
-            help="Allow only mismatches in alignments. "
-                "(allow both mismatches and indels)")
-        group.add_argument("-n", "--times", type=int, metavar="COUNT", default=1,
+        group.add_argument(
+            "--no-indels",
+            action='store_false', dest='indels', default=True,
+            help="Allow only mismatches in alignments. (allow both mismatches and indels)")
+        group.add_argument(
+            "-n",
+            "--times",
+            type=positive(int, False), default=1, metavar="COUNT",
             help="Remove up to COUNT adapters from each read. (1)")
-        group.add_argument("--match-read-wildcards", action="store_true", default=False,
+        group.add_argument(
+            "--match-read-wildcards",
+            action="store_true", default=False,
             help="Interpret IUPAC wildcards in reads. (no)")
-        group.add_argument("-N", "--no-match-adapter-wildcards", action="store_false",
-            default=True, dest='match_adapter_wildcards',
+        group.add_argument(
+            "-N",
+            "--no-match-adapter-wildcards",
+            action="store_false", dest='match_adapter_wildcards', default=True,
             help="Do not interpret IUPAC wildcards in adapters. (no)")
-        group.add_argument("-O", "--overlap", type=int, metavar="MINLENGTH", default=None,
+        group.add_argument(
+            "-O",
+            "--overlap",
+            type=positive(int, False), default=None, metavar="MINLENGTH",
             help="If the overlap between the read and the adapter is shorter than "
                 "MINLENGTH, the read is not modified. Reduces the no. of bases "
                 "trimmed due to random adapter matches. (3)")
-        group.add_argument("--adapter-max-rmp", type=float, metavar="PROB", default=None,
+        group.add_argument(
+            "--adapter-max-rmp",
+            type=probability, default=None, metavar="PROB",
             help="If no minimum overlap (-O) is specified, then adapters are only matched "
                  "when the probabilty of observing k out of n matching bases is <= PROB. (1E-6)")
         
         # Arguments for insert match
-        group.add_argument("--adapter-pair", default=None, metavar="NAME1,NAME2",
+        group.add_argument(
+            "--adapter-pair",
+            type=str_list, default=None, metavar="NAME1,NAME2",
             help="When adapters are specified in files, this option selects a single pair to use "
                  "for insert-based adapter matching.")
-        group.add_argument("--insert-max-rmp", type=float, metavar="PROB", default=1E-6,
+        group.add_argument(
+            "--insert-max-rmp",
+            type=probability, default=1E-6, metavar="PROB",
             help="Overlapping inserts only match when the probablity of observing k of n "
                  "matching bases is <= PROB. (1E-6)")
-        group.add_argument("--insert-match-error-rate", type=float, default=None,
+        group.add_argument(
+            "--insert-match-error-rate",
+            type=probability, default=None,
             help="Maximum allowed error rate for insert match (no. of errors divided by the length "
                 "of the matching region). (0.2)")
-        group.add_argument("--insert-match-adapter-error-rate", type=float, default=None,
+        group.add_argument(
+            "--insert-match-adapter-error-rate",
+            type=probability, default=None,
             help="Maximum allowed error rate for matching adapters after successful insert match "
                  "(no. of errors divided by the length of the matching region). (0.2)")
-        group.add_argument("--correct-mismatches", choices=("liberal", "conservative", "N"), default=None,
+        group.add_argument(
+            "--correct-mismatches",
+            choices=("liberal", "conservative", "N"), default=None,
             help="How to handle mismatches while aligning/merging. 'Liberal' and 'conservative' error "
                  "correction both involve setting the base to the one with the best quality. They differ "
                  "only when the qualities are equal -- liberal means set it to the base from the read with "
@@ -276,183 +448,283 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "is always used. (no error correction)")
         
         # Merging arguments
-        group.add_argument("-R", "--merge-overlapping", action="store_true", default=False,
+        group.add_argument(
+            "-R",
+            "--merge-overlapping",
+            action="store_true", default=False,
             help="Merge read pairs that overlap into a single sequence. This is experimental "
                  "and currently only works with read pairs where an adapter match was found at "
                  "the 3' ends of both reads. The minimum required overlap is controled by "
                  "--merge-min-overlap, and the mimimum error rate in the alignment is controlled "
                  "by --error-rate. (no)")
-        group.add_argument("--merge-min-overlap", type=float, default=0.9,
+        group.add_argument(
+            "--merge-min-overlap",
+            type=positive(float, True), default=0.9,
             help="The minimum overlap between reads required for merging. If this number is (0,1.0], "
                  "it specifies the minimum length as the fraction of the length of the *shorter* read "
                  "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
                  "with an absolute minimum of 2 bp). (0.9)")
         
         group = parser.add_argument_group("Additional read modifications")
-        group.add_argument("--op-order", default="CGQA",
+        group.add_argument(
+            "--op-order",
+            type=char_list(choices=('A','C','G','Q')), default="CGQA",
             help="The order in which trimming operations are be applied. This is a string of "
                  "1-4 of the following characters: A = adapter trimming; C = cutting "
                  "(unconditional); G = NextSeq trimming; Q = quality trimming. The default is "
                  "'CGQA' to maintain compatibility with Cutadapt; however, this is likely to "
                  "change to 'GACQ' in the near future.")
-        group.add_argument("-u", "--cut", action='append', default=[], type=int, metavar="LENGTH",
+        group.add_argument(
+            "-u",
+            "--cut",
+            type=int, action='append', default=[], metavar="LENGTH",
             help="Remove bases from each read (first read only if paired). "
                 "If LENGTH is positive, remove bases from the beginning. "
                 "If LENGTH is negative, remove bases from the end. "
                 "Can be used twice if LENGTHs have different signs. (no)")
-        group.add_argument("-q", "--quality-cutoff", default=None, metavar="[5'CUTOFF,]3'CUTOFF",
+        group.add_argument(
+            "-q",
+            "--quality-cutoff",
+            type=delimited(data_type=positive(int, True), min_len=1, max_len=2),
+            default=None, metavar="[5'CUTOFF,]3'CUTOFF",
             help="Trim low-quality bases from 5' and/or 3' ends of each read before "
                 "adapter removal. Applied to both reads if data is paired. If one "
                 "value is given, only the 3' end is trimmed. If two "
                 "comma-separated cutoffs are given, the 5' end is trimmed with "
                 "the first cutoff, the 3' end with the second. (no)")
-        group.add_argument("-i", "--cut-min", action='append', default=[], type=int, metavar="LENGTH",
+        group.add_argument(
+            "-i",
+            "--cut-min",
+            type=int, action='append', default=[], metavar="LENGTH",
             help="Similar to -u, except that cutting is done AFTER adapter trimming, and only "
                 "if a minimum of LENGTH bases was not already removed. (no)")
-        group.add_argument("--nextseq-trim", type=int, default=None, metavar="3'CUTOFF",
+        group.add_argument(
+            "--nextseq-trim",
+            type=positive(), default=None, metavar="3'CUTOFF",
             help="NextSeq-specific quality trimming (each read). Trims also dark "
                 "cycles appearing as high-quality G bases (EXPERIMENTAL). (no)")
-        group.add_argument("--quality-base", type=int, default=33,
+        group.add_argument(
+            "--quality-base",
+            type=positive(), default=33,
             help="Assume that quality values in FASTQ are encoded as ascii(quality "
                 "+ QUALITY_BASE). This needs to be set to 64 for some old Illumina "
                 "FASTQ files. (33)")
-        group.add_argument("--trim-n", action='store_true', default=False,
+        group.add_argument(
+            "--trim-n",
+             action='store_true', default=False,
             help="Trim N's on ends of reads. (no)")
-        group.add_argument("-x", "--prefix", default='',
+        group.add_argument(
+            "-x",
+            "--prefix",
+            default='',
             help="Add this prefix to read names. Use {name} to insert the name of "
                  "the matching adapter. (no)")
-        group.add_argument("-y", "--suffix", default='',
+        group.add_argument(
+            "-y",
+            "--suffix",
+            default='',
             help="Add this suffix to read names; can also include {name}. (no)")
-        group.add_argument("--strip-suffix", action='append', default=[],
+        group.add_argument(
+            "--strip-suffix",
+            action='append', default=[],
             help="Remove this suffix from read names if present. Can be given "
                  "multiple times. (no)")
-        group.add_argument("--length-tag", metavar="TAG",
+        group.add_argument(
+            "--length-tag",
+            metavar="TAG",
             help="Search for TAG followed by a decimal number in the description "
                 "field of the read. Replace the decimal number with the correct "
                 "length of the trimmed read. For example, use --length-tag 'length=' "
                 "to correct fields like 'length=123'. (no)")
         
         group = parser.add_argument_group("Filtering of processed reads")
-        group.add_argument("--discard-trimmed", "--discard", action='store_true', default=False,
+        group.add_argument(
+            "--discard-trimmed", "--discard",
+            action='store_true', default=False,
             help="Discard reads that contain an adapter. Also use -O to avoid "
                 "discarding too many randomly matching reads! (no)")
-        group.add_argument("--discard-untrimmed", "--trimmed-only", action='store_true', default=False,
+        group.add_argument(
+            "--discard-untrimmed", "--trimmed-only",
+            action='store_true', default=False,
             help="Discard reads that do not contain the adapter. (no)")
-        group.add_argument("-m", "--minimum-length", type=int, default=None, metavar="LENGTH",
+        group.add_argument(
+            "-m",
+            "--minimum-length",
+            type=positive(int, True), default=None, metavar="LENGTH",
             help="Discard trimmed reads that are shorter than LENGTH. Reads that "
                 "are too short even before adapter removal are also discarded. In "
                 "colorspace, an initial primer is not counted. (0)")
-        group.add_argument("-M", "--maximum-length", type=int, default=sys.maxsize, metavar="LENGTH",
+        group.add_argument(
+            "-M",
+            "--maximum-length",
+            type=positive(int, True), default=sys.maxsize, metavar="LENGTH",
             help="Discard trimmed reads that are longer than LENGTH. "
                 "Reads that are too long even before adapter removal "
                 "are also discarded. In colorspace, an initial primer "
                 "is not counted. (no limit)")
-        group.add_argument("--max-n", type=float, default=-1.0, metavar="COUNT",
+        group.add_argument(
+            "--max-n",
+            type=positive(float, True), default=None, metavar="COUNT",
             help="Discard reads with too many N bases. If COUNT is an integer, it "
                 "is treated as the absolute number of N bases. If it is between 0 "
                 "and 1, it is treated as the proportion of N's allowed in a read. "
                 "(no)")
         
         group = parser.add_argument_group("Output")
-        group.add_argument("-o", "--output", metavar="FILE",
+        group.add_argument(
+            "-o",
+            "--output",
+            type=writeable_file, metavar="FILE",
             help="Write trimmed reads to FILE. FASTQ or FASTA format is chosen "
                 "depending on input. The summary report is sent to standard output. "
                 "Use '{name}' in FILE to demultiplex reads into multiple "
                 "files. (write to standard output)")
-        group.add_argument("--info-file", metavar="FILE",
+        group.add_argument(
+            "--info-file",
+            type=writeable_file, metavar="FILE",
             help="Write information about each read and its adapter matches into FILE. "
                  "See the documentation for the file format. (no)")
-        group.add_argument("-r", "--rest-file", metavar="FILE",
+        group.add_argument(
+            "-r",
+            "--rest-file",
+            type=writeable_file, metavar="FILE",
             help="When the adapter matches in the middle of a read, write the "
                 "rest (after the adapter) into FILE. (no)")
-        group.add_argument("--wildcard-file", metavar="FILE",
+        group.add_argument(
+            "--wildcard-file",
+            type=writeable_file, metavar="FILE",
             help="When the adapter has N bases (wildcards), write adapter bases "
                 "matching wildcard positions to FILE. When there are indels in the "
                 "alignment, this will often not be accurate. (no)")
-        group.add_argument("--too-short-output", metavar="FILE",
+        group.add_argument(
+            "--too-short-output",
+            type=writeable_file, metavar="FILE",
             help="Write reads that are too short (according to length specified by "
-            "-m) to FILE. (no - too short reads are discarded)")
-        group.add_argument("--too-long-output", metavar="FILE",
+                "-m) to FILE. (no - too short reads are discarded)")
+        group.add_argument(
+            "--too-long-output",
+            type=writeable_file, metavar="FILE",
             help="Write reads that are too long (according to length specified by "
-            "-M) to FILE. (no - too long reads are discarded)")
-        group.add_argument("--untrimmed-output", default=None, metavar="FILE",
+                "-M) to FILE. (no - too long reads are discarded)")
+        group.add_argument(
+            "--untrimmed-output",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write reads that do not contain the adapter to FILE. (no - "
-                 "untrimmed reads are written to default output)")
-        group.add_argument("--merged-output", default=None, metavar="FILE",
+                "untrimmed reads are written to default output)")
+        group.add_argument(
+            "--merged-output",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write reads that have been merged to this file. By default, merged "
-                 "reads are written to --too-short-output if specified, and otherwise "
-                 "are discarded. (no - merged reads are written to default output)")
-        group.add_argument("--report-file", default=None, metavar="FILE",
+                "reads are written to --too-short-output if specified, and otherwise "
+                "are discarded. (no - merged reads are written to default output)")
+        group.add_argument(
+            "--report-file",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)")
         
         group = parser.add_argument_group("Colorspace options")
-        group.add_argument("-d", "--double-encode", action='store_true', default=False,
+        group.add_argument(
+            "-d",
+            "--double-encode",
+            action='store_true', default=False,
             help="Double-encode colors (map 0,1,2,3,4 to A,C,G,T,N). (no)")
-        group.add_argument("-t", "--trim-primer", action='store_true', default=False,
+        group.add_argument(
+            "-t",
+            "--trim-primer",
+            action='store_true', default=False,
             help="Trim primer base and the first color (which is the transition "
                 "to the first nucleotide). (no)")
-        group.add_argument("--strip-f3", action='store_true', default=False,
+        group.add_argument(
+            "--strip-f3",
+            action='store_true', default=False,
             help="Strip the _F3 suffix of read names. (no)")
-        group.add_argument("--maq", "--bwa", action='store_true', default=False,
+        group.add_argument(
+            "--maq", "--bwa",
+            action='store_true', default=False,
             help="MAQ- and BWA-compatible colorspace output. This enables -c, -d, "
                 "-t, --strip-f3 and -y '/1'. (no)")
-        group.add_argument("--no-zero-cap", dest='zero_cap', action='store_false',
+        group.add_argument(
+            "--no-zero-cap",
+            dest='zero_cap', action='store_false',
             help="Do not change negative quality values to zero in colorspace "
                 "data. By default, they are since many tools have problems with "
                 "negative qualities. (no)")
-        group.add_argument("--zero-cap", "-z", action='store_true',
+        group.add_argument(
+            "-z",
+            "--zero-cap",
+            action='store_true',
             help="Change negative quality values to zero. This is enabled "
-            "by default when -c/--colorspace is also enabled. Use the above option "
-            "to disable it. (no)")
-        parser.set_defaults(zero_cap=None, action='trim')
+                "by default when -c/--colorspace is also enabled. Use the above option "
+                "to disable it. (no)")
         
         group = parser.add_argument_group("Paired-end options", description="The "
             "-A/-G/-B/-U options work like their -a/-b/-g/-u counterparts, but "
             "are applied to the second read in each pair.")
-        group.add_argument("-A", dest='adapters2', action='append', default=[],
-            metavar='ADAPTER',
+        group.add_argument(
+            "-A",
+            action='append', dest='adapters2', default=[], metavar='ADAPTER',
             help="3' adapter to be removed from second read in a pair. (no)")
-        group.add_argument("-G", dest='front2', action='append', default=[],
-            metavar='ADAPTER',
+        group.add_argument(
+            "-G",
+            action='append', dest='front2', default=[], metavar='ADAPTER',
             help="5' adapter to be removed from second read in a pair. (no)")
-        group.add_argument("-B", dest='anywhere2', action='append', default=[],
-            metavar='ADAPTER',
+        group.add_argument(
+            "-B",
+            action='append', dest='anywhere2',  default=[], metavar='ADAPTER',
             help="5'/3 adapter to be removed from second read in a pair. (no)")
-        group.add_argument("-U", dest='cut2', action='append', default=[], type=int,
-            metavar="LENGTH",
+        group.add_argument(
+            "-U",
+            type=int, action='append', dest='cut2', default=[], metavar="LENGTH",
             help="Remove LENGTH bases from second read in a pair (see --cut). (no)")
-        group.add_argument("-I", "--cut-min2", action='append', default=[],
-            type=int, metavar="LENGTH",
+        group.add_argument(
+            "-I",
+            "--cut-min2",
+            type=int, action='append', default=[], metavar="LENGTH",
             help="Similar to -U, except that cutting is done AFTER adapter trimming, "
                  "and only if a minimum of LENGTH bases was not already removed "
                  "(see --cut-min). (no)")
-        group.add_argument("-p", "--paired-output", metavar="FILE",
+        group.add_argument(
+            "-p",
+            "--paired-output",
+            type=writeable_file, metavar="FILE",
             help="Write second read in a pair to FILE. (no)")
-        group.add_argument("-L", "--interleaved-output", metavar="FILE",
+        group.add_argument(
+            "-L",
+            "--interleaved-output",
+            type=writeable_file, metavar="FILE",
             help="Write output to interleaved file.")
         # Setting the default for pair_filter to None allows us to find out whether
         # the option was used at all.
-        group.add_argument("--pair-filter", metavar='(any|both)', default=None,
-            choices=("any", "both"),
+        group.add_argument(
+            "--pair-filter",
+            choices=("any", "both"), default=None, metavar='(any|both)',
             help="Which of the reads in a paired-end read have to match the "
                 "filtering criterion in order for it to be filtered. (any)")
-        group.add_argument("--untrimmed-paired-output", metavar="FILE",
+        group.add_argument(
+            "--untrimmed-paired-output",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write second read in a pair to this FILE when no adapter "
                 "was found in the first read. Use this option together with "
                 "--untrimmed-output when trimming paired-end reads. (no - output "
                 "to same file as trimmed reads)")
-        group.add_argument("--too-short-paired-output", metavar="FILE", default=None,
+        group.add_argument(
+            "--too-short-paired-output",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write second read in a pair to this file if pair is too short. "
                 "Use together with --too-short-output. (no - too short reads are "
                 "discarded)")
-        group.add_argument("--too-long-paired-output", metavar="FILE", default=None,
+        group.add_argument(
+            "--too-long-paired-output",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write second read in a pair to this file if pair is too long. "
                 "Use together with --too-long-output. (no - too long reads are "
                 "discarded)")
         
         group = parser.add_argument_group("Method-specific options")
         group = group.add_mutually_exclusive_group()
-        group.add_argument("--bisulfite", default=False, metavar="METHOD",
+        group.add_argument(
+            "--bisulfite",
+            default=False, metavar="METHOD",
             help="Set default option values for bisulfite-treated data. The argument specifies the "
                  "type of bisulfite library (rrbs, non-directional, non-directional-rrbs, truseq, "
                  "epignome, or swift) or custom parameters for trimming: '<read1>[;<read2>]' where "
@@ -461,29 +733,48 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "during/prior to adapter trimming should be counted towards the total bases to be "
                  "cut and 'only trimmed' is 1 or 0 for whether or not only trimmed reads should be "
                  "further cut. (no)")
-        group.add_argument("--mirna", action="store_true", default=False,
+        group.add_argument(
+            "--mirna",
+            action="store_true", default=False,
             help="Set default option values for miRNA data. (no)")
         
         group = parser.add_argument_group("Parallel (multi-core) options")
-        group.add_argument("-T", "--threads", type=int, default=None, metavar="THREADS",
+        group.add_argument(
+            "-T",
+            "--threads",
+            type=positive(int, True), default=None, metavar="THREADS",
             help="Number of threads to use for read trimming. Set to 0 to use "
                  "max available threads. (Do not use multithreading)")
-        group.add_argument("--no-writer-process", action="store_true", default=False,
+        group.add_argument(
+            "--no-writer-process",
+            action="store_false", dest="writer_process", default=True,
             help="Do not use a writer process; instead, each worker thread writes its "
                  "own output to a file with a '.N' suffix. (no)")
-        group.add_argument("--preserve-order", action="store_true", default=False,
+        group.add_argument(
+            "--preserve-order",
+            action="store_true", default=False,
             help="Preserve order of reads in input files (ignored if "
                  "--no-writer-process is set). (no)")
-        group.add_argument("--process-timeout", type=int, default=60, metavar="SECONDS",
+        group.add_argument(
+            "--process-timeout",
+            type=positive(int, True), default=60, metavar="SECONDS",
             help="Number of seconds process should wait before escalating messages "
                  "to ERROR level. (60)")
-        group.add_argument("--batch-size", type=int, default=5000, metavar="SIZE",
+        group.add_argument(
+            "--batch-size",
+            type=int_or_str, default=5000, metavar="SIZE",
             help="Number of records to process in each batch. (5000)")
-        group.add_argument("--read-queue-size", type=int, default=None, metavar="SIZE",
+        group.add_argument(
+            "--read-queue-size",
+            type=int_or_str, default=None, metavar="SIZE",
             help="Size of queue for batches of reads to be processed. (THREADS * 100)")
-        group.add_argument("--result-queue-size", type=int, default=None, metavar="SIZE",
+        group.add_argument(
+            "--result-queue-size",
+            type=int_or_str, default=None, metavar="SIZE",
             help="Size of queue for batches of results to be written. (THREADS * 100)")
-        group.add_argument("--compression", choices=("worker", "writer"), default=None,
+        group.add_argument(
+            "--compression",
+            choices=("worker", "writer"), default=None,
             help="Where data compression should be performed. Defaults to 'writer' if "
                  "system-level compression can be used and (1 < threads < 8), otherwise "
                  "defaults to 'worker'.")
@@ -535,12 +826,6 @@ standard input/output. Without the -o option, output is sent to standard output.
         # minimum overlap and -O is set to 1, otherwise -O is set to the old
         # default of 3.
         # TODO: This is pretty confusing logic - need to simplify
-        if options.overlap is not None and options.overlap < 1:
-            parser.error("The overlap must be at least 1.")
-        if options.indels and options.indel_cost is not None and options.indel_cost < 0:
-            parser.error("--indel-cost must be >= 0")
-        if options.adapter_max_rmp is not None and (options.adapter_max_rmp < 0 or options.adapter_max_rmp > 1.0):
-            parser.error("--adapter-max-rmp must be between [0,1].")
         
         if options.aligner == 'adapter':
             if options.indels and options.indel_cost is None:
@@ -555,8 +840,6 @@ standard input/output. Without the -o option, output is sent to standard output.
                 parser.error("Insert aligner only works with paired-end reads")
                 # TODO: should also be checking that there is exactly one 3' adapter for each read
                 # TODO: have the aligner tell us whether it can be used based on options?
-            if options.insert_max_rmp < 0 or options.insert_max_rmp > 1.0:
-                parser.error("--insert-max-rmp must be between [0,1].")
             if options.indels and options.indel_cost is None:
                 options.indel_cost = 3
             if options.overlap is None:
@@ -575,19 +858,11 @@ standard input/output. Without the -o option, output is sent to standard output.
                 options.times != 1):
             parser.error("--merge-overlapping currently only works for paired-end reads with 3' adapters.")
         
-        if options.format is not None and options.format.lower() not in ['fasta', 'fastq', 'sra-fastq']:
-            parser.error("The input file format must be either 'fasta', 'fastq' or "
-                "'sra-fastq' (not '{0}').".format(options.format))
-        
-        options.op_order = list(options.op_order)
-        if not (1 <= len(options.op_order) <= 4 and all(o in ('A','C','G','Q') for o in options.op_order)):
-            parser.error("--op-order must be a string of 1-4 characters consisting of A,C,G,Q")
-        
         if options.mirna:
             if options.adapter is None and options.front is None and options.anywhere is None:
                 options.adapter = ['TGGAATTCTCGG'] # illumina small RNA adapter
             if options.quality_cutoff is None:
-                options.quality_cutoff = "20,20"
+                options.quality_cutoff = (20, 20)
             if options.minimum_length is None:
                 options.minimum_length = 16
             if options.error_rate is None:
@@ -621,26 +896,12 @@ standard input/output. Without the -o option, output is sent to standard output.
                     parser.error("Too many bisulfite parameters for single-end reads")
                 options.bisulfite = temp
         
-        if options.quality_cutoff is not None:
-            cutoffs = options.quality_cutoff.split(',')
-            if len(cutoffs) == 1:
-                try:
-                    cutoffs_array = [0, int(cutoffs[0])]
-                except ValueError as e:
-                    parser.error("Quality cutoff value not recognized: {0}".format(e))
-            elif len(cutoffs) == 2:
-                try:
-                    cutoffs_array = [int(cutoffs[0]), int(cutoffs[1])]
-                except ValueError as e:
-                    parser.error("Quality cutoff value not recognized: {0}".format(e))
-            else:
-                parser.error("Expected one value or two values separated by comma for the quality cutoff")
-            
-            if all(x <= 0 for x in cutoffs_array):
+        if options.quality_cutoff:
+            if all(c <= 0 for c in options.quality_cutoff):
                 options.quality_cutoff = None
-            else:
-                options.quality_cutoff = cutoffs_array
-            
+            elif len(options.quality_cutoff) == 1:
+                options.quality_cutoff = [0] + options.quality_cutoff
+        
         if options.pair_filter is None:
             options.pair_filter = 'any'
 
@@ -666,20 +927,21 @@ standard input/output. Without the -o option, output is sent to standard output.
         if options.zero_cap is None:
             options.zero_cap = options.colorspace
         
-        if options.trim_primer and not options.colorspace:
-            parser.error("Trimming the primer makes only sense in colorspace.")
-        
-        if options.double_encode and not options.colorspace:
-            parser.error("Double-encoding makes only sense in colorspace.")
-        
-        if options.anywhere and options.colorspace:
-            parser.error("Using --anywhere with colorspace reads is currently not supported (if you "
-                "think this may be useful, contact the author).")
-        
+        if options.colorspace:
+            if options.anywhere:
+                parser.error("Using --anywhere with colorspace reads is currently not supported (if you "
+                    "think this may be useful, contact the author).")
+            if options.match_read_wildcards:
+                parser.error('IUPAC wildcards not supported in colorspace')
+            options.match_adapter_wildcards = False
+        else:
+            if options.trim_primer:
+                parser.error("Trimming the primer makes only sense in colorspace.")
+            if options.double_encode:
+                parser.error("Double-encoding makes only sense in colorspace.")
+                
         if options.error_rate is None:
             options.error_rate = 0.1
-        elif not (0 <= options.error_rate <= 1.0):
-            parser.error("The maximum error rate must be between 0 and 1.")
         
         if options.cut:
             if len(options.cut) > 2:
@@ -705,11 +967,6 @@ standard input/output. Without the -o option, output is sent to standard output.
             if len(options.cut_min2) == 2 and options.cut_min2[0] * options.cut_min2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
         
-        if options.colorspace:
-            if options.match_read_wildcards:
-                parser.error('IUPAC wildcards not supported in colorspace')
-            options.match_adapter_wildcards = False
-        
         if options.threads is not None:
             if options.debug:
                 parser.error("Cannot use debug mode with multiple threads")
@@ -717,27 +974,24 @@ standard input/output. Without the -o option, output is sent to standard output.
             threads = options.threads
             if threads <= 0:
                 threads = cpu_count()
-            if threads < 2:
-                parser.error("At least two threads are required for multi-processing")
+            elif threads == 1:
+                parser.error("--threads must be >= 2")
             options.threads = threads
             
             if options.compression is None:
                 # Our tests show that with 8 or more threads, worker compression is
                 # more efficient.
-                if options.no_writer_process or threads == 2 or threads >= 8:
-                    options.compression = "worker"
-                else:
+                if options.writer_process and 2 < threads < 8:
                     from atropos.compression import can_use_system_compression
                     options.compression = "writer" if can_use_system_compression() else "worker"
-            elif options.compression == "writer" and options.no_writer_process:
-                parser.error("Writer compression and --no-writer-process are mutually exclusive")
-            elif threads == 2 and options.compression == "writer":
-                logging.getLogger.warn("Writer compression requires > 2 threads; using worker compression instead")
-                options.compression = "worker"
-            
-            options.batch_size = int_or_str(options.batch_size)
-            if options.process_timeout < 0:
-                options.process_timeout = 0
+                else:
+                    options.compression = "worker"
+            elif options.compression == "writer":
+                if not options.writer_process:
+                    parser.error("Writer compression and --no-writer-process are mutually exclusive")
+                elif threads == 2:
+                    logging.getLogger.warn("Writer compression requires > 2 threads; using worker compression instead")
+                    options.compression = "worker"
             
             # Set queue sizes if necessary.
             # If we are using writer compression, the back-up will be in the result queue,
@@ -762,28 +1016,43 @@ class DetectCommand(Command):
     
     def add_command_options(self):
         parser = self.parser
-        group.add_argument("-o", "--output", metavar="FILE",
+        group.add_argument(
+            "-o",
+            "--output",
+            type=writeable_file, default=STDOUT, metavar="FILE",
             help="File in which to write the summary of detected adapters. (stdout)")
-        parser.add_argument("-k", "--kmer-size", type=int, default=12,
+        parser.add_argument(
+            "-k",
+            "--kmer-size",
+            type=positive(), default=12,
             help="Size of k-mer used to scan reads for adapter sequences. (12)")
-        parser.add_argument("-m", "--max-adapters", type=int, default=None,
+        parser.add_argument(
+            "-m",
+            "--max-adapters",
+            type=positive(), default=None,
             help="The maximum number of candidate adapters to report. (none)")
-        parser.add_argument("-i", "--include-contaminants", choices=('all','known','unknown'), default='all',
+        parser.add_argument(
+            "-i",
+            "--include-contaminants",
+            choices=('all','known','unknown'), default='all',
             help="What conaminants to search for: all, only known adapters/contaminants ('known'), "
                  "or only unknown contaminants ('unknown').")
-        parser.add_argument("-c", "--known-contaminant", action="append", default=None,
+        parser.add_argument(
+            "-c",
+            "--known-contaminant",
+            action="append", default=None,
             help="Pass known contaminants in on the commandline as 'name=sequence'. "
                  "Can be specified multiple times.")
-        parser.add_argument("-C", "--known-contaminants-file", default=None,
+        parser.add_argument(
+            "-C",
+            "--known-contaminants-file",
+            type=readable_file, default=None,
             help="File with known contaminants, one per line, with name and sequence "
                  "separated by one or more tabs.")
-        parser.add_argument("--no-cache-contaminants", action="store_true", default=False,
+        parser.add_argument(
+            "--no-cache-contaminants",
+            action="store_false", dest="cache_contaminants", default=True,
             help="Don't cache contaminant list as '.contaminants' in the working directory.")
-    
-    def validate_command_options(self):
-        options = self.options
-        if options.kmer_size <= 0:
-            self.
 
 class ErrorCommand(Command):
     """
@@ -799,20 +1068,25 @@ experiment is around 1% or less. We recommend setting -e to
 10 x the empirical error rate."""
     
     def add_command_options(self):
-        parser.add_argument("--error-report", default="-",
+        parser.add_argument(
+            "-o",
+            "--output",
+            type=writeable_file, default=STDOUT,
             help="File in which to write the summary of the estimated error rates. (stdout)")
     
-COMMANDS = dict(
+COMMANDS = OrderedDict(
     trim=TrimCommand,
     detect=DetectCommand,
     error=ErrorCommand
 )
 
+# Main
+
 def print_subcommands():
     print("Atropos version {}\n".format(__version__))
     print("usage: atropos <command> [options]\n")
     print("commands:")
-    for command_class in commands:
+    for command_class in COMMANDS.values():
         print("  {}: {}".format(command_class.name, command_class.__doc__))
     print("\noptional arguments:\n  -h, --help  show this help message and exit")
     print("""
@@ -828,6 +1102,28 @@ Cutadapt (https://github.com/marcelm/cutadapt) was developed by Marcel Martin,
 "Cutadapt Removes Adapter Sequences From High-Throughput Sequencing Reads,"
 EMBnet Journal, 2011, 17(1):10-12.
 """)
+
+def main(cmdlineargs=None):
+    """
+    Main function that evaluates command-line parameters.
+    
+    :param cmdlineargs: iterable of command line arguments; `None` is equivalent to
+    `sys.argv[1:]`
+    """
+    args = cmdlineargs or sys.argv[1:]
+    if args[0] in ('-h', '--help'):
+        print_subcommands()
+        return
+    
+    if args[0][0] == '-':
+        command_name = "trim"
+    else:
+        command_name = args[0]
+        del args[0]
+    
+    command_class = COMMANDS[command_name]
+    command = command_class(args)
+    command.execute()
 
 if __name__ == '__main__':
     main()

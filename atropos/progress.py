@@ -1,6 +1,15 @@
 import logging
 import time
-from atropos.util import magnitude_formatter
+from .util import MAGNITUDE
+
+def magnitude_formatter(magnitude):
+    suffix = ""
+    if magnitude is None:
+        div = 1.0
+    else:
+        div = float(MAGNITUDE[magnitude.upper()][0])
+        suffix = magnitude
+    return lambda val: "{:.1f} {}".format(val / div, suffix)
 
 def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=None,
                            counter_magnitude="M", **kwargs):

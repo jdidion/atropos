@@ -14,7 +14,7 @@ import re
 import sys
 
 from .filters import NoFilter
-from .xopen import xopen, open_output
+from .xopen import STDOUT, STDERR, xopen, open_output
 
 def _shorten(s, n=100):
     """Shorten string s to at most n characters, appending "..." if necessary."""
@@ -494,11 +494,11 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
     fastq_handler = ColorspaceFastqReader if colorspace else FastqReader
     fasta_handler = ColorspaceFastaReader if colorspace else FastaReader
 
-    if fileformat is None and file1 != "-":
+    if fileformat is None and file1 != STDOUT:
         fileformat = guess_format_from_name(file1)
     
     if fileformat is None:
-        if file1 == "-":
+        if file1 == STDOUT:
             file1 = sys.stdin if mode == 'r' else sys.stdout
         for line in file1:
             if line.startswith('#'):
@@ -830,7 +830,7 @@ class Writers(object):
     
     def close(self):
         for path in self.force_create:
-            if path not in self.writers and path != '-':
+            if path not in self.writers and path != STDOUT:
                 with open_output(path, "w"):
                     pass
         for writer in self.writers.values():

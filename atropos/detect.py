@@ -22,7 +22,7 @@ from .xopen import open_output, xopen
 
 def load_known_contaminants(options):
     cache_file = ".contaminants"
-    if not options.no_cache_contaminants and os.path.exists(cache_file):
+    if options.cache_contaminants and os.path.exists(cache_file):
         with open(cache_file, "rb") as cache:
             return pickle.load(cache)
     else:
@@ -35,7 +35,7 @@ def load_known_contaminants(options):
             merge_contaminants(
                 known_contaminants,
                 load_known_contaminants_from_file(options.known_contaminants_file))
-        if not options.no_cache_contaminants:
+        if options.cache_contaminants:
             # need to make it pickleable
             temp = {}
             for seq, names in known_contaminants.items():

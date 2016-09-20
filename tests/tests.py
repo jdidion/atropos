@@ -269,7 +269,7 @@ except ImportError:
 @raises(SystemExit)
 def test_qualfile_only():
     with redirect_stderr():
-        atropos.main(['file.qual'])
+        atropos.main(['-sq', datapath('E3M.qual')])
 
 
 @raises(SystemExit)
@@ -281,7 +281,7 @@ def test_no_args():
 @raises(SystemExit)
 def test_two_fastqs():
     with redirect_stderr():
-        atropos.main([datapath('paired.1.fastq'), datapath('paired.2.fastq')])
+        atropos.main(['-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 
 def test_anchored_no_indels():

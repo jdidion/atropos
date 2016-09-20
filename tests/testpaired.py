@@ -299,7 +299,7 @@ def test_no_insert_match():
     #     aligners=('insert',)
     # )
     # with --adapter-max-rmp
-    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT --bisulfite truseq -e 0.3 --adapter-max-rmp 0.001 -m 25 -q 0 --trim-n',
+    run_paired('-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -e 0.3 --adapter-max-rmp 0.001 -m 25 -q 0 --trim-n',
         in1='insert.1.fastq', in2='insert.2.fastq',
         expected1='insert.1.fastq', expected2='insert.2.fastq',
         aligners=('insert',)
