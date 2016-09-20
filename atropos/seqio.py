@@ -390,16 +390,24 @@ class SAMReader(object):
 class SingleEndSAMReader(SAMReader):
     def _iter(self, sam):
         for read in sam:
-            yield self.as_sequence(read)
+            yield self._as_sequence(read)
 
 class PairedEndSAMReader(SAMReader):
     def _iter(self, sam):
-        for read1, read2 in zip(sam, sam):
-            assert read1.query_name == read2.query_name
-            yield (
-                self.as_sequence(read1),
-                self.as_sequence(read2)
-            )
+        for reads in zip(sam, sam):
+            if reads[0].query_name != reads[1].query_name:
+                raise Exception(
+                    "Consecutive reads in paired-end SAM/BAM file do not have the "
+                    "same name; make sure your file is name-sorted and does not "
+                    "contain any secondary/supplementary alignments.")
+            
+            if reads[0].is_read1:
+                assert reads[1].is_read2
+            else:
+                assert reads[1].is_read1
+                reads = (reads[1], reads[0])
+            
+            yield tuple(self._as_sequence(r) for r in reads)
 
 class BatchIterator(object):
     def __init__(self, reader, size, max_reads=None):

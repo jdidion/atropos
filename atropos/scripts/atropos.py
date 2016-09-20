@@ -269,9 +269,6 @@ class Command(object):
         if options.single_input:
             if options.input1 or options.input2 or options.interleaved_input:
                 parser.error("Cannot use -se together with -pe1, -pe2, or -l")
-            if options.untrimmed_paired_output:
-                parser.error("Option --untrimmed-paired-output can only be used when "
-                    "trimming paired-end reads (with option -p).")
             options.paired = False
             options.input1 = options.single_input
             options.input2 = options.single_quals
@@ -790,6 +787,9 @@ standard input/output. Without the -o option, output is sent to standard output.
         if not paired:
             if not options.output:
                 parser.error("An output file is required")
+            if options.untrimmed_paired_output:
+                parser.error("Option --untrimmed-paired-output can only be used when "
+                    "trimming paired-end reads (with option -p).")
         else:
             if not options.interleaved_output:
                 if not options.output:
