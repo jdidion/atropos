@@ -111,7 +111,8 @@ def trim(options, parser):
     else:
         # Run multiprocessing version
         import atropos.multicore
-        rc, summary = atropos.multicore.run_parallel(*params,
+        rc, summary = atropos.multicore.run_parallel(
+            params.reader, params.modifiers, params.filters, params.formatters, params.writers,
             options.threads, options.process_timeout, options.preserve_order, options.read_queue_size,
             options.result_queue_size, options.writer_process, options.compression)
     
