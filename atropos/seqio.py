@@ -381,8 +381,8 @@ class SAMReader(object):
             self._file.close()
             self._file = None
         
-    def _as_sequence(read):
-        self.sequence_class(
+    def _as_sequence(self, read):
+        return self.sequence_class(
             read.query_name,
             read.query_sequence,
             read.query_qualities)
