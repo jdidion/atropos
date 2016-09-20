@@ -179,6 +179,7 @@ class Detector(object):
         self.known_contaminants = known_contaminants
         self._read_length = None
         self._read_sequences = set()
+        self._matches = None
     
     def consume_all(self, reader):
         """
@@ -189,6 +190,19 @@ class Detector(object):
         for read in enumerate_range(reader, 1, n_reads):
             self.consume(read)
     
+    def consume_all_batches(self, batch_iterator):
+        """
+        Consume all reads from the specified batch_iterator.
+        It is expected that the iterator was constructed
+        with max_reads == n_reads.
+        """
+        for batch_num, (batch_size, batch) in enumerate(batch_iterator):
+            if batch_num == 0:
+                self.consume_first(batch[0])
+                batch = batch[1:]
+            for read in batch:
+                self.consume(read)
+        
     def consume_first(self, read):
         assert self._read_length is None
         self._read_length = len(read.sequence)
@@ -212,9 +226,14 @@ class Detector(object):
             return None
         return seq
     
-    def filter_and_sort(self, include="all", min_len=None, min_complexity=1.1, min_match_frac=0.1, limit=20):
+    def matches(self, **kwargs):
+        if self._matches is None or len(kwargs) > 0:
+            self._filter_and_sort(**kwargs)
+        return self._matches
+    
+    def _filter_and_sort(self, include="all", min_len=None, min_complexity=1.1, min_match_frac=0.1, limit=20):
         """
-        Returns list of contaminants.
+        Identify, filter, and sort contaminants.
         """
         if min_len is None:
             min_len = self.k
@@ -245,8 +264,46 @@ class Detector(object):
         if limit is not None:
             matches = matches[:limit]
         
-        return matches
+        self._matches = matches
     
+    def summarize(self, outstream, name=None, **kwargs):
+        header = "File: {}".format(name) if name else None
+        summarize_contaminants(outstream, self.matches(**kwargs), self.n_reads, header)
+
+class PairedDetector(object):
+    def __init__(self, detector_class, **kwargs):
+        self.d1 = detector_class(**kwargs)
+        self.d2 = detector_class(**kwargs)
+    
+    def consume_all(self, reader):
+        read1, read2 = next(reader)
+        self.d1.consume_first(read1)
+        self.d2.consume_first(read2)
+        for read1, read2 in reader:
+            self.d1.consume(read1)
+            self.d2.consume(read2)
+    
+    def consume_all_batches(self, batch_iterator):
+        for batch_num, (batch_size, batch) in enumerate(batch_iterator):
+            if batch_num == 0:
+                read1, read2 = batch[0]
+                self.d1.consume_first(read1)
+                self.d2.consume_first(read2)
+                batch = batch[1:]
+            for read1, read2 in batch:
+                self.d1.consume(read1)
+                self.d2.consume(read2)
+    
+    def matches(self, **kwargs):
+        return (
+            self.d1.matches(**kwargs),
+            self.d2.matches(**kwargs))
+    
+    def summarize(self, outstream, names=[None, None], **kwargs):
+        name1, name2 = names
+        self.d1.summarize(outstream, name1, **kwargs)
+        self.d2.summarize(outstream, name2, **kwargs)
+
 class KnownContaminantDetector(Detector):
     """
     Test known contaminants against reads.
@@ -299,7 +356,7 @@ class HeuristicDetector(Detector):
     and becomes too slow/memory-intenstive when n_reads > 50k.
     """
     def __init__(self, min_freq=0.001, min_contaminant_match_frac=0.9, **kwargs):
-        super(HeuristicDetector, self).__init__(known_contaminants=known_contaminants, **kwargs)
+        super(HeuristicDetector, self).__init__(**kwargs)
         self.min_freq = min_freq
         self.min_contaminant_match_frac = min_contaminant_match_frac
     
@@ -400,20 +457,22 @@ class HeuristicDetector(Detector):
             unknown = []
             
             for match in matches:
+                seq = match.seq
+                seqrc = reverse_complement(seq)
                 best_matches = {}
                 best_match_frac = (self.min_contaminant_match_frac, 0)
                 for contam in contaminants:
-                    match_frac, compare_seq = contam.match(match.seq)
-                    if match_frac[0] < best_match_frac[0]:
+                    match_frac1, match_frac2, compare_seq = contam.match(seq, seqrc)
+                    if match_frac1 < best_match_frac[0]:
                         continue
                     if (contam.seq in compare_seq or
                             align(compare_seq, contam.seq, min_contaminant_match_frac)):
-                        if (match_frac[0] > best_match_frac[0] or (
-                                match_frac[0] == best_match_frac[0] and
-                                match_frac[1] > best_match_frac[1])):
+                        if (match_frac1 > best_match_frac[0] or (
+                                match_frac1 == best_match_frac[0] and
+                                match_frac2 > best_match_frac[1])):
                             best_matches = {}
-                            best_match_frac = match_frac
-                        best_matches[contam] = (match, match_frac)
+                            best_match_frac = (match_frac1, match_frac2)
+                        best_matches[contam] = (match, (match_frac1, match_frac2))
                 
                 if best_matches:
                     for contam, match in best_matches.items():
@@ -550,7 +609,7 @@ def align(seq1, seq2, min_overlap_frac=0.9):
     else:
         return None
 
-def summarize_contaminants(outstream, matches, n_reads, num_contaminated=None, header=None):
+def summarize_contaminants(outstream, matches, n_reads, header=None):
     print("", file=outstream)
     
     if header:
@@ -558,10 +617,6 @@ def summarize_contaminants(outstream, matches, n_reads, num_contaminated=None, h
         print('-' * len(header), file=outstream)
     
     print("Detected {} adapters/contaminants:".format(len(matches)), file=outstream)
-    
-    if num_contaminated:
-        print("Full-length contaminant(s) found in {} out of {} reads ({:.1%})".format(
-            num_contaminated, n_reads, num_contaminated / n_reads), file=outstream)
     
     pad = len(str(len(matches)))
     for i, match in enumerate(matches):

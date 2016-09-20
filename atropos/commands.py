@@ -1,19 +1,22 @@
 import logging
 import sys
 
-from .xopen import STDOUT, STDERR
+from .xopen import STDOUT, STDERR, open_output
 
 def detect(options, parser):
-    from .detect import create_detector, summarize_contaminants
+    from .detect import (
+        load_known_contaminants, summarize_contaminants,
+        PairedDetector, KnownContaminantDetector, HeuristicDetector, KhmerDetector)
     from .util import enumerate_range
     
     k = options.kmer_size or 12
-    n_reads = options.max_reads or 10000
+    n_reads = options.max_reads
     overrep_cutoff = 100
     known_contaminants = None
     include = options.include_contaminants or "all"
     if include != 'unknown':
         known_contaminants = load_known_contaminants(options)
+    
     if known_contaminants and include == 'known':
         logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
         detector_class = KnownContaminantDetector
@@ -24,63 +27,44 @@ def detect(options, parser):
         logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
         detector_class = KhmerDetector
     
-    reader = create_reader(options, parser, counter_magnitude="K", values_have_size=False)[0]
+    batch_iterator, names = create_reader(options, parser, counter_magnitude="K")[0:2]
     try:
+        detector_args = dict(
+            k=k, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
+            known_contaminants=known_contaminants)
+        if options.paired:
+            d = PairedDetector(detector_class, **detector_args)
+        else:
+            d = detector_class(**detector_args)
+            names = names[0]
+        
         with open_output(options.output) as o:
             print("\nDetecting adapters and other potential contaminant sequences based on "
-                  "{}-mers in {} reads".format(options.kmer_size, n_reads), file=o)
-            
-            if options.paired:
-                d1, d2 = (detector_class(k, n_reads, overrep_cutoff, known_contaminants) for i in (1,2))
-                read1, read2 = next(reader)
-                d1.consume_first(read1)
-                d2.consume_first(read2)
-                for read1, read2 in enumerate_range(reader, 1, n_reads):
-                    d1.consume(read1)
-                    d2.consume(read2)
-                
-                summarize_contaminants(o, d1.filter_and_sort(include), n_reads, "File 1: {}".format(reader.reader1.name))
-                summarize_contaminants(o, d2.filter_and_sort(include), n_reads, "File 2: {}".format(reader.reader2.name))
-                
-            else:
-                d = detector_class(k, n_reads, overrep_cutoff, known_contaminants)
-                d.consume_all(reader)
-                summarize_contaminants(o, d.filter_and_sort(include), n_reads, "File: {}".format(reader.name))
+                  "{}-mers in {} reads".format(k, n_reads), file=o)
+            d.consume_all_batches(batch_iterator)
+            d.summarize(o, names, include=include)
     finally:
-        reader.close()
+        batch_iterator.close()
 
 def error(options, parser):
-    reader, qualities, has_qual_file = create_reader(options, parser, counter_magnitude="K", values_have_size=False)
+    from .error import ErrorEstimator, PairedErrorEstimator
+    
+    batch_iterator, names, qualities = create_reader(options, parser, counter_magnitude="K")[0:3]
     try:
         if not qualities:
             parser.error("Cannot estimate error rate without base qualities")
         
-        n_reads = options.max_reads or 10000
+        if options.paired:
+            e = PairedErrorEstimator()
+        else:
+            e = ErrorEstimator()
         
-        with open_output(options.error_report) as o:
-            if options.paired:
-                e1, e1 = (ErrorEstimator() for i in (1,2))
-                for read1, read2 in enumerate_range(reader, 1, n_reads):
-                    e1.consume(read1.sequence)
-                    e2.consume(read2.sequence)
-                
-                print("File 1: {}".format(reader.reader1.name))
-                print("\n  Error rate: {:.2%}".format(e1.estimate()))
-                
-                print("File 2: {}".format(reader.reader2.name))
-                print("\n  Error rate: {:.2%}".format(e2.estimate()))
-                
-                print("Overall error rate: {:.2%}".format(
-                    (e1.total_qual + e2.total_qual) / (e1.total_len / e2.total_len)))
-            
-            else:
-                for read in enumerate_range(reader, 1, n_reads):
-                    e.consume(read.sequence)
-                
-                print("File: {}".format(reader.name))
-                print("\n  Error rate: {:.2%}".format(e.estimate()))
+        e.consume_all_batches(batch_iterator)
     finally:
-        reader.close()
+        batch_iterator.close()
+    
+    with open_output(options.output) as o:
+        e.summarize(o, names)
 
 def trim(options, parser):
     import time
@@ -128,7 +112,7 @@ def trim(options, parser):
         summary,
         params.modifiers.get_trimmer_classes())
 
-def create_reader(options, parser, counter_magnitude="M", values_have_size=True):
+def create_reader(options, parser, counter_magnitude="M"):
     from .seqio import UnknownFileType, BatchIterator, open_reader
     
     input1 = input2 = qualfile = None
@@ -161,9 +145,9 @@ def create_reader(options, parser, counter_magnitude="M", values_have_size=True)
         from .progress import create_progress_reader
         reader = create_progress_reader(
             reader, options.progress, batch_size, options.max_reads,
-            counter_magnitude, values_have_size)
+            counter_magnitude)
     
-    return (reader, qualities, qualfile is not None)
+    return (reader, (input1, input2), qualities, qualfile is not None)
 
 from collections import namedtuple
 AtroposParams = namedtuple("AtroposParams", ("reader", "modifiers", "filters", "formatters", "writers"))
@@ -183,7 +167,7 @@ def create_atropos_params(options, parser, default_outfile):
     from .seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
     from .util import RandomMatchProbability
     
-    reader, qualities, has_qual_file = create_reader(options, parser)
+    reader, input_names, qualities, has_qual_file = create_reader(options, parser)
     
     if options.adapter_max_rmp or options.aligner == 'insert':
         match_probability = RandomMatchProbability()

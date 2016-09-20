@@ -27,6 +27,7 @@ def get_compressor(filename):
 
 class GzipWriter:
     def __init__(self, path, mode='w'):
+        self.name = path
         self.outfile = open(path, mode)
         self.devnull = open(os.devnull, 'w')
         self.closed = False
@@ -67,6 +68,7 @@ class GzipWriter:
 
 class GzipReader:
     def __init__(self, path):
+        self.name = path
         self.process = Popen([get_program_path('gzip'), '-cd', path], stdout=PIPE)
         self.closed = False
     

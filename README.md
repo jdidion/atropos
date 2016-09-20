@@ -19,7 +19,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 
 * Python 3.3+ (python 2.x is NOT supported)
 * Cython 0.24+ (`pip install Cython`)
-* progressbar or tqdm (optional, if you want progressbar support)
+* progressbar2 or tqdm (optional, if you want progressbar support)
 * pysam (optional, if you want support for SAM/BAM input)
 * khmer 2.0+ (`pip install khmer`) (optional, for detecting low-frequency adapter contamination)
 

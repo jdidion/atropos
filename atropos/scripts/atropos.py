@@ -230,6 +230,10 @@ class Command(object):
             "--max-reads",
             type=int_or_str, default=None,
             help="Maximum number of reads/pairs to process (no max)")
+        group.add_argument(
+            "--batch-size",
+            type=int_or_str, default=5000, metavar="SIZE",
+            help="Number of records to process in each batch. (5000)")
     
     def add_command_options(self):
         """
@@ -246,7 +250,8 @@ class Command(object):
             # Due to backwards compatibility, logging output is sent to standard output
             # instead of standard error if the -o option is used.
             level = getattr(logging, level)
-            stream_handler = logging.StreamHandler(sys.stdout if self.options.output else sys.stderr)
+            stream_handler = logging.StreamHandler(
+                sys.stdout if self.options.output not in (None, STDOUT, STDERR) else sys.stderr)
             stream_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
             stream_handler.setLevel(level)
             logging.getLogger().setLevel(level)
@@ -279,8 +284,10 @@ class Command(object):
                     "interleaved file, use '-l' instead.")
             options.paired = True
         
-        if options.quiet or options.output is None or options.output == STDOUT:
+        if options.quiet:
             options.progress = None
+        elif options.progress and options.output == STDERR:
+            parser.warn("Progress bar may corrupt output written to STDERR")
     
     def validate_command_options(self):
         pass
@@ -761,10 +768,6 @@ standard input/output. Without the -o option, output is sent to standard output.
             help="Number of seconds process should wait before escalating messages "
                  "to ERROR level. (60)")
         group.add_argument(
-            "--batch-size",
-            type=int_or_str, default=5000, metavar="SIZE",
-            help="Number of records to process in each batch. (5000)")
-        group.add_argument(
             "--read-queue-size",
             type=int_or_str, default=None, metavar="SIZE",
             help="Size of queue for batches of reads to be processed. (THREADS * 100)")
@@ -1016,7 +1019,8 @@ class DetectCommand(Command):
     
     def add_command_options(self):
         parser = self.parser
-        group.add_argument(
+        parser.set_defaults(max_reads=10000)
+        parser.add_argument(
             "-o",
             "--output",
             type=writeable_file, default=STDOUT, metavar="FILE",
@@ -1030,26 +1034,28 @@ class DetectCommand(Command):
             "-m",
             "--max-adapters",
             type=positive(), default=None,
-            help="The maximum number of candidate adapters to report. (none)")
-        parser.add_argument(
+            help="The maximum number of candidate adapters to report. (report all)")
+        
+        group = parser.add_argument_group("Contaminants")
+        group.add_argument(
             "-i",
             "--include-contaminants",
             choices=('all','known','unknown'), default='all',
             help="What conaminants to search for: all, only known adapters/contaminants ('known'), "
-                 "or only unknown contaminants ('unknown').")
-        parser.add_argument(
-            "-c",
+                 "or only unknown contaminants ('unknown'). (all)")
+        group.add_argument(
+            "-x",
             "--known-contaminant",
             action="append", default=None,
             help="Pass known contaminants in on the commandline as 'name=sequence'. "
                  "Can be specified multiple times.")
-        parser.add_argument(
-            "-C",
+        group.add_argument(
+            "-X",
             "--known-contaminants-file",
             type=readable_file, default=None,
             help="File with known contaminants, one per line, with name and sequence "
                  "separated by one or more tabs.")
-        parser.add_argument(
+        group.add_argument(
             "--no-cache-contaminants",
             action="store_false", dest="cache_contaminants", default=True,
             help="Don't cache contaminant list as '.contaminants' in the working directory.")
@@ -1068,6 +1074,8 @@ experiment is around 1% or less. We recommend setting -e to
 10 x the empirical error rate."""
     
     def add_command_options(self):
+        parser = self.parser
+        parser.set_defaults(max_reads=10000)
         parser.add_argument(
             "-o",
             "--output",
