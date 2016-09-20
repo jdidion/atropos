@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from .seqio import UnknownFileType, BatchIterator, open_reader
 from .xopen import STDOUT, STDERR, open_output
 
 def detect(options, parser):
@@ -113,8 +114,6 @@ def trim(options, parser):
         params.modifiers.get_trimmer_classes())
 
 def create_reader(options, parser, counter_magnitude="M"):
-    from .seqio import UnknownFileType, BatchIterator, open_reader
-    
     input1 = input2 = qualfile = None
     interleaved = False
     if options.interleaved_input:

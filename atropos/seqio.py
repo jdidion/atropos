@@ -544,7 +544,7 @@ def guess_format_from_name(file, raise_on_failure=False):
             return 'fasta'
         elif ext in ['.fastq', '.fq'] or (ext == '.txt' and name.endswith('_sequence')):
             return 'fastq'
-        elif ext in ('sam', 'bam'):
+        elif ext in ('.sam', '.bam'):
             return ext
     
     if raise_on_failure:
