@@ -46,7 +46,7 @@ class SequenceReader(object):
         be compressed (.gz, .bz2, .xz).
         """
         if isinstance(file, str):
-            file = xopen(file)
+            file = xopen(file, mode)
             self._close_on_exit = True
         self._file = file
     
@@ -358,26 +358,41 @@ class SAMReader(object):
         file is a filename or a file-like object.
         If file is a filename, then .gz files are supported.
         """
-        super(SAMReader, self).__init__(file, 'rb')
+        self._close_on_exit = False
+        if isinstance(file, str):
+            file = xopen(file, 'rb')
+            self._close_on_exit = True
+        self._file = file
         self.sequence_class = sequence_class
         self.delivers_qualities = True
 
     def __iter__(self):
         import pysam
         return self._iter(pysam.AlignmentFile(self._file))
-
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *args):
+        self.close()
+    
+    def close(self):
+        if self._close_on_exit and self._file is not None:
+            self._file.close()
+            self._file = None
+        
     def _as_sequence(read):
         self.sequence_class(
             read.query_name,
             read.query_sequence,
             read.query_qualities)
 
-class SingleEndSAMReader(SequenceReader, SAMReader):
+class SingleEndSAMReader(SAMReader):
     def _iter(self, sam):
         for read in sam:
             yield self.as_sequence(read)
 
-class PairedEndSAMReader(PairedSequenceReader, SAMReader):
+class PairedEndSAMReader(SAMReader):
     def _iter(self, sam):
         for read1, read2 in zip(sam, sam):
             assert read1.query_name == read2.query_name
@@ -545,7 +560,7 @@ def guess_format_from_name(file, raise_on_failure=False):
         elif ext in ['.fastq', '.fq'] or (ext == '.txt' and name.endswith('_sequence')):
             return 'fastq'
         elif ext in ('.sam', '.bam'):
-            return ext
+            return ext[1:]
     
     if raise_on_failure:
         raise UnknownFileType("Could not determine whether file {0!r} is FASTA "
