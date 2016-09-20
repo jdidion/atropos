@@ -477,23 +477,14 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
     
     if file2 is not None:
         return PairedSequenceReader(file1, file2, colorspace, fileformat)
-    elif fileformat in ("sam", "bam"):
-        if interleaved:
-            return PairedEndSAMReader(file1)
-        else:
-            return SingleEndSAMReader(file1)
-    elif interleaved:
-        return InterleavedSequenceReader(file1, colorspace, fileformat)
-    elif qualfile is not None:
+    
+    if qualfile is not None:
         if colorspace:
             # read from .(CS)FASTA/.QUAL
             return ColorspaceFastaQualReader(file1, qualfile)
         else:
             return FastaQualReader(file1, qualfile)
     
-    fastq_handler = ColorspaceFastqReader if colorspace else FastqReader
-    fasta_handler = ColorspaceFastaReader if colorspace else FastaReader
-
     if fileformat is None and file1 != STDOUT:
         fileformat = guess_format_from_name(file1)
     
@@ -508,22 +499,35 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
                 fileformat = 'fasta'
             elif line.startswith('@'):
                 fileformat = 'fastq'
+            # TODO: guess SAM/BAM from data
             file1 = FileWithPrependedLine(file1, line)
             break
-        
-    fileformat = fileformat.lower()
-    if fileformat == 'fastq' and qualities is False:
-        raise ValueError("Output format cannot be FASTQ since no quality values are available.")
-    if fileformat == 'fasta':
-        return fasta_handler(file1)
-    if fileformat == 'fastq':
-        return fastq_handler(file1)
-    if fileformat == 'sra-fastq' and colorspace:
-        return SRAColorspaceFastqReader(file1)
+    
+    if fileformat is not None:
+        fileformat = fileformat.lower()
+        if fileformat in ("sam", "bam"):
+            if colorspace:
+                raise ValueError("SAM/BAM format is not currently supported for colorspace reads")
+            if interleaved:
+                return PairedEndSAMReader(file1)
+            else:
+                return SingleEndSAMReader(file1)
+        elif interleaved:
+            return InterleavedSequenceReader(file1, colorspace, fileformat)
+        elif fileformat == 'fasta':
+            fasta_handler = ColorspaceFastaReader if colorspace else FastaReader
+            return fasta_handler(file1)
+        elif fileformat == 'fastq':
+            if qualities is False:
+                raise ValueError("Output format cannot be FASTQ since no quality values are available.")
+            fastq_handler = ColorspaceFastqReader if colorspace else FastqReader
+            return fastq_handler(file1)
+        elif fileformat == 'sra-fastq' and colorspace:
+            return SRAColorspaceFastqReader(file1)
     
     raise UnknownFileType(
         "File format {0!r} is unknown (expected 'sra-fastq' (only for colorspace), "
-        "'fasta' or 'fastq').".format(fileformat))
+        "'fasta', 'fastq', 'sam', or 'bam').".format(fileformat))
 
 def guess_format_from_name(file, raise_on_failure=False):
     # Detect file format
@@ -540,6 +544,8 @@ def guess_format_from_name(file, raise_on_failure=False):
             return 'fasta'
         elif ext in ['.fastq', '.fq'] or (ext == '.txt' and name.endswith('_sequence')):
             return 'fastq'
+        elif ext in ('sam', 'bam'):
+            return ext
     
     if raise_on_failure:
         raise UnknownFileType("Could not determine whether file {0!r} is FASTA "

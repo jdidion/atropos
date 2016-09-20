@@ -265,13 +265,10 @@ class Command(object):
         options = self.options
         parser = self.parser
         
-        if options.format in ("sam", "bam") and options.colorspace:
-            parser.error("SAM/BAM format is not currently supported for colorspace reads")
-        
         # Find out which 'mode' we need to use.
         if options.single_input:
             if options.input1 or options.input2 or options.interleaved_input:
-                parser.error("Cannot use -se together with -pe1, -pe2, -l, -sam, or -bam")
+                parser.error("Cannot use -se together with -pe1, -pe2, or -l")
             if options.untrimmed_paired_output:
                 parser.error("Option --untrimmed-paired-output can only be used when "
                     "trimming paired-end reads (with option -p).")
