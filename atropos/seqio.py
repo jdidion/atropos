@@ -385,7 +385,7 @@ class SAMReader(object):
         return self.sequence_class(
             read.query_name,
             read.query_sequence,
-            read.query_qualities)
+            ''.join(chr(33 + q) for q in read.query_qualities))
 
 class SingleEndSAMReader(SAMReader):
     def _iter(self, sam):
