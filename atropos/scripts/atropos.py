@@ -149,6 +149,8 @@ probability = between(0, 1, float)
 
 # Commands
 
+COMMANDS = OrderedDict()
+
 class Command(object):
     def __init__(self, args):
         self.orig_args = copy.copy(args)
@@ -288,9 +290,7 @@ class Command(object):
         cmd(self.options, self.parser)
 
 class TrimCommand(Command):
-    """
-    trim sequencing reads.
-    """
+    """trim sequencing reads."""
     name = "trim"
     usage = """
 atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
@@ -1006,10 +1006,10 @@ standard input/output. Without the -o option, output is sent to standard output.
             elif options.result_queue_size > 0:
                 assert options.result_queue_size >= threads
 
+COMMANDS['trim'] = TrimCommand
+
 class DetectCommand(Command):
-    """
-    detect adapter and other contaminant sequences.
-    """
+    """detect adapter and other contaminant sequences."""
     name = "detect"
     usage = "atropos -se input.fastq detect\natropos -pe1 in1.fq -pe2 in2.fq detect"
     description = "Detect adapter sequences directly from read sequences."
@@ -1054,10 +1054,10 @@ class DetectCommand(Command):
             action="store_false", dest="cache_contaminants", default=True,
             help="Don't cache contaminant list as '.contaminants' in the working directory.")
 
+COMMANDS['detect'] = DetectCommand
+
 class ErrorCommand(Command):
-    """
-    estimate the sequencing error rate.
-    """
+    """estimate the sequencing error rate."""
     name = "error"
     usage = "atropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error",
     description = """
@@ -1073,35 +1073,10 @@ experiment is around 1% or less. We recommend setting -e to
             "--output",
             type=writeable_file, default=STDOUT,
             help="File in which to write the summary of the estimated error rates. (stdout)")
-    
-COMMANDS = OrderedDict(
-    trim=TrimCommand,
-    detect=DetectCommand,
-    error=ErrorCommand
-)
+
+COMMANDS['error'] = ErrorCommand
 
 # Main
-
-def print_subcommands():
-    print("Atropos version {}\n".format(__version__))
-    print("usage: atropos <command> [options]\n")
-    print("commands:")
-    for command_class in COMMANDS.values():
-        print("  {}: {}".format(command_class.name, command_class.__doc__))
-    print("\noptional arguments:\n  -h, --help  show this help message and exit")
-    print("""
-Use "atropos <command> --help" to see all options for a specific command.
-See http://atropos.readthedocs.org/ for full documentation.
-
-Atropos is a fork of Cutadapt 1.10 (
-https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d4999)
-by John Didion, "Atropos: sensitive, specific, and speedy trimming of NGS reads,"
-in prep.
-
-Cutadapt (https://github.com/marcelm/cutadapt) was developed by Marcel Martin,
-"Cutadapt Removes Adapter Sequences From High-Throughput Sequencing Reads,"
-EMBnet Journal, 2011, 17(1):10-12.
-""")
 
 def main(cmdlineargs=None):
     """
@@ -1124,6 +1099,27 @@ def main(cmdlineargs=None):
     command_class = COMMANDS[command_name]
     command = command_class(args)
     command.execute()
+
+def print_subcommands():
+    print("Atropos version {}\n".format(__version__))
+    print("usage: atropos <command> [options]\n")
+    print("commands:")
+    for command_class in COMMANDS.values():
+        print("  {}: {}".format(command_class.name, command_class.__doc__))
+    print("\noptional arguments:\n  -h, --help  show this help message and exit")
+    print("""
+Use "atropos <command> --help" to see all options for a specific command.
+See http://atropos.readthedocs.org/ for full documentation.
+
+Atropos is a fork of Cutadapt 1.10 (
+https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d4999)
+by John Didion, "Atropos: sensitive, specific, and speedy trimming of NGS reads,"
+in prep.
+
+Cutadapt (https://github.com/marcelm/cutadapt) was developed by Marcel Martin,
+"Cutadapt Removes Adapter Sequences From High-Throughput Sequencing Reads,"
+EMBnet Journal, 2011, 17(1):10-12.
+""")
 
 if __name__ == '__main__':
     main()
