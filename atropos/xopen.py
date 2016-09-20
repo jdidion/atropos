@@ -1,11 +1,81 @@
 """
 Open compressed files transparently.
 """
-import sys
+import errno
 import io
 import os
+import sys
 
 from .compression import get_file_opener
+
+STDOUT = '-'
+STDERR = '_'
+
+def abspath(path):
+    return os.path.abspath(os.path.expanduser(path))
+
+def existing_path(path):
+    """Test that a path exists."""
+    if path == STDOUT:
+        return path
+    return resolve_path(path)
+    
+def resolve_path(path, parent=None):
+    """Resolves the absolute path of the specified file.
+    
+    Args:
+        path (str): Path to resolve.
+        parent (str): The directory containing ``path`` if ``path`` is relative.
+    
+    Returns:
+        The absolute path.
+    
+    Raises:
+        IOError: if the path does not exist.
+    """
+    apath = abspath(path)
+    if not os.path.exists(apath) and parent is not None:
+        apath = abspath(os.path.join(parent, path))
+    if not os.path.exists(apath):
+        raise IOError(errno.ENOENT, "%s does not exist" % apath, apath)
+    return apath
+
+def check_path(path, ptype=None, access=None):
+    """Checks that a path exists, is of the specified type, and allows the specified access.
+    
+    Args:
+        ptype: 'f' for file or 'd' for directory.
+        access (int): One of the access values from :module:`os`
+    
+    Raises:
+        IOError if the path does not exist, is not of the specified type, or doesn't allow the
+        specified access.
+    """
+    if ptype == 'f' and not path.startswith("/dev/") and not os.path.isfile(path):
+        raise IOError(errno.EISDIR, "{} is not a file".format(path), path)
+    elif ptype == 'd' and not os.path.isdir(path):
+        raise IOError(errno.ENOTDIR, "{} is not a directory".format(path), path)
+    elif not os.path.exists(path):
+        raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
+    if access is not None and not os.access(path, access):
+        raise IOError(errno.EACCES, "{} is not accessable".format(path), path)
+    return path
+
+def check_writeable(p, ptype=None):
+    if p in (STDOUT, STDERR):
+        return p
+    p = abspath(p)
+    try:
+        path = resolve_path(p)
+        check_path(path, ptype, os.W_OK)
+    except IOError:
+        dirpath = os.path.dirname(p)
+        if os.path.exists(dirpath):
+            check_path(dirpath, "d", os.W_OK)
+        else:
+            os.makedirs(dirpath)
+        path = os.path.join(dirpath, os.path.basename(p))
+    return path
 
 def open_output(filename, mode='w', context_wrapper=False):
     """
@@ -25,8 +95,8 @@ def open_output(filename, mode='w', context_wrapper=False):
         raise ValueError("the filename must be a string")
 
     # standard input and standard output handling
-    if filename in ('-', '_'):
-        fh = sys.stdout if filename == '-' else sys.stderr
+    if filename in (STDOUT, STDERR):
+        fh = sys.stdout if filename == STDOUT else sys.stderr
         if mode == 'wb':
             fh = fh.buffer
         if context_wrapper:
@@ -39,6 +109,7 @@ def open_output(filename, mode='w', context_wrapper=False):
                     pass
             fh = StdWrapper(fh)
     else:
+        filename = check_writeable(filename, 'f')
         fh = open(filename, mode)
     
     return fh
@@ -72,11 +143,11 @@ def xopen(filename, mode='r', use_system=True):
         raise ValueError("the filename must be a string")
 
     # standard input and standard output handling
-    if filename in ('-', '_'):
+    if filename in (STDOUT, STDERR):
         if 'r' in mode:
             fh = sys.stdin
         else:
-            fh = sys.stdout if filename == '-' else sys.stderr
+            fh = sys.stdout if filename == STDOUT else sys.stderr
         if 'b' in mode:
             fh = fh.buffer
         return fh

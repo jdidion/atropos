@@ -1,6 +1,15 @@
 import logging
 import time
-from atropos.util import magnitude_formatter
+from .util import MAGNITUDE
+
+def magnitude_formatter(magnitude):
+    suffix = ""
+    if magnitude is None:
+        div = 1.0
+    else:
+        div = float(MAGNITUDE[magnitude.upper()])
+        suffix = magnitude
+    return lambda val: "{:.1f} {}".format(val / div, suffix)
 
 def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=None,
                            counter_magnitude="M", **kwargs):
@@ -8,8 +17,6 @@ def create_progress_reader(reader, progress_type="bar", batch_size=1, max_items=
     
     if progress_type == "msg":
         return ProgressMessageReader(reader, batch_size, max_items=max_items, mag_format=mag_format, **kwargs)
-    elif progress_type != "bar":
-        raise Exception("Unsupported progress type {}".format(progress_type))
             
     try:
         return create_progressbar_reader(reader, max_items, mag_format, **kwargs)
@@ -59,17 +66,16 @@ class ProgressMessageReader(object):
         logging.getLogger().info("Read a total of {} records".format(self.ctr))
         self.iterable.close()
 
-def create_progressbar_reader(reader, max_reads=None, mag_format=None, values_have_size=True):
+def create_progressbar_reader(reader, max_reads=None, mag_format=None):
     import progressbar
     import progressbar.widgets
     import math
 
     class ProgressBarReader(progressbar.ProgressBar):
-        def __init__(self, iterable, widgets, max_value=None, values_have_size=True):
+        def __init__(self, iterable, widgets, max_value=None):
             super(ProgressBarReader, self).__init__(
                 widgets=widgets, max_value=max_value or progressbar.UnknownLength)
             self._iterable = iterable
-            self.values_have_size = values_have_size
             self.done = False
         
         def __next__(self):
@@ -77,10 +83,7 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None, values_ha
                 value = next(self._iterable)
                 if self.start_time is None:
                     self.start()
-                if self.values_have_size:
-                    self.update(self.value + value[0])
-                else:
-                    self.update(self.value + 1)
+                self.update(self.value + value[0])
                 return value
             except StopIteration:
                 self.close()
@@ -106,12 +109,12 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None, values_ha
         reader = ProgressBarReader(reader, [
             MagCounter(mag_format), " Reads (", progressbar.Percentage(), ") ",
             progressbar.Timer(), " ", progressbar.Bar(), progressbar.AdaptiveETA()
-        ], max_reads, values_have_size=values_have_size)
+        ], max_reads)
     else:
         reader = ProgressBarReader(reader, [
             MagCounter(mag_format), " Reads", progressbar.Timer(),
             progressbar.AnimatedMarker()
-        ], values_have_size=values_have_size)
+        ])
     
     return reader
 

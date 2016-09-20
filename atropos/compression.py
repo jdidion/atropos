@@ -27,6 +27,7 @@ def get_compressor(filename):
 
 class GzipWriter:
     def __init__(self, path, mode='w'):
+        self.name = path
         self.outfile = open(path, mode)
         self.devnull = open(os.devnull, 'w')
         self.closed = False
@@ -67,6 +68,7 @@ class GzipWriter:
 
 class GzipReader:
     def __init__(self, path):
+        self.name = path
         self.process = Popen([get_program_path('gzip'), '-cd', path], stdout=PIPE)
         self.closed = False
     
@@ -148,7 +150,7 @@ def open_lzma_file(filename, mode, use_system=False):
 file_openers = {
     ".gz"  : open_gzip_file,
     ".bz2" : open_bzip_file,
-    ".xz"  : open_lzma_file
+    ".xz"  : open_lzma_file,
 }
 
 def can_use_system_compression():

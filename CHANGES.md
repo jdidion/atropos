@@ -5,6 +5,7 @@ v1.0.16 (dev)
 
 * Migrate to Versioneer for version management.
 * Enable stderr as a valid output using the '_' shortcut.
+* Add ability to specify SAM/BAM as input format.
 
 v1.0.15 (2016.09.14)
 --------------------

@@ -272,7 +272,7 @@ class Summary(object):
         
         return stats
 
-def print_report(paired, options, wallclock_time, cpu_time, stats, trimmer_classes):
+def print_report(options, wallclock_time, cpu_time, stats, trimmer_classes):
     outfile = options.report_file
     close = False
     
@@ -284,6 +284,7 @@ def print_report(paired, options, wallclock_time, cpu_time, stats, trimmer_class
     else:
         return
     
+    paired = options.paired
     stats["paired"] = paired
     stats["wallclock_time"] = max(wallclock_time, 0.01)
     stats["cpu_time"] = max(cpu_time, 0.01)

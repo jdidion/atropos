@@ -3,41 +3,62 @@
 from .seqio import FastqReader
 from .util import enumerate_range
 
-def main(options):
-    n_reads = options.max_reads or 10000
+def qual2prob(qchar):
+    q = ord(qchar) - 33
+    return 10 ** (-q / 10)
+
+class ErrorEstimator(object):
+    def __init__(self):
+        self.total_qual = 0.0
+        self.total_len = 0
     
-    infiles = [f for f in (
-        options.single_input, options.input1, options.input2, options.interleaved_input
-    ) if f is not None]
+    def consume_all_batches(self, batch_iterator):
+        for batch_num, batch in batch_iterator:
+            for read in batch:
+                self.consume(read)
     
-    def qual2prob(qchar):
-        q = ord(qchar) - 33
-        return 10**(-q/10)
+    def consume(self, read):
+        self.total_qual += sum(qual2prob(qchar) for qchar in read.qualities)
+        self.total_len += len(read.qualities)
     
-    total_qual = 0.0
-    total_len = 0
+    def estimate(self):
+        return self.total_qual / self.total_len
     
-    for i, f in enumerate(infiles, 1):
-        fq = FastqReader(f)
-        fq_iter = iter(fq)
-        try:
-            if options.progress:
-                from .progress import create_progress_reader
-                fq_iter = create_progress_reader(fq_iter, max_items=n_reads,
-                    counter_magnitude="K", values_have_size=False)
-            
-            print("File {}: {}".format(i, f))
-            
-            cum_qual = 0.0
-            cum_len = 0
-            for i, read in enumerate_range(fq_iter, 0, n_reads):
-                cum_qual += sum(qual2prob(qchar) for qchar in read.qualities)
-                cum_len += len(read.qualities)
-            
-            print("\n  Error rate: {:.2%}".format(cum_qual / cum_len))
-            total_qual += cum_qual
-            total_len += cum_len
-        finally:
-            fq.close()
+    def summarize(self, outstream, name=None):
+        print("", file=outstream)
+        if name is not None:
+            header = "File: {}".format(name)
+            print(header)
+            print('-' * len(header), file=outstream)
+        print("Error rate: {:.2%}".format(self.estimate()))
+
+class PairedErrorEstimator(object):
+    def __init__(self):
+        self.e1 = ErrorEstimator()
+        self.e2 = ErrorEstimator()
+    
+    def consume_all_batches(self, batch_iterator):
+        for batch_num, batch in batch_iterator:
+            for read1, read2 in batch:
+                self.e1.consume(read1)
+                self.e2.consume(read2)
+    
+    def estimate(self):
+        return (self.e1.estimate(), self.e2.estimate())
+    
+    def summarize(self, outstream, names=None):
+        print("", file=outstream)
+        if names:
+            header = "File 1: {}".format(names[0])
+            print(header)
+            print('-' * len(header), file=outstream)
+        print("Error rate: {:.2%}\n".format(self.e1.estimate()))
         
-    print("Overall error rate: {:.2%}".format(total_qual / total_len))
+        if names:
+            header = "File 2: {}".format(names[1])
+            print(header)
+            print('-' * len(header), file=outstream)
+        print("Error rate: {:.2%}\n".format(self.e2.estimate()))
+        
+        print("Overall error rate: {:.2%}".format(
+            (self.e1.total_qual + self.e2.total_qual) / (self.e1.total_len + self.e2.total_len)))
