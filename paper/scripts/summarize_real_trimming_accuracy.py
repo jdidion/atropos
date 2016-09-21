@@ -10,7 +10,6 @@ from glob import glob
 import os
 import tqdm
 from atropos.xopen import open_output
-import editdistance
 
 nuc = ('A','C','G','T','N')
 
@@ -71,7 +70,7 @@ class TableRead(object):
             self.clipped_front = count_soft_clipped(ref_pos)
             self.clipped_back = count_soft_clipped(reversed(ref_pos))
     
-    def set_trimming(self, u, t):
+    def set_trimming(self, u, t, use_edit_distance=True):
         untrimmed = u.query_sequence.upper()
         untrimmed_len = len(untrimmed)
         trimmed = t.query_sequence.upper()
@@ -83,7 +82,7 @@ class TableRead(object):
                 if untrimmed[i:(i+trimmed_len)] == trimmed:
                     trimmed_front = i
                     break
-            else:
+            elif use_edit_distance:
                 # Since Skewer performs automatic error correction, the trimmed and
                 # untrimmed reads may not match, so in that case we find the closest
                 # match by Levenshtein distance.
@@ -95,6 +94,8 @@ class TableRead(object):
                     elif d < dist:
                         trimmed_front = i
                         dist = d
+            else:
+                trimmed_front = -1
         
         self.trimmed_front = trimmed_front
         self.trimmed_back = untrimmed_len - (trimmed_len + trimmed_front)
@@ -190,7 +191,7 @@ class Hist(object):
                     for pos, count in enumerate(read_hists[side][base], 1):
                         w.writerow((self.prog, read, side, pos, base, count))
 
-def summarize(untrimmed, trimmed, regions, ow, hw, n_hist_bases=20, max_reads=None, progress=True):
+def summarize(untrimmed, trimmed, regions, ow, hw, n_hist_bases=20, max_reads=None, use_edit_distance=True, progress=True):
     progs = ('untrimmed',) + tuple(trimmed.keys())
     hists = dict((prog, Hist(prog, n_hist_bases)) for prog in progs)
     itr = enumerate(untrimmed, 1)
@@ -246,8 +247,8 @@ def summarize(untrimmed, trimmed, regions, ow, hw, n_hist_bases=20, max_reads=No
             for prog, (r1, r2) in valid.items():
                 row = rows[prog]
                 row.set_from_pair(r1, r2)
-                row.read1.set_trimming(u1, r1)
-                row.read2.set_trimming(u2, r2)
+                row.read1.set_trimming(u1, r1, use_edit_distance)
+                row.read2.set_trimming(u2, r2, use_edit_distance)
         
         for prog in progs:
             rows[prog].write(ow)
@@ -278,7 +279,13 @@ def main():
             "region is extended. This is often necessary with amplicon data "
             "because enrichment can capture sequences that only paritally "
             "overlap the probes.")
+    parser.add_argument("--no-edit-distance",
+        action="store_false", default=True, dest="edit_distance",
+        help="Don't try to match by editdistance.")
     args = parser.parse_args()
+    
+    if args.edit_distance:
+        import editdistance
     
     trimmed = {}
     untrimmed = None
@@ -298,7 +305,8 @@ def main():
             write_header(ow)
             hw = csv.writer(h, delimiter="\t")
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
-            summarize(untrimmed, trimmed, regions, ow, hw, max_reads=args.max_reads)
+            summarize(untrimmed, trimmed, regions, ow, hw,
+                max_reads=args.max_reads, use_edit_distance=args.edit_distance)
     finally:
         if untrimmed:
             untrimmed.close()
