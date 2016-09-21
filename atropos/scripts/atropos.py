@@ -777,9 +777,6 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "defaults to 'worker'.")
     
     def validate_command_options(self):
-        # TODO: some of these validation checks can be specified using
-        # functions passed to the 'type' parameter of add_argument
-        
         options = self.options
         parser = self.parser
         paired = options.paired

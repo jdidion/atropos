@@ -131,7 +131,8 @@ setup(
     extras_require = {
         'progressbar' : ['progressbar2'],
         'tqdm' : ['tqdm'],
-        'khmer' : ['khmer']
+        'khmer' : ['khmer'],
+        'pysam' : ['pysam']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

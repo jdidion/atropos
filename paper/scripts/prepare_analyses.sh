@@ -88,24 +88,19 @@ do
   
   if [ "$err" == "real_wgs" ]
   then
-      fq1=$root/data/real/NA12878_03_AACGTGAT_L001_R1_001.fastq.gz
-      fq2=$root/data/real/NA12878_03_AACGTGAT_L001_R2_001.fastq.gz
-      # download data
-      if [ ! -f $fq1 ]
-      then
-        mkdir -p $root/data/real
-        wget -S -O ftp://ftp.sra.ebi.ac.uk/vol1/ERA494/ERA494451/fastq/NA12878_03_AACGTGAT_L001_R1_001.fastq.gz > $fq1
-        wget -S -O ftp://ftp.sra.ebi.ac.uk/vol1/ERA494/ERA494451/fastq/NA12878_03_AACGTGAT_L001_R2_001.fastq.gz > $fq2
-      fi
+      # real WGS (amplicon) data
+      fq1=$root/data/real/amplicon.1.fq.gz
+      fq2=$root/data/real/amplicon.2.fq.gz
       quals='0 20'
       aligners='insert'
-      atropos_extra='--insert-match-error 0.2 -e 0.1 --correct-mismatches liberal'
-      seqpurge_extra='-ec -match_perc 80'
-      skewer_extra='-r 0.2'
-      ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACAACGTGATATCTCGTATGCCGTCTTCTGCTTG" # custom
+      atropos_extra='-e 0.1 --correct-mismatches liberal'
+      seqpurge_extra='-ec -match_perc 90'
+      skewer_extra='-r 0.1'
+      ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACTCATGAATCTCGTATGCCGTCTTCTGCTTG" # TruSeq custom
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
   elif [ "$err" == "real_wgbs" ]
   then
+      # real WGBS data
       fq1=$root/data/real/GM12878_WGBS.1.fq.gz
       fq2=$root/data/real/GM12878_WGBS.2.fq.gz
       # download data
@@ -123,6 +118,7 @@ do
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
   else
+      # simulated data
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
       quals='0'

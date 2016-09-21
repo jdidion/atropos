@@ -33,3 +33,4 @@ paper/scripts/real*
 paper/data/real/
 .contaminants
 .DS_Store
+atropos-*/
