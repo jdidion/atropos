@@ -281,6 +281,7 @@ def main():
     args = parser.parse_args()
     
     trimmed = {}
+    untrimmed = None
     pattern = args.bam_pattern or "*{}".format(args.bam_extension)
     for path in glob(os.path.join(args.bam_dir, pattern)):
         name = os.path.basename(path)[:-len(args.bam_extension)]
@@ -299,7 +300,8 @@ def main():
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
             summarize(untrimmed, trimmed, regions, ow, hw, max_reads=args.max_reads)
     finally:
-        untrimmed.close()
+        if untrimmed:
+            untrimmed.close()
         for t in trimmed.values():
             t.close()
 
