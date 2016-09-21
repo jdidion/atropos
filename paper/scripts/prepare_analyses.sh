@@ -89,8 +89,8 @@ do
   if [ "$err" == "real_wgs" ]
   then
       # real WGS (amplicon) data
-      fq1=$root/data/real/amplicon.1.fq.gz
-      fq2=$root/data/real/amplicon.2.fq.gz
+      fq1=$root/data/amplicon/amplicon.1.fq.gz
+      fq2=$root/data/amplicon/amplicon.2.fq.gz
       quals='0 20'
       aligners='insert'
       atropos_extra='-e 0.1 --correct-mismatches liberal'
@@ -101,12 +101,12 @@ do
   elif [ "$err" == "real_wgbs" ]
   then
       # real WGBS data
-      fq1=$root/data/real/GM12878_WGBS.1.fq.gz
-      fq2=$root/data/real/GM12878_WGBS.2.fq.gz
+      fq1=$root/data/wgbs/GM12878_WGBS.1.fq.gz
+      fq2=$root/data/wgbs/GM12878_WGBS.2.fq.gz
       # download data
       if [ ! -f $fq1 ]
       then
-        mkdir -p $root/data/real
+        mkdir -p $root/data/wgbs
         wget -S -O https://www.encodeproject.org/files/ENCFF798RSS/@@download/ENCFF798RSS.fastq.gz | gunzip | head -4000000 | gzip > $fq1
         wget -S -O https://www.encodeproject.org/files/ENCFF113KRQ/@@download/ENCFF113KRQ.fastq.gz | gunzip | head -4000000 | gzip > $fq2
       fi
