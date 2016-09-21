@@ -28,3 +28,6 @@ paper/data/simulated/sim_01.1.fq filter=lfs diff=lfs merge=lfs -text
 paper/data/simulated/sim_01.2.aln filter=lfs diff=lfs merge=lfs -text
 paper/data/simulated/sim_01.2.fq filter=lfs diff=lfs merge=lfs -text
 atropos/_version.py export-subst
+paper/data/amplicon/amplicon.1.fq.gz filter=lfs diff=lfs merge=lfs -text
+paper/data/amplicon/amplicon.2.fq.gz filter=lfs diff=lfs merge=lfs -text
+paper/data/amplicon/amplicon_regions.bed filter=lfs diff=lfs merge=lfs -text
