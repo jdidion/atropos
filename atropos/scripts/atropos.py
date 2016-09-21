@@ -119,10 +119,10 @@ def int_or_str(x):
     elif isinstance(x, str):
         match = int_or_str_re.match(x.upper())
         num, mult = match.groups()
-        if mult is None:
-            return int(num)
-        else:
+        if mult:
             return int(float(num) * MAGNITUDE[mult])
+        else:
+            return int(num)
     else:
         raise Exception("Unsupported type {}".format(x))
 
