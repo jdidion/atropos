@@ -148,7 +148,7 @@ do
         "$ATROPOS -T $threads --aligner $aligner --op-order GACQ" \
         "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
-        "--report-file ${outdir}/${profile}_writer.report.txt" \
+        "--report-file ${outdir}/${profile}.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
         "-p ${outdir}/${profile}.2.fq.gz" \
         "--log-level ERROR --quiet $atropos_extra" \
@@ -159,7 +159,7 @@ do
         "$ATROPOS -T $threads --aligner $aligner --op-order GACQ" \
         "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
-        "--report-file ${outdir}/${profile}_nowriter.report.txt" \
+        "--report-file ${outdir}/${profile}.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
         "-p ${outdir}/${profile}.2.fq.gz" \
         "--log-level ERROR --quiet $atropos_extra" \
@@ -170,7 +170,7 @@ do
         "$ATROPOS -T $threads --aligner $aligner --op-order GACQ" \
         "-a $ADAPTER1 -A $ADAPTER2 -q $qcut --trim-n" \
         "-m $MIN_LEN --batch-size $BATCH_SIZE " \
-        "--report-file ${outdir}/${profile}_nowriter.report.txt" \
+        "--report-file ${outdir}/${profile}.report.txt" \
         "-o ${outdir}/${profile}.1.fq.gz" \
         "-p ${outdir}/${profile}.2.fq.gz" \
         "--log-level ERROR --quiet $atropos_extra" \

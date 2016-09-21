@@ -117,7 +117,7 @@ def int_or_str(x):
     if x is None or isinstance(x, int):
         return x
     elif isinstance(x, str):
-        match = int_fmt_re.match(x.upper())
+        match = int_or_str_re.match(x.upper())
         num, mult = match.groups()
         if mult is None:
             return int(num)
