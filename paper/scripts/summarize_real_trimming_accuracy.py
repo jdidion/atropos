@@ -34,7 +34,8 @@ read_fields = [
     ('clipped_front', -1),
     ('clipped_back', -1),
     ('trimmed_front', 0),
-    ('trimmed_back', 0)
+    ('trimmed_back', 0),
+    ('in_region', -1)
 ]
 
 def write_header(w):
@@ -97,12 +98,19 @@ class TableRead(object):
         
         self.trimmed_front = trimmed_front
         self.trimmed_back = untrimmed_len - (trimmed_len + trimmed_front)
-        # print(untrimmed)
-        # print(trimmed)
-        # print(self.clipped_front)
-        # print(self.clipped_back)
-        # print(self.trimmed_front)
-        # print(self.trimmed_back)
+    
+    def set_region(self, regions, min_overlap=1.0):
+        if self.mapped:
+            self.in_region = 0
+            best_hit = regions.overlaps(self.chrm, self.start, self.end)
+            if best_hit:
+                read, region, overlap = best_hit
+                overlap_frac = overlap / len(read)
+                if overlap_frac >= min_overlap:
+                    self.in_region = 1
+                else:
+                    print("Read {} overlaps {} by {}, less than min cutoff {}".format(
+                        read, region, overlap_frac, min_overlap))
 
 class TableRow(object):
     def __init__(self, prog, read_name, read_idx):
@@ -132,6 +140,28 @@ class TableRow(object):
             getattr(self.read2, key) for key, val in read_fields
         ])
 
+class Bed(object):
+    def __init__(self, path, slop=200):
+        from pybedtools import BedTool, Interval
+        self.regions = BedTool(args.bed).set_chromsizes('hg19').slop(slop)
+    
+    def overlaps(self, chrm, start, end, strand='.', same_strand=False, min_overlap=1.0):
+        i = Interval(chrm, start-1, end, strand=strand)
+        hits = self.regions.all_hits(i, same_strand, min_overlap)
+        if len(hits) == 0:
+            return None
+        else:
+            def _overlap(h):
+                if h.start < i.start:
+                    return h.end - i.start
+                else:
+                    return i.end - h.start
+            overlaps = [(i, h, _overlap(h)) for h in hits]
+            if len(hits) > 1:
+                print("Multiple hits found for read {}".format(i))
+                overlaps.sort(key=lambda h: h[1], reversed=True)
+            return hits[0]
+
 class Hist(object):
     def __init__(self, prog, n_bases):
         # position base histograms
@@ -160,12 +190,17 @@ class Hist(object):
                     for pos, count in enumerate(read_hists[side][base], 1):
                         w.writerow((self.prog, read, side, pos, base, count))
 
-def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20, max_reads=None):
+def summarize(untrimmed, trimmed, regions, ow, hw, n_hist_bases=20, max_reads=None, progress=True):
     progs = ('untrimmed',) + tuple(trimmed.keys())
     hists = dict((prog, Hist(prog, n_hist_bases)) for prog in progs)
+    itr = enumerate(untrimmed, 1)
+    if progress:
+        try:
+            itr = tqdm.tqdm(itr)
+        except:
+            pass
     
-    for i, (name, u1, u2) in tqdm.tqdm(enumerate(untrimmed, 1)):
-    #for i, (name, u1, u2) in enumerate(untrimmed, 1):
+    for i, (name, u1, u2) in itr:
         assert len(u1) > 0 and len(u2) > 0
         
         rows = dict(untrimmed=TableRow('untrimmed', name, i))
@@ -185,11 +220,8 @@ def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20, max_reads=None):
             else:
                 hists['untrimmed'].add_reads(u1, u2)
                 rows['untrimmed'].set_from_pair(u1, u2)
-        # print(u1)
-        # print(u2)
-        # print(skip)
+        
         for prog, bam in trimmed.items():
-            #print(prog)
             rows[prog] = TableRow(prog, name, i)
             if skip:
                 rows[prog].skipped = True
@@ -199,28 +231,21 @@ def summarize(untrimmed, trimmed, ow, hw, n_hist_bases=20, max_reads=None):
                 _, t1, t2 = next(bam)
                 assert len(t1) > 0 and len(t2) > 0
                 if len(t1) > 1 or len(t2) > 1:
-                    #print('split')
                     rows[prog].split = True
                 elif not skip:
-                    #print('valid')
                     t1 = t1[0]
                     t2 = t2[0]
                     hists[prog].add_reads(t1, t2)
                     valid[prog] = (t1, t2)
-                #else:
-                    #print('skip')
             else:
-                #print('discarded')
                 rows[prog].discarded = True
         
         if skip or len(valid) == 0:
             rows['untrimmed'].skipped = True
         else:
-            #print(valid)
             for prog, (r1, r2) in valid.items():
                 row = rows[prog]
                 row.set_from_pair(r1, r2)
-                #print(prog)
                 row.read1.set_trimming(u1, r1)
                 row.read2.set_trimming(u2, r2)
         
@@ -242,7 +267,17 @@ def main():
     parser.add_argument("-o", "--output", default="-")
     parser.add_argument("-H", "--hist", default="trimmed_hists.txt")
     parser.add_argument("-m", "--max-reads", type=int, default=None)
-    
+    parser.add_argument("-b", "--bed", default=None,
+        help=".bed file of regions where reads should map.")
+    parser.add_argument("--min-overlap", type=float, default=1.0,
+        help="When a .bed file is specified, this is the minimum "
+            "fraction of a mapped read that must overlap a selected "
+            "interval for that mapping to be considered valid. (1.0)")
+    parser.add_argument("--slop", type=int, default=200,
+        help="When a .bed file is specified, this is the number of bp each "
+            "region is extended. This is often necessary with amplicon data "
+            "because enrichment can capture sequences that only paritally "
+            "overlap the probes.")
     args = parser.parse_args()
     
     trimmed = {}
@@ -254,13 +289,15 @@ def main():
         else:
             trimmed[name] = BAMReader(path)
     
+    regions = Bed(args.bed, args.slop) if args.bed else None
+    
     try:
         with open_output(args.output) as o, open_output(args.hist) as h:
             ow = csv.writer(o, delimiter="\t")
             write_header(ow)
             hw = csv.writer(h, delimiter="\t")
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
-            summarize(untrimmed, trimmed, ow, hw, max_reads=args.max_reads)
+            summarize(untrimmed, trimmed, regions, ow, hw, max_reads=args.max_reads)
     finally:
         untrimmed.close()
         for t in trimmed.values():
