@@ -1015,6 +1015,11 @@ class DetectCommand(Command):
         parser = self.parser
         parser.set_defaults(max_reads=10000)
         parser.add_argument(
+            "-d",
+            "--detector",
+            choices=('known', 'heuristic', 'khmer'), default=None,
+            help="Which detector to use. (automatically choose based on other options)")
+        parser.add_argument(
             "-o",
             "--output",
             type=writeable_file, default=STDOUT, metavar="FILE",
