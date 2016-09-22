@@ -103,8 +103,8 @@ class TableRead(object):
             self.in_region = 0
             best_hit = regions.overlaps(self.chrm, self.start, self.end)
             if best_hit:
-                read, region, overlap = best_hit
-                overlap_frac = overlap / len(read)
+                read, region, overlap, length = best_hit
+                overlap_frac = overlap / length
                 if overlap_frac >= min_overlap:
                     self.in_region = 1
                 else:
@@ -141,25 +141,45 @@ class TableRow(object):
 
 class Bed(object):
     def __init__(self, path, slop=200):
-        from pybedtools import BedTool, Interval
-        self.regions = BedTool(path).set_chromsizes('hg19').slop(b=slop)
+        self.regions = bt.BedTool(path).set_chromsizes('hg19').slop(b=slop)
+        self.slop = slop
     
     def overlaps(self, chrm, start, end, strand='.', same_strand=False, min_overlap=1.0):
-        i = Interval(chrm, start-1, end, strand=strand)
+        i = bt.Interval(chrm, start-1, end, strand=strand)
         hits = self.regions.all_hits(i, same_strand, min_overlap)
         if len(hits) == 0:
             return None
-        else:
-            def _overlap(h):
-                if h.start < i.start:
-                    return h.end - i.start
-                else:
-                    return i.end - h.start
-            overlaps = [(i, h, _overlap(h)) for h in hits]
-            if len(hits) > 1:
-                print("Multiple hits found for read {}".format(i))
-                overlaps.sort(key=lambda h: h[1], reversed=True)
-            return hits[0]
+        
+        def _overlap(h):
+            l = min(len(h), len(i))
+            if h.start < i.start:
+                return (h.end - i.start, l)
+            else:
+                return (i.end - h.start, l)
+        
+        if len(hits) == 1:
+            return (i, hits[0]) + _overlap(hits[0])
+        
+        overlaps = []
+        for h in hits:
+            hit_orig = bt.Interval(h[0], h.start + self.slop, h.end - self.slop)
+            ovl_orig = _overlap(hit_orig)
+            if ovl_orig[0] > 0:
+                overlaps.append((i, h) + ovl_orig)
+        
+        if len(overlaps) > 0:
+            overlaps.sort(key=lambda o: o[2], reverse=True)
+            o = overlaps[0]
+            return (o[0], o[1]) + _overlap(o[1])
+        
+        overlaps = [(i, h) + _overlap(h) for h in hits]
+        if len(overlaps) > 1:
+            overlaps.sort(key=lambda h: h[1], reverse=True)
+            #print("Multiple hits found for read <{}>:\n{}".format(
+            #    ','.join(i[0:3]),
+            #    '\n'.join('  <{}>'.format(','.join(h[0:3])) for h in hits)))
+            
+        return overlaps[0]
 
 class Hist(object):
     def __init__(self, prog, n_bases):
@@ -298,7 +318,11 @@ def main():
         else:
             trimmed[name] = BAMReader(path)
     
-    regions = Bed(args.bed, args.slop) if args.bed else None
+    regions = None
+    if args.bed:
+        global bt
+        import pybedtools as bt
+        regions = Bed(args.bed, args.slop)
     
     try:
         with open_output(args.output) as o, open_output(args.hist) as h:
