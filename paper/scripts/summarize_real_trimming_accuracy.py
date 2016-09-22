@@ -76,13 +76,13 @@ class TableRead(object):
         trimmed = t.query_sequence.upper()
         trimmed_len = len(trimmed)
         
-        trimmed_front = 0
-        if untrimmed_len > trimmed_len:
+        trimmed_front = 0 if use_edit_distance else -1
+        if use_edit_distance and (untrimmed_len > trimmed_len):
             for i in range(untrimmed_len - trimmed_len + 1):
                 if untrimmed[i:(i+trimmed_len)] == trimmed:
                     trimmed_front = i
                     break
-            elif use_edit_distance:
+            else:
                 # Since Skewer performs automatic error correction, the trimmed and
                 # untrimmed reads may not match, so in that case we find the closest
                 # match by Levenshtein distance.
@@ -94,8 +94,6 @@ class TableRead(object):
                     elif d < dist:
                         trimmed_front = i
                         dist = d
-            else:
-                trimmed_front = -1
         
         self.trimmed_front = trimmed_front
         self.trimmed_back = untrimmed_len - (trimmed_len + trimmed_front)
@@ -144,7 +142,7 @@ class TableRow(object):
 class Bed(object):
     def __init__(self, path, slop=200):
         from pybedtools import BedTool, Interval
-        self.regions = BedTool(args.bed).set_chromsizes('hg19').slop(slop)
+        self.regions = BedTool(path).set_chromsizes('hg19').slop(b=slop)
     
     def overlaps(self, chrm, start, end, strand='.', same_strand=False, min_overlap=1.0):
         i = Interval(chrm, start-1, end, strand=strand)
@@ -191,7 +189,7 @@ class Hist(object):
                     for pos, count in enumerate(read_hists[side][base], 1):
                         w.writerow((self.prog, read, side, pos, base, count))
 
-def summarize(untrimmed, trimmed, regions, ow, hw, n_hist_bases=20, max_reads=None, use_edit_distance=True, progress=True):
+def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_reads=None, use_edit_distance=True, progress=True):
     progs = ('untrimmed',) + tuple(trimmed.keys())
     hists = dict((prog, Hist(prog, n_hist_bases)) for prog in progs)
     itr = enumerate(untrimmed, 1)
@@ -249,6 +247,9 @@ def summarize(untrimmed, trimmed, regions, ow, hw, n_hist_bases=20, max_reads=No
                 row.set_from_pair(r1, r2)
                 row.read1.set_trimming(u1, r1, use_edit_distance)
                 row.read2.set_trimming(u2, r2, use_edit_distance)
+                if regions:
+                    row.read1.set_region(regions)
+                    row.read2.set_region(regions)
         
         for prog in progs:
             rows[prog].write(ow)
@@ -305,8 +306,9 @@ def main():
             write_header(ow)
             hw = csv.writer(h, delimiter="\t")
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
-            summarize(untrimmed, trimmed, regions, ow, hw,
-                max_reads=args.max_reads, use_edit_distance=args.edit_distance)
+            summarize(untrimmed, trimmed, ow, hw,
+                regions=regions, max_reads=args.max_reads,
+                use_edit_distance=args.edit_distance)
     finally:
         if untrimmed:
             untrimmed.close()
