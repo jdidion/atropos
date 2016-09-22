@@ -100,16 +100,8 @@ class TableRead(object):
     
     def set_region(self, regions, min_overlap=1.0):
         if self.mapped:
-            self.in_region = 0
-            best_hit = regions.overlaps(self.chrm, self.start, self.end)
-            if best_hit:
-                read, region, overlap, length = best_hit
-                overlap_frac = overlap / length
-                if overlap_frac >= min_overlap:
-                    self.in_region = 1
-                else:
-                    print("Read {} overlaps {} by {}, less than min cutoff {}".format(
-                        read, region, overlap_frac, min_overlap))
+            self.in_region = regions.overlaps(
+                self.chrm, self.start, self.end, min_overlap)
 
 class TableRow(object):
     def __init__(self, prog, read_name, read_idx):
@@ -141,45 +133,42 @@ class TableRow(object):
 
 class Bed(object):
     def __init__(self, path, slop=200):
-        self.regions = bt.BedTool(path).set_chromsizes('hg19').slop(b=slop)
+        from intervaltree import IntervalTree
+        from csv import reader
+        self.trees = {}
         self.slop = slop
+        with open(path, "rt") as bed:
+            chrm = None
+            ivls = []
+            for row in reader(bed, delimiter="\t"):
+                if row[0] != chrm:
+                    if len(ivls) > 0:
+                        self.trees[chrm] = IntervalTree.from_tuples(ivls)
+                    chrm = row[0]
+                    ivls = []
+                ivls.append((
+                    max(1, int(row[1]) - slop + 1),
+                    int(row[2]) + slop + 1
+                ))
+            if len(ivls) > 0:
+                self.trees[chrm] = IntervalTree(ivls)
     
-    def overlaps(self, chrm, start, end, strand='.', same_strand=False, min_overlap=1.0):
-        i = bt.Interval(chrm, start-1, end, strand=strand)
-        hits = self.regions.all_hits(i, same_strand, min_overlap)
+    def overlaps(self, chrm, start, end, min_overlap=1.0):
+        tree = self.trees[chrm]
+        hits = tree.search(start, end+1)
+        
         if len(hits) == 0:
-            return None
+            return 0
         
-        def _overlap(h):
-            l = min(len(h), len(i))
-            if h.start < i.start:
-                return (h.end - i.start, l)
-            else:
-                return (i.end - h.start, l)
+        length = end - start + 1
         
-        if len(hits) == 1:
-            return (i, hits[0]) + _overlap(hits[0])
-        
-        overlaps = []
         for h in hits:
-            hit_orig = bt.Interval(h[0], h.start + self.slop, h.end - self.slop)
-            ovl_orig = _overlap(hit_orig)
-            if ovl_orig[0] > 0:
-                overlaps.append((i, h) + ovl_orig)
+            o = min(end, h.end) - max(start, h.begin) + 1
+            l = min(length, h.end - h.start + 1)
+            if o / l >= min_overlap:
+                return 1
         
-        if len(overlaps) > 0:
-            overlaps.sort(key=lambda o: o[2], reverse=True)
-            o = overlaps[0]
-            return (o[0], o[1]) + _overlap(o[1])
-        
-        overlaps = [(i, h) + _overlap(h) for h in hits]
-        if len(overlaps) > 1:
-            overlaps.sort(key=lambda h: h[1], reverse=True)
-            #print("Multiple hits found for read <{}>:\n{}".format(
-            #    ','.join(i[0:3]),
-            #    '\n'.join('  <{}>'.format(','.join(h[0:3])) for h in hits)))
-            
-        return overlaps[0]
+        return 0
 
 class Hist(object):
     def __init__(self, prog, n_bases):
@@ -290,7 +279,7 @@ def main():
     parser.add_argument("-H", "--hist", default="trimmed_hists.txt")
     parser.add_argument("-m", "--max-reads", type=int, default=None)
     parser.add_argument("-b", "--bed", default=None,
-        help=".bed file of regions where reads should map.")
+        help="Sorted .bed file of regions where reads should map.")
     parser.add_argument("--min-overlap", type=float, default=1.0,
         help="When a .bed file is specified, this is the minimum "
             "fraction of a mapped read that must overlap a selected "
