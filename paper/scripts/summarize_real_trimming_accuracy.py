@@ -122,6 +122,15 @@ class TableRow(object):
         self.read1.set_from_read(r1)
         self.read2.set_from_read(r2)
     
+    def set_trimming(self, u1, r1, u2, r2, use_edit_distance):
+        self.read1.set_trimming(u1, r1, use_edit_distance)
+        self.read2.set_trimming(u2, r2, use_edit_distance)
+    
+    def set_region(self, regions):
+        self.read1.set_region(regions)
+        self.read2.set_region(regions)
+        # TODO: check that both reads map to the same region?
+    
     def write(self, w):
         w.writerow([
             getattr(self, key) for key, val in pair_fields
@@ -151,9 +160,12 @@ class Bed(object):
                     int(row[2]) + slop + 1
                 ))
             if len(ivls) > 0:
-                self.trees[chrm] = IntervalTree(ivls)
+                self.trees[chrm] = IntervalTree.from_tuples(ivls)
     
     def overlaps(self, chrm, start, end, min_overlap=1.0):
+        if chrm not in self.trees:
+            return 0
+        
         tree = self.trees[chrm]
         hits = tree.search(start, end+1)
         
@@ -164,7 +176,7 @@ class Bed(object):
         
         for h in hits:
             o = min(end, h.end) - max(start, h.begin) + 1
-            l = min(length, h.end - h.start + 1)
+            l = min(length, h.end - h.begin + 1)
             if o / l >= min_overlap:
                 return 1
         
@@ -228,6 +240,8 @@ def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_rea
             else:
                 hists['untrimmed'].add_reads(u1, u2)
                 rows['untrimmed'].set_from_pair(u1, u2)
+                if regions:
+                    rows['untrimmed'].set_region(regions)
         
         for prog, bam in trimmed.items():
             rows[prog] = TableRow(prog, name, i)
@@ -254,11 +268,9 @@ def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_rea
             for prog, (r1, r2) in valid.items():
                 row = rows[prog]
                 row.set_from_pair(r1, r2)
-                row.read1.set_trimming(u1, r1, use_edit_distance)
-                row.read2.set_trimming(u2, r2, use_edit_distance)
+                row.set_trimming(u1, r1, u2, r2, use_edit_distance)
                 if regions:
-                    row.read1.set_region(regions)
-                    row.read2.set_region(regions)
+                    row.set_region(regions)
         
         for prog in progs:
             rows[prog].write(ow)
