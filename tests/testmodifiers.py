@@ -178,7 +178,7 @@ def test_Swift_trimmer():
     trimmed = trimmer(read1, read2)
     assert trimmed[0].sequence == seq[:-10]
     assert trimmed[1].sequence == seq[10:]
-
+                            
 def test_overlapping():
     trimmer = MergeOverlapping(min_overlap=10, error_rate = 0.1)
     a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
@@ -244,6 +244,20 @@ def test_overlapping():
     read1_merged, read2_merged = trimmer(read1, read2)
     assert read1_merged.merged is False
     assert read2 is not None
+
+def test_overlapping_with_error_correction():
+    trimmer = MergeOverlapping(min_overlap=10, error_rate = 0.1, mismatch_action='liberal')
+    r1 = 'AGATCGGAAGACCGTCATGTAGGGAAAGAGTGTAGATCTC'
+    q1 = 'FFFFFFFFFFF#FFFFFFFFFFFFFFFFFFFFF#######'
+    r2 = reverse_complement('AGATCGGTAGAGCGTCGTGTAGGGAAATAGTGTAGATCTC')
+    q2 = ''.join(reversed('FFFFFFFFFFFFFFFF#FFFFFFFFFF#FFFFFFFFFFFF'))
+    read1 = Sequence('foo', r1, q1)
+    read2 = Sequence('foo', r2, q2)
+    read1_merged, read2_merged = trimmer(read1, read2)
+    assert read1_merged.merged
+    assert read2_merged is None
+    assert read1_merged.sequence == 'AGATCGGTAGAGCGTCATGTAGGGAAAGAGTGTAGATCTC'
+    assert read1_merged.qualities == 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF#######'
 
 def test_mismatched_adapter_overlaps():
     """

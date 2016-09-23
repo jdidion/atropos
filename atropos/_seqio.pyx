@@ -22,12 +22,13 @@ cdef class Sequence(object):
         public object match
         public object match_info
         public object clipped
+        public bint insert_overlap
         public bint merged
         public int corrected
     
     def __init__(self, str name, str sequence, str qualities=None, str name2='',
                  original_length=None, match=None, match_info=None, clipped=None,
-                 merged=False, corrected=0):
+                 insert_overlap=False, merged=False, corrected=0):
         """Set qualities to None if there are no quality values"""
         self.name = name
         self.sequence = sequence
@@ -37,6 +38,7 @@ cdef class Sequence(object):
         self.match = match
         self.match_info = match_info
         self.clipped = clipped or [0,0,0,0]
+        self.insert_overlap = insert_overlap
         self.merged = merged
         self.corrected = corrected
         if qualities is not None and len(qualities) != len(sequence):
@@ -82,6 +84,7 @@ cdef class Sequence(object):
             self.match,
             self.match_info,
             list(self.clipped),
+            self.insert_overlap,
             self.merged,
             self.corrected
         )

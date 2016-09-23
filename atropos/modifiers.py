@@ -9,7 +9,7 @@ import copy
 import logging
 import re
 from .qualtrim import quality_trim_index, nextseq_trim_index
-from .align import Aligner, SEMIGLOBAL, InsertAligner
+from .align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
 from .util import complement, reverse_complement, mean
 
 # Base classes
@@ -144,87 +144,15 @@ class AdapterCutter(object):
         self.with_adapters += 1
         return trimmed_read
 
-class InsertAdapterCutter(ReadPairModifier):
-    """
-    AdapterCutter that uses InsertAligner to first try to identify
-    insert overlap before falling back to semi-global adapter alignment.
-    """
-    def __init__(self, adapter1, adapter2, action='trim', mismatch_action=None,
-                 symmetric=True, min_insert_overlap=1, **aligner_args):
-        self.adapter1 = adapter1
-        self.adapter2 = adapter2
-        self.aligner = InsertAligner(adapter1.sequence, adapter2.sequence,
-            min_insert_overlap=min_insert_overlap, **aligner_args)
-        self.min_insert_len = min_insert_overlap
-        self.action = action
+# TODO: For bases in overlapping sequences, should we also correct
+# the base qualities to be the highest of the two?
+
+class ErrorCorrectorMixin(object):
+    def __init__(self, mismatch_action=None):
         self.mismatch_action = mismatch_action
-        self.symmetric = symmetric
-        self.with_adapters = [0, 0]
         self.corrected_pairs = 0
         self.corrected_bp = [0, 0]
     
-    def __call__(self, read1, read2):
-        if len(read1) < self.min_insert_len or len(read2) < self.min_insert_len:
-            return (read1, read2)
-        
-        match = self.aligner.match_insert(read1.sequence, read2.sequence)
-        
-        if match:
-            insert_match, adapter_match1, adapter_match2 = match
-            if self.mismatch_action and insert_match[5] > 0:
-                self.correct_errors(read1, read2, insert_match)
-        else:
-            adapter_match1 = self.adapter1.match_to(read1)
-            adapter_match2 = self.adapter2.match_to(read2)
-        
-        if self.symmetric:
-            if adapter_match1 is None and adapter_match2:
-                adapter_match1 = adapter_match2.copy()
-            if adapter_match2 is None and adapter_match1:
-                adapter_match2 = adapter_match1.copy()
-        
-        # TODO: optionally merge overlapping reads
-        
-        return (
-            self.trim(read1, self.adapter1, adapter_match1, 0),
-            self.trim(read2, self.adapter2, adapter_match2, 1)
-        )
-    
-    def trim(self, read, adapter, match, read_idx):
-        if not match:
-            read.match = None
-            read.match_info = None
-            return read
-        
-        match.adapter = adapter
-        match.read = read
-        match.front = False
-    
-        if self.action is None or match.rstart >= len(read):
-            trimmed_read = read
-        
-        else:
-            trimmed_read = adapter.trimmed(match)
-            
-            if self.action == 'mask':
-                # add N from last modification
-                masked_sequence = trimmed_read.sequence
-                masked_sequence += ('N' * len(read) - len(trimmed_read))
-                # set masked sequence as sequence with original quality
-                trimmed_read.sequence = masked_sequence
-                trimmed_read.qualities = read.qualities
-            elif self.action == 'lower':
-                # TODO: offer option to mask with lower-case of trimmed base
-                # This will happen as part of the refactoring to modify
-                # Sequences in-place.
-                pass
-        
-        trimmed_read.match = match
-        trimmed_read.match_info = [match.get_info_record()]
-        
-        self.with_adapters[read_idx] += 1
-        return trimmed_read
-
     def correct_errors(self, read1, read2, insert_match):
         # read2 reverse-complement is the reference, read1 is the query
         r1_seq = list(read1.sequence)
@@ -313,6 +241,85 @@ class InsertAdapterCutter(ReadPairModifier):
                 read2.corrected = r2_changed
                 if has_quals:
                     read2.qualities = ''.join(r2_qual)
+
+class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
+    """
+    AdapterCutter that uses InsertAligner to first try to identify
+    insert overlap before falling back to semi-global adapter alignment.
+    """
+    def __init__(self, adapter1, adapter2, action='trim', mismatch_action=None,
+                 symmetric=True, min_insert_overlap=1, **aligner_args):
+        ErrorCorrectorMixin.__init__(self, mismatch_action)
+        self.adapter1 = adapter1
+        self.adapter2 = adapter2
+        self.aligner = InsertAligner(adapter1.sequence, adapter2.sequence,
+            min_insert_overlap=min_insert_overlap, **aligner_args)
+        self.min_insert_len = min_insert_overlap
+        self.action = action
+        self.symmetric = symmetric
+        self.with_adapters = [0, 0]
+    
+    def __call__(self, read1, read2):
+        if len(read1) < self.min_insert_len or len(read2) < self.min_insert_len:
+            return (read1, read2)
+        
+        match = self.aligner.match_insert(read1.sequence, read2.sequence)
+        
+        read1.insert_overlap = read2.insert_overlap = (match is not None)
+        
+        if match:
+            insert_match, adapter_match1, adapter_match2 = match
+            if self.mismatch_action and insert_match[5] > 0:
+                self.correct_errors(read1, read2, insert_match)
+        else:
+            adapter_match1 = self.adapter1.match_to(read1)
+            adapter_match2 = self.adapter2.match_to(read2)
+        
+        if self.symmetric:
+            if adapter_match1 is None and adapter_match2:
+                adapter_match1 = adapter_match2.copy()
+            if adapter_match2 is None and adapter_match1:
+                adapter_match2 = adapter_match1.copy()
+        
+        return (
+            self.trim(read1, self.adapter1, adapter_match1, 0),
+            self.trim(read2, self.adapter2, adapter_match2, 1)
+        )
+    
+    def trim(self, read, adapter, match, read_idx):
+        if not match:
+            read.match = None
+            read.match_info = None
+            return read
+        
+        match.adapter = adapter
+        match.read = read
+        match.front = False
+    
+        if self.action is None or match.rstart >= len(read):
+            trimmed_read = read
+        
+        else:
+            trimmed_read = adapter.trimmed(match)
+            
+            if self.action == 'mask':
+                # add N from last modification
+                masked_sequence = trimmed_read.sequence
+                masked_sequence += ('N' * len(read) - len(trimmed_read))
+                # set masked sequence as sequence with original quality
+                trimmed_read.sequence = masked_sequence
+                trimmed_read.qualities = read.qualities
+            elif self.action == 'lower':
+                # TODO: offer option to mask with lower-case of trimmed base
+                # This will happen as part of the refactoring to modify
+                # Sequences in-place.
+                pass
+        
+        trimmed_read.match = match
+        trimmed_read.match_info = [match.get_info_record()]
+        
+        self.with_adapters[read_idx] += 1
+        return trimmed_read
 
 class UnconditionalCutter(Trimmer):
     """
@@ -590,54 +597,65 @@ class SwiftBisulfiteTrimmer(ReadPairModifier):
 # TODO: InsertAdapterCutter should save the insert match, and
 # MergeOverlapping should use that rather than doing another alignment
 
-class MergeOverlapping(ReadPairModifier):
-    def __init__(self, min_overlap=0.9, error_rate=0.1):
+class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
+    def __init__(self, min_overlap=0.9, error_rate=0.1, mismatch_action=None):
+        ErrorCorrectorMixin.__init__(self, mismatch_action)
         self.min_overlap = int(min_overlap) if min_overlap > 1 else min_overlap
         self.error_rate = error_rate
     
     def __call__(self, read1, read2):
-        if read1.match and not read1.match.front and read2.match and not read2.match.front:
-            l1 = len(read1.sequence)
-            l2 = len(read2.sequence)
-            min_overlap = self.min_overlap
-            if min_overlap <= 1:
-                min_overlap = max(2, round(self.min_overlap * min(l1, l2)))
-            
-            if l1 < min_overlap or l2 < min_overlap:
-                return (read1, read2)
-            
-            aligner = Aligner(read1.sequence, self.error_rate, SEMIGLOBAL)
-            read2_rc = reverse_complement(read2.sequence)
-            # TODO: Resolve overlap. We offer the user the choice to set mismatching bases to
-            # the one with the highest quality or to 'N'. Additionally, set qualities of overlapping
-            # bases to the highest value. The acutal alignment is not returned, so if there are
-            # mismatches we don't know what they are, and figuring it out is complicated by indels.
-            alignment = aligner.locate(read2_rc)
-            if alignment:
-                r1_start, r1_stop, r2_start, r2_stop, matches, errors = alignment
-                if matches >= min_overlap:
-                    if r2_start == 0 and r2_stop == l2:
-                        # r2 is fully contained in r1
-                        pass
-                    elif r1_start == 0 and r1_stop == l1:
-                        # r1 is fully contained in r2
-                        read1.sequence = read2_rc
-                        read1.qualities = "".join(reversed(read2.qualities))
-                    elif r1_start > 0:
-                        read1.sequence += read2_rc[r2_stop:]
-                        if read1.qualities and read2.qualities:
-                            read1.qualities += "".join(reversed(read2.qualities))[r2_stop:]
-                    elif r2_start > 0:
-                        read1.sequence = read2_rc + read1[r1_stop:]
-                        if read1.qualities and read2.qualities:
-                            read1.qualities = "".join(reversed(read2.qualities)) + read1.qualities[r1_stop:]
-                    else:
-                        raise Exception(
-                            "Invalid alignment while trying to merge read {}: {}".format(
-                                read1.name, ",".join(str(i) for i in alignment)))
-                    
-                    read1.merged = True
-                    read2 = None
+        l1 = len(read1.sequence)
+        l2 = len(read2.sequence)
+        min_overlap = self.min_overlap
+        if min_overlap <= 1:
+            min_overlap = max(2, round(self.min_overlap * min(l1, l2)))
+        
+        if l1 < min_overlap or l2 < min_overlap:
+            return (read1, read2)
+        
+        insert_matched = read1.insert_overlap and read2.insert_overlap
+        
+        if insert_matched:
+            # If we've already determined that there is an insert overlap
+            # with a 3' overhang, we can constrain our alignment
+            aflags = START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2
+        else:
+            aflags = SEMIGLOBAL
+        # align read1 to read2 reverse-complement to be compatible with InsertAligner
+        read2_rc = reverse_complement(read2.sequence)
+        aligner = Aligner(read2_rc, self.error_rate, aflags)
+        alignment = aligner.locate(read1.sequence)
+        
+        if alignment:
+            r2_start, r2_stop, r1_start, r1_stop, matches, errors = alignment
+            if matches >= min_overlap:
+                # Only correct errors if we haven't already done correction in the InsertAligner
+                if (self.mismatch_action and errors > 0 and not insert_matched and
+                        read1.corrected == 0 and read2.corrected == 0):
+                    self.correct_errors(read1, read2, alignment)
+                
+                if r2_start == 0 and r2_stop == l2:
+                    # r2 is fully contained in r1
+                    pass
+                elif r1_start == 0 and r1_stop == l1:
+                    # r1 is fully contained in r2
+                    read1.sequence = read2_rc
+                    read1.qualities = "".join(reversed(read2.qualities))
+                elif r1_start > 0:
+                    read1.sequence += read2_rc[r2_stop:]
+                    if read1.qualities and read2.qualities:
+                        read1.qualities += "".join(reversed(read2.qualities))[r2_stop:]
+                elif r2_start > 0:
+                    read1.sequence = read2_rc + read1[r1_stop:]
+                    if read1.qualities and read2.qualities:
+                        read1.qualities = "".join(reversed(read2.qualities)) + read1.qualities[r1_stop:]
+                else:
+                    raise Exception(
+                        "Invalid alignment while trying to merge read {}: {}".format(
+                            read1.name, ",".join(str(i) for i in alignment)))
+                
+                read1.merged = True
+                read2 = None
                 
         return (read1, read2)
 

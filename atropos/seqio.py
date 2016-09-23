@@ -73,7 +73,9 @@ except ImportError:
     pass
 
 class ColorspaceSequence(Sequence):
-    def __init__(self, name, sequence, qualities, primer=None, name2='', original_length=None, match=None, match_info=None, clipped=[0,0,0]):
+    def __init__(self, name, sequence, qualities, primer=None, name2='', original_length=None,
+                 match=None, match_info=None, clipped=[0,0,0], insert_overlap=False,
+                 merged=False, corrected=0):
         # In colorspace, the first character is the last nucleotide of the primer base
         # and the second character encodes the transition from the primer base to the
         # first real base of the read.
@@ -87,7 +89,9 @@ class ColorspaceSequence(Sequence):
             raise FormatError("In read named {0!r}: length of colorspace quality "
                 "sequence ({1}) and length of read ({2}) do not match (primer "
                 "is: {3!r})".format(rname, len(qualities), len(sequence), self.primer))
-        super(ColorspaceSequence, self).__init__(name, sequence, qualities, name2, original_length, match, match_info, clipped)
+        super(ColorspaceSequence, self).__init__(
+            name, sequence, qualities, name2, original_length, match, match_info, clipped,
+            insert_overlap, merged, corrected)
         if not self.primer in ('A', 'C', 'G', 'T'):
             raise FormatError("Primer base is {0!r} in read {1!r}, but it "
                 "should be one of A, C, G, T.".format(
@@ -110,7 +114,10 @@ class ColorspaceSequence(Sequence):
             self.original_length,
             self.match,
             self.match_info,
-            self.clipped)
+            self.clipped,
+            self.insert_overlap,
+            self.merged,
+            self.corrected)
 
 def sra_colorspace_sequence(name, sequence, qualities, name2):
     """Factory for an SRA colorspace sequence (which has one quality value too many)"""
