@@ -313,7 +313,8 @@ def create_atropos_params(options, parser, default_outfile):
     if options.merge_overlapping:
         modifiers.add_modifier(MergeOverlapping,
             min_overlap=options.merge_min_overlap,
-            error_rate=options.error_rate)
+            error_rate=options.merge_error_rate,
+            mismatch_action=options.correct_mismatches)
     
     # Create Filters and Formatters
     

@@ -438,6 +438,25 @@ standard input/output. Without the -o option, output is sent to standard output.
             type=probability, default=None,
             help="Maximum allowed error rate for matching adapters after successful insert match "
                  "(no. of errors divided by the length of the matching region). (0.2)")
+        
+        # Arguments for merging and error correction
+        # TODO: add RMP parameter for MergeOverlap
+        group.add_argument(
+            "-R",
+            "--merge-overlapping",
+            action="store_true", default=False,
+            help="Merge read pairs that overlap into a single sequence. This is experimental. (no)")
+        group.add_argument(
+            "--merge-min-overlap",
+            type=positive(float, True), default=0.9,
+            help="The minimum overlap between reads required for merging. If this number is (0,1.0], "
+                 "it specifies the minimum length as the fraction of the length of the *shorter* read "
+                 "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
+                 "with an absolute minimum of 2 bp). (0.9)")
+        group.add_argument(
+            "--merge-error-rate",
+            type=probability, default=None,
+            help="The maximum error rate for merging. (0.2)")
         group.add_argument(
             "--correct-mismatches",
             choices=("liberal", "conservative", "N"), default=None,
@@ -447,24 +466,6 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "the overall best median base quality, while conservative means to leave it unchanged. "
                  "'N' means to set the base to N. If exactly one base is ambiguous, the non-ambiguous base "
                  "is always used. (no error correction)")
-        
-        # Merging arguments
-        group.add_argument(
-            "-R",
-            "--merge-overlapping",
-            action="store_true", default=False,
-            help="Merge read pairs that overlap into a single sequence. This is experimental "
-                 "and currently only works with read pairs where an adapter match was found at "
-                 "the 3' ends of both reads. The minimum required overlap is controled by "
-                 "--merge-min-overlap, and the mimimum error rate in the alignment is controlled "
-                 "by --error-rate. (no)")
-        group.add_argument(
-            "--merge-min-overlap",
-            type=positive(float, True), default=0.9,
-            help="The minimum overlap between reads required for merging. If this number is (0,1.0], "
-                 "it specifies the minimum length as the fraction of the length of the *shorter* read "
-                 "in the pair; otherwise it specifies the minimum number of overlapping base pairs ("
-                 "with an absolute minimum of 2 bp). (0.9)")
         
         group = parser.add_argument_group("Additional read modifications")
         group.add_argument(
@@ -848,12 +849,16 @@ standard input/output. Without the -o option, output is sent to standard output.
             if options.insert_match_adapter_error_rate is None:
                 options.insert_match_adapter_error_rate = options.insert_match_error_rate
         
-        if options.merge_overlapping and (
-                paired != "both" or
-                options.adapters is None or
-                options.adapters2 is None or
-                options.times != 1):
-            parser.error("--merge-overlapping currently only works for paired-end reads with 3' adapters.")
+        #if options.merge_overlapping and (
+        #        paired != "both" or
+        #        options.adapters is None or
+        #        options.adapters2 is None or
+        #        options.times != 1):
+        #    parser.error("--merge-overlapping currently only works for paired-end reads with 3' adapters.")
+        
+        if options.merge_overlapping:
+            if options.merge_error_rate is None:
+                options.merge_error_rate = options.error_rate or 0.2
         
         if options.mirna:
             if options.adapter is None and options.front is None and options.anywhere is None:
