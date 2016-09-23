@@ -77,11 +77,11 @@ outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), num.progs), function(i) {
     })
 }))
 
-process <- function(tab, exclude.discarded=TRUE) {
+process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
     progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
     N <- max(tab$read_idx)
     num.progs <- length(progs)
-    for (i in c(4:10,19)) {
+    for (i in c(4:10,ifelse(has.regions, 20, 19))) {
         tab[,i] <- ifelse(tab[,i]=='True', TRUE, FALSE)
     }
     sample_tabs <- lapply(1:num.progs, function(i) tab[seq(i,nrow(tab),num.progs),])
@@ -111,7 +111,15 @@ process <- function(tab, exclude.discarded=TRUE) {
             pts[pts$prog == prog & pts$th == th, 'delta'] <- pts[pts$prog == prog & pts$th == th, 'y'] - pts[pts$prog == 'untrimmed' & pts$th == th, 'y']
         }
     }
-    list(progs=progs, quals=quals, pts=pts)
+    retval<-list(progs=progs, quals=quals, pts=pts)
+    if (has.regions) {
+        in_region <- rbind(
+            data.frame(read_id=1:N, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_in_region))),
+            data.frame(read_id=1:N, read=2, do.call(cbind, lapply(sample_tabs, function(x) x$read2_in_region)))
+        )
+        retval <- c(retval, list(reg=in_region))
+    }
+    retval
 }
 
 plot.data <- function(data, prog.labels) {
@@ -125,13 +133,13 @@ plot.data <- function(data, prog.labels) {
     pts$Q <- 0
     pts[grep(pts$Program, pattern = 'Q20'), 'Q'] <- 20
     pts$Q <- factor(pts$Q)
-    ggplot(pts[pts$Program != 'Untrimmed',], aes(x=MAPQ, y=Delta, colour=Program, shape=Q)) + 
+    ggplot(pts[pts$Program != 'Untrimmed',], aes(x=MAPQ, y=Delta, colour=Program, shape=Q)) +
         geom_line() + geom_point() +
         labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
 }
 
 wgs <- read_tsv('wgs_results.txt')
-wgs.data <- process(wgs)
+wgs.data <- process(wgs, has.regions=TRUE)
 
 wgbs <- read_tsv('wgbs_results.txt')
 wgbs.data <- process(wgbs)
