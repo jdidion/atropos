@@ -10,7 +10,13 @@ def detect(options, parser):
         PairedDetector, KnownContaminantDetector, HeuristicDetector, KhmerDetector)
     from .util import enumerate_range
     
+    k = options.kmer_size or 12
+    n_reads = options.max_reads
+    overrep_cutoff = 100
     include = options.include_contaminants or "all"
+    known_contaminants = load_known_contaminants(options) if include != 'unknown' else None
+    batch_iterator, names = create_reader(options, parser, counter_magnitude="K")[0:2]
+    
     detector = options.detector
     if not detector:
         if known_contaminants and include == 'known':
@@ -29,12 +35,6 @@ def detect(options, parser):
     elif detector == 'khmer':
         logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
         detector_class = KhmerDetector
-    
-    k = options.kmer_size or 12
-    n_reads = options.max_reads
-    overrep_cutoff = 100
-    known_contaminants = load_known_contaminants(options) if include != 'unknown' else None
-    batch_iterator, names = create_reader(options, parser, counter_magnitude="K")[0:2]
     
     try:
         detector_args = dict(
