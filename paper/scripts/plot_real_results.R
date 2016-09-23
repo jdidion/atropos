@@ -90,8 +90,18 @@ process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
         data.frame(read_id=1:N, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_quality))),
         data.frame(read_id=1:N, read=2, do.call(cbind, lapply(sample_tabs, function(x) x$read2_quality)))
     )
+    if (has.regions) {
+        in_region <- rbind(
+            data.frame(read_id=1:N, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_in_region))),
+            data.frame(read_id=1:N, read=2, do.call(cbind, lapply(sample_tabs, function(x) x$read2_in_region)))
+        )
+    }
     if (exclude.discarded) {
         w <- apply(quals[,3:ncol(quals)], 1, function(x) any(x==-1))
+        if (has.regions) {
+            w <- w | apply(in_region[,3:ncol(in_region)], 1, function(x) any(x==-1))
+            in_region <- in_region[!w,]
+        }
         quals <- quals[!w,]
     }
     quals$maxq <- apply(quals[,3:ncol(quals)], 1, max)
@@ -113,11 +123,23 @@ process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
     }
     retval<-list(progs=progs, quals=quals, pts=pts)
     if (has.regions) {
-        in_region <- rbind(
-            data.frame(read_id=1:N, read=1, do.call(cbind, lapply(sample_tabs, function(x) x$read1_in_region))),
-            data.frame(read_id=1:N, read=2, do.call(cbind, lapply(sample_tabs, function(x) x$read2_in_region)))
-        )
-        retval <- c(retval, list(reg=in_region))
+        in_region$maxi <- apply(in_region[,3:ncol(in_region)], 1, max)
+        pts2 <- melt(as.data.frame(t(sapply(th_values, function(th) {
+            c(
+                th=th,
+                x=sum(in_region[quals$maxq >= th, 'maxi']==1),
+                sapply(progs, function(p) {
+                    sum(in_region[quals[,p] >= th, p]==1)
+                })
+            )
+        }))), id.vars=c('th', 'x'), measure.vars=progs, variable.name='prog', value.name='y')
+        pts2$delta <- NA
+        for (th in th_values) {
+            for (prog in progs) {
+                pts2[pts2$prog == prog & pts2$th == th, 'delta'] <- pts2[pts2$prog == prog & pts2$th == th, 'y'] - pts2[pts2$prog == 'untrimmed' & pts2$th == th, 'y']
+            }
+        }
+        retval <- c(retval, list(reg=in_region, pts2=pts2))
     }
     retval
 }
