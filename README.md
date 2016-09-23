@@ -64,7 +64,7 @@ Note: while we consider the command-line interface to be stable, the internal co
 
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
-* Provide option for RNA-seq data that will 1) trim polyA sequence, 2)
+* Provide option for RNA-seq data that will trim polyA sequence
 * Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120)
 * Expand the list of contaminants that are detected by default.
 * Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
