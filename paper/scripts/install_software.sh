@@ -12,6 +12,7 @@
 #    * cmake
 # 4. To run the analyses on real data, you need
 #    * BWA (the MEM command is required; we used version 0.7.15)
+#    * STAR aligner
 #    * samtools
 #    * bedtools
 
@@ -25,7 +26,6 @@ genome=../data/ref.fa
 
 # We need some python libraries for the benchmarking scripts
 pip install editdistance
-pip install pybedtools
 
 # Install modified ART
 mkdir ../software/build/art &&
@@ -46,7 +46,7 @@ mkdir ../software/build/art &&
     cd ../../../scripts
 
 # Install version of Atropos on which manuscript is based
-pip install atropos==1.0.12
+pip install atropos==1.0.16
 
 # Install Skewer
 mkdir ../software/build/skewer &&
