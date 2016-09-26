@@ -140,7 +140,7 @@ def create_reader(options, parser, counter_magnitude="M"):
     
     # Wrap reader in subsampler
     if options.subsample:
-        reader = options.subsample(reader, options.subsample)
+        reader = subsample(reader, options.subsample)
     
     # Wrap reader in batch iterator
     batch_size = options.batch_size or 1000
