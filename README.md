@@ -76,6 +76,7 @@ Note: while we consider the command-line interface to be stable, the internal co
 * Autodetection of compressed files from stdin by "magic numbers" (similar to how screed does it)
 * Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
 * Accept multiple input files.
+* Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
