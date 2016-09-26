@@ -399,6 +399,18 @@ class SingleEndSAMReader(SAMReader):
         for read in sam:
             yield self._as_sequence(read)
 
+class Read1SingleEndSAMReader(SAMReader):
+    def _iter(self, sam):
+        for read in sam:
+            if read.is_read1:
+                yield self._as_sequence(read)
+
+class Read2SingleEndSAMReader(SAMReader):
+    def _iter(self, sam):
+        for read in sam:
+            if read.is_read2:
+                yield self._as_sequence(read)
+
 class PairedEndSAMReader(SAMReader):
     def _iter(self, sam):
         for reads in zip(sam, sam):
@@ -416,6 +428,12 @@ class PairedEndSAMReader(SAMReader):
                 reads = (reads[1], reads[0])
             
             yield tuple(self._as_sequence(r) for r in reads)
+
+def paired_to_read1(reader):
+    for r1, r2 in reader: yield r1
+
+def paired_to_read2(reader):
+    for r1, r2 in reader: yield r2
 
 class BatchIterator(object):
     def __init__(self, reader, size, max_reads=None):
@@ -468,7 +486,7 @@ class BatchIterator(object):
         self.reader.close()
 
 def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=None,
-                interleaved=False, qualities=None):
+                interleaved=False, qualities=None, single_input_read=None):
     """
     Open sequence files in FASTA or FASTQ format for reading. This is
     a factory that returns an instance of one of the ...Reader
@@ -499,7 +517,10 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
           appropriately.
         * When False (no qualities available), an exception is raised when the
           auto-detected output format is FASTQ.
-
+    
+    single_input_read -- When file1 is a paired-end interleaved or SAM/BAM file,
+        this specifies whether to only use the first or second read (1 or 2) or
+        to use both reads (None).
     """
     if interleaved and (file2 is not None or qualfile is not None):
         raise ValueError("When interleaved is set, file2 and qualfile must be None")
@@ -540,11 +561,21 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
             if colorspace:
                 raise ValueError("SAM/BAM format is not currently supported for colorspace reads")
             if interleaved:
-                return PairedEndSAMReader(file1)
+                return paired_to_single(PairedEndSAMReader(file1))
+            elif single_input_read == 1:
+                return Read1SingleEndSAMReader(file1)
+            elif single_input_read == 2:
+                return Read2SingleEndSAMReader(file1)
             else:
                 return SingleEndSAMReader(file1)
         elif interleaved:
-            return InterleavedSequenceReader(file1, colorspace, fileformat)
+            reader = InterleavedSequenceReader(file1, colorspace, fileformat)
+            if single_input_read == 1:
+                return paired_to_read1(reader)
+            elif single_input_read == 2:
+                return paired_to_read2(reader)
+            else:
+                return reader
         elif fileformat == 'fasta':
             fasta_handler = ColorspaceFastaReader if colorspace else FastaReader
             return fasta_handler(file1)

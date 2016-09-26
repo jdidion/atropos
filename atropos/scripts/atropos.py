@@ -210,6 +210,12 @@ class Command(object):
             type=readable_file, default=None, metavar="FILE",
             help="A single-end read file.")
         group.add_argument(
+            "--single-input-read",
+            choices=(1, 2), default=None,
+            help="When treating an interleaved FASTQ or paired-end SAM/BAM "
+                "file as single-end, this option specifies which of the two "
+                "reads to process. (both reads used)")
+        group.add_argument(
             "-sq",
             "--single-quals",
             type=readable_file, default=None, metavar="FILE",
@@ -272,6 +278,9 @@ class Command(object):
             options.paired = False
             options.input1 = options.single_input
             options.input2 = options.single_quals
+        elif options.interleaved_input and options.single_input_read:
+            options.input1 = options.interleaved_input
+            options.paired = False
         else:
             if not options.interleaved_input and (not options.input1 or not options.input2):
                 parser.error("Both '-pe1' and '-pe2' are required for paired-end trimming. If this is an "

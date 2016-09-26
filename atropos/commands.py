@@ -121,22 +121,18 @@ def trim(options, parser):
         params.modifiers.get_trimmer_classes())
 
 def create_reader(options, parser, counter_magnitude="M"):
-    input1 = input2 = qualfile = None
-    interleaved = False
-    if options.interleaved_input:
-        input1 = options.interleaved_input
-        interleaved = True
+    interleaved = bool(options.interleaved_input)
+    input1 = options.interleaved_input if interleaved else options.input1
+    input2 = qualfile = None
+    if options.paired and not interleaved:
+        input2 = options.input2
     else:
-        input1 = options.input1
-        if options.paired:
-            input2 = options.input2
-        else:
-            qualfile = options.input2
+        qualfile = options.input2
     
     try:
         reader = open_reader(input1, file2=input2, qualfile=qualfile,
             colorspace=options.colorspace, fileformat=options.format,
-            interleaved=interleaved)
+            interleaved=interleaved, single_input_read=options.single_input_read)
     except (UnknownFileType, IOError) as e:
         parser.error(e)
     
