@@ -170,7 +170,10 @@ class Command(object):
     
     def add_common_options(self):
         # Add common options
-        self.parser.set_defaults(paired=False, default_outfile=STDOUT)
+        self.parser.set_defaults(
+            paired=False,
+            default_outfile=STDOUT,
+            batch_size=1000)
         self.parser.add_argument(
             "--debug",
             action='store_true', default=False,
@@ -242,7 +245,7 @@ class Command(object):
             help="Subsample a fraction of reads. (no)")
         group.add_argument(
             "--batch-size",
-            type=int_or_str, default=5000, metavar="SIZE",
+            type=int_or_str, metavar="SIZE",
             help="Number of records to process in each batch. (5000)")
     
     def add_command_options(self):
@@ -327,7 +330,10 @@ standard input/output. Without the -o option, output is sent to standard output.
     
     def add_command_options(self):
         parser = self.parser
-        parser.set_defaults(zero_cap=None, action='trim')
+        parser.set_defaults(
+            zero_cap=None,
+            action='trim',
+            batch_size=5000)
         
         group = parser.add_argument_group("Finding adapters",
             description="Parameters -a, -g, -b specify adapters to be removed from "
