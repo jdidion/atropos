@@ -98,13 +98,8 @@ class TableRead(object):
         self.trimmed_front = trimmed_front
         self.trimmed_back = untrimmed_len - (trimmed_len + trimmed_front)
     
-    def set_region(self, regions, min_overlap=1.0):
-        if self.mapped:
-            self.in_region = regions.overlaps(
-                self.chrm, self.start, self.end, min_overlap)
-
 class TableRow(object):
-    def __init__(self, prog, read_name, read_idx):
+    def __init__(self, prog, read_name, read_idx, regions=None):
         for key, val in pair_fields:
             setattr(self, key, val)
         self.prog = prog
@@ -121,15 +116,11 @@ class TableRow(object):
         self.valid = self.proper and (r1.is_reverse != r2.is_reverse)
         self.read1.set_from_read(r1)
         self.read2.set_from_read(r2)
+        self.regions.set_overlaps(self.prog, read1, read2)
     
     def set_trimming(self, u1, r1, u2, r2, use_edit_distance):
         self.read1.set_trimming(u1, r1, use_edit_distance)
         self.read2.set_trimming(u2, r2, use_edit_distance)
-    
-    def set_region(self, regions):
-        self.read1.set_region(regions)
-        self.read2.set_region(regions)
-        # TODO: check that both reads map to the same region?
     
     def write(self, w):
         w.writerow([
@@ -162,6 +153,12 @@ class Bed(object):
             if len(ivls) > 0:
                 self.trees[chrm] = IntervalTree.from_tuples(ivls)
     
+    def set_overlaps(self, name, read1, read2, min_overlap=1.0):
+        for read in (read1, read2):
+            if read.mapped:
+                read.in_region = self.overlaps(
+                    read.chrm, read.start, read.end, min_overlap)
+
     def overlaps(self, chrm, start, end, min_overlap=1.0):
         if chrm not in self.trees:
             return 0
@@ -181,6 +178,54 @@ class Bed(object):
                 return 1
         
         return 0
+
+class Annotations(object):
+    def __init__(self, bed_dir, pattern, names):
+        self.bed_dir = bed_dir
+        self.pattern = pattern
+        self.annot_beds = {}
+        self.add('untrimmed')
+        for name in names:
+            self.add(name)
+    
+    def add(self, name):
+        self.annot_beds[name] = AnnotBed(os.path.join(
+            self.bed_dir, self.pattern.format(name)))
+    
+    def set_overlaps(self, name, read1, read2, min_overlap):
+        annot = self.annot_beds[name]
+        annot.set_overlaps(read1, read2, min_overlap)
+
+class AnnotBed(object):
+    """
+    The result of intersecting a name-sorted BAM file of read mappings with an
+    annotation database:
+    bam2bed --all-reads --do-not-sort < <bam> | cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id - <annotations> > out.
+    """
+    def __init__(self, path):
+        import csv
+        self.reader = csv.reader(path, delimiter="\t")
+    
+    def set_overlaps(self, read1, read2, min_overlap=1.0):
+        if read1.is_proper_pair: and read2.is_proper_pair:
+            # load the next two rows from the annotation
+            a1 = next(self.reader)
+            assert a1[3] == read1.query_name
+            a2 = next(self.reader)
+            assert a2[3] == read2.query_name
+            
+            # gene names should be semicolon-delimited in the 7th column
+            g1 = set(a1[6].split(';'))
+            g2 = set(a2[6].split(';'))
+            
+            # reads are considered "in region" if they are both mapped to
+            # the same gene
+            intersection = g1 & g2
+            if len(intersection) > 0:
+                read1.in_region = read2.in_region = 1
+                return
+        
+        read1.in_region = read2.in_region = 0
 
 class Hist(object):
     def __init__(self, prog, n_bases):
@@ -210,7 +255,8 @@ class Hist(object):
                     for pos, count in enumerate(read_hists[side][base], 1):
                         w.writerow((self.prog, read, side, pos, base, count))
 
-def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_reads=None, use_edit_distance=True, progress=True):
+def summarize(untrimmed, trimmed, ow, hw, mode=None, regions=None, n_hist_bases=20, max_reads=None,
+              use_edit_distance=True, progress=True):
     progs = ('untrimmed',) + tuple(trimmed.keys())
     hists = dict((prog, Hist(prog, n_hist_bases)) for prog in progs)
     itr = enumerate(untrimmed, 1)
@@ -223,7 +269,7 @@ def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_rea
     for i, (name, u1, u2) in itr:
         assert len(u1) > 0 and len(u2) > 0
         
-        rows = dict(untrimmed=TableRow('untrimmed', name, i))
+        rows = dict(untrimmed=TableRow('untrimmed', name, i, regions))
         valid = {}
         fail = False
         skip = False
@@ -240,11 +286,9 @@ def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_rea
             else:
                 hists['untrimmed'].add_reads(u1, u2)
                 rows['untrimmed'].set_from_pair(u1, u2)
-                if regions:
-                    rows['untrimmed'].set_region(regions)
         
         for prog, bam in trimmed.items():
-            rows[prog] = TableRow(prog, name, i)
+            rows[prog] = TableRow(prog, name, i, regions)
             if skip:
                 rows[prog].skipped = True
                 rows[prog].failed = fail
@@ -269,8 +313,6 @@ def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_rea
                 row = rows[prog]
                 row.set_from_pair(r1, r2)
                 row.set_trimming(u1, r1, u2, r2, use_edit_distance)
-                if regions:
-                    row.set_region(regions)
         
         for prog in progs:
             rows[prog].write(ow)
@@ -283,6 +325,7 @@ def summarize(untrimmed, trimmed, ow, hw, regions=None, n_hist_bases=20, max_rea
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.set_defaults(command=None)
     parser.add_argument("-d", "--bam-dir")
     parser.add_argument("-x", "--bam-extension", default=".sorted.bam")
     parser.add_argument("-p", "--bam-pattern", default=None)
@@ -290,20 +333,33 @@ def main():
     parser.add_argument("-o", "--output", default="-")
     parser.add_argument("-H", "--hist", default="trimmed_hists.txt")
     parser.add_argument("-m", "--max-reads", type=int, default=None)
-    parser.add_argument("-b", "--bed", default=None,
+    parser.add_argument("--no-edit-distance",
+        action="store_false", default=True, dest="edit_distance",
+        help="Don't try to match by editdistance.")
+    sp = parser.add_subparsers()
+    
+    amplicon = sp.add_parser('amplicon')
+    amplicon.set_defaults(command='amplicon')
+    amplicon.add_argument("-b", "--bed", default=None,
         help="Sorted .bed file of regions where reads should map.")
-    parser.add_argument("--min-overlap", type=float, default=1.0,
+    amplicon.add_argument("--min-overlap", type=float, default=1.0,
         help="When a .bed file is specified, this is the minimum "
             "fraction of a mapped read that must overlap a selected "
             "interval for that mapping to be considered valid. (1.0)")
-    parser.add_argument("--slop", type=int, default=200,
+    amplicon.add_argument("--slop", type=int, default=None,
         help="When a .bed file is specified, this is the number of bp each "
             "region is extended. This is often necessary with amplicon data "
             "because enrichment can capture sequences that only paritally "
             "overlap the probes.")
-    parser.add_argument("--no-edit-distance",
-        action="store_false", default=True, dest="edit_distance",
-        help="Don't try to match by editdistance.")
+    
+    mrna = sp.add_parser('mrna')
+    mrna.set_defaults(command='mrna')
+    mrna.add_argument("-D", "--bed-dir", default=None,
+        help="Directory where to find annotation bed files. Defaults to --bam-dir.")
+    mrna.add_argument("-B", "--bed-pattern", default='{name}.bed',
+        help="String template for bed file names. \{name\} is replaced with the "
+            "BAM file name with extension (--bam-extension) removed.")
+    
     args = parser.parse_args()
     
     if args.edit_distance:
@@ -320,10 +376,10 @@ def main():
             trimmed[name] = BAMReader(path)
     
     regions = None
-    if args.bed:
-        global bt
-        import pybedtools as bt
-        regions = Bed(args.bed, args.slop)
+    if args.command == 'amplicon':
+        regions = Bed(args.bed, args.slop or 200)
+    elif args.command == 'mrna':
+        regions = Annotations(args.bed_dir, args.bed_pattern, trimmed.keys())
     
     try:
         with open_output(args.output) as o, open_output(args.hist) as h:
@@ -332,7 +388,7 @@ def main():
             hw = csv.writer(h, delimiter="\t")
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
             summarize(untrimmed, trimmed, ow, hw,
-                regions=regions, max_reads=args.max_reads,
+                mode=args.command, regions=regions, max_reads=args.max_reads,
                 use_edit_distance=args.edit_distance)
     finally:
         if untrimmed:
