@@ -234,8 +234,12 @@ class Command(object):
                  "the found adapter. (no)")
         group.add_argument(
             "--max-reads",
-            type=int_or_str, default=None,
+            type=int_or_str, default=None, metavar="N",
             help="Maximum number of reads/pairs to process (no max)")
+        group.add_argument(
+            "--subsample",
+            type=probability, default=None, metavar="PROB",
+            help="Subsample a fraction of reads. (no)")
         group.add_argument(
             "--batch-size",
             type=int_or_str, default=5000, metavar="SIZE",

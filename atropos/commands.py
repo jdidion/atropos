@@ -138,6 +138,10 @@ def create_reader(options, parser, counter_magnitude="M"):
     
     qualities = reader.delivers_qualities
     
+    # Wrap reader in subsampler
+    if options.subsample:
+        reader = options.subsample(reader, options.subsample)
+    
     # Wrap reader in batch iterator
     batch_size = options.batch_size or 1000
     reader = BatchIterator(reader, batch_size, options.max_reads)
@@ -150,6 +154,12 @@ def create_reader(options, parser, counter_magnitude="M"):
             counter_magnitude)
     
     return (reader, (input1, input2), qualities, qualfile is not None)
+
+def subsample(reader, frac):
+    from random import random
+    for reads in reader:
+        if random() < frac:
+            yield reads
 
 from collections import namedtuple
 AtroposParams = namedtuple("AtroposParams", ("reader", "modifiers", "filters", "formatters", "writers"))
