@@ -63,6 +63,8 @@ Note: while we consider the command-line interface to be stable, the internal co
 2017. The following enhancements are also being considered:
 
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+* Implement additional alternate alignment algorithms.
+* Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 * Provide option for RNA-seq data that will trim polyA sequence
 * Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120)
@@ -77,6 +79,7 @@ Note: while we consider the command-line interface to be stable, the internal co
 * Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
 * Accept multiple input files.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
+* Consider supporting different error rates for read1 vs read2.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
