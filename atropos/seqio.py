@@ -561,7 +561,7 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
             if colorspace:
                 raise ValueError("SAM/BAM format is not currently supported for colorspace reads")
             if interleaved:
-                return paired_to_single(PairedEndSAMReader(file1))
+                return PairedEndSAMReader(file1)
             elif single_input_read == 1:
                 return Read1SingleEndSAMReader(file1)
             elif single_input_read == 2:
