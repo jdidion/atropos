@@ -211,7 +211,7 @@ class Command(object):
             help="A single-end read file.")
         group.add_argument(
             "--single-input-read",
-            choices=(1, 2), default=None,
+            type=int, choices=(1, 2), default=None,
             help="When treating an interleaved FASTQ or paired-end SAM/BAM "
                 "file as single-end, this option specifies which of the two "
                 "reads to process. (both reads used)")

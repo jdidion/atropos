@@ -6,6 +6,7 @@ v1.0.16 (dev)
 * Migrate to Versioneer for version management.
 * Enable stderr as a valid output using the '_' shortcut.
 * Add ability to specify SAM/BAM as input format.
+* Add option to select which read to use when treating a paired-end interleaved or SAM/BAM file as single-end.
 * Remove restrictions on the use of --merge-overlapping, and enable error correction during merging.
 * We are beginning to move towards the use of commands for all operations, and read-trimming now falls under the 'trim' command. Currently, calling atropos without any command will default to the 'trim' command.
 
