@@ -31,3 +31,5 @@ atropos/_version.py export-subst
 paper/data/amplicon/amplicon.1.fq.gz filter=lfs diff=lfs merge=lfs -text
 paper/data/amplicon/amplicon.2.fq.gz filter=lfs diff=lfs merge=lfs -text
 paper/data/amplicon/amplicon_regions.bed filter=lfs diff=lfs merge=lfs -text
+paper/data/rna/rna.1.fq.gz filter=lfs diff=lfs merge=lfs -text
+paper/data/rna/rna.2.fq.gz filter=lfs diff=lfs merge=lfs -text
