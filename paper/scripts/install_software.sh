@@ -14,7 +14,7 @@
 #    * BWA (the MEM command is required; we used version 0.7.15)
 #    * STAR aligner
 #    * samtools
-#    * bedtools
+#    * bedops
 
 scripts=`pwd`
 root=`dirname $scripts`
