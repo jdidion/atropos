@@ -405,7 +405,7 @@ class HeuristicDetector(Detector):
                     if match_frac1 < best_match_frac[0]:
                         continue
                     if (contam.seq in compare_seq or
-                            align(compare_seq, contam.seq, min_contaminant_match_frac)):
+                            align(compare_seq, contam.seq, self.min_contaminant_match_frac)):
                         if (match_frac1 > best_match_frac[0] or (
                                 match_frac1 == best_match_frac[0] and
                                 match_frac2 > best_match_frac[1])):

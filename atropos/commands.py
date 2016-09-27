@@ -157,7 +157,7 @@ def create_reader(options, parser, counter_magnitude="M"):
 
 # TODO: specify this externally rather than hard-coding
 DEFAULT_ADAPTERS_URL = \
-    "https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/3ad9c919acf600097e1c78c0db6bbf915fd70348/sequencing_adapters.txt"
+    "https://gist.githubusercontent.com/jdidion/c151526b8ccd84945cd31dfa4f83591d/raw/eaa6b2d99983f5b14f75357c93c1540142436a49/sequencing_adapters.fa"
 
 def load_known_adapters(options):
     from .adapters import AdapterCache

@@ -1105,7 +1105,7 @@ class DetectCommand(Command):
             help="Pass known contaminants in on the commandline as 'name=sequence'. "
                  "Can be specified multiple times.")
         group.add_argument(
-            "-X",
+            "-F",
             "--known-contaminants-file",
             type=readable_file, dest='known_adapters_file', default=None,
             help="File with known contaminants, one per line, with name and sequence "
