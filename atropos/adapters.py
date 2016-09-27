@@ -535,10 +535,7 @@ class AdapterCache(object):
         if seq not in self.seq_to_name:
             self.seq_to_name[seq] = set()
         self.seq_to_name[seq].add(name)
-        
-        if name not in self.name_to_seq:
-            self.name_to_seq[name] = set()
-        self.name_to_seq[name].add(seq)
+        self.name_to_seq[name] = seq
     
     def load_from_file(self, path):
         with open(path, "rt") as i:
@@ -588,4 +585,4 @@ class AdapterCache(object):
         return seq in self.seq_to_name
     
     def get_for_seq(self, seq):
-        return self.seq_to_name[seq]
+        return list(self.seq_to_name[seq])
