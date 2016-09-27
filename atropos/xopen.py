@@ -13,12 +13,6 @@ STDERR = '_'
 
 def abspath(path):
     return os.path.abspath(os.path.expanduser(path))
-
-def existing_path(path):
-    """Test that a path exists."""
-    if path == STDOUT:
-        return path
-    return resolve_path(path)
     
 def resolve_path(path, parent=None):
     """Resolves the absolute path of the specified file.

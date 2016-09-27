@@ -21,7 +21,7 @@ check_importability()
 from atropos import __version__
 import atropos.commands
 from atropos.util import MAGNITUDE
-from atropos.xopen import STDOUT, STDERR, existing_path, check_path, check_writeable
+from atropos.xopen import STDOUT, STDERR, resolve_path, check_path, check_writeable
 
 # Extensions to argparse
 
@@ -99,6 +99,12 @@ class accessible_path(TypeWithArgs):
         else:
             return check_path(path, type_, ACCESS[mode])
 
+def existing_path(path):
+    """Test that a path exists."""
+    if path == STDOUT:
+        return path
+    return resolve_path(path)
+
 readable_file = CompositeType(existing_path, accessible_path('f', 'r'))
 """Test that a file exists and is readable."""
 
@@ -107,6 +113,20 @@ writeable_file = accessible_path('f', 'w')
 Test that a file 1) exists and is writelable, or 2) does not exist but
 is in a writeable directory.
 """
+
+class _readwriteable_file(object):
+    def __init__(self):
+        self.r = accessible_path('f', 'r')
+        self.w = accessible_path('f', 'w')
+    
+    def __call__(self, string):
+        path = string
+        if os.path.exists(path):
+            path = self.r(path)
+        path = self.w(path)
+        return path
+readwriteable_file = _readwriteable_file()
+"""Test that a file is both readable and writeable."""
 
 str_list = delimited(data_type=str)
 """Comma-delimited list of strings."""
@@ -333,7 +353,8 @@ standard input/output. Without the -o option, output is sent to standard output.
         parser.set_defaults(
             zero_cap=None,
             action='trim',
-            batch_size=5000)
+            batch_size=5000,
+            known_adapter=None)
         
         group = parser.add_argument_group("Finding adapters",
             description="Parameters -a, -g, -b specify adapters to be removed from "
@@ -341,7 +362,8 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "If specified multiple times, only the best matching adapter is "
                 "trimmed (but see the --times option). When the special notation "
                 "'file:FILE' is used, adapter sequences are read from the given "
-                "FASTA file.")
+                "FASTA file. When the --adapter-file option is used, adapters can "
+                "be specified by name rather than sequence.")
         group.add_argument(
             "-a",
             "--adapter",
@@ -370,6 +392,21 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "as with -a. This option is mostly for rescuing failed library "
                 "preparations - do not use if you know which end your adapter was "
                 "ligated to! (none)")
+        group.add_argument(
+            "-F",
+            "--known-adapters-file",
+            type=readable_file, default=None,
+            help="File with known contaminants, one per line, with name and sequence "
+                 "separated by one or more tabs.")
+        group.add_argument(
+            "--adapter-cache-file",
+            type=readwriteable_file, default='.adapters',
+            help="File where adapter sequences will be cached, unless "
+                "--no-cache-adapters is set.")
+        group.add_argument(
+            "--no-cache-adapters",
+            action="store_false", dest="cache_adapters", default=True,
+            help="Don't cache adapters list as '.adapters' in the working directory.")
         group.add_argument(
             "--no-trim",
             action='store_const', dest='action', const=None,
@@ -437,11 +474,6 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "when the probabilty of observing k out of n matching bases is <= PROB. (1E-6)")
         
         # Arguments for insert match
-        group.add_argument(
-            "--adapter-pair",
-            type=str_list, default=None, metavar="NAME1,NAME2",
-            help="When adapters are specified in files, this option selects a single pair to use "
-                 "for insert-based adapter matching.")
         group.add_argument(
             "--insert-max-rmp",
             type=probability, default=1E-6, metavar="PROB",
@@ -1069,18 +1101,23 @@ class DetectCommand(Command):
         group.add_argument(
             "-x",
             "--known-contaminant",
-            action="append", default=None,
+            action="append", dest='known_adapter', default=None,
             help="Pass known contaminants in on the commandline as 'name=sequence'. "
                  "Can be specified multiple times.")
         group.add_argument(
             "-X",
             "--known-contaminants-file",
-            type=readable_file, default=None,
+            type=readable_file, dest='known_adapters_file', default=None,
             help="File with known contaminants, one per line, with name and sequence "
                  "separated by one or more tabs.")
         group.add_argument(
+            "--contaminant-cache-file",
+            type=readwriteable_file, dest='adapter_cache_file', default='.adapters',
+            help="File where known contaminant sequences will be cached, unless "
+                "--no-cache-contaminants is set.")
+        group.add_argument(
             "--no-cache-contaminants",
-            action="store_false", dest="cache_contaminants", default=True,
+            action="store_false", dest="cache_adapters", default=True,
             help="Don't cache contaminant list as '.contaminants' in the working directory.")
 
 COMMANDS['detect'] = DetectCommand

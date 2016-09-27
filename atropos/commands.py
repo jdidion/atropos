@@ -6,15 +6,15 @@ from .xopen import STDOUT, STDERR, open_output
 
 def detect(options, parser):
     from .detect import (
-        load_known_contaminants, summarize_contaminants,
-        PairedDetector, KnownContaminantDetector, HeuristicDetector, KhmerDetector)
+        summarize_contaminants, PairedDetector, KnownContaminantDetector,
+        HeuristicDetector, KhmerDetector)
     from .util import enumerate_range
     
     k = options.kmer_size or 12
     n_reads = options.max_reads
     overrep_cutoff = 100
     include = options.include_contaminants or "all"
-    known_contaminants = load_known_contaminants(options) if include != 'unknown' else None
+    known_contaminants = load_known_adapters(options) if include != 'unknown' else None
     batch_iterator, names = create_reader(options, parser, counter_magnitude="K")[0:2]
     
     detector = options.detector
@@ -155,6 +155,26 @@ def create_reader(options, parser, counter_magnitude="M"):
     
     return (reader, (input1, input2), qualities, qualfile is not None)
 
+# TODO: specify this externally rather than hard-coding
+DEFAULT_ADAPTERS_URL = \
+    "https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/3ad9c919acf600097e1c78c0db6bbf915fd70348/sequencing_adapters.txt"
+
+def load_known_adapters(options):
+    from .adapters import AdapterCache
+    cache_file = options.adapter_cache_file if options.cache_adapters else None
+    adapter_cache = AdapterCache(cache_file)
+    if adapter_cache.empty:
+        adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
+    if options.known_adapter:
+        for s in options.known_adapter:
+            name, seq = s.split('=')
+            adapter_cache.add(name, seq)
+    if options.known_adapters_file:
+        adapter_cache.load_from_file(options.known_adapters_file)
+    if options.cache_adapters:
+        adapter_cache.save()
+    return adapter_cache
+
 def subsample(reader, frac):
     from random import random
     for reads in reader:
@@ -186,28 +206,42 @@ def create_atropos_params(options, parser, default_outfile):
     
     # Create Adapters
     
-    parser_args = dict(
-        colorspace=options.colorspace,
-        max_error_rate=options.error_rate,
-        min_overlap=options.overlap,
-        read_wildcards=options.match_read_wildcards,
-        adapter_wildcards=options.match_adapter_wildcards,
-        indels=options.indels, indel_cost=options.indel_cost
-    )
-    if options.adapter_max_rmp:
-        parser_args['match_probability'] = match_probability
-        parser_args['max_rmp'] = options.adapter_max_rmp
-    adapter_parser = AdapterParser(**parser_args)
-
-    try:
-        adapters1 = adapter_parser.parse_multi(options.adapters, options.anywhere, options.front)
-        adapters2 = adapter_parser.parse_multi(options.adapters2, options.anywhere2, options.front2)
-    except IOError as e:
-        if e.errno == errno.ENOENT:
+    has_adapters1 = options.adapters or options.anywhere or options.front
+    has_adapters2 = options.adapters2 or options.anywhere2 or options.front2
+    
+    adapters1 = adapters2 = []
+    if has_adapters1 or has_adapters2:
+        adapter_cache = load_known_adapters(options)
+        parser_args = dict(
+            colorspace=options.colorspace,
+            max_error_rate=options.error_rate,
+            min_overlap=options.overlap,
+            read_wildcards=options.match_read_wildcards,
+            adapter_wildcards=options.match_adapter_wildcards,
+            indels=options.indels, indel_cost=options.indel_cost,
+            cache=adapter_cache
+        )
+        if options.adapter_max_rmp:
+            parser_args['match_probability'] = match_probability
+            parser_args['max_rmp'] = options.adapter_max_rmp
+        adapter_parser = AdapterParser(**parser_args)
+        
+        try:
+            if has_adapters1:
+                adapters1 = adapter_parser.parse_multi(
+                    options.adapters, options.anywhere, options.front)
+            if has_adapters2:
+                adapters2 = adapter_parser.parse_multi(
+                    options.adapters2, options.anywhere2, options.front2)
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                parser.error(e)
+            raise
+        except ValueError as e:
             parser.error(e)
-        raise
-    except ValueError as e:
-        parser.error(e)
+        
+        if options.cache_adapters:
+            adapter_cache.save()
     
     # Create Modifiers
     
@@ -221,10 +255,6 @@ def create_atropos_params(options, parser, default_outfile):
         parser.error("You need to provide at least one adapter sequence.")
     
     if options.aligner == 'insert':
-        if options.adapter_pair and adapters1 and adapters2:
-            name1, name2 = options.adapter_pair
-            adapters1 = [a for a in adapters1 if a.name == name1]
-            adapters2 = [a for a in adapters2 if a.name == name2]
         if not adapters1 or len(adapters1) != 1 or adapters1[0].where != BACK or \
                 not adapters2 or len(adapters2) != 1 or adapters2[0].where != BACK:
             parser.error("Insert aligner requires a single 3' adapter for each read")

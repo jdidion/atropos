@@ -4,11 +4,9 @@ from collections import defaultdict
 import logging
 import math
 import os
-import pickle
 import re
 import statistics as stats
 import sys
-from urllib.request import urlopen
 from .align import Aligner, SEMIGLOBAL
 from .seqio import open_reader
 from .util import reverse_complement, sequence_complexity, enumerate_range
@@ -19,65 +17,6 @@ from .xopen import open_output, xopen
 # read sequence against only the forward-orientation known contaminants.
 # Also, offer an option of whether to test the reverse complement, with
 # the default being false.
-
-def load_known_contaminants(options):
-    cache_file = ".contaminants"
-    if options.cache_contaminants and os.path.exists(cache_file):
-        with open(cache_file, "rb") as cache:
-            return pickle.load(cache)
-    else:
-        known_contaminants = load_known_contaminants_from_url()
-        if options.known_contaminant:
-            merge_contaminants(
-                known_contaminants,
-                load_known_contaminants_from_option_strings(options.known_contaminant))
-        if options.known_contaminants_file:
-            merge_contaminants(
-                known_contaminants,
-                load_known_contaminants_from_file(options.known_contaminants_file))
-        if options.cache_contaminants:
-            # need to make it pickleable
-            temp = {}
-            for seq, names in known_contaminants.items():
-                temp[seq] = list(names)
-            with open(cache_file, "wb") as cache:
-                pickle.dump(temp, cache)
-        return known_contaminants
-
-def load_known_contaminants_from_file(path):
-    with open(path, "rt") as i:
-        return parse_known_contaminants(i)
-
-def load_known_contaminants_from_option_strings(opt_strings):
-    """Parse contaminants from list of name=seq options supplied on command line."""
-    return parse_known_contaminants(opt_strings, delim='=')
-
-def load_known_contaminants_from_url(url="https://gist.githubusercontent.com/jdidion/ba7a83c0934abe4bd040d1bfc5752d5f/raw/a6372f21281705ac9031697fcaed3d1f64cea9a5/sequencing_adapters.txt"):
-    logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
-    return parse_known_contaminants(urlopen(url).read().decode().split("\n"))
-
-def parse_known_contaminants(line_iter, delim='\t', rc=False):
-    regex = re.compile("([^{0}]+){0}+(.+)".format(delim))
-    contam = defaultdict(lambda: set())
-    for line in line_iter:
-        line = line.rstrip()
-        if len(line) == 0 or line.startswith('#'):
-            continue
-        m = regex.match(line)
-        if m:
-            seq = m.group(2)
-            name = m.group(1)
-            contam[seq].add(name)
-            if rc:
-                contam[reverse_complement(seq)].add("{}_rc".format(name))
-    return contam
-
-def merge_contaminants(c1, c2):
-    for k, v in c2.items():
-        if k in c1:
-            c1[k] = c1[k] + c2[k]
-        else:
-            c1[k] = c2[k]
 
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None, match_frac2=None):
@@ -166,7 +105,7 @@ class ContaminantMatcher(object):
 def create_contaminant_matchers(contaminants, k):
     return [
         ContaminantMatcher(seq, names, k)
-        for seq, names in contaminants.items()
+        for seq, names in contaminants.iter_sequences()
     ]
 
 POLY_A = re.compile('A{8,}.*|A{2,}$')
@@ -314,7 +253,7 @@ class KnownContaminantDetector(Detector):
     def __init__(self, known_contaminants, min_match_frac=0.5, **kwargs):
         super(KnownContaminantDetector, self).__init__(known_contaminants=known_contaminants, **kwargs)
         self.min_match_frac = min_match_frac
-        self._min_k = min(len(s) for s in known_contaminants.keys())
+        self._min_k = min(len(s) for s in known_contaminants.sequences)
     
     @property
     def min_report_freq(self):
@@ -559,7 +498,7 @@ class KhmerDetector(Detector):
                     seen.add(kmer)
                 return n
             
-            for seq, names in self.known_contaminants.items():
+            for seq, names in self.known_contaminants.iter_sequences():
                 l = len(seq)
                 if l < k:
                     print("Cannot check {}; sequence is shorter than {}".format(list(names)[0], k))

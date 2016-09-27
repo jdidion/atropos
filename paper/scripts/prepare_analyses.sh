@@ -223,7 +223,7 @@ do
       
       if [ ! -f $genome.umfa ]
       then
-        mkdir $STAR_INDEX_DIR
+        mkdir -p $STAR_INDEX_DIR
         echo "$STAR --runThreadN $threads --runMode genomeGenerate --genomeDir $STAR_INDEX_DIR --genomeFastaFiles $genome --sjdbGTFfile $annotations" >> $align_commands
       fi
       
@@ -299,5 +299,6 @@ do
 done
 
 chmod +x $commands
-chmod +x $bwa_commands
+chmod +x $align_commands
 chmod +x $sort_commands
+chmod +x $bedops_commands

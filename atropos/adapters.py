@@ -2,12 +2,16 @@
 """
 Adapters
 """
-import sys
-import re
 from collections import defaultdict
+import logging
+import os
+import pickle
+import re
+import sys
+from urllib.request import urlopen
 from atropos import align, colorspace
-from atropos.align import Match
-from atropos.seqio import ColorspaceSequence, FastaReader
+from .align import Match
+from .seqio import ColorspaceSequence, FastaReader
 
 # Constants for the find_best_alignment function.
 # The function is called with SEQ1 as the adapter, SEQ2 as the read.
@@ -67,17 +71,20 @@ def parse_braces(sequence):
         raise ValueError("Unterminated expression")
     return result
 
+ADAPTER_TYPES = dict(back=BACK, front=FRONT, anywhere=ANYWHERE)
+
 class AdapterParser(object):
     """
     Factory for Adapter classes that all use the same parameters (error rate,
     indels etc.). The given **kwargs will be passed to the Adapter constructors.
     """
-    def __init__(self, colorspace=False, **kwargs):
+    def __init__(self, colorspace=False, cache=None, **kwargs):
         self.colorspace = colorspace
+        self.cache = cache
         self.constructor_args = kwargs
         self.adapter_class = ColorspaceAdapter if colorspace else Adapter
 
-    def parse(self, spec, name=None, cmdline_type='back'):
+    def parse(self, spec=None, name=None, cmdline_type='back'):
         """
         Parse an adapter specification not using ``file:`` notation and return
         an object of an appropriate Adapter class. The notation for anchored
@@ -88,13 +95,29 @@ class AdapterParser(object):
         cmdline_type -- describes which commandline parameter was used (``-a``
         is 'back', ``-b`` is 'anywhere', and ``-g`` is 'front').
         """
-        if name is None:
-            name, spec = self._extract_name(spec)
-        sequence = get_sequence_for_spec(spec)
-        types = dict(back=BACK, front=FRONT, anywhere=ANYWHERE)
-        if cmdline_type not in types:
+        if cmdline_type not in ADAPTER_TYPES:
             raise ValueError('cmdline_type cannot be {0!r}'.format(cmdline_type))
-        where = types[cmdline_type]
+        where = ADAPTER_TYPES[cmdline_type]
+        
+        if name is None and spec is None:
+            raise ValueError("Either name or spec must be given")
+        elif name is None:
+            if self.cache and self.cache.has_name(spec):
+                name = spec
+                spec = self.cache.get_for_name(name)
+        elif spec is None:
+            if self.cache and self.cache.has_name(name):
+                spec = self.cache.get_for_name(name)
+        
+        if spec is None:
+            raise ValueError("Name not found: {}".format(name))
+        elif name is None:
+            name, spec = self._extract_name(spec)
+        
+        if self.cache and name is not None:
+            self.cache.add(name, spec)
+            
+        sequence = get_sequence_for_spec(spec)
         if where == FRONT and spec.startswith('^'):  # -g ^ADAPTER
             sequence, where = spec[1:], PREFIX
         elif where == BACK:
@@ -114,29 +137,33 @@ class AdapterParser(object):
                         **self.constructor_args)
             elif spec.endswith('$'):   # -a ADAPTER$
                 sequence, where = spec[:-1], SUFFIX
+        
         if not sequence:
             raise ValueError("The adapter sequence is empty.")
-
+        
         return self.adapter_class(sequence, where, name=name, **self.constructor_args)
-
-    def parse_with_file(self, spec, cmdline_type='back'):
+    
+    def parse_multi(self, back=[], anywhere=[], front=[]):
         """
-        Parse an adapter specification and yield appropriate Adapter classes.
-        This works like the parse() function above, but also supports the
-        ``file:`` notation for reading adapters from an external FASTA
-        file. Since a file can contain multiple adapters, this
-        function is a generator.
-        """
-        if spec.startswith('file:'):
-            # read adapter sequences from a file
-            with FastaReader(spec[5:]) as fasta:
-                for record in fasta:
-                    name = record.name.split(None, 1)[0]
-                    yield self.parse(record.sequence, name, cmdline_type)
-        else:
-            name, spec = self._extract_name(spec)
-            yield self.parse(spec, name, cmdline_type)
+        Parse all three types of commandline options that can be used to
+        specify adapters. back, anywhere and front are lists of strings,
+        corresponding to the respective commandline types (-a, -b, -g).
 
+        Return a list of appropriate Adapter classes.
+        """
+        adapters = []
+        for specs, cmdline_type in (back, 'back'), (anywhere, 'anywhere'), (front, 'front'):
+            for spec in specs:
+                if spec.startswith('file:'):
+                    # read adapter sequences from a file
+                    with FastaReader(spec[5:]) as fasta:
+                        for record in fasta:
+                            name = record.name.split(None, 1)[0]
+                            adapters.append(self.parse(record.sequence, name, cmdline_type))
+                else:
+                    adapters.append(self.parse(spec=spec, cmdline_type=cmdline_type))
+        return adapters
+    
     def _extract_name(self, spec):
         """
         Parse an adapter specification given as 'name=adapt' into 'name' and 'adapt'.
@@ -149,20 +176,6 @@ class AdapterParser(object):
             name = None
         spec = spec.strip()
         return name, spec
-
-    def parse_multi(self, back, anywhere, front):
-        """
-        Parse all three types of commandline options that can be used to
-        specify adapters. back, anywhere and front are lists of strings,
-        corresponding to the respective commandline types (-a, -b, -g).
-
-        Return a list of appropriate Adapter classes.
-        """
-        adapters = []
-        for specs, cmdline_type in (back, 'back'), (anywhere, 'anywhere'), (front, 'front'):
-            for spec in specs:
-                adapters.extend(self.parse_with_file(spec, cmdline_type))
-        return adapters
 
 def _generate_adapter_name(_start=[1]):
     name = str(_start[0])
@@ -338,7 +351,6 @@ class Adapter(object):
     def __len__(self):
         return len(self.sequence)
 
-
 class ColorspaceAdapter(Adapter):
     def __init__(self, *args, **kwargs):
         super(ColorspaceAdapter, self).__init__(*args, **kwargs)
@@ -410,7 +422,6 @@ class ColorspaceAdapter(Adapter):
     def __repr__(self):
         return '<ColorspaceAdapter(sequence={0!r}, where={1})>'.format(self.sequence, self.where)
 
-
 class LinkedMatch(object):
     """
     Represent a match of a LinkedAdapter.
@@ -426,7 +437,6 @@ class LinkedMatch(object):
     
     def get_info_record(self):
         return self.back_match.get_info_record() if self.back_match else self.front_match.get_info_record()
-
 
 class LinkedAdapter(object):
     """
@@ -495,3 +505,87 @@ class LinkedAdapter(object):
     @property
     def adjacent_bases(self):
         return self.back_adapter.adjacent_bases
+
+class AdapterCache(object):
+    def __init__(self, path=".adapters", auto_reverse_complement=False):
+        self.path = path
+        self.auto_reverse_complement = auto_reverse_complement
+        if path and os.path.exists(path):
+            with open(path, "rb") as cache:
+                (self.seq_to_name, self.name_to_seq) = pickle.load(cache)
+        else:
+            self.seq_to_name = {}
+            self.name_to_seq = {}
+    
+    @property
+    def empty(self):
+        return len(self.seq_to_name) == 0
+    
+    def save(self):
+        if self.path is not None:
+            with open(self.path, "wb") as cache:
+                pickle.dump((self.seq_to_name, self.name_to_seq), cache)
+    
+    def add(self, name, seq):
+        self._add(name, seq)
+        if self.auto_reverse_complement:
+            self._add("{}_rc".format(name), reverse_complement(seq))
+    
+    def _add(self, name, seq):
+        if seq not in self.seq_to_name:
+            self.seq_to_name[seq] = set()
+        self.seq_to_name[seq].add(name)
+        
+        if name not in self.name_to_seq:
+            self.name_to_seq[name] = set()
+        self.name_to_seq[name].add(seq)
+    
+    def load_from_file(self, path):
+        with open(path, "rt") as i:
+            self.load_from_fasta(i)
+
+    def load_from_url(self, url):
+        logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
+        return self.load_from_fasta(urlopen(url).read().decode().split("\n"))
+    
+    def load_from_fasta(self, fasta):
+        """
+        Returns a dict of seq:set(names)
+        """
+        close = False
+        if isinstance(fasta, str):
+            fasta = open(fasta, 'rt')
+            close = True
+        with FastaReader(fasta) as fasta:
+            for record in fasta:
+                name = record.name.split(None, 1)[0]
+                seq = record.sequence
+                self.add(name, seq)
+        if close:
+            fasta.close()
+    
+    @property
+    def names(self):
+        return list(self.name_to_seq.keys())
+    
+    @property
+    def sequences(self):
+        return list(self.seq_to_name.keys())
+    
+    def iter_names(self):
+        return self.name_to_seq.items()
+    
+    def iter_sequences(self):
+        return self.seq_to_name.items()
+    
+    def has_name(self, name):
+        return name in self.name_to_seq
+    
+    def get_for_name(self, name):
+        return self.name_to_seq[name]
+    
+    def has_seq(self, seq):
+        return seq in self.seq_to_name
+    
+    def get_for_seq(self, seq):
+        return self.seq_to_name[seq]
