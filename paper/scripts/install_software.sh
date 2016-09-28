@@ -24,7 +24,12 @@ automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 # If this file doesn't exist, the bwameth index won't be built.
 genome=../data/ref.fa
 
-# We need some python libraries for the benchmarking scripts
+# We need some python libraries for the benchmarking scripts.
+# Note - if this doesn't work for you, you'll need to checkout
+# the editdistance repository and edit setup.py to enable the
+# 'cythonize' command, which will recompile the cython code for
+# your local environment. So you would run:
+# python setup.py build_ext -i && python setup.py install
 pip install editdistance
 
 # Install modified ART
