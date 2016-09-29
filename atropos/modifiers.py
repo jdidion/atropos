@@ -646,7 +646,7 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
                     if read1.qualities and read2.qualities:
                         read1.qualities += "".join(reversed(read2.qualities))[r2_stop:]
                 elif r2_start > 0:
-                    read1.sequence = read2_rc + read1[r1_stop:]
+                    read1.sequence = read2_rc + read1.sequence[r1_stop:]
                     if read1.qualities and read2.qualities:
                         read1.qualities = "".join(reversed(read2.qualities)) + read1.qualities[r1_stop:]
                 else:
