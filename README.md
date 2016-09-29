@@ -80,6 +80,8 @@ Note: while we consider the command-line interface to be stable, the internal co
 * Accept multiple input files.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
 * Consider supporting different error rates for read1 vs read2.
+* Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
+* Implement a public plugin API.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 

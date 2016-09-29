@@ -900,7 +900,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 options.insert_match_adapter_error_rate = options.insert_match_error_rate
                 
         if options.merge_overlapping:
-            if options.merge_output is None:
+            if options.merged_output is None:
                 parser.warn("--merge-output is not set; merged reads will be discarded")
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
