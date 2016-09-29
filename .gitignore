@@ -34,3 +34,4 @@ paper/data/real/
 .contaminants
 .DS_Store
 atropos-*/
+.adapters
