@@ -56,7 +56,7 @@ class PairedWrapper(object):
         failures = 0
         if self.filter(read1):
             failures += 1
-        if (self.min_affected - failures == 1) and self.filter(read2):
+        if (self.min_affected - failures == 1) and (read2 is None or self.filter(read2)):
             failures += 1
         if failures >= self.min_affected:
             self.filtered += 1

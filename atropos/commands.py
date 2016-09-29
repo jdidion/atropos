@@ -374,8 +374,10 @@ def create_atropos_params(options, parser, default_outfile):
     formatters = Formatters(output1, seq_formatter_args)
     force_create = []
         
-    if (options.merge_overlapping and options.merged_output):
-        formatters.add_seq_formatter(MergedReadFilter, options.merged_output)
+    if options.merge_overlapping:
+        filters.add_filter(MergedReadFilter)
+        if options.merged_output:
+            formatters.add_seq_formatter(MergedReadFilter, options.merged_output)
         
     if options.minimum_length is not None and options.minimum_length > 0:
         filters.add_filter(TooShortReadFilter, options.minimum_length)

@@ -908,6 +908,8 @@ standard input/output. Without the -o option, output is sent to standard output.
         #    parser.error("--merge-overlapping currently only works for paired-end reads with 3' adapters.")
         
         if options.merge_overlapping:
+            if options.merge_output is None:
+                options.merge_output = options.too_short_output
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
         
