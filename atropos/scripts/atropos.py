@@ -667,9 +667,8 @@ standard input/output. Without the -o option, output is sent to standard output.
         group.add_argument(
             "--merged-output",
             type=writeable_file, default=None, metavar="FILE",
-            help="Write reads that have been merged to this file. By default, merged "
-                "reads are written to --too-short-output if specified, and otherwise "
-                "are discarded. (no - merged reads are written to default output)")
+            help="Write reads that have been merged to this file. (merged reads "
+                "are discarded)")
         group.add_argument(
             "--report-file",
             type=writeable_file, default=None, metavar="FILE",
@@ -899,17 +898,10 @@ standard input/output. Without the -o option, output is sent to standard output.
                 options.insert_match_error_rate = options.error_rate or 0.2
             if options.insert_match_adapter_error_rate is None:
                 options.insert_match_adapter_error_rate = options.insert_match_error_rate
-        
-        #if options.merge_overlapping and (
-        #        paired != "both" or
-        #        options.adapters is None or
-        #        options.adapters2 is None or
-        #        options.times != 1):
-        #    parser.error("--merge-overlapping currently only works for paired-end reads with 3' adapters.")
-        
+                
         if options.merge_overlapping:
             if options.merge_output is None:
-                options.merge_output = options.too_short_output
+                parser.warn("--merge-output is not set; merged reads will be discarded")
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
         
