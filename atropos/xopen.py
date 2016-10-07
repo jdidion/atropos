@@ -121,8 +121,6 @@ def xopen(filename, mode='r', use_system=True):
     mode can be: 'rt', 'rb', 'a', 'wt', or 'wb'
     Instead of 'rt' and 'wt', 'r' and 'w' can be used as abbreviations.
 
-    In Python 2, the 't' and 'b' characters are ignored.
-
     Append mode ('a') is unavailable with BZ2 compression and will raise an error.
     """
     if mode == 'r':

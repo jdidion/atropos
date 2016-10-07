@@ -113,7 +113,6 @@ cdef class Sequence(object):
     def __reduce__(self):
         return (Sequence, (self.name, self.sequence, self.qualities, self.name2))
 
-
 class FastqReader(SequenceReader):
     """
     Reader for FASTQ files. Does not support multi-line FASTQ files.
