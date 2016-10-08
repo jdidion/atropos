@@ -82,6 +82,7 @@ Note: while we consider the command-line interface to be stable, the internal co
 * Consider supporting different error rates for read1 vs read2.
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
 * Implement a public plugin API.
+* Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
