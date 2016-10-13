@@ -23,15 +23,6 @@ SUFFIX = align.START_WITHIN_SEQ2
 ANYWHERE = align.SEMIGLOBAL
 LINKED = 'linked'
 
-DEFAULT_ADAPTERS = dict(
-    nextera='CTGTCTCTTATA',
-    illumina='AGATCGGAAGAGC'
-)
-
-# TODO: write test
-def get_sequence_for_spec(spec):
-    return DEFAULT_ADAPTERS.get(spec.lower(), spec)
-
 def parse_braces(sequence):
     """
     Replace all occurrences of ``x{n}`` (where x is any character) with n
@@ -117,7 +108,7 @@ class AdapterParser(object):
         if self.cache and name is not None:
             self.cache.add(name, spec)
             
-        sequence = get_sequence_for_spec(spec)
+        sequence = spec
         if where == FRONT and spec.startswith('^'):  # -g ^ADAPTER
             sequence, where = spec[1:], PREFIX
         elif where == BACK:
@@ -543,7 +534,10 @@ class AdapterCache(object):
 
     def load_from_url(self, url):
         logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
-        return self.load_from_fasta(urlopen(url).read().decode().split("\n"))
+        if url.startswith("file:"):
+            return self.load_from_file(url[5:])
+        else:
+            return self.load_from_fasta(urlopen(url).read().decode().split("\n"))
     
     def load_from_fasta(self, fasta):
         """

@@ -157,20 +157,30 @@ def create_reader(options, parser, counter_magnitude="M"):
 
 # TODO: specify this externally rather than hard-coding
 DEFAULT_ADAPTERS_URL = \
-    "https://gist.githubusercontent.com/jdidion/c151526b8ccd84945cd31dfa4f83591d/raw/eaa6b2d99983f5b14f75357c93c1540142436a49/sequencing_adapters.fa"
+    "https://gist.githubusercontent.com/jdidion/c151526b8ccd84945cd31dfa4f83591d/raw/" \
+    "eaa6b2d99983f5b14f75357c93c1540142436a49/sequencing_adapters.fa"
 
 def load_known_adapters(options):
     from .adapters import AdapterCache
     cache_file = options.adapter_cache_file if options.cache_adapters else None
     adapter_cache = AdapterCache(cache_file)
-    if adapter_cache.empty:
-        adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
+    if adapter_cache.empty and options.default_adapters:
+        try:
+            adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
+        except:
+            logging.getLogger().error(
+                "Error loading adapters from URL %s", DEFAULT_ADAPTERS_URL)
     if options.known_adapter:
         for s in options.known_adapter:
             name, seq = s.split('=')
             adapter_cache.add(name, seq)
     if options.known_adapters_file:
-        adapter_cache.load_from_file(options.known_adapters_file)
+        for f in options.known_adapters_file:
+            try:
+                adapter_cache.load_from_url(f)
+            except:
+                logging.getLogger().error(
+                    "Error loading adapters from url/file %s", f)
     if options.cache_adapters:
         adapter_cache.save()
     return adapter_cache

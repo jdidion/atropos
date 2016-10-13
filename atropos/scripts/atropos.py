@@ -128,6 +128,16 @@ class _readwriteable_file(object):
 readwriteable_file = _readwriteable_file()
 """Test that a file is both readable and writeable."""
 
+import urllib
+def readable_url(url):
+    parsed = urllib.parse.urlparse(url)
+    scheme = parsed.scheme or 'file'
+    if scheme == 'file':
+        filename = readable_file(parsed.path)
+        return 'file:' + filename
+    else:
+        return url
+
 str_list = delimited(data_type=str)
 """Comma-delimited list of strings."""
 
@@ -402,9 +412,13 @@ standard input/output. Without the -o option, output is sent to standard output.
         group.add_argument(
             "-F",
             "--known-adapters-file",
-            type=readable_file, default=None,
-            help="File with known contaminants, one per line, with name and sequence "
-                 "separated by one or more tabs.")
+            type=readable_file, action="append", default=None,
+            help="Path or URL of a FASTA file containing adapter sequences.")
+        group.add_argument(
+            "--no-default-adapters",
+            action="store_false", dest="default_adapters", default=True,
+            help="Don't fetch the default adapter list (which is currently stored as a) "
+                "GitHub gist).")
         group.add_argument(
             "--adapter-cache-file",
             type=readwriteable_file, default='.adapters',
@@ -1108,9 +1122,13 @@ class DetectCommand(Command):
         group.add_argument(
             "-F",
             "--known-contaminants-file",
-            type=readable_file, dest='known_adapters_file', default=None,
-            help="File with known contaminants, one per line, with name and sequence "
-                 "separated by one or more tabs.")
+            type=readable_url, action="append", dest='known_adapters_file', default=None,
+            help="Points to FASTA File or URL with known contaminants.")
+        group.add_argument(
+            "--no-default-contaminants",
+            action="store_false", dest="default_adapters", default=True,
+            help="Don't fetch the default contaminant list (which is currently stored as a "
+                "GitHub gist).")
         group.add_argument(
             "--contaminant-cache-file",
             type=readwriteable_file, dest='adapter_cache_file', default='.adapters',
