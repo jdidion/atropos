@@ -144,6 +144,9 @@ process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
     retval
 }
 
+x<-lapply(progs, function(prog)
+    tab$prog == prog & tab$read1_quality >= 30 & tab$read1_in_region == 1 & tab$read2_quality >= 30 & tab$read2_in_region == 1)
+
 plot.data <- function(data, prog.labels) {
     pts <- data$pts
     progs <- data$progs

@@ -40,12 +40,12 @@ def sequence_complexity(seq):
     return -term
 
 def enumerate_range(collection, start, end):
-        'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
-        i = start
-        it = iter(collection)
-        while i < end:
-            yield (i, next(it))
-            i += 1
+    'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
+    i = start
+    it = iter(collection)
+    while i < end:
+        yield (i, next(it))
+        i += 1
 
 def mean(data):
     return sum(data) / len(data)
