@@ -295,7 +295,7 @@ class Command(object):
             handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
             handler.setLevel(level)
             logging.getLogger().setLevel(level)
-            logging.getLogger().addHandler(stream_handler)
+            logging.getLogger().addHandler(handler)
         
         logger = logging.getLogger()
         logger.info("This is Atropos %s with Python %s", __version__, platform.python_version())
