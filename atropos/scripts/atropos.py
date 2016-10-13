@@ -210,6 +210,10 @@ class Command(object):
             "--log-level",
             choices=('DEBUG', 'INFO', 'WARN', 'ERROR'), default=None,
             help="Logging level. (ERROR when --quiet else INFO)")
+        self.parser.add_argument(
+            "--log-file",
+            type=writeable_file, default=None, metavar="FILE",
+            help="File to write logging info. (stdout)")
         
         group = self.parser.add_argument_group("Input")
         group.add_argument(
@@ -280,13 +284,16 @@ class Command(object):
         # this function is being called externally such as from unit tests)
         if not logging.root.handlers:
             level = self.options.log_level or ("ERROR" if self.options.quiet else "INFO")
-            # Due to backwards compatibility, logging output is sent to standard output
-            # instead of standard error if the -o option is used.
             level = getattr(logging, level)
-            stream_handler = logging.StreamHandler(
-                sys.stdout if self.options.output not in (None, STDOUT, STDERR) else sys.stderr)
-            stream_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-            stream_handler.setLevel(level)
+            if self.options.log_file is None:
+                # Due to backwards compatibility, log messages are sent to standard output
+                # instead of standard error if the -o option is used.
+                handler = logging.StreamHandler(
+                    sys.stdout if self.options.output not in (None, STDOUT, STDERR) else sys.stderr)
+            else:
+                handler = logging.FileHandler(options.log_file)
+            handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+            handler.setLevel(level)
             logging.getLogger().setLevel(level)
             logging.getLogger().addHandler(stream_handler)
         
