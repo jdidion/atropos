@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # Summarize the mapping results of trimmed versus untrimmed reads.
 # This requires that both input bams be name-sorted.
@@ -107,6 +108,7 @@ class TableRow(object):
         self.read_idx = read_idx
         self.read1 = TableRead()
         self.read2 = TableRead()
+        self.regions = regions
     
     def set_from_pair(self, r1, r2):
         assert r1.is_proper_pair == r2.is_proper_pair
@@ -116,7 +118,8 @@ class TableRow(object):
         self.valid = self.proper and (r1.is_reverse != r2.is_reverse)
         self.read1.set_from_read(r1)
         self.read2.set_from_read(r2)
-        self.regions.set_overlaps(self.prog, read1, read2)
+        if self.regions:
+            self.regions.set_overlaps(self.prog, read1, read2)
     
     def set_trimming(self, u1, r1, u2, r2, use_edit_distance):
         self.read1.set_trimming(u1, r1, use_edit_distance)
@@ -368,13 +371,17 @@ def main():
     
     trimmed = {}
     untrimmed = None
-    pattern = args.bam_pattern or "*{}".format(args.bam_extension)
+    pattern = (args.bam_pattern or "*{}").format(args.bam_extension)
     for path in glob(os.path.join(args.bam_dir, pattern)):
         name = os.path.basename(path)[:-len(args.bam_extension)]
         if name == args.untrimmed_name:
             untrimmed = BAMReader(path)
         else:
             trimmed[name] = BAMReader(path)
+    if untrimmed is None:
+        untrimmed = BAMReader(os.path.join(
+            args.bam_dir,
+            "{}{}".format(args.untrimmed_name, args.bam_extension)))
     
     regions = None
     if args.command == 'amplicon':
