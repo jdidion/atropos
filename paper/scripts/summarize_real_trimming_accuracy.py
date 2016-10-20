@@ -200,14 +200,15 @@ class AnnotBed(object):
     """
     The result of intersecting a name-sorted BAM file of read mappings with an
     annotation database:
-    bam2bed --all-reads --do-not-sort < <bam> | cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id - <annotations> > out.
+    bam2bed --all-reads --do-not-sort < <bam> | cut -f 1-6 | bedmap \
+      --delim '\t' --echo --echo-map-id - <annotations> > out.
     """
     def __init__(self, path):
         import csv
         self.reader = csv.reader(path, delimiter="\t")
     
     def set_overlaps(self, read1, read2, min_overlap=1.0):
-        if read1.is_proper_pair: and read2.is_proper_pair:
+        if read1.is_proper_pair and read2.is_proper_pair:
             # load the next two rows from the annotation
             a1 = next(self.reader)
             assert a1[3] == read1.query_name
