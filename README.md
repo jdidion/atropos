@@ -31,19 +31,19 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 
 Atropos is almost fully backward-compatible with cutadapt. If you currently use cutadapt, you can simply install Atropos and then substitute the executable name in your command line, with one key difference: you need to use options to specify input file names. For example:
 
-```{python}
+```
 atropos -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz -se reads.fq.gz
 ```
 
 To take advantage of multi-threading, set the `--threads` option:
 
-```{python}
+```
 atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz -se reads.fq.gz
 ```
 
 To take advantage of the new aligner (if you have paired-end reads with 3' adatpers), set the `--aligner` option to 'insert':
 
-```{python}
+```
 atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
   -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz \
   -pe1 reads.1.fq.gz -pe2 reads.2.fq.gz
@@ -57,33 +57,53 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * [Source code](https://github.com/jdidion/atropos/)
 * [Report an issue](https://github.com/jdidion/atropos/issues)
 
-## Planned enhancements and experiments
+## Roadmap
 
-Note: while we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 1.1, which is planned for early
-2017. The following enhancements are also being considered:
+### 1.1
 
-* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
-* Implement additional alternate alignment algorithms.
-* Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
-* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
-* Provide option for RNA-seq data that will trim polyA sequence
-* Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120)
-* Expand the list of contaminants that are detected by default.
-* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
-  * https://github.com/marcelm/cutadapt/issues/112
-  * Also look at the QCML used in ngs-bits
-* Support for paired-end demultiplexing (i.e. when barcodes are used in both paired-end adapters): https://github.com/marcelm/cutadapt/issues/118
-* General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107
-* Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53
-* Autodetection of compressed files from stdin by "magic numbers" (similar to how screed does it)
-* Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+* Migrate to xphyle (https://github.com/jdidion/xphyle) for file management.
+* Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
+* Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
+* Expand the list of contaminants that are detected by default.
+
+### 1.2
+
+* Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120).
+* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+
+### 1.3
+
+* Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
+* General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
+
+### 1.4
+
+* Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
+* Support for paired-end demultiplexing (i.e. when barcodes are used in both paired-end adapters): https://github.com/marcelm/cutadapt/issues/118.
+* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 * Consider supporting different error rates for read1 vs read2.
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
-* Implement a public plugin API.
 * Add option to InsertAdapter to trim overhangs without adapter matching.
-* Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
+
+### 1.5
+
+* Implement a public plugin API.
+* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
+    * https://github.com/marcelm/cutadapt/issues/112
+    * Also look at the QCML used in ngs-bits
+
+### 2.0
+
+* Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+
+### Beyond 2.0
+
+* Implement additional alternate alignment algorithms.
+* Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
+
+While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 2.0, which is planned for early 2017.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
