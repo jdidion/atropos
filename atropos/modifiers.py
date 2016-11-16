@@ -10,7 +10,7 @@ import logging
 import re
 from .qualtrim import quality_trim_index, nextseq_trim_index
 from .align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
-from .util import complement, reverse_complement, mean
+from .util import base_complements, reverse_complement, mean
 
 # Base classes
 
@@ -148,8 +148,20 @@ class AdapterCutter(object):
 # the base qualities to be the highest of the two?
 
 class ErrorCorrectorMixin(object):
-    def __init__(self, mismatch_action=None):
+    """Provides a method for error correction.
+    
+    Args:
+        mismatch_action: The action to take when a mismatch between the
+            overlapping portions of read1 and read2 is encountered. Valid
+            values are 'liberal', 'conservative', 'N'.
+        min_qual_difference: When mismatch_action=='conservative', the minimum
+            difference in base quality between read1 and read2 required to
+            perform the correction.
+    """
+    def __init__(self, mismatch_action=None, min_qual_difference=1):
         self.mismatch_action = mismatch_action
+        self.r1r2_min_qual_difference = min_qual_difference
+        self.r2r1_min_qual_difference = -1 * min_qual_difference
         self.corrected_pairs = 0
         self.corrected_bp = [0, 0]
     
@@ -164,7 +176,8 @@ class ErrorCorrectorMixin(object):
             r1_qual = list(read1.qualities)
             r2_qual = list(read2.qualities)
         elif self.mismatch_action in ('liberal', 'conservative'):
-            raise Exception("Cannot perform quality-based error correction on reads lacking quality information")
+            raise Exception("Cannot perform quality-based error correction on "
+                            "reads lacking quality information")
         
         r1_start = insert_match[2]
         r1_end = insert_match[3]
@@ -176,7 +189,7 @@ class ErrorCorrectorMixin(object):
         
         for i, j in zip(range(r1_start, r1_end), range(r2_end - 1, r2_start, -1)):
             b1 = r1_seq[i]
-            b2 = complement[r2_seq[j]]
+            b2 = base_complements[r2_seq[j]]
             if b1 == b2:
                 continue
             if self.mismatch_action == 'N':
@@ -190,16 +203,17 @@ class ErrorCorrectorMixin(object):
                     r1_qual[i] = r2_qual[j]
                 r1_changed += 1
             elif b2 == 'N':
-                r2_seq[j] = complement[b1]
+                r2_seq[j] = base_complements[b1]
                 if has_quals:
                     r2_qual[j] = r1_qual[i]
                 r2_changed += 1
             elif has_quals:
-                if r1_qual[i] > r2_qual[j]:
-                    r2_seq[j] = complement[b1]
+                diff = ord(r1_qual[i]) - ord(r2_qual[j])
+                if diff >= self.r1r2_min_qual_difference:
+                    r2_seq[j] = base_complements[b1]
                     r2_qual[j] = r1_qual[i]
                     r2_changed += 1
-                elif r2_qual[j] > r1_qual[i]:
+                elif diff <= self.r2r1_min_qual_difference:
                     r1_seq[i] = b2
                     r1_qual[i] = r2_qual[j]
                     r1_changed += 1
@@ -217,7 +231,7 @@ class ErrorCorrectorMixin(object):
             if diff > 1:
                 # read1 is better than read2
                 for i, j, b1, b2 in quals_equal:
-                    r2_seq[j] = complement[b1]
+                    r2_seq[j] = base_complements[b1]
                     r2_qual[j] = r1_qual[i]
                     r2_changed += 1
             elif diff < -1:
@@ -260,26 +274,47 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         self.with_adapters = [0, 0]
     
     def __call__(self, read1, read2):
-        if len(read1) < self.min_insert_len or len(read2) < self.min_insert_len:
+        read_lengths = [len(r) for r in (read1, read2)]
+        if any(l < self.min_insert_len for l in read_lengths):
             return (read1, read2)
         
         match = self.aligner.match_insert(read1.sequence, read2.sequence)
-        
         read1.insert_overlap = read2.insert_overlap = (match is not None)
+        insert_match = None
+        correct_errors = False
         
         if match:
             insert_match, adapter_match1, adapter_match2 = match
-            if self.mismatch_action and insert_match[5] > 0:
-                self.correct_errors(read1, read2, insert_match)
+            correct_errors = self.mismatch_action and insert_match[5] > 0
         else:
             adapter_match1 = self.adapter1.match_to(read1)
             adapter_match2 = self.adapter2.match_to(read2)
+            # If the adapter matches are complementary, perform error correction
+            if (self.mismatch_action and adapter_match1 and adapter_match2 and
+                        adapter_match1.rstart == adapter_match2.rstart):
+                    insert_match = (
+                        read_lengths[1] - adapter_match1.rstart,
+                        read_lengths[1], 0, adapter_match1.rstart)
+                    correct_errors = True
         
-        if self.symmetric:
-            if adapter_match1 is None and adapter_match2:
-                adapter_match1 = adapter_match2.copy()
-            if adapter_match2 is None and adapter_match1:
+        # If exactly one of the two alignments failed and symmetrix is True,
+        # duplicate the good alignment
+        if self.symmetric and sum(
+                bool(m) for m in (adapter_match1, adapter_match2)) == 1:
+            if adapter_match1:
                 adapter_match2 = adapter_match1.copy()
+            else:
+                adapter_match1 = adapter_match2.copy()
+            if self.mismatch_action and not insert_match:
+                # Assume that the symmetric read segments overlap and
+                # perform error correction
+                insert_match = (
+                    read_lengths[1] - adapter_match1.rstart,
+                    read_lengths[1], 0, adapter_match1.rstart)
+                correct_errors = True
+        
+        if correct_errors:
+            self.correct_errors(read1, read2, insert_match)
         
         return (
             self.trim(read1, self.adapter1, adapter_match1, 0),

@@ -1,6 +1,6 @@
 import math
 
-complement = {
+base_complements = {
     'A' : 'T',
     'C' : 'G',
     'R' : 'Y',
@@ -11,10 +11,10 @@ complement = {
     'D' : 'H',
     'N' : 'N'
 }
-for k,v in list(complement.items()):
-    complement[v] = k
-    complement[k.lower()] = v.lower()
-    complement[v.lower()] = k.lower()
+for k,v in list(base_complements.items()):
+    base_complements[v] = k
+    base_complements[k.lower()] = v.lower()
+    base_complements[v.lower()] = k.lower()
 
 MAGNITUDE = dict(
     G=1E9,
@@ -24,8 +24,11 @@ MAGNITUDE = dict(
 
 log2 = math.log(2)
 
+def complement(seq):
+    return "".join(base_complements[base] for base in seq)
+
 def reverse_complement(seq):
-    return "".join(complement[base] for base in reversed(seq))
+    return "".join(base_complements[base] for base in reversed(seq))
 
 def sequence_complexity(seq):
     """A simple measure of sequence complexity"""
