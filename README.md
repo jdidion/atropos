@@ -101,6 +101,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 ### Beyond 2.0
 
 * Implement additional alternate alignment algorithms.
+* Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
 * Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
 
 While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 2.0, which is planned for early 2017.
@@ -115,4 +116,4 @@ The citation for the original Cutadapt paper is:
 
 Atropos is currently published as a pre-print on PeerJ, and will be submitted for peer review shortly. For now, you can cite it as:
 
-> John P Didion and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/
+> John P Didion, Marcel Martin, and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/
