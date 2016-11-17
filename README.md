@@ -103,6 +103,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * Implement additional alternate alignment algorithms.
 * Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
 * Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
+* Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcomming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
 
 While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 2.0, which is planned for early 2017.
 
