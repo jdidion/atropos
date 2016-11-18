@@ -112,7 +112,7 @@ class sdist(versioneer_sdist):
         from Cython.Build import cythonize
         check_cython_version()
         cythonize(extensions)
-        _sdist.run(self)
+        versioneer_sdist.run(self)
 
 cmdclass['sdist'] = sdist
 
