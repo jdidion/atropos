@@ -99,6 +99,14 @@ do
   then
     fq1=$root/data/rna/rna.1.fq.gz
     fq2=$root/data/rna/rna.2.fq.gz
+    # download data
+    if [ ! -f $fq1 ]
+    then
+      mkdir -p $root/data/rna
+      fastq-dump --split-files -A SRR521459
+      mv SRR521459_1.fastq $fq1
+      mv SRR521459_2.fastq $fq2
+    fi
     quals='0'
     aligners='insert'
     atropos_extra='--insert-match-error 0.3 -e 0.2 --correct-mismatches liberal'
