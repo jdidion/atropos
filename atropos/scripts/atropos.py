@@ -1144,7 +1144,7 @@ COMMANDS['detect'] = DetectCommand
 class ErrorCommand(Command):
     """estimate the sequencing error rate."""
     name = "error"
-    usage = "atropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error",
+    usage = "atropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error"
     description = """
 Estimate the error rate from base qualities. This can help to
 determine the quality of your data, and to decide the value for
