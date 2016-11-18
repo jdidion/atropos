@@ -9,6 +9,7 @@ v1.0.16 (dev)
 * Add option to select which read to use when treating a paired-end interleaved or SAM/BAM file as single-end.
 * Remove restrictions on the use of --merge-overlapping, and enable error correction during merging.
 * We are beginning to move towards the use of commands for all operations, and read-trimming now falls under the 'trim' command. Currently, calling atropos without any command will default to the 'trim' command.
+* When InsertAdapterCutter.symmetric is True and mismatch_action is not None, insert match fails, at least one adapter match succeeds, and the adapter matches (if there are two) are complementary, then the reads are treated as overlapping and error correction is performed. This leads to substantial improvements when one read is of good quality while the other is other is of poor quality.
 
 v1.0.15 (2016.09.14)
 --------------------

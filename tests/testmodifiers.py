@@ -290,7 +290,7 @@ def test_mismatched_adapter_overlaps():
     
 def test_error_correction():
     a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = reverse_complement('AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA')
+    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
     frag = 'CCAAGCAGACATTCACTCAGATTGCA'
     correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
     
@@ -309,8 +309,9 @@ def test_error_correction():
     q2 = ['#'] * 40
     # quality of read2 > quality of read1 at pos 11
     q2[len(frag)-15] = 'A'
-    r2 = reverse_complement(a2 + ''.join(r2))[0:40]
+    r2 = reverse_complement(reverse_complement(a2) + ''.join(r2))[0:40]
     q2 = ''.join(q2)
+    
     read1 = Sequence('foo', r1, q1)
     read2 = Sequence('foo', r2, q2)
     
@@ -318,10 +319,103 @@ def test_error_correction():
     adapter1 = parser.parse(a1)
     adapter2 = parser.parse(a2)
     
-    cutter = InsertAdapterCutter(adapter1, adapter2, mismatch_action='best')
+    cutter = InsertAdapterCutter(adapter1, adapter2, mismatch_action='liberal')
     
     new_read1, new_read2 = cutter(read1, read2)
     assert len(new_read1) == 26
+    assert new_read1.insert_overlap
     assert new_read1.sequence == correct_frag
     assert len(new_read2) == 26
+    assert new_read2.insert_overlap
+    assert new_read2.sequence == reverse_complement(correct_frag)
+
+def test_error_correction_no_insert_match_one_adapter_match():
+    a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
+    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
+    a2_mod = 'ACATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
+    frag = 'CCAAGCAGACATTCACTCAGATTGCA'
+    correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
+    
+    r1 = list(frag)
+    # C>T at pos 6
+    r1[5] = 'T'
+    q1 = ['#'] * 40
+    # quality of read1 > quality of read2 at pos 6
+    q1[5] = 'A'
+    r1 = (''.join(r1) + a1)[0:40]
+    q1 = ''.join(q1)
+    
+    r2 = list(frag)
+    # A>G at pos 15
+    r2[14] = 'G'
+    q2 = ['#'] * 40
+    # quality of read2 > quality of read1 at pos 11
+    q2[len(frag)-15] = 'A'
+    r2 = reverse_complement(reverse_complement(a2_mod) + ''.join(r2))[0:40]
+    q2 = ''.join(q2)
+    
+    read1 = Sequence('foo', r1, q1)
+    read2 = Sequence('foo', r2, q2)
+    
+    parser1 = AdapterParser()
+    adapter1 = parser1.parse(a1)
+    # Allow zero mismatches to prevent adapter alignment
+    parser2 = AdapterParser(max_error_rate=0)
+    adapter2 = parser2.parse(a2)
+    
+    # Allow zero mismatches to prevent insert alignment
+    cutter = InsertAdapterCutter(
+        adapter1, adapter2, mismatch_action='liberal',
+        max_insert_mismatch_frac=0)
+    
+    new_read1, new_read2 = cutter(read1, read2)
+    assert len(new_read1) == 26
+    assert not new_read1.insert_overlap
+    assert new_read1.sequence == correct_frag
+    assert len(new_read2) == 26
+    assert not new_read2.insert_overlap
+    assert new_read2.sequence == reverse_complement(correct_frag)
+
+def test_error_correction_no_insert_match_two_adapter_matches():
+    a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
+    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
+    frag = 'CCAAGCAGACATTCACTCAGATTGCA'
+    correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
+    
+    r1 = list(frag)
+    # C>T at pos 6
+    r1[5] = 'T'
+    q1 = ['#'] * 40
+    # quality of read1 > quality of read2 at pos 6
+    q1[5] = 'A'
+    r1 = (''.join(r1) + a1)[0:40]
+    q1 = ''.join(q1)
+    
+    r2 = list(frag)
+    # A>G at pos 15
+    r2[14] = 'G'
+    q2 = ['#'] * 40
+    # quality of read2 > quality of read1 at pos 11
+    q2[len(frag)-15] = 'A'
+    r2 = reverse_complement(reverse_complement(a2) + ''.join(r2))[0:40]
+    q2 = ''.join(q2)
+    
+    read1 = Sequence('foo', r1, q1)
+    read2 = Sequence('foo', r2, q2)
+    
+    parser = AdapterParser()
+    adapter1 = parser.parse(a1)
+    adapter2 = parser.parse(a2)
+    
+    # Allow zero mismatches to prevent insert alignment
+    cutter = InsertAdapterCutter(
+        adapter1, adapter2, mismatch_action='liberal',
+        max_insert_mismatch_frac=0)
+    
+    new_read1, new_read2 = cutter(read1, read2)
+    assert len(new_read1) == 26
+    assert not new_read1.insert_overlap
+    assert new_read1.sequence == correct_frag
+    assert len(new_read2) == 26
+    assert not new_read2.insert_overlap
     assert new_read2.sequence == reverse_complement(correct_frag)

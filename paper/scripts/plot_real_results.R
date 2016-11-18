@@ -81,7 +81,7 @@ process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
     progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
     N <- max(tab$read_idx)
     num.progs <- length(progs)
-    for (i in c(4:10,ifelse(has.regions, 20, 19))) {
+    for (i in c(4:10, ifelse(has.regions, 20, 19))) {
         tab[,i] <- ifelse(tab[,i]=='True', TRUE, FALSE)
     }
     sample_tabs <- lapply(1:num.progs, function(i) tab[seq(i,nrow(tab),num.progs),])
@@ -127,7 +127,7 @@ process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
         pts2 <- melt(as.data.frame(t(sapply(th_values, function(th) {
             c(
                 th=th,
-                x=sum(in_region[quals$maxq >= th, 'maxi']==1),
+                x=sum(in_region[quals$maxq >= th, 'max']==1),
                 sapply(progs, function(p) {
                     sum(in_region[quals[,p] >= th, p]==1)
                 })
@@ -163,11 +163,35 @@ plot.data <- function(data, prog.labels) {
         labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
 }
 
+plot.data2 <- function(data, q.labels=NULL) {
+    pts <- data$pts
+    progs <- data$progs
+    pts$prog <- as.character(pts$prog)
+    colnames(pts) <- c("MAPQ", "x", "Q", "y", "Delta")
+    if (!is.null(q.labels)) {
+        for (i in 1:length(q.labels)) {
+            pts[pts$Q == progs[i], 'Q'] <- names(q.labels)[i]
+        }
+        n <- names(sort(q.labels))
+    }
+    else {
+        n <- sort(unique(pts$Q))
+    }
+    pts$Q <- factor(pts$Q, levels=n)
+    pts <- pts[order(pts$Q),]
+    ggplot(pts[pts$Q != 'untrimmed',], aes(x=MAPQ, y=Delta, colour=Q)) +
+        geom_line() + geom_point() +
+        labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
+}
+
 wgs <- read_tsv('wgs_results.txt')
 wgs.data <- process(wgs, has.regions=TRUE)
 
 wgbs <- read_tsv('wgbs_results.txt')
 wgbs.data <- process(wgbs)
+
+rna <- read_tsv('rnaseq_results.txt')
+rna.data <- process(rna, has.regions = TRUE)
 
 #sum(quals[,7] != -1 & quals[,3] != -1 & quals[,7] > quals[,3])
 #sum(quals[,7] != -1 & quals[,3] != -1 & quals[,7] < quals[,3])

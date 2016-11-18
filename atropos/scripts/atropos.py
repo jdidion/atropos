@@ -1173,7 +1173,7 @@ def main(cmdlineargs=None):
     `sys.argv[1:]`
     """
     args = cmdlineargs or sys.argv[1:]
-    if args[0] in ('-h', '--help'):
+    if len(args) == 0 or any(h in args for h in ('-h', '--help')):
         print_subcommands()
         return
     
