@@ -1,5 +1,5 @@
 # documentation
-include README.md
+include README.rst
 include CHANGES.md
 include CITATION
 include LICENSE.txt
