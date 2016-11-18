@@ -16,7 +16,7 @@ from distutils.command.build_ext import build_ext as _build_ext
 
 import versioneer
 
-MIN_CYTHON_VERSION = '0.24'
+MIN_CYTHON_VERSION = '0.25'
 
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
@@ -119,12 +119,12 @@ cmdclass['sdist'] = sdist
 setup(
     name = 'atropos',
     version = versioneer.get_version(),
+    cmdclass = cmdclass,
     author = 'John Didion',
     author_email = 'john.didion@nih.gov',
     url = 'https://atropos.readthedocs.org/',
     description = 'trim adapters from high-throughput sequencing reads',
     license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
-    cmdclass = cmdclass,
     ext_modules = extensions,
     packages = ['atropos', 'atropos.scripts'],
     scripts = ['bin/atropos'],
@@ -138,6 +138,7 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "Environment :: Console",
         "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
         "License :: OSI Approved :: MIT License",
         "License :: Public Domain",
         "Natural Language :: English",
@@ -145,7 +146,6 @@ setup(
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Topic :: Scientific/Engineering :: Bio-Informatics"
+        "Programming Language :: Python :: 3.6"
     ]
 )
