@@ -28,6 +28,7 @@ pair_fields = [
 read_fields = [
     ('mapped', False),
     ('quality', -1),
+    ('score', -1),
     ('chrm', -1),
     ('start', -1),
     ('end', -1),
@@ -52,6 +53,8 @@ class TableRead(object):
     def set_from_read(self, r):
         self.mapped = not r.is_unmapped
         self.quality = r.mapping_quality
+        if r.has_tag('AS'):
+            self.score = r.get_tag('AS')
         
         if self.mapped:
             self.chrm = r.reference_name
