@@ -124,12 +124,12 @@ do
       fq1=$root/data/wgbs/GM12878_WGBS.1.fq.gz
       fq2=$root/data/wgbs/GM12878_WGBS.2.fq.gz
       # download data
-      #if [ ! -f $fq1 ]
-      #then
-      #  mkdir -p $root/data/wgbs
-      #  wget -S -O https://www.encodeproject.org/files/ENCFF798RSS/@@download/ENCFF798RSS.fastq.gz | gunzip | head -4000000 | gzip > $fq1
-      #  wget -S -O https://www.encodeproject.org/files/ENCFF113KRQ/@@download/ENCFF113KRQ.fastq.gz | gunzip | head -4000000 | gzip > $fq2
-      #fi
+      if [ ! -f $fq1 ]
+      then
+        mkdir -p $root/data/wgbs
+        wget -S -O https://www.encodeproject.org/files/ENCFF798RSS/@@download/ENCFF798RSS.fastq.gz | gunzip | head -4000000 | gzip > $fq1
+        wget -S -O https://www.encodeproject.org/files/ENCFF113KRQ/@@download/ENCFF113KRQ.fastq.gz | gunzip | head -4000000 | gzip > $fq2
+      fi
       quals='0 20'
       aligners='insert'
       atropos_extra='--insert-match-error 0.3 -e 0.2 --correct-mismatches liberal'
