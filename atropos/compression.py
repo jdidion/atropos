@@ -78,7 +78,9 @@ class GzipReader:
     def flush(self): pass
     
     def close(self):
-        self.close = True
+        if self.closed:
+            return
+        self.closed = True
         retcode = self.process.poll()
         if retcode is None:
             # still running
