@@ -93,7 +93,8 @@ cdef class Sequence(object):
         qstr = ''
         if self.qualities is not None:
             qstr = ', qualities={0!r}'.format(_shorten(self.qualities))
-        return '<Sequence(name={0!r}, sequence={1!r}{2})>'.format(_shorten(self.name), _shorten(self.sequence), qstr)
+        return '<Sequence(name={0!r}, sequence={1!r}{2})>'.format(
+            _shorten(self.name), _shorten(self.sequence), qstr)
 
     def __len__(self):
         return len(self.sequence)
@@ -138,7 +139,8 @@ class FastqReader(SequenceReader):
         it = iter(self._file)
         line = next(it)
         if not (line and line[0] == '@'):
-            raise FormatError("Line {0} in FASTQ file is expected to start with '@', but found {1!r}".format(i+1, line[:10]))
+            raise FormatError("Line {0} in FASTQ file is expected to start "
+                              "with '@', but found {1!r}".format(i+1, line[:10]))
         strip = -2 if line.endswith('\r\n') else -1
         name = line[1:strip]
 
@@ -146,7 +148,9 @@ class FastqReader(SequenceReader):
         for line in it:
             if i == 0:
                 if not (line and line[0] == '@'):
-                    raise FormatError("Line {0} in FASTQ file is expected to start with '@', but found {1!r}".format(i+1, line[:10]))
+                    raise FormatError("Line {0} in FASTQ file is expected to "
+                                      "start with '@', but found {1!r}".format(
+                                      i+1, line[:10]))
                 name = line[1:strip]
             elif i == 1:
                 sequence = line[:strip]
@@ -156,7 +160,9 @@ class FastqReader(SequenceReader):
                 else:
                     line = line[:strip]
                     if not (line and line[0] == '+'):
-                        raise FormatError("Line {0} in FASTQ file is expected to start with '+', but found {1!r}".format(i+1, line[:10]))
+                        raise FormatError("Line {0} in FASTQ file is expected "
+                                          "to start with '+', but found {1!r}".format(
+                                          i+1, line[:10]))
                     if len(line) > 1:
                         if not line[1:] == name:
                             raise FormatError(

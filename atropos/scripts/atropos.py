@@ -542,12 +542,12 @@ standard input/output. Without the -o option, output is sent to standard output.
         group = parser.add_argument_group("Additional read modifications")
         group.add_argument(
             "--op-order",
-            type=char_list(choices=('A','C','G','Q')), default="CGQA",
+            type=char_list(choices=('W','A','C','G','Q')), default="WCGQA",
             help="The order in which trimming operations are be applied. This is a string of "
-                 "1-4 of the following characters: A = adapter trimming; C = cutting "
-                 "(unconditional); G = NextSeq trimming; Q = quality trimming. The default is "
-                 "'CGQA' to maintain compatibility with Cutadapt; however, this is likely to "
-                 "change to 'GACQ' in the near future.")
+                 "1-5 of the following characters: W = overwrite poor quality reads; "
+                 "A = adapter trimming; C = cutting (unconditional); G = NextSeq trimming; "
+                 "Q = quality trimming. The default is 'WCGQA' to maintain compatibility with "
+                 "Cutadapt; however, this is likely to change to 'WGACQ' in the near future.")
         group.add_argument(
             "-u",
             "--cut",
@@ -731,7 +731,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "to disable it. (no)")
         
         group = parser.add_argument_group("Paired-end options", description="The "
-            "-A/-G/-B/-U options work like their -a/-b/-g/-u counterparts, but "
+            "-A/-G/-B/-U/-I options work like their -a/-b/-g/-u/-i counterparts, but "
             "are applied to the second read in each pair.")
         group.add_argument(
             "-A",
@@ -756,6 +756,14 @@ standard input/output. Without the -o option, output is sent to standard output.
             help="Similar to -U, except that cutting is done AFTER adapter trimming, "
                  "and only if a minimum of LENGTH bases was not already removed "
                  "(see --cut-min). (no)")
+        group.add_argument(
+            "-w",
+            "--overwrite-low-quality",
+            type=delimited(data_type=positive(int, True), min_len=3, max_len=3),
+            default=None, metavar="LOWQ,HIGHQ,WINDOW",
+            help="When one read has mean quality < LOWQ and the other read has "
+                 "mean quality >= HIGHQ over the first WINDOW bases, overwrite "
+                 "the worse read with the better read.")
         group.add_argument(
             "-p",
             "--paired-output",
@@ -880,7 +888,8 @@ standard input/output. Without the -o option, output is sent to standard output.
             # Any of these options switch off legacy mode
             if (options.adapters2 or options.front2 or options.anywhere2 or options.cut2 or
                 options.cut_min2 or options.interleaved_input or options.pair_filter or
-                options.too_short_paired_output or options.too_long_paired_output):
+                options.too_short_paired_output or options.too_long_paired_output or
+                options.overwrite_low_quality):
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
                 # Read modifications (such as quality trimming) are applied also to second read.
                 paired = 'both'
@@ -963,6 +972,12 @@ standard input/output. Without the -o option, output is sent to standard output.
                 elif paired != "both" and len(temp) > 1:
                     parser.error("Too many bisulfite parameters for single-end reads")
                 options.bisulfite = temp
+        
+        if options.overwrite_low_quality:
+            if not paired:
+                parser.error("--overwrite-low-quality is not valid for single-end reads")
+            if options.overwrite_low_quality[0] > options.overwrite_low_quality[1]:
+                parser.error("For --overwrite-low-quality, LOWQ must be <= HIGHQ")
         
         if options.quality_cutoff:
             if all(c <= 0 for c in options.quality_cutoff):

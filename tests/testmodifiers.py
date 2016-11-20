@@ -419,3 +419,43 @@ def test_error_correction_no_insert_match_two_adapter_matches():
     assert len(new_read2) == 26
     assert not new_read2.insert_overlap
     assert new_read2.sequence == reverse_complement(correct_frag)
+
+def ints2quals(ints):
+    return ''.join(chr(i+33) for i in ints)
+
+def test_overwrite_read():
+    overwrite = OverwriteRead(20, 40, 10)
+    lowseq = 'ACGT' * 5
+    highseq = 'TCAG' * 5
+    
+    # mean lowq > 20, mean highq > 40
+    lowq = (11, 31, 16, 24, 16, 20, 17, 19, 21, 28) * 2
+    highq = (22, 62, 32, 48, 32, 40, 34, 38, 42, 56) * 2
+    read1 = Sequence('foo', lowseq, ints2quals(lowq))
+    read2 = Sequence('foo', highseq, ints2quals(highq))
+    new_read1, new_read2 = overwrite(read1, read2)
+    assert new_read1.sequence == lowseq
+    assert new_read1.qualities == ints2quals(lowq)
+    assert new_read2.sequence == highseq
+    assert new_read2.qualities == ints2quals(highq)
+    assert new_read1.corrected == new_read2.corrected == 0
+    
+    # mean lowq < 20, mean highq > 40
+    lowq = tuple(i-1 for i in lowq)
+    read1 = Sequence('foo', lowseq, ints2quals(lowq))
+    new_read1, new_read2 = overwrite(read1, read2)
+    assert new_read1.sequence == highseq
+    assert new_read1.qualities == ints2quals(highq)
+    assert new_read2.sequence == highseq
+    assert new_read2.qualities == ints2quals(highq)
+    assert new_read1.corrected == new_read2.corrected == 1
+    
+    # mean lowq < 20, mean highq < 40
+    highq = tuple(i-1 for i in highq)
+    read2 = Sequence('foo', highseq, ints2quals(highq))
+    new_read1, new_read2 = overwrite(read1, read2)
+    assert new_read1.sequence == lowseq
+    assert new_read1.qualities == ints2quals(lowq)
+    assert new_read2.sequence == highseq
+    assert new_read2.qualities == ints2quals(highq)
+    assert new_read1.corrected == new_read2.corrected == 0

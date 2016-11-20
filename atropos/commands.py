@@ -201,7 +201,7 @@ def create_atropos_params(options, parser, default_outfile):
         NextseqQualityTrimmer, QualityTrimmer, NonDirectionalBisulfiteTrimmer,
         RRBSTrimmer, SwiftBisulfiteTrimmer, MinCutter, NEndTrimmer,
         LengthTagModifier, SuffixRemover, PrefixSuffixAdder, DoubleEncoder,
-        ZeroCapper, PrimerTrimmer, MergeOverlapping)
+        ZeroCapper, PrimerTrimmer, MergeOverlapping, OverwriteRead)
     from .filters import (
         Filters, FilterFactory, TooShortReadFilter, TooLongReadFilter,
         NContentFilter, TrimmedFilter, UntrimmedFilter, NoFilter,
@@ -255,13 +255,15 @@ def create_atropos_params(options, parser, default_outfile):
     
     # Create Modifiers
     
+    # TODO: can this be replaced with an argparse required group?
     if not adapters1 and not adapters2 and not options.quality_cutoff and \
             options.nextseq_trim is None and \
             options.cut == [] and options.cut2 == [] and \
             options.cut_min == [] and options.cut_min2 == [] and \
             (options.minimum_length is None or options.minimum_length <= 0) and \
             options.maximum_length == sys.maxsize and \
-            not has_qual_file and options.max_n is None and not options.trim_n:
+            not has_qual_file and options.max_n is None and not options.trim_n \
+            and (not options.paired or options.overwrite_low_quality is None):
         parser.error("You need to provide at least one adapter sequence.")
     
     if options.aligner == 'insert':
@@ -276,7 +278,13 @@ def create_atropos_params(options, parser, default_outfile):
     modifiers = Modifiers(options.paired)
             
     for op in options.op_order:
-        if op == 'A' and (adapters1 or adapters2):
+        if op == 'W' and options.overwrite_low_quality:
+            lowq, highq, window = options.overwrite_low_quality
+            modifiers.add_modifier(OverwriteRead,
+                worse_read_min_quality=lowq, better_read_min_quality=highq,
+                window_size=window, base=options.quality_base)
+            
+        elif op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
                 # Use different base probabilities if we're trimming bisulfite data.

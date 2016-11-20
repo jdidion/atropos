@@ -42,6 +42,16 @@ def sequence_complexity(seq):
             term += d * math.log(d) / log2
     return -term
 
+def qual2int(q, base=33):
+    """Convert a quality charater to a phred-scale int.
+    """
+    return ord(q) - base
+
+def quals2ints(quals, base=33):
+    """Convert an iterable of quality characters to phred-scale ints.
+    """
+    return (ord(q) - base for q in quals)
+
 def enumerate_range(collection, start, end):
     'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
     i = start

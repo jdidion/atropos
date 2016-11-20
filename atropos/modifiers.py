@@ -10,16 +10,19 @@ import logging
 import re
 from .qualtrim import quality_trim_index, nextseq_trim_index
 from .align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
-from .util import base_complements, reverse_complement, mean
+from .util import base_complements, reverse_complement, mean, quals2ints
 
 # Base classes
 
 class ReadPairModifier(object):
-    """Superclass of modifiers that edit a pair of reads simultaneously."""
+    """Base class of modifiers that edit a pair of reads simultaneously.
+    """
     def __call__(self, read1, read2):
         raise NotImplemented()
 
 class Trimmer(object):
+    """Base class of modifiers that trim bases from reads.
+    """
     def __init__(self):
         self.trimmed_bases = 0
     
@@ -144,9 +147,6 @@ class AdapterCutter(object):
         self.with_adapters += 1
         return trimmed_read
 
-# TODO: For bases in overlapping sequences, should we also correct
-# the base qualities to be the highest of the two?
-
 class ErrorCorrectorMixin(object):
     """Provides a method for error correction.
     
@@ -166,6 +166,10 @@ class ErrorCorrectorMixin(object):
         self.corrected_bp = [0, 0]
     
     def correct_errors(self, read1, read2, insert_match):
+        # Do not attempt to correct an already corrected read
+        if read1.corrected > 0 or read2.corrected > 0:
+            return
+        
         # read2 reverse-complement is the reference, read1 is the query
         r1_seq = list(read1.sequence)
         r2_seq = list(read2.sequence)
@@ -356,14 +360,63 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         self.with_adapters[read_idx] += 1
         return trimmed_read
 
-class UnconditionalCutter(Trimmer):
-    """
-    A modifier that unconditionally removes the first n or the last n bases from a read.
-    Equivalent to MinCutter with count_trimmed=False and only_trimmed=False, but
-    UnconditionalCutter is applied before adapter trimming.
+class OverwriteRead(ReadPairModifier):
+    """If one read is of significantly worse quality than the other, overwrite
+    the poor quality read with the good-quality read.
     
-    If the length is positive, the bases are removed from the beginning of the read.
-    If the length is negative, the bases are removed from the end of the read.
+    Computes the mean quality over the first `window_size` bases. If one read
+    has mean quality < `worse_read_min_quality` and the other read has mean
+    quality >= `better_read_min_quality`, replace the entire worse read with
+    the better read.
+    
+    Args:
+        worse_read_min_quality: The minimum quality below which a read is
+            considered 'poor'
+        better_read_min_quality: The quality above which a read is considered
+            'good'
+        window_size: The number of bases over which to compute mean quality
+        base: The base for ascii-to-int quality conversion
+        summary_fn: Function to summarize base quality (default=mean)
+    """
+    def __init__(self, worse_read_min_quality, better_read_min_quality,
+                 window_size, base=33, summary_fn=mean):
+        self.worse_read_min_quality = worse_read_min_quality
+        self.better_read_min_quality = better_read_min_quality
+        self.window_size = window_size
+        self.base = base
+        self.summary_fn = summary_fn
+    
+    def __call__(self, read1, read2):
+        if len(read1) < self.window_size or len(read2) < self.window_size:
+            return (read1, read2)
+        if not (read1.qualities and read2.qualities):
+            raise Exception("OverwriteRead modifier does not work with reads "
+                            "lacking base qualities.")
+        q1 = list(quals2ints(read1.qualities[:self.window_size], self.base))
+        s1 = self.summary_fn(q1)
+        
+        q2 = list(quals2ints(read2.qualities[:self.window_size], self.base))
+        s2 = self.summary_fn(q2)
+        
+        if s1 < self.worse_read_min_quality and s2 >= self.better_read_min_quality:
+            # TODO: not sure what the right value is here
+            read2.corrected = 1
+            read1 = read2[:]
+        elif s2 < self.worse_read_min_quality and s1 >= self.better_read_min_quality:
+            read1.corrected = 1
+            read2 = read1[:]
+        
+        return (read1, read2)
+
+class UnconditionalCutter(Trimmer):
+    """A modifier that unconditionally removes the first n or the last n bases
+    from a read. Equivalent to MinCutter with count_trimmed=False and
+    only_trimmed=False, but UnconditionalCutter is applied before adapter
+    trimming.
+    
+    If the length is positive, the bases are removed from the beginning of the
+    read. If the length is negative, the bases are removed from the end of the
+    read.
     """
     
     display_str = "Cut unconditionally"
@@ -377,10 +430,10 @@ class UnconditionalCutter(Trimmer):
         return self.clip(read, self.front_length, self.back_length)
 
 class MinCutter(Trimmer):
-    """
-    Ensure that a minimum number of bases have been trimmed off each end.
-    count_trimmed :: whether to consider bases cut before or during adapter trimming
-        when counting the number of bases that have already been cut
+    """Ensure that a minimum number of bases have been trimmed off each end.
+    
+    count_trimmed :: whether to consider bases cut before or during adapter
+        trimming when counting the number of bases that have already been cut
     only_trimmed :: only cut read ends if they have already been adapter-trimmed.
     """
     
@@ -413,7 +466,10 @@ class MinCutter(Trimmer):
             if self.count_trimmed:
                 trimmed = read.clipped[offset] + read.clipped[offset+2]
                 if read.match:
-                    trimmed += sum(i.rsize_total for i in read.match_info if is_front == i.is_front)
+                    trimmed += sum(
+                        i.rsize_total
+                        for i in read.match_info
+                        if is_front == i.is_front)
             elif read.match:
                 trimmed = read.clipped[offset+2]
             else:
@@ -441,7 +497,8 @@ class LengthTagModifier(object):
     def __call__(self, read):
         read = read[:]
         if read.name.find(self.length_tag) >= 0:
-            read.name = self.regex.sub(self.length_tag + str(len(read.sequence)), read.name)
+            read.name = self.regex.sub(
+                self.length_tag + str(len(read.sequence)), read.name)
         return read
 
 class SuffixRemover(object):
@@ -702,7 +759,10 @@ class Modifiers(object):
     
     def add_modifier(self, mod_class, read=1|2, **kwargs):
         if issubclass(mod_class, ReadPairModifier):
-            assert self.paired == "both" and read == 1|2
+            if self.paired != "both" and read == 1|2:
+                raise ValueError(
+                    "Must have paired-end reads to use modifer {}".format(
+                    mod_class))
             mods = mod_class(**kwargs)
         else:
             mods = [None, None]

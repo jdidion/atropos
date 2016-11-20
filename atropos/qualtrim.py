@@ -3,6 +3,7 @@
 Quality trimming.
 """
 import sys
+from atropos.util import qual2int
 
 def quality_trim_index(qualities, cutoff, base=33):
     """
@@ -20,7 +21,7 @@ def quality_trim_index(qualities, cutoff, base=33):
     max_qual = 0
     max_i = len(qualities)
     for i in reversed(range(max_i)):
-        q = ord(qualities[i]) - base
+        q = qual2int(qualities[i], base)
         s += cutoff - q
         if s < 0:
             break
@@ -47,7 +48,7 @@ def nextseq_trim_index(sequence, cutoff, base=33):
     max_qual = 0
     max_i = len(qualities)
     for i in reversed(xrange(max_i)):
-        q = ord(qualities[i]) - base
+        q = qual2int(qualities[i], base)
         if bases[i] == 'G':
             q = cutoff - 1
         s += cutoff - q
