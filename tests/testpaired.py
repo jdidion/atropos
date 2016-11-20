@@ -304,3 +304,7 @@ def test_no_insert_match():
         expected1='insert.1.fastq', expected2='insert.2.fastq',
         aligners=('insert',)
     )
+
+def test_overwrite():
+    run_paired('-w 10,30,10', in1='lowq.fastq', in2='highq.fastq',
+               expected1='lowq.fastq', expected2='highq.fastq')
