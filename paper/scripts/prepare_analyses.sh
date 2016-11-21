@@ -109,7 +109,7 @@ do
     fi
     quals='0'
     aligners='insert'
-    atropos_extra='--insert-match-error 0.3 -e 0.2 --correct-mismatches liberal'
+    atropos_extra='--insert-match-error-rate 0.3 -e 0.2 --correct-mismatches liberal'
     seqpurge_extra='-ec -match_perc 70'
     skewer_extra='-r 0.3'
     ADAPTER1="AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATATCGTATGCCGTCTTCTGCTTG"
@@ -140,7 +140,7 @@ do
       fi
       quals='0 20'
       aligners='insert'
-      atropos_extra='--insert-match-error 0.3 -e 0.2 --correct-mismatches liberal'
+      atropos_extra='--insert-match-error-rate 0.3 -e 0.2 --correct-mismatches liberal'
       seqpurge_extra='-ec -match_perc 70'
       skewer_extra='-r 0.3'
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
@@ -150,7 +150,7 @@ do
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
       quals='0'
-      atropos_extra='--insert-match-error 0.20 -e 0.10'
+      atropos_extra='--insert-match-error-rate 0.20 -e 0.10'
       seqpurge_extra='-match_perc 80'
       skewer_extra='-r 0.20'
       aligners='adapter insert'
