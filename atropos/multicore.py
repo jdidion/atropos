@@ -47,9 +47,9 @@ from queue import Empty, Full
 import time
 from multiprocessing import Process, Queue, Value, cpu_count
 
-from .report import *
-from .seqio import Writers, FormatError
-from .compression import get_compressor, can_use_system_compression
+from atropos.report import *
+from atropos.seqio import Writers, FormatError
+from atropos.compression import get_compressor, can_use_system_compression
 
 __author__ = "John Didion"
 

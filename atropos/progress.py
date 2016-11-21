@@ -1,6 +1,6 @@
 import logging
 import time
-from .util import MAGNITUDE
+from atropos.util import MAGNITUDE
 
 def magnitude_formatter(magnitude):
     suffix = ""

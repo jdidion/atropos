@@ -5,6 +5,7 @@ from atropos.seqio import Sequence
 from atropos.modifiers import *
 from atropos.adapters import *
 from atropos.align import MatchInfo
+from atropos.util import reverse_complement as rc
 
 DUMMY_ADAPTER = Adapter("ACGT", FRONT)
 def front_match(read):
@@ -444,8 +445,8 @@ def test_overwrite_read():
     lowq = tuple(i-1 for i in lowq)
     read1 = Sequence('foo', lowseq, ints2quals(lowq))
     new_read1, new_read2 = overwrite(read1, read2)
-    assert new_read1.sequence == highseq
-    assert new_read1.qualities == ints2quals(highq)
+    assert new_read1.sequence == rc(highseq)
+    assert new_read1.qualities == ints2quals(reversed(highq))
     assert new_read2.sequence == highseq
     assert new_read2.qualities == ints2quals(highq)
     assert new_read1.corrected == new_read2.corrected == 1

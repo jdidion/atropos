@@ -10,8 +10,8 @@ import re
 import sys
 from urllib.request import urlopen
 from atropos import align, colorspace
-from .align import Match
-from .seqio import ColorspaceSequence, FastaReader
+from atropos.align import Match
+from atropos.seqio import ColorspaceSequence, FastaReader
 
 # Constants for the find_best_alignment function.
 # The function is called with SEQ1 as the adapter, SEQ2 as the read.

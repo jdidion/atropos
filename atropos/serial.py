@@ -1,6 +1,6 @@
 from collections import defaultdict
-from .report import *
-from .seqio import FormatError
+from atropos.report import *
+from atropos.seqio import FormatError
 
 def run_serial(reader, modifiers, filters, formatters, writers):
     try:

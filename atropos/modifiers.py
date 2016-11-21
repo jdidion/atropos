@@ -8,9 +8,9 @@ need to be stored, and as a class with a __call__ method if there are parameters
 import copy
 import logging
 import re
-from .qualtrim import quality_trim_index, nextseq_trim_index
-from .align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
-from .util import base_complements, reverse_complement, mean, quals2ints
+from atropos.qualtrim import quality_trim_index, nextseq_trim_index
+from atropos.align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
+from atropos.util import base_complements, reverse_complement, mean, quals2ints
 
 # Base classes
 
@@ -401,10 +401,10 @@ class OverwriteRead(ReadPairModifier):
         if s1 < self.worse_read_min_quality and s2 >= self.better_read_min_quality:
             # TODO: not sure what the right value is here
             read2.corrected = 1
-            read1 = read2[:]
+            read1 = read2.reverse_complement()
         elif s2 < self.worse_read_min_quality and s1 >= self.better_read_min_quality:
             read1.corrected = 1
-            read2 = read1[:]
+            read2 = read1.reverse_complement()
         
         return (read1, read2)
 

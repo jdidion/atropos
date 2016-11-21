@@ -1,14 +1,14 @@
 import logging
 import sys
 
-from .seqio import UnknownFileType, BatchIterator, open_reader
-from .xopen import STDOUT, STDERR, open_output
+from atropos.seqio import UnknownFileType, BatchIterator, open_reader
+from atropos.xopen import STDOUT, STDERR, open_output
 
 def detect(options, parser):
-    from .detect import (
+    from atropos.detect import (
         summarize_contaminants, PairedDetector, KnownContaminantDetector,
         HeuristicDetector, KhmerDetector)
-    from .util import enumerate_range
+    from atropos.util import enumerate_range
     
     k = options.kmer_size or 12
     n_reads = options.max_reads
@@ -55,7 +55,7 @@ def detect(options, parser):
         batch_iterator.close()
 
 def error(options, parser):
-    from .error import ErrorEstimator, PairedErrorEstimator
+    from atropos.error import ErrorEstimator, PairedErrorEstimator
     
     batch_iterator, names, qualities = create_reader(options, parser, counter_magnitude="K")[0:3]
     try:
@@ -77,7 +77,7 @@ def error(options, parser):
 def trim(options, parser):
     import time
     import textwrap
-    from .report import print_report
+    from atropos.report import print_report
     
     params = create_atropos_params(options, parser, options.default_outfile)
     num_adapters = sum(len(a) for a in params.modifiers.get_adapters())
@@ -161,7 +161,7 @@ DEFAULT_ADAPTERS_URL = \
     "eaa6b2d99983f5b14f75357c93c1540142436a49/sequencing_adapters.fa"
 
 def load_known_adapters(options):
-    from .adapters import AdapterCache
+    from atropos.adapters import AdapterCache
     cache_file = options.adapter_cache_file if options.cache_adapters else None
     adapter_cache = AdapterCache(cache_file)
     if adapter_cache.empty and options.default_adapters:
@@ -195,19 +195,19 @@ from collections import namedtuple
 AtroposParams = namedtuple("AtroposParams", ("reader", "modifiers", "filters", "formatters", "writers"))
 
 def create_atropos_params(options, parser, default_outfile):
-    from .adapters import AdapterParser, BACK
-    from .modifiers import (
+    from atropos.adapters import AdapterParser, BACK
+    from atropos.modifiers import (
         Modifiers, AdapterCutter, InsertAdapterCutter, UnconditionalCutter,
         NextseqQualityTrimmer, QualityTrimmer, NonDirectionalBisulfiteTrimmer,
         RRBSTrimmer, SwiftBisulfiteTrimmer, MinCutter, NEndTrimmer,
         LengthTagModifier, SuffixRemover, PrefixSuffixAdder, DoubleEncoder,
         ZeroCapper, PrimerTrimmer, MergeOverlapping, OverwriteRead)
-    from .filters import (
+    from atropos.filters import (
         Filters, FilterFactory, TooShortReadFilter, TooLongReadFilter,
         NContentFilter, TrimmedFilter, UntrimmedFilter, NoFilter,
         MergedReadFilter)
-    from .seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
-    from .util import RandomMatchProbability
+    from atropos.seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
+    from atropos.util import RandomMatchProbability
     
     reader, input_names, qualities, has_qual_file = create_reader(options, parser)
     

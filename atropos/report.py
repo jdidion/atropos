@@ -6,9 +6,9 @@ import sys
 from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 import textwrap
-from .adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
-from .modifiers import *
-from .filters import *
+from atropos.adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
+from atropos.modifiers import *
+from atropos.filters import *
 
 # TODO: Would be good to have a more generic way for filters
 # and modifiers to report summary information

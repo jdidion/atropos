@@ -1,7 +1,7 @@
 # Estimate the empircal error rate
 
-from .seqio import FastqReader
-from .util import enumerate_range
+from atropos.seqio import FastqReader
+from atropos.util import enumerate_range
 
 def qual2prob(qchar):
     q = ord(qchar) - 33

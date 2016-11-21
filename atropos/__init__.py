@@ -2,7 +2,7 @@
 from __future__ import print_function, division, absolute_import
 import sys
 
-from ._version import get_versions
+from atropos._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 

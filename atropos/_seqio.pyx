@@ -1,8 +1,10 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 from __future__ import print_function, division, absolute_import
-from .xopen import xopen
-from .seqio import _shorten, FormatError, SequenceReader
+import copy
+from atropos.xopen import xopen
+from atropos.seqio import _shorten, FormatError, SequenceReader
+from atropos.util import reverse_complement
 
 cdef class Sequence(object):
     """
@@ -72,6 +74,40 @@ cdef class Sequence(object):
         if back:
             new_read.clipped[offset+1] += back
         return (front, back, new_read)
+    
+    def reverse_complement(self):
+        """Returns a copy of this read with the sequence reverse-complemented
+        and the qualities reversed.
+        
+        TODO: add option to also reverse the alignment positions
+        """
+        sequence = reverse_complement(self.sequence)
+        qualities = clipped = match_info = None
+        if self.qualities:
+            qualities = ''.join(reversed(self.qualities))
+        if self.match_info:
+            match_info = [copy.copy(m) for m in self.match_info]
+        
+        new_read = self.__class__(
+            self.name,
+            sequence,
+            qualities,
+            self.name2,
+            self.original_length,
+            None,
+            match_info,
+            list(self.clipped),
+            self.insert_overlap,
+            self.merged,
+            self.corrected
+        )
+        
+        if self.match:
+            match = self.match.copy()
+            match.read = new_read
+            new_read.match = match
+        
+        return new_read
     
     def __getitem__(self, key):
         """slicing"""
