@@ -340,8 +340,13 @@ class Command(object):
         pass
     
     def execute(self):
+        """Execute the command:
+        
+        Returns:
+            Tuple (rc, "msg", {details})
+        """
         cmd = getattr(atropos.commands, self.name)
-        cmd(self.options, self.parser)
+        return cmd(self.options, self.parser)
 
 class TrimCommand(Command):
     """trim sequencing reads."""
@@ -1181,17 +1186,18 @@ COMMANDS['error'] = ErrorCommand
 
 # Main
 
-def main(cmdlineargs=None):
-    """
-    Main function that evaluates command-line parameters.
+def main(args):
+    """Main function that evaluates command-line parameters.
     
-    :param cmdlineargs: iterable of command line arguments; `None` is equivalent to
-    `sys.argv[1:]`
+    Args:
+        args: list/tuple of command line arguments
+    
+    Returns:
+        Tuple (rc, "msg", {details})
     """
-    args = cmdlineargs or sys.argv[1:]
     if len(args) == 0 or any(h in args for h in ('-h', '--help')):
         print_subcommands()
-        return
+        return (0, None, {})
     
     if args[0][0] == '-':
         command_name = "trim"
@@ -1201,7 +1207,7 @@ def main(cmdlineargs=None):
     
     command_class = COMMANDS[command_name]
     command = command_class(args)
-    command.execute()
+    return command.execute()
 
 def print_subcommands():
     print("Atropos version {}\n".format(__version__))
@@ -1225,4 +1231,7 @@ EMBnet Journal, 2011, 17(1):10-12.
 """)
 
 if __name__ == '__main__':
-    main()
+    result = main(sys.argv[1:])
+    if result[1]:
+        print(result[1])
+    sys.exit(result[0])
