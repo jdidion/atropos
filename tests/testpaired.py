@@ -9,21 +9,23 @@ from .utils import run, files_equal, datapath, cutpath, redirect_stderr, tempora
 
 BACK_ALIGNERS = ('adapter', 'insert')
 
-def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',), callback=None):
+def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
+               callback=None, assert_files_equal=True):
     if type(params) is str:
         params = params.split()
     for aligner in aligners:
         with temporary_path('tmp1-' + expected1.format(aligner=aligner)) as p1:
             with temporary_path('tmp2-' + expected2.format(aligner=aligner)) as p2:
-                print(aligner)
                 p = params.copy()
                 p += ['--aligner', aligner, '-o', p1, '-p', p2]
-                p += ['-pe1', datapath(in1.format(aligner=aligner)), '-pe2', datapath(in2.format(aligner=aligner))]
+                p += ['-pe1', datapath(in1.format(aligner=aligner)),
+                      '-pe2', datapath(in2.format(aligner=aligner))]
                 assert atropos.main(p) is None
-                assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
-                assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
+                if assert_files_equal:
+                    assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
+                    assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
                 if callback:
-                    callback(aligner)
+                    callback(aligner, p1, p2)
 
 def run_interleaved(params, inpath, expected, aligners=('adapter',)):
     if type(params) is str:
@@ -67,7 +69,7 @@ def test_paired_end_legacy():
 def test_untrimmed_paired_output():
     with temporary_path("tmp-untrimmed.1.fastq") as untrimmed1:
         with temporary_path("tmp-untrimmed.2.fastq") as untrimmed2:
-            def callback(aligner):
+            def callback(aligner, p1, p2):
                 assert files_equal(cutpath('paired-untrimmed.1.fastq'), untrimmed1)
                 assert files_equal(cutpath('paired-untrimmed.2.fastq'), untrimmed2)
             run_paired(['-a', 'TTAGACATAT',
@@ -241,7 +243,7 @@ def test_pair_filter():
 def test_too_short_paired_output():
     with temporary_path("temp-too-short.1.fastq") as p1:
         with temporary_path("temp-too-short.2.fastq") as p2:
-            def callback(aligner):
+            def callback(aligner, _1, _2):
                 assert files_equal(cutpath('paired-too-short.1.fastq'), p1)
                 assert files_equal(cutpath('paired-too-short.2.fastq'), p2)
             run_paired('-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output '
@@ -254,7 +256,7 @@ def test_too_short_paired_output():
 def test_too_long_output():
     with temporary_path("temp-too-long.1.fastq") as p1:
         with temporary_path("temp-too-long.2.fastq") as p2:
-            def callback(aligner):
+            def callback(aligner, _1, _2):
                 assert files_equal(cutpath('paired_{aligner}.1.fastq'.format(aligner=aligner)), p1)
                 assert files_equal(cutpath('paired_{aligner}.2.fastq'.format(aligner=aligner)), p2)
             run_paired('-a TTAGACATAT -A CAGTGGAGTA -M 14 --too-long-output '
@@ -308,3 +310,14 @@ def test_no_insert_match():
 def test_overwrite():
     run_paired('-w 10,30,10', in1='lowq.fastq', in2='highq.fastq',
                expected1='lowq.fastq', expected2='highq.fastq')
+
+# def test_no_writer_process():
+#     def check_multifile(aligner, p1, p2):
+#
+#     run_paired('-a TTAGACATAT -A CAGTGGAGTA --threads 4 --no-writer-process',
+#         in1='paired.1.fastq', in2='paired.2.fastq',
+#         expected1='out.1.fastq', expected2='out.2.fastq',
+#         aligners=BACK_ALIGNERS, test_paired_end=False,
+#         callback=check_multifile
+#     )
+    

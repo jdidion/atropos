@@ -542,12 +542,13 @@ standard input/output. Without the -o option, output is sent to standard output.
         group = parser.add_argument_group("Additional read modifications")
         group.add_argument(
             "--op-order",
-            type=char_list(choices=('W','A','C','G','Q')), default="WCGQA",
+            type=char_list(choices=('A','C','G','Q','W')), default="CGQAW",
             help="The order in which trimming operations are be applied. This is a string of "
-                 "1-5 of the following characters: W = overwrite poor quality reads; "
-                 "A = adapter trimming; C = cutting (unconditional); G = NextSeq trimming; "
-                 "Q = quality trimming. The default is 'WCGQA' to maintain compatibility with "
-                 "Cutadapt; however, this is likely to change to 'WGACQ' in the near future.")
+                 "1-5 of the following characters: A = adapter trimming; "
+                 "C = cutting (unconditional); G = NextSeq trimming; "
+                 "Q = quality trimming; W = overwrite poor quality reads. The "
+                 "default is 'WCGQA' to maintain compatibility with "
+                 "Cutadapt; however, this is likely to change to 'GAWCQ' in the near future.")
         group.add_argument(
             "-u",
             "--cut",
