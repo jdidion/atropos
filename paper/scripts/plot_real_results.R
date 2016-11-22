@@ -1,4 +1,4 @@
-library(reshpae2)
+library(reshape2)
 library(ggplot2)
 library(readr)
 library(cowplot)
