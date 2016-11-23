@@ -1,5 +1,8 @@
-|https://travis-ci.org/jdidion/atropos|
-|https://pypi.python.org/pypi/atropos|
+.. image:: https://travis-ci.org/jdidion/atropos.svg?branch=master
+    :target: https://travis-ci.org/marcelm/cutadapt
+
+.. image:: https://img.shields.io/pypi/v/atropos.svg?branch=master
+    :target: https://pypi.python.org/pypi/atropos
 
 Atropos
 =======
