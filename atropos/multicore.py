@@ -107,20 +107,20 @@ def dequeue(queue, wait_message="Waiting to dequeue item {}", block_timeout=RETR
 class Control(object):
     def __init__(self, initial_value):
         self.control = Value('l', initial_value)
-
+    
     def check_value(self, value, lock=False):
         return self.get_value(lock=lock) == value
-
+    
     def check_value_positive(self, lock=False):
         return self.get_value(lock=lock) > 0
-
+    
     def get_value(self, lock=True):
         if lock:
             with self.control.get_lock():
                 return self.control.value
         else:
             return self.control.value
-
+    
     def set_value(self, value):
         with self.control.get_lock():
             self.control.value = value
@@ -241,25 +241,25 @@ class WriterProcess(Process):
         self.timeout = timeout
         self.seen_batches = set()
         self.num_batches = None
-
+    
     def run(self):
         logging.getLogger().debug("Writer process running under pid {}".format(self.name, os.getpid()))
         
         class Done(Exception): pass
         class Killed(Exception): pass
-
+        
         def fail_callback():
             if self.num_batches is None and self.control.check_value_positive():
                 self.num_batches = self.control.get_value()
             if self.num_batches is not None and len(self.seen_batches) >= self.num_batches:
                 raise Done()
-
+        
         def timeout_callback():
             if self.num_batches is not None:
                 missing = set(range(1, self.num_batches+1)) - self.seen_batches
                 logging.getLogger().error("Writer thread still missing batches {} of {}".format(
                     ",".join(str(i) for i in missing), self.num_batches))
-
+        
         def iter_batches():
             while True:
                 batch = dequeue(
@@ -294,7 +294,7 @@ class WorkerResultHandler(object):
     """
     def __init__(self, handler):
         self.handler = handler
-
+    
     def start(self, worker):
         self.handler.start(worker)
     
@@ -305,8 +305,10 @@ class WorkerResultHandler(object):
         and then return the property formatted result
         dict.
         """
-        self.handler.write_result(batch_num, dict(self.prepare_file(*item)
-            for item in result.items()))
+        self.handler.write_result(
+            batch_num, dict(
+                self.prepare_file(*item)
+                for item in result.items()))
     
     def prepare_file(self, path, strings):
         return (path, "".join(strings))
@@ -342,11 +344,11 @@ class QueueResultHandler(object):
     """
     def __init__(self, queue):
         self.queue = queue
-
+    
     def start(self, worker):
         self.message = "{} waiting to queue result {{}}".format(worker.name)
         self.timeout = worker.timeout
-
+    
     def write_result(self, batch_num, result):
         enqueue(
             self.queue,
@@ -354,7 +356,7 @@ class QueueResultHandler(object):
             wait_message=self.message,
             timeout=self.timeout
         )
-
+    
     def finish(self, total_batches=None):
         pass
 
@@ -366,14 +368,14 @@ class WriterResultHandler(object):
         self.writers = writers
         self.compressed = compressed
         self.use_suffix = use_suffix
-
+    
     def start(self, worker):
         if self.use_suffix:
             self.writers.suffix = ".{}".format(worker.index)
-
+    
     def write_result(self, batch_num, result):
         self.writers.write_result(result, self.compressed)
-
+    
     def finish(self, total_batches=None):
         self.writers.close()
 
@@ -386,7 +388,7 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
         super(OrderPreservingWriterResultHandler, self).__init__(worker)
         self.pending = PendingQueue()
         self.cur_batch = 1
-
+    
     def write_result(self, batch_num, result):
         if batch_num == self.cur_batch:
             self.writers.write_result(result, self.compressed)
@@ -394,7 +396,7 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
             self.consume_pending()
         else:
             self.pending.push(batch_num, result)
-
+    
     def finish(self, total_batches):
         if total_batches is not None:
             self.consume_pending()
@@ -402,7 +404,7 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
                 raise Exception("OrderPreservingWriterResultHandler finishing without having seen "
                                 "{} batches".format(total_batches))
         self.writers.close()
-
+    
     def consume_pending(self):
         while (not self.pending.empty) and (self.cur_batch == pending.min_priority):
             self.writers.write_result(pending.pop(), self.compressed)
@@ -413,13 +415,13 @@ class PendingQueue(object):
         self.queue = {}
         self.max_size = max_size
         self.min_priority = None
-
+    
     def push(self, priority, value):
         assert not self.full
         self.queue[priority] = value
         if self.min_priority is None or priority < self.min_priority:
             self.min_priority = priority
-
+    
     def pop(self):
         assert not self.empty
         value = self.queue.pop(self.min_priority)
@@ -428,11 +430,11 @@ class PendingQueue(object):
         else:
             self.min_priority = min(self.queue.keys())
         return value
-
+    
     @property
     def full(self):
         return self.max_size and len(self.queue) >= self.max_size
-
+    
     @property
     def empty(self):
         return len(self.queue) == 0
@@ -442,7 +444,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
                  use_writer_process=True, compression=None):
     """
     Execute atropos in parallel mode.
-
+    
     reader 				:: iterator over batches of reads (most likely a BatchIterator)
     modifiers 			::
     filters 			::
@@ -477,7 +479,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
         threads -= 1
     
     timeout = max(timeout, RETRY_INTERVAL)
-
+    
     # Queue by which batches of reads are sent to worker processes
     input_queue = Queue(input_queue_size)
     # Queue by which results are sent from the worker processes to the writer process
@@ -488,7 +490,7 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
     summary = Summary(trimmer_classes=modifiers.get_trimmer_classes())
     # Return code (0=normal, anything else is an error)
     rc = 0
-
+    
     if use_writer_process:
         worker_result_handler = QueueResultHandler(result_queue)
         if compression == "writer":
@@ -576,11 +578,6 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
         if use_writer_process:
             writer_control.set_value(num_batches)
         
-        # Wait for workers to exit
-        #for worker in worker_processes:
-        #	# Wait for worker to exit
-        #	wait_on_process(worker)
-        
         # Now that the reader process is done, it essentially
         # frees up another thread to use for a worker
         worker_processes += launch_workers(1, threads-1)
@@ -620,40 +617,40 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
             seen_batches |= worker_batches
             summary.add_process_stats(process_stats)
             summary.add_adapter_stats(adapter_stats)
-
+        
         # Check if any batches were missed
         if num_batches > 0:
             missing_batches = set(range(1, num_batches+1)) - seen_batches
             if len(missing_batches) > 0:
                 raise Exception("Workers did not process batches {}".format(
                     ",".join(str(b) for b in missing_batches)))
-
+        
         if use_writer_process:
             # Wait for writer to complete
             wait_on_process(writer_process)
-
+    
     except KeyboardInterrupt as e:
         logging.getLogger().error("Interrupted")
         rc = 130
-
+    
     except IOError as e:
         if e.errno == errno.EPIPE:
             rc = 1
         else:
             raise
-
+    
     except (FormatError, EOFError) as e:
         logging.getLogger().error("Atropos error", exc_info=True)
         rc = 1
-
+    
     except Exception as e:
         logging.getLogger().error("Unknown error", exc_info=True)
         rc = 1
-
+    
     finally:
         logging.getLogger().debug("Waiting for reader to close")
         reader.close()
-
+        
         # notify all threads that they should stop
         logging.getLogger().debug("Exiting all processes")
         def kill(process):
@@ -667,4 +664,10 @@ def run_parallel(reader, modifiers, filters, formatters, writers, threads=2, tim
             kill(writer_process)
     
     report = summary.finish() if rc == 0 else None
-    return (rc, report)
+    
+    details = dict(
+        mode='parallel',
+        threads=threads
+    )
+    
+    return (rc, report, details)

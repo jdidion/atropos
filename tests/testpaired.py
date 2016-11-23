@@ -20,7 +20,9 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                 p += ['--aligner', aligner, '-o', p1, '-p', p2]
                 p += ['-pe1', datapath(in1.format(aligner=aligner)),
                       '-pe2', datapath(in2.format(aligner=aligner))]
-                assert atropos.main(p) is None
+                result = atropos.main(p)
+                assert isinstance(result, tuple)
+                assert len(result) == 3
                 if assert_files_equal:
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
@@ -34,7 +36,9 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',)):
         with temporary_path(expected.format(aligner=aligner)) as tmp:
             p = params.copy()
             p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner)), '-L', tmp]
-            assert atropos.main(p) is None
+            result = atropos.main(p)
+            assert isinstance(result, tuple)
+            assert len(result) == 3
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
 # def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
@@ -129,7 +133,6 @@ def test_second_too_short():
         with redirect_stderr():
             atropos.main('-a XX --paired-output out.fastq'.split() + [datapath('paired.1.fastq'), trunc2])
 
-@raises(SystemExit)
 def test_unmatched_read_names():
     with temporary_path("swapped.1.fastq") as swapped:
         try:
@@ -140,7 +143,12 @@ def test_unmatched_read_names():
             with open(swapped, 'w') as f:
                 f.writelines(lines)
             with redirect_stderr():
-                atropos.main('-a XX -o out1.fastq -p out2.fastq'.split() + ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
+                result = atropos.main(
+                    '-a XX -o out1.fastq -p out2.fastq'.split() +
+                    ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
+                assert isinstance(result, tuple)
+                assert len(result) == 3
+                assert result[0] != 0
         finally:
             os.remove('out1.fastq')
             os.remove('out2.fastq')

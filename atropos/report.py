@@ -282,7 +282,7 @@ def print_report(options, wallclock_time, cpu_time, stats, trimmer_classes):
     elif not options.quiet:
         outfile = sys.stderr if options.output is None else sys.stdout
     else:
-        return
+        return None
     
     paired = options.paired
     stats["paired"] = paired
@@ -295,7 +295,7 @@ def print_report(options, wallclock_time, cpu_time, stats, trimmer_classes):
         # receives a string result and writes it to outfile
         # outfile.write(generate_report(paired, time, stats))
         generate_report(stats, trimmer_classes, outfile)
-
+        return stats
     finally:
         if close and outfile is not None:
             outfile.close()

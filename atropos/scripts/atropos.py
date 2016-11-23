@@ -340,7 +340,7 @@ class Command(object):
         pass
     
     def execute(self):
-        """Execute the command:
+        """Execute the command
         
         Returns:
             Tuple (rc, "msg", {details})
@@ -1197,7 +1197,7 @@ def main(args):
     """
     if len(args) == 0 or any(h in args for h in ('-h', '--help')):
         print_subcommands()
-        return (0, None, {})
+        return (2, None, {})
     
     if args[0][0] == '-':
         command_name = "trim"
@@ -1231,7 +1231,7 @@ EMBnet Journal, 2011, 17(1):10-12.
 """)
 
 if __name__ == '__main__':
-    result = main(sys.argv[1:])
-    if result[1]:
-        print(result[1])
-    sys.exit(result[0])
+    rc, message, _ = main(sys.argv[1:])
+    if message:
+        print(message)
+    sys.exit(rc)

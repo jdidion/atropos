@@ -272,10 +272,12 @@ def test_qualfile_only():
         atropos.main(['-sq', datapath('E3M.qual')])
 
 
-@raises(SystemExit)
 def test_no_args():
     with redirect_stderr():
-        atropos.main([])
+        result = atropos.main([])
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+        assert result[0] != 0
 
 
 @raises(SystemExit)
@@ -338,7 +340,10 @@ def test_adapter_file_3p_anchored_no_indels():
 def test_demultiplex():
     multiout = os.path.join(os.path.dirname(__file__), 'data', 'tmp-demulti.{name}.fasta')
     params = ['-a', 'first=AATTTCAGGAATT', '-a', 'second=GTTCTCTAGTTCT', '-o', multiout, '-se', datapath('twoadapters.fasta')]
-    assert atropos.main(params) is None
+    result = atropos.main(params)
+    assert isinstance(result, tuple)
+    assert len(result) == 3
+    assert result[0] == 0
     assert files_equal(cutpath('twoadapters.first.fasta'), multiout.format(name='first'))
     assert files_equal(cutpath('twoadapters.second.fasta'), multiout.format(name='second'))
     assert files_equal(cutpath('twoadapters.unknown.fasta'), multiout.format(name='unknown'))

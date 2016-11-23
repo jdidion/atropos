@@ -3,6 +3,9 @@ from atropos.report import *
 from atropos.seqio import FormatError
 
 def run_serial(reader, modifiers, filters, formatters, writers):
+    report = None
+    details = {}
+    
     try:
         n = 0
         total_bp1 = 0
@@ -21,22 +24,31 @@ def run_serial(reader, modifiers, filters, formatters, writers):
                 for path, strings in result.items())
             writers.write_result(result)
         
-        return (0, Summary(
+        report = Summary(
             collect_process_statistics(n, total_bp1, total_bp2, modifiers, filters, formatters),
             summarize_adapters(modifiers.get_adapters()),
             modifiers.get_trimmer_classes()
-        ).finish())
+        ).finish()
+        
+        rc = 0
+        details = dict(
+            mode='serial',
+            threads=1
+        )
     
     except KeyboardInterrupt as e:
         logging.getLogger().error("Interrupted")
-        return (130, None)
+        rc = 130
     except IOError as e:
         if e.errno == errno.EPIPE:
-            return (1, None)
-        raise
+            rc = 1
+        else:
+            raise
     except (FormatError, EOFError) as e:
         logging.getLogger().error("Atropos error", exc_info=True)
-        return(1, None)
+        rc = 1
     finally:
         reader.close()
         writers.close()
+    
+    return (rc, report, details)

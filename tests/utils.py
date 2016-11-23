@@ -64,7 +64,9 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         else:
             params += ['-o', tmp_fastaq] # TODO not parallelizable
         print(params)
-        assert atropos.main(params) is None
+        result = atropos.main(params)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
         # TODO redirect standard output
         assert files_equal(cutpath(expected), tmp_fastaq)
     # TODO diff log files

@@ -53,6 +53,8 @@ def detect(options, parser):
             d.summarize(o, names, include=include)
     finally:
         batch_iterator.close()
+    
+    return (0, None, {})
 
 def error(options, parser):
     from atropos.error import ErrorEstimator, PairedErrorEstimator
@@ -73,6 +75,8 @@ def error(options, parser):
     
     with open_output(options.output) as o:
         e.summarize(o, names)
+    
+    return (0, None, {})
 
 def trim(options, parser):
     import time
@@ -99,26 +103,30 @@ def trim(options, parser):
     if options.threads is None:
         # Run single-threaded version
         import atropos.serial
-        rc, summary = atropos.serial.run_serial(*params)
+        rc, summary, details = atropos.serial.run_serial(*params)
     else:
         # Run multiprocessing version
         import atropos.multicore
-        rc, summary = atropos.multicore.run_parallel(
-            params.reader, params.modifiers, params.filters, params.formatters, params.writers,
-            options.threads, options.process_timeout, options.preserve_order, options.read_queue_size,
+        rc, summary, details = atropos.multicore.run_parallel(
+            params.reader, params.modifiers, params.filters, params.formatters,
+            params.writers, options.threads, options.process_timeout,
+            options.preserve_order, options.read_queue_size,
             options.result_queue_size, options.writer_process, options.compression)
     
     if rc != 0:
-        sys.exit(rc)
+        return (rc, None, details)
     
     stop_wallclock_time = time.time()
     stop_cpu_time = time.clock()
-    report = print_report(
+    stats = print_report(
         options,
         stop_wallclock_time - start_wallclock_time,
         stop_cpu_time - start_cpu_time,
         summary,
         params.modifiers.get_trimmer_classes())
+    
+    details['stats'] = stats
+    return (rc, None, details)
 
 def create_reader(options, parser, counter_magnitude="M"):
     interleaved = bool(options.interleaved_input)
