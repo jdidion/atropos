@@ -55,8 +55,10 @@ class Match(object):
         self.length = self.astop - self.astart
         assert self.length > 0
         assert self.length - self.errors > 0
-        if self.adapter:
-            assert self.errors / self.length <= self.adapter.max_error_rate
+        # TODO: this assertion may not always hold now that we use both error
+        # rates and probabilities
+        #if self.adapter:
+        #    assert self.errors / self.length <= self.adapter.max_error_rate
 
     def __str__(self):
         return 'Match(astart={0}, astop={1}, rstart={2}, rstop={3}, matches={4}, errors={5})'.format(
