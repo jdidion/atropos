@@ -2,9 +2,9 @@
 import sys
 
 try:
-	import _preamble
+    import _preamble
 except ImportError:
-	pass
+    pass
 
 from atropos.scripts import atropos
-atropos.main()
+atropos.main_from_commandline()

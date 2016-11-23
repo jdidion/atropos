@@ -1186,6 +1186,12 @@ COMMANDS['error'] = ErrorCommand
 
 # Main
 
+def main_from_commandline():
+    rc, message, _ = main(sys.argv[1:])
+    if message:
+        print(message)
+    sys.exit(rc)
+
 def main(args):
     """Main function that evaluates command-line parameters.
     
@@ -1231,7 +1237,4 @@ EMBnet Journal, 2011, 17(1):10-12.
 """)
 
 if __name__ == '__main__':
-    rc, message, _ = main(sys.argv[1:])
-    if message:
-        print(message)
-    sys.exit(rc)
+    main_from_commandline()
