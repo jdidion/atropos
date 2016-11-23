@@ -21,7 +21,8 @@ def temporary_path(name):
         os.mkdir(directory)
     path = os.path.join(directory, name)
     yield path
-    os.remove(path)
+    if os.path.exists(path):
+        os.remove(path)
 
 
 def datapath(path):

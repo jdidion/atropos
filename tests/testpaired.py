@@ -27,7 +27,7 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
                 if callback:
-                    callback(aligner, p1, p2)
+                    callback(aligner, p1, p2, result)
 
 def run_interleaved(params, inpath, expected, aligners=('adapter',)):
     if type(params) is str:
@@ -73,7 +73,7 @@ def test_paired_end_legacy():
 def test_untrimmed_paired_output():
     with temporary_path("tmp-untrimmed.1.fastq") as untrimmed1:
         with temporary_path("tmp-untrimmed.2.fastq") as untrimmed2:
-            def callback(aligner, p1, p2):
+            def callback(aligner, p1, p2, result):
                 assert files_equal(cutpath('paired-untrimmed.1.fastq'), untrimmed1)
                 assert files_equal(cutpath('paired-untrimmed.2.fastq'), untrimmed2)
             run_paired(['-a', 'TTAGACATAT',
@@ -251,7 +251,7 @@ def test_pair_filter():
 def test_too_short_paired_output():
     with temporary_path("temp-too-short.1.fastq") as p1:
         with temporary_path("temp-too-short.2.fastq") as p2:
-            def callback(aligner, _1, _2):
+            def callback(aligner, _1, _2, result):
                 assert files_equal(cutpath('paired-too-short.1.fastq'), p1)
                 assert files_equal(cutpath('paired-too-short.2.fastq'), p2)
             run_paired('-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output '
@@ -264,7 +264,7 @@ def test_too_short_paired_output():
 def test_too_long_output():
     with temporary_path("temp-too-long.1.fastq") as p1:
         with temporary_path("temp-too-long.2.fastq") as p2:
-            def callback(aligner, _1, _2):
+            def callback(aligner, _1, _2, result):
                 assert files_equal(cutpath('paired_{aligner}.1.fastq'.format(aligner=aligner)), p1)
                 assert files_equal(cutpath('paired_{aligner}.2.fastq'.format(aligner=aligner)), p2)
             run_paired('-a TTAGACATAT -A CAGTGGAGTA -M 14 --too-long-output '
@@ -319,13 +319,21 @@ def test_overwrite():
     run_paired('-w 10,30,10', in1='lowq.fastq', in2='highq.fastq',
                expected1='lowq.fastq', expected2='highq.fastq')
 
-# def test_no_writer_process():
-#     def check_multifile(aligner, p1, p2):
-#
-#     run_paired('-a TTAGACATAT -A CAGTGGAGTA --threads 4 --no-writer-process',
-#         in1='paired.1.fastq', in2='paired.2.fastq',
-#         expected1='out.1.fastq', expected2='out.2.fastq',
-#         aligners=BACK_ALIGNERS, test_paired_end=False,
-#         callback=check_multifile
-#     )
+def test_no_writer_process():
+    def check_multifile(aligner, p1, p2, result):
+        assert os.path.basename(p1) == 'tmp1-out.1.fastq'
+        assert os.path.basename(p2) == 'tmp2-out.2.fastq'
+        tmpdir = os.path.dirname(p1)
+        assert tmpdir == os.path.dirname(p2)
+        assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.0.fastq'))
+        assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.1.fastq'))
+        assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.0.fastq'))
+        assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.1.fastq'))
+
+    run_paired('--threads 2 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG" -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+        in1='big.1.fq', in2='big.2.fq',
+        expected1='out.1.fastq', expected2='out.2.fastq',
+        aligners=BACK_ALIGNERS, assert_files_equal=False,
+        callback=check_multifile
+    )
     
