@@ -533,11 +533,15 @@ class AdapterCache(object):
             self.load_from_fasta(i)
 
     def load_from_url(self, url):
-        logging.getLogger().info("\nDownloading list of known contaminants from {}".format(url))
-        if url.startswith("file:"):
-            return self.load_from_file(url[5:])
-        else:
-            return self.load_from_fasta(urlopen(url).read().decode().split("\n"))
+        logging.getLogger().info(
+            "Loading list of known contaminants from {}".format(url))
+        try:
+            fasta = urlopen(url).read().decode().split("\n")
+            return self.load_from_fasta(fasta)
+        except:
+            if url.startswith("file:"):
+                url = url[5:]
+            return self.load_from_file(url)
     
     def load_from_fasta(self, fasta):
         """
