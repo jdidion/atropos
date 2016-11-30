@@ -1177,10 +1177,17 @@ experiment is around 1% or less. We recommend setting -e to
         parser = self.parser
         parser.set_defaults(max_reads=10000)
         parser.add_argument(
+            "-m",
+            "--max-bases",
+            type=int, default=None,
+            help="Maximum number of bases to use in the error calculation, "
+                "starting from the 5' end of the read.")
+        parser.add_argument(
             "-o",
             "--output",
             type=writeable_file, default=STDOUT,
-            help="File in which to write the summary of the estimated error rates. (stdout)")
+            help="File in which to write the summary of the estimated error "
+                "rates. (stdout)")
 
 COMMANDS['error'] = ErrorCommand
 

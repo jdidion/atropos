@@ -59,15 +59,16 @@ def detect(options, parser):
 def error(options, parser):
     from atropos.error import ErrorEstimator, PairedErrorEstimator
     
-    batch_iterator, names, qualities = create_reader(options, parser, counter_magnitude="K")[0:3]
+    batch_iterator, names, qualities = create_reader(
+        options, parser, counter_magnitude="K")[0:3]
     try:
         if not qualities:
             parser.error("Cannot estimate error rate without base qualities")
         
         if options.paired:
-            e = PairedErrorEstimator()
+            e = PairedErrorEstimator(options.max_bases)
         else:
-            e = ErrorEstimator()
+            e = ErrorEstimator(options.max_bases)
         
         e.consume_all_batches(batch_iterator)
     finally:

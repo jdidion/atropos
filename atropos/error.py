@@ -8,9 +8,10 @@ def qual2prob(qchar):
     return 10 ** (-q / 10)
 
 class ErrorEstimator(object):
-    def __init__(self):
+    def __init__(self, max_read_len=None):
         self.total_qual = 0.0
         self.total_len = 0
+        self.max_read_len = max_read_len
     
     def consume_all_batches(self, batch_iterator):
         for batch_num, batch in batch_iterator:
@@ -18,8 +19,13 @@ class ErrorEstimator(object):
                 self.consume(read)
     
     def consume(self, read):
-        self.total_qual += sum(qual2prob(qchar) for qchar in read.qualities)
-        self.total_len += len(read.qualities)
+        quals = read.qualities
+        readlen = len(read.qualities)
+        if self.max_read_len and self.max_read_len < readlen:
+            readlen = self.max_read_len
+            quals = quals[:readlen]
+        self.total_qual += sum(qual2prob(qchar) for qchar in quals)
+        self.total_len += readlen
     
     def estimate(self):
         return self.total_qual / self.total_len
@@ -33,9 +39,9 @@ class ErrorEstimator(object):
         print("Error rate: {:.2%}".format(self.estimate()))
 
 class PairedErrorEstimator(object):
-    def __init__(self):
-        self.e1 = ErrorEstimator()
-        self.e2 = ErrorEstimator()
+    def __init__(self, max_read_len=None):
+        self.e1 = ErrorEstimator(max_read_len)
+        self.e2 = ErrorEstimator(max_read_len)
     
     def consume_all_batches(self, batch_iterator):
         for batch_num, batch in batch_iterator:
