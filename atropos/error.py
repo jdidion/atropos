@@ -11,18 +11,19 @@ class ErrorEstimator(object):
             for read in batch:
                 self.consume(read)
     
-    def summarize(self, outstream, name=None, show_details=True):
+    def summarize(self, outstream, name=None, show_details=True, indent="  "):
         print("", file=outstream)
         if name is not None:
             header = "File: {}".format(name)
-            print(header)
+            print(header, file=outstream)
             print('-' * len(header), file=outstream)
         overall, details = self.estimate()
-        print("Error rate: {:.2%}".format(overall))
+        print("Error rate: {:.2%}".format(overall), file=outstream)
         if details and show_details:
-            self.print_details(details, outstream)
+            print("Details:\n", file=outstream)
+            self.print_details(details, outstream, indent)
     
-    def print_details(self, details, outstream):
+    def print_details(self, details, outstream, indent):
         pass
 
 class PairedErrorEstimator(object):
@@ -40,30 +41,34 @@ class PairedErrorEstimator(object):
                 self.e1.consume(read1)
                 self.e2.consume(read2)
     
-    def summarize(self, outstream, names=None, show_details=True):
+    def summarize(self, outstream, names=None, show_details=True, indent="  "):
         print("", file=outstream)
         if names:
             header = "File 1: {}".format(names[0])
-            print(header)
+            print(header, file=outstream)
             print('-' * len(header), file=outstream)
         err1, details1 = self.e1.estimate()
-        print("Error rate: {:.2%}\n".format(err1))
+        print("Error rate: {:.2%}".format(err1), file=outstream)
         if show_details and details1:
-            self.e1.print_details(details1, outstream)
+            print("Details:\n", file=outstream)
+            self.e1.print_details(details1, outstream, indent)
+        print("", file=outstream)
         
         if names:
             header = "File 2: {}".format(names[1])
-            print(header)
+            print(header, file=outstream)
             print('-' * len(header), file=outstream)
         err2, details2 = self.e2.estimate()
-        print("Error rate: {:.2%}\n".format(err2))
+        print("Error rate: {:.2%}".format(err2), file=outstream)
         if show_details and details2:
-            self.e2.print_details(details2, outstream)
+            print("Details:\n", file=outstream)
+            self.e2.print_details(details2, outstream, indent)
+        print("", file=outstream)
         
         l1 = self.e1.total_len
         l2 = self.e2.total_len
         overall_err = ((err1 * l1) + (err2 * l2)) / (l1+l2)
-        print("Overall error rate: {:.2%}".format(overall_err))
+        print("Overall error rate: {:.2%}".format(overall_err), file=outstream)
 
 # Error estimation using base qualities
 
@@ -178,8 +183,11 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
             for f in tempfiles:
                 os.remove(f)
     
-    def print_details(self, outstream, details):
+    def print_details(self, outstream, details, indent):
         per_read = details['per_read']
         per_cycle = details['per_cycle']
         
-        # TODO
+        print("{}StdErr: {:.2%}".format(indent, per_read['standard error']), file=outstream)
+        print("{}Per-cycle rates:".format(indent), file=outstream)
+        for cycle in per_cycle:
+            print("{}Cycle: {}, Error: {:.2%}, StdErr: {:.2%}".format(indent*2, *cycle))
