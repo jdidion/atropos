@@ -1167,15 +1167,21 @@ class ErrorCommand(Command):
     name = "error"
     usage = "atropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error"
     description = """
-Estimate the error rate from base qualities. This can help to
-determine the quality of your data, and to decide the value for
-the max error rate (-e) parameter. Normal error for an Illumina
-experiment is around 1% or less. We recommend setting -e to
-10 x the empirical error rate."""
+Estimate the sequencing error rate. This can help to determine
+the quality of your data, and to decide the value for the max
+error rate (-e) parameter. Normal error for an Illumina experiment
+is around 1% or less. We recommend setting -e to 10x the empirical
+error rate."""
     
     def add_command_options(self):
         parser = self.parser
         parser.set_defaults(max_reads=10000)
+        parser.add_argument(
+            "-a",
+            "--algorithm",
+            choices=('quality', 'shadow'), default="quality",
+            help="Method for estimating error rates; quality = base qualities, "
+                "shadow = shadow regression")
         parser.add_argument(
             "-m",
             "--max-bases",
