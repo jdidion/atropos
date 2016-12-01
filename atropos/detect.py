@@ -289,8 +289,7 @@ class KnownContaminantDetector(Detector):
         ]
 
 class HeuristicDetector(Detector):
-    """
-    Use a heuristic iterative algorithm to arrive at likely contaminants.
+    """Use a heuristic iterative algorithm to arrive at likely contaminants.
     This is the most accurate algorithm overall, but it has quadratic complexity
     and becomes too slow/memory-intenstive when n_reads > 50k.
     """
@@ -379,7 +378,11 @@ class HeuristicDetector(Detector):
         
         if len(results) == 0:
             return []
-            
+        
+        # TODO: For each retained match, pull out the longest sequence that
+        # matches to have a better shot of identifying long adapters that
+        # appear in full very infrequently
+        
         # Re-sort by frequency
         results.sort(key=lambda i: i[1], reverse=True)
         # Keep anything that's within 50% of the top hit

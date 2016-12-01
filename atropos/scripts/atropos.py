@@ -1181,7 +1181,8 @@ error rate."""
             "--algorithm",
             choices=('quality', 'shadow'), default="quality",
             help="Method for estimating error rates; quality = base qualities, "
-                "shadow = shadow regression")
+                "shadow = shadow regression. The former is much faster, but the "
+                "latter is more accurate.")
         parser.add_argument(
             "-m",
             "--max-bases",

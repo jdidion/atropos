@@ -162,8 +162,8 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
 class PairedErrorEstimator(object):
     def __init__(self, max_read_len=None,
                  estimator_class=BaseQualityErrorEstimator):
-        self.e1 = estimator_class(max_read_len)
-        self.e2 = estimator_class(max_read_len)
+        self.e1 = estimator_class(max_read_len=max_read_len)
+        self.e2 = estimator_class(max_read_len=max_read_len)
     
     def estimate(self):
         return (self.e1.estimate(), self.e2.estimate())
