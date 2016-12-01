@@ -1,10 +1,47 @@
 # Changes
 
-v1.0.16 (dev)
+v1.0.22 (dev)
 -------------
 
+* Abstracted the ErrorEstimator class to enable alternate implementations.
+* Added a new ShadowRegressionErrorEstimator that uses the ShadowRegression R package (Wang et al.) to more accurately estimate sequencing error rate. This requires that R and the [ShadowRegression package](http://bcb.dfci.harvard.edu/~vwang/shadowRegression.html) and its dependencies be installed -- MASS and ReadCount, which in turn depend on a bunch of Bioconductor packages. At some point, this dependency will go away when I reimplement the method in pure python.
+
+v1.0.21 (2016.11.23)
+--------------------
+
+* Bugfixes
+
+v1.0.20 (2016.11.22)
+--------------------
+
+* Changed the order of trimming operations - OverwriteReadModifier is now after read and quality trimming.
+* Refactored the main Atropos interface to improve testability.
+* Added more unit tests.
+
+v1.0.19 (2016.11.21)
+--------------------
+
+* Fixed a major bug in OverwriteReadModifier, and in the unit tests for paired-end trimmers.
+
+v1.0.18 (2016.11.20)
+--------------------
+
+* Added OverwriteReadModifier, a paired-end modifier that overwrites one read end with the other if the mean quality over the first N bases (where N is user-specified) of one is below a threshold value and the mean quality of the other is above a second threshold. This dramatically improves the number of high-quality read mappings in data sets where there are systematic problems with one read-end.
+
+v1.0.17 (2016.11.18)
+--------------------
+
+* Perform error correction when insert match fails but adapter matches are complementary
+* Improvements to handling of cached adapter lists
+* Merged reads are no longer written to --too-short-output by default
+* Many bugfixes and improvements in deployment (including a Makefile)
+* Many
+
+v1.0.16 (2016.09.20)
+-------------------
+
 * Migrate to Versioneer for version management.
-* Enable stderr as a valid output using the '_' shortcut.
+* Enable stderr as a valid output using the '\_' shortcut.
 * Add ability to specify SAM/BAM as input format.
 * Add option to select which read to use when treating a paired-end interleaved or SAM/BAM file as single-end.
 * Remove restrictions on the use of --merge-overlapping, and enable error correction during merging.
