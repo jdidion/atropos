@@ -19,7 +19,8 @@ from atropos.xopen import open_output, xopen
 # the default being false.
 
 class Match(object):
-    def __init__(self, seq_or_contam, count=0, names=None, match_frac=None, match_frac2=None):
+    def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,
+                 match_frac2=None, reads=None):
         if isinstance(seq_or_contam, ContaminantMatcher):
             self.seq = seq_or_contam.seq
             self.count = seq_or_contam.matches
@@ -33,6 +34,9 @@ class Match(object):
         self.match_frac = match_frac
         self.match_frac2 = match_frac2
         self.abundance = None
+        self.longest_match = None
+        if reads:
+            self.set_longest_match(reads)
     
     def __len__(self):
         return len(self.seq)
@@ -63,6 +67,13 @@ class Match(object):
     @property
     def is_known(self):
         return self.known_seqs is not None
+    
+    def set_longest_match(self, sequences):
+        for seq in sequences:
+            i = seq.index(self.seq)
+            l = len(self.seq) - i
+            if self.longest_match is None or self.longest_match[1] < l:
+                self.longest_match = (seq[i:], l)
     
     def estimate_abundance(self, read_sequences):
         """
@@ -100,7 +111,12 @@ class ContaminantMatcher(object):
             compare_seq = seqrc
         
         self.matches += n_matches
-        return (n_matches / self.n_kmers, n_matches / len(kmers), compare_seq)
+        match_frac1 = match_frac2 = 0
+        if self.n_kmers > 0:
+            match_frac1 = n_matches / self.n_kmers
+        if len(kmers) > 0:
+            match_frac2 = n_matches / len(kmers)
+        return (match_frac1, match_frac2, compare_seq)
 
 def create_contaminant_matchers(contaminants, k):
     return [
@@ -320,6 +336,7 @@ class HeuristicDetector(Detector):
         prev = None
         cur = {}
         results = {}
+        result_seqs = defaultdict(lambda: set())
         min_count = _min_count(k)
         
         # Identify candidate kmers for increasing values of k
@@ -337,6 +354,7 @@ class HeuristicDetector(Detector):
                 for kmer, (count, seqs) in prev.items():
                     if not any(seq in cur for seq in seqs) and sequence_complexity(kmer) > 1.0:
                         results[kmer] = count
+                        result_seqs[kmer].update(seqs)
             
             k += 1
             kmers = defaultdict(lambda: [0, set()])
@@ -388,9 +406,9 @@ class HeuristicDetector(Detector):
         # Keep anything that's within 50% of the top hit
         # TODO: make this user-configurable?
         min_count = int(results[0][1] * 0.5)
-        results = filter(lambda x: x[1] >= min_count, results)
+        results = (x for x in results if x[1] >= min_count)
         # Convert to matches
-        matches = [Match(x[0], x[1]) for x in results]
+        matches = [Match(x[0], x[1], reads=result_seqs[x[0]]) for x in results]
         
         if self.known_contaminants:
             # Match to known sequences
@@ -398,11 +416,8 @@ class HeuristicDetector(Detector):
             known = {}
             unknown = []
             
-            for match in matches:
-                seq = match.seq
+            def find_best_match(seq, best_matches, best_match_frac):
                 seqrc = reverse_complement(seq)
-                best_matches = {}
-                best_match_frac = (self.min_contaminant_match_frac, 0)
                 for contam in contaminants:
                     match_frac1, match_frac2, compare_seq = contam.match(seq, seqrc)
                     if match_frac1 < best_match_frac[0]:
@@ -415,6 +430,15 @@ class HeuristicDetector(Detector):
                             best_matches = {}
                             best_match_frac = (match_frac1, match_frac2)
                         best_matches[contam] = (match, (match_frac1, match_frac2))
+                return (best_matches, best_match_frac)
+            
+            for match in matches:
+                best_matches, best_match_frac = find_best_match(
+                    match.seq, {}, (self.min_contaminant_match_frac, 0))
+                
+                if match.longest_match:
+                    best_matches, best_match_frac = find_best_match(
+                        match.longest_match[0], best_matches, best_match_frac)
                 
                 if best_matches:
                     for contam, match in best_matches.items():
@@ -558,20 +582,32 @@ def summarize_contaminants(outstream, matches, n_reads, header=None):
         print(header, file=outstream)
         print('-' * len(header), file=outstream)
     
-    print("Detected {} adapters/contaminants:".format(len(matches)), file=outstream)
+    n_matches = len(matches)
+    print("Detected {} adapters/contaminants:".format(n_matches), file=outstream)
+    
+    if n_matches == 0:
+        print("Try increasing --max-reads", file=outstream)
+        return
     
     pad = len(str(len(matches)))
+    pad2 = ' ' * (pad + 2)
+    def println(s):
+        print(pad2 + s, file=outstream)
+    
     for i, match in enumerate(matches):
-        print(("{:>" + str(pad) + "}. {}").format(i+1, match.seq), file=outstream)
+        print(("{:>" + str(pad) + "}. Longest kmer: {}").format(i+1, match.seq), file=outstream)
+        if match.longest_match:
+            println("Longest matching sequence: {}".format(match.longest_match[0]))
         if match.is_known:
-            print("    Name(s): {}".format(",\n             ".join(match.names)), file=outstream)
-            print("    Known sequence(s): {}".format(",\n             ".join(match.known_seqs)), file=outstream)
-            print("    Known sequence K-mers that match detected contaminant: {:.2%}".format(match.match_frac), file=outstream)
+            println("Name(s): {}".format(",\n{}".format(' ' * (pad + 11)).join(match.names)))
+            println("Known sequence(s): {}".format(",\n{}".format(' ' * (pad + 11)).join(match.known_seqs)))
+            println("Known sequence K-mers that match detected contaminant: {:.2%}".format(match.match_frac))
         if match.abundance:
-            print("    Abundance (full-length) in {} reads: {} ({:.1%})".format(n_reads, match.abundance, match.abundance / n_reads))
+            println("Abundance (full-length) in {} reads: {} ({:.1%})".format(
+                n_reads, match.abundance, match.abundance / n_reads))
         if match.match_frac2:
-            print("    Detected contaminant kmers that match known sequence: {:.2%}".format(match.match_frac2), file=outstream)
+            println("Detected contaminant kmers that match known sequence: {:.2%}".format(match.match_frac2))
         if match.count_is_frequency:
-            print("    Frequency of k-mers: {:.2%}".format(match.count), file=outstream)
+            println("Frequency of k-mers: {:.2%}".format(match.count))
         else:
-            print("    Number of k-mer matches: {}".format(match.count), file=outstream)
+            println("Number of k-mer matches: {}".format(match.count))

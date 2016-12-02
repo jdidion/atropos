@@ -35,3 +35,5 @@ paper/data/real/
 .DS_Store
 atropos-*/
 .adapters
+paper/data/rna/
+paper/data/wgbs/
