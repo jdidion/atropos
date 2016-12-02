@@ -1,36 +1,61 @@
 #!/bin/bash
+
 # This script installs all the software in the ../software
 # directory into the ../bin directory. It also installs
-# Atropos from pypi, and it installs bwameth from GitHub.
+# Atropos from pypi.
+
 # Prerequisites:
-# 1. modern C++ compiler (we use homebrew/linuxbrew to install gcc 5.1)
-# 2. python 3.3+ (we recommend Anaconda)
-#    * cython 0.24+ ('conda install cython' or 'pip install cython')
-# 3. To install SeqPurge, you need
+# 1. We recommend using conda to install all of these packages. Conda is
+# available stand-alone (http://conda.pydata.org/miniconda.html) or as part of
+# the Anaconda python distribution (https://www.continuum.io/downloads).
+# 2. modern C++ compiler (we use gcc 5.1)
+# 3. python 3.3+
+#    * We recommend using a virtual environment, e.g.
+#      'conda create -n atropos python=3.5'
+#    * cython 0.25+
+# 4. To install ART you need:
+#    * automake
+# 5. To install SeqPurge, you need
 #    * Qt 5.3+ with xmlpatterns and mysql packages
 #    * git
 #    * cmake
-# 4. To run the analyses on real data, you need
+# 6. To run the analyses on real data, you need the following, which are all
+# available in the bioconda repository: https://anaconda.org/bioconda):
 #    * BWA (the MEM command is required; we used version 0.7.15)
+#    * bwa-meth
 #    * STAR aligner
 #    * samtools
 #    * bedops
+#    * SRA tools
+# 7. Download the reference sequence and annotations and place them in $root/data
+#    * Reference genome NCBI GRCh37:
+#      ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/ARCHIVE/BUILD.37.3
+#        * If you download individual chromsome files, concatenate them all
+#          together into a single fasta
+#    * ENCODE v19 Annotations:
+#      ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz
 
 scripts=`pwd`
 root=`dirname $scripts`
-mkdir ../software/build
+mkdir $root/software/build
 automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 # Set this to the location of the hg19 reference multifasta.
 # If this file doesn't exist, the bwameth index won't be built.
-genome=../data/ref.fa
+genome_dir=$root/data
+genome=$genome_dir/ref.fa
+annotations=../data/gencode.v19.annotation.gtf
 
-# We need some python libraries for the benchmarking scripts.
-# Note - if this doesn't work for you, you'll need to checkout
+# For the benchmarking script, there is the option to compute
+# edit distance between the untrimmed and trimmed reads. We
+# did not use those metrics in the paper. If you want to enable
+# the edit distance calculation, you need to install the 'editdistance'
+# pyton library.
+# pip install editdistance
+# Note: if this doesn't work for you, you'll need to checkout
 # the editdistance repository and edit setup.py to enable the
 # 'cythonize' command, which will recompile the cython code for
 # your local environment. So you would run:
 # python setup.py build_ext -i && python setup.py install
-pip install editdistance
 
 # Install modified ART
 mkdir ../software/build/art &&
@@ -51,7 +76,7 @@ mkdir ../software/build/art &&
     cd ../../../scripts
 
 # Install version of Atropos on which manuscript is based
-pip install atropos==1.0.16
+pip install atropos==1.0.22
 
 # Install Skewer
 mkdir ../software/build/skewer &&
@@ -78,14 +103,11 @@ mkdir ../software/build/seqpurge &&
 
 if [ -f $genome ]
 then
-    # Install bwameth
-    pip install toolshed
-    mkdir ../software/build/bwameth &&
-        cd ../software/build/bwameth &&
-        wget https://github.com/brentp/bwa-meth/archive/v0.10.tar.gz &&
-        tar xzvf v0.10.tar.gz &&
-        cd bwa-meth-0.10/ &&
-        sudo python setup.py install
-    # Build the index
+    # Build the bwa-meth index
     bwameth.py index $genome
+    
+    # Build the STAR index
+    # Set --runThreadN to the number of threads available on your machine
+    STAR --runMode genomeGenerate --genomeDir $genome_dir --genomeFastaFiles \
+    $genome --runThreadN 24 --sjdbGTFfile $annotations --sjdbOverhang 75
 fi
