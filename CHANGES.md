@@ -1,10 +1,11 @@
 # Changes
 
-v1.0.22 (dev)
--------------
+v1.0.22 (2012.12.02)
+--------------------
 
 * Abstracted the ErrorEstimator class to enable alternate implementations.
 * Added a new ShadowRegressionErrorEstimator that uses the ShadowRegression R package (Wang et al.) to more accurately estimate sequencing error rate. This requires that R and the [ShadowRegression package](http://bcb.dfci.harvard.edu/~vwang/shadowRegression.html) and its dependencies be installed -- MASS and ReadCount, which in turn depend on a bunch of Bioconductor packages. At some point, this dependency will go away when I reimplement the method in pure python.
+* The error command now reports the longest matching read fragment, which is usually a closer match for the actual adapter sequence than the longest matching k-mer.
 
 v1.0.21 (2016.11.23)
 --------------------
