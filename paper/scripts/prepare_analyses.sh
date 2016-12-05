@@ -33,7 +33,7 @@ while getopts "t:r:o:g:a:" opt; do
     t)
         threads=$OPTARG
         ;;
-    r)``
+    r)
         root=$OPTARG
         ;;
     o)
@@ -42,7 +42,8 @@ while getopts "t:r:o:g:a:" opt; do
     g)
         genome_dir=$OPTARG
         ;;
-    a)  annotations=$OPTARG
+    a)
+        annotations=$OPTARG
         ;;
     esac
 done
