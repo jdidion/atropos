@@ -212,14 +212,14 @@ do
   # Generate commands to map reads
   if [ "$err" == "real_rna" ]
   then
-      STAR_INDEX_DIR=`dirname $genome_dir/STAR`
+      STAR_INDEX_DIR="$genome_dir/STAR"
       
-      if [ ! -f $genome_dir/STAR ]
+      if [ ! -f $STAR_INDEX_DIR ]
       then
         echo "STAR index does not exist; make sure to build it before running the align commands"
       fi
       
-      echo "./star_align.sh unmapped $base $threads $genome_dir/STAR" >> $align_commands
+      echo "./star_align.sh unmapped $base $threads $STAR_INDEX_DIR" >> $align_commands
       echo "$SAMTOOLS sort -n -O bam -@ $threads -o ${outdir}/untrimmed.sorted.bam" \
       "${outdir}/untrimmed_rnaAligned.out.bam" >> $sort_commands
       echo "$BAM2BED --all-reads --do-not-sort < ${outdir}/untrimmed.sorted.bam" \
@@ -231,7 +231,7 @@ do
         seqpurge_${threads}_real_wgs_q${qcut} \
         skewer_${threads}_real_wgs_q${qcut}
       do
-          echo "./star_align.sh ${profile} ${outdir}/${profile} $threads $genome_dir/STAR" >> $align_commands
+          echo "./star_align.sh ${profile} ${outdir}/${profile} $threads $STAR_INDEX_DIR" >> $align_commands
           echo "$SAMTOOLS sort -n -O bam -@ $threads -o ${outdir}/${profile}.sorted.bam" \
           "${outdir}/${profile}_rnaAligned.out.bam" >> $sort_commands
           echo "$BAM2BED --all-reads --do-not-sort < ${outdir}/${profile}.sorted.bam" \
