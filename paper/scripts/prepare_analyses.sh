@@ -295,7 +295,7 @@ do
         "-o $outdir/simulated_accuracy/$profile.txt" \
         "-s $outdir/simulated_accuracy/$profile.summary.txt" \
         "-t $outdir/simulated_accuracy/table.txt" \
-        "--name $profile" >> $commands
+        "--name $profile" >> $summarize_commands
     done
   fi
 done
