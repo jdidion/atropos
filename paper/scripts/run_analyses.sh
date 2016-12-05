@@ -36,6 +36,9 @@ shift $((OPTIND-1))
 
 [ "$1" = "--" ] && shift
 
+timing_commands="timing_commands_t${threads}.sh"
+rm -f $timing_commands
+
 for threads in $thread_list
 do
     rm -f ./commands_t${threads}.sh ./commands_t${threads}_shuf.sh
@@ -47,25 +50,37 @@ do
     then
         if [ "$env" == "local" ]
         then
+            # summarize timing
+            echo "python summarize_timing_info.py -i $outdir/timing_local_t4.txt --output-format latex" \
+              "-o $root/results/timing_local_table.latex --table-name 'local-timing'" \
+              "--table-caption 'Execution time for programs running on desktop with 4 threads.'" >> $timing_commands
+            
             rm -f timing_log_${threads}.txt
-            ./commands_t${threads}_shuf.sh 2>> ../results/timing_log_${threads}.txt
-            ./rename_outputs.sh
-            ./align_commands_t${threads}.sh
-            ./sort_commands_t${threads}.sh
-            ./bedops_commands_t${threads}.sh
-            ./summarize.sh
+            ./commands_t${threads}_shuf.sh 2>> ../results/timing_log_${threads}.txt && \
+            ./rename_outputs.sh && \
+            ./align_commands_t${threads}.sh && \
+            ./sort_commands_t${threads}.sh && \
+            ./bedops_commands_t${threads}.sh && \
+            ./summarize.sh && \
+            ./$timing_commands
         else
+            echo "cat commands_t*.e* | python summarize_timing_info.py --output-format latex" \
+              "-o $root/results/timing_cluster_table.latex --table-name 'cluster-timing'" \
+              "--table-caption 'Execution time for programs running on a cluster.'" >> $timing_commands
+            
             trimJID=`swarm --jobid --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}.sh`
             # rename skewer outputs
             renameJID=`qsub -hold_jid $trimJID rename_outputs.sh`
             # map reads
             alignJID=`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}.sh`
+            # summarize timing
+            swarm --hold_jid $alignHJID --file $timing_commands
             # name-sort reads
             sortJID=`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}.sh`
             # overlap RNA-seq alignments with GENCODE annotations
             overlapJID=`swarm --jobid --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}.sh`
             # summarize trimming accuracy
-            summarizeJID=`swarm --jobid --hold_jid $overlapJID --file summarize_commands.sh`
+            swarm --hold_jid $overlapJID --file summarize_commands.sh
         fi
     fi
 done

@@ -272,6 +272,23 @@ do
           echo "$SAMTOOLS sort -n -O bam -@ $threads -o " \
           "$outdir/$profile.sorted.bam $outdir/$profile.bam" >> $sort_commands
       done
+    else
+        mkdir -p $outdir/simulated_accuracy
+        for profile in \
+          atropos_4_${err}_q0_adapter_writercomp \
+          atropos_4_${err}_q0_insert_writercomp \
+          seqpurge_4_${err}_q0 \
+          skewer_4_${err}_q0-trimmed-pair
+        do
+          echo "python summarize_simulated_trimming_accuracy.py" \
+          "-a1 $root/data/simulated/sim_${err}.1.aln" \
+          "-a2 $root/data/simulated/sim_${err}.2.aln" \
+          "-r1 $outdir/$profile.1.fq.gz -r2 $outdir/$profile.2.fq.gz" \
+          "-o $outdir/simulated_accuracy/$profile.txt" \
+          "-s $outdir/simulated_accuracy/$profile.summary.txt" \
+          "-t $outdir/simulated_accuracy/table.txt" \
+          "--name $profile" >> $commands
+        done
     done
     
     echo "python summarize_real_trimming_accuracy.py -d ${outdir}" \
