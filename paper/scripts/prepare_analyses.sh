@@ -240,7 +240,7 @@ do
       done
   elif [ "$err" == "real_wgbs" ]
   then
-    if [ ! -f $genome_dir/bwa-meth/ref.bwameth.c2t ]
+    if [ ! -f $genome_dir/bwa-meth/ref.fasta.bwameth.c2t ]
     then
       echo "bwa-meth index does not exist; make sure to build it before running the align commands"
     fi
