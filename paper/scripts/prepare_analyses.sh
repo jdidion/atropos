@@ -238,6 +238,10 @@ do
           "| cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id -" \
           "$annotations > ${outdir}/${profile}.overlap.txt" >> $bedops_commands
       done
+      
+      echo "python summarize_real_trimming_accuracy.py -d ${outdir}" \
+      "-o ${outdir}/accuracy.txt -H ${outdir}/trimmed_hists.txt" \
+      "--no-edit-distance --no-progress mna -B '{name}.overlap.txt'" >> $summarize_commands
   elif [ "$err" == "real_wgbs" ]
   then
     if [ ! -f $genome_dir/bwa-meth/ref.fasta.bwameth.c2t ]
@@ -269,10 +273,12 @@ do
           "$outdir/$profile.sorted.bam $outdir/$profile.bam" >> $sort_commands
       done
     done
+    
+    echo "python summarize_real_trimming_accuracy.py -d ${outdir}" \
+    "-o ${outdir}/accuracy.txt -H ${outdir}/trimmed_hists.txt" \
+    "--no-edit-distance --no-progress" >> $summarize_commands
   fi
 done
-
-qsub -b y --hold_jid $overlapJID python summarize_real_trimming_accuracy.py -d results/rnaseq -o results/rnaseq/accuracy.txt -H results/rnaseq/trimmed_hists.txt --no-edit-distance --no-progress mrna -B '{name}.overlap.txt'
 
 chmod +x $commands
 chmod +x $align_commands

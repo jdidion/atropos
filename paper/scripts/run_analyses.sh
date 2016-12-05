@@ -59,13 +59,13 @@ do
             # rename skewer outputs
             renameJID=`qsub -hold_jid $trimJID rename_outputs.sh`
             # map reads
-            alignJID=`swarm --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}.sh`
+            alignJID=`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}.sh`
             # name-sort reads
-            sortJID=`swarm --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}.sh`
+            sortJID=`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}.sh`
             # overlap RNA-seq alignments with GENCODE annotations
-            overlapJID=`swarm --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}.sh`
+            overlapJID=`swarm --jobid --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}.sh`
             # summarize trimming accuracy
-            summarizeJID=`swarm --hold_jid $overlapJID --file summarize_commands.sh`
+            summarizeJID=`swarm --jobid --hold_jid $overlapJID --file summarize_commands.sh`
         fi
     fi
 done
