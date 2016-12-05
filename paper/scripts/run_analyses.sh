@@ -43,7 +43,7 @@ do
     # shuffle the commands just to make sure there's no bias associated with the ordering
     shuf -o ./commands_t${threads}_shuf.sh ./commands_t${threads}.sh
     
-    if [ "$mode" == "run"]
+    if [ "$mode" == "run" ]
     then
         if [ "$env" == "local" ]
         then
