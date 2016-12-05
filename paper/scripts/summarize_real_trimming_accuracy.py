@@ -121,7 +121,7 @@ class TableRow(object):
             self.failed = True
         if discarded:
             self.discarded = True
-        if self.regions:
+        if self.regions and not discarded:
             self.regions.skip(self)
     
     def set_from_pair(self, r1, r2):
