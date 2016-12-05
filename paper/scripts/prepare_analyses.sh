@@ -23,9 +23,10 @@ script_dir=`pwd`
 root=`dirname $script_dir`
 outdir_root='results'
 # reference genome (for mapping real reads)
-genome=$root/data/GRCh37.fa
+genome_dir=$root/data/reference
+genome_fasta=$genome_dir/ref.fasta
 # transcriptome annotations
-annotations=$root/data/gencode.v19.gff
+annotations=$root/data/reference/gencode.v19.gff
 
 while getopts "t:r:o:g:a:" opt; do
     case "$opt" in
@@ -39,7 +40,7 @@ while getopts "t:r:o:g:a:" opt; do
         outdir_root=$OPTARG
         ;;
     g)
-        genome=$OPTARG
+        genome_dir=$OPTARG
         ;;
     a)  annotations=$OPTARG
         ;;
@@ -210,14 +211,14 @@ do
   # Generate commands to map reads
   if [ "$err" == "real_rna" ]
   then
-      STAR_INDEX_DIR=`dirname $genome`
+      STAR_INDEX_DIR=`dirname $genome_dir/STAR`
       
-      if [ ! -f $genome.umfa ]
+      if [ ! -f $genome_dir/STAR ]
       then
         echo "STAR index does not exist; make sure to build it before running the align commands"
       fi
       
-      echo "./star_align.sh unmapped $base $threads $genome" >> $align_commands
+      echo "./star_align.sh unmapped $base $threads $genome_dir/STAR" >> $align_commands
       echo "$SAMTOOLS sort -n -O bam -@ $threads -o ${outdir}/untrimmed.sorted.bam" \
       "${outdir}/untrimmed_rnaAligned.out.bam" >> $sort_commands
       echo "$BAM2BED --all-reads --do-not-sort < ${outdir}/untrimmed.sorted.bam" \
@@ -229,7 +230,7 @@ do
         seqpurge_${threads}_real_wgs_q${qcut} \
         skewer_${threads}_real_wgs_q${qcut}
       do
-          echo "./star_align.sh ${profile} ${outdir}/${profile} $threads $genome" >> $align_commands
+          echo "./star_align.sh ${profile} ${outdir}/${profile} $threads $genome_dir/STAR" >> $align_commands
           echo "$SAMTOOLS sort -n -O bam -@ $threads -o ${outdir}/${profile}.sorted.bam" \
           "${outdir}/${profile}_rnaAligned.out.bam" >> $sort_commands
           echo "$BAM2BED --all-reads --do-not-sort < ${outdir}/${profile}.sorted.bam" \
@@ -238,7 +239,7 @@ do
       done
   elif [ "$err" == "real_wgbs" ]
   then
-    if [ ! -f $genome.bwameth.c2t ]
+    if [ ! -f $genome_dir/bwa-meth/ref.bwameth.c2t ]
     then
       echo "bwa-meth index does not exist; make sure to build it before running the align commands"
     fi
@@ -246,7 +247,7 @@ do
     # map the untrimmed reads
     rg="@RG\tID:untrimmed\tSM:untrimmed\tLB:untrimmed\tPL:ILLUMINA"
     echo "$BWAMETH -z -t ${threads} -o ${outdir}/untrimmed_wgbs.bam" \
-    "--read-group '$rg' --reference $genome $fq1 $fq2" >> $align_commands
+    "--read-group '$rg' --reference $genome_dir/bwa-meth/ref $fq1 $fq2" >> $align_commands
     echo "$SAMTOOLS sort -n -O bam -@ $threads -o" \
     "$outdir/untrimmed_wgbs.sorted.bam $outdir/untrimmed_wgbs.bam" >> $sort_commands
   
@@ -262,7 +263,7 @@ do
           fq1=$outdir/${profile}.1.fq.gz
           fq2=$outdir/${profile}.2.fq.gz
           echo "$BWAMETH -z -t ${threads} -o ${outdir}/$profile.bam " \
-          "--read-group '$rg' --reference $genome $fq1 $fq2" >> $align_commands
+          "--read-group '$rg' --reference $genome_dir/bwa-meth/ref $fq1 $fq2" >> $align_commands
           echo "$SAMTOOLS sort -n -O bam -@ $threads -o " \
           "$outdir/$profile.sorted.bam $outdir/$profile.bam" >> $sort_commands
       done

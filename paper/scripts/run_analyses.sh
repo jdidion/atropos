@@ -65,7 +65,7 @@ do
             # overlap RNA-seq alignments with GENCODE annotations
             overlapJID=`swarm --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}.sh`
             # summarize trimming accuracy
-            swarm --hold_jid $overlapJID --file summarize_commands.sh
+            summarizeJID=`swarm --hold_jid $overlapJID --file summarize_commands.sh`
         fi
     fi
 done

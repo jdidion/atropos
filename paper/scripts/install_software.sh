@@ -41,7 +41,7 @@ mkdir $root/software/build
 automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 # Set this to the location of the hg19 reference multifasta.
 # If this file doesn't exist, the bwameth index won't be built.
-genome_dir=$root/data
+genome_dir=$root/data/reference
 genome=$genome_dir/ref.fa
 annotations=../data/gencode.v19.annotation.gtf
 
@@ -103,11 +103,23 @@ mkdir ../software/build/seqpurge &&
 
 if [ -f $genome ]
 then
-    # Build the bwa-meth index
-    bwameth.py index $genome
+    if [ ! -f $genome_dir/STAR ]
+    then
+    fi
     
-    # Build the STAR index
-    # Set --runThreadN to the number of threads available on your machine
-    STAR --runMode genomeGenerate --genomeDir $genome_dir --genomeFastaFiles \
-    $genome --runThreadN 24 --sjdbGTFfile $annotations --sjdbOverhang 75
+    if [ ! -f $genome_dir/bwa-meth ]
+    then
+        # Build the bwa-meth index
+        mkdir $genome_dir/bwa-meth
+        ln -s $genome $genome_dir/bwa-meth/ref.fa
+        bwameth.py index $genome_dir/bwa-meth/ref.fa
+    fi
+    
+    if [ ! -f $genome_dir/STAR ]
+    then
+        # Build the STAR index
+        # Set --runThreadN to the number of threads available on your machine
+        STAR --runMode genomeGenerate --genomeDir $genome_dir/STAR --genomeFastaFiles \
+        $genome --runThreadN 24 --sjdbGTFfile $annotations --sjdbOverhang 75
+    fi
 fi
