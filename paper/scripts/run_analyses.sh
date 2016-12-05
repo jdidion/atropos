@@ -18,7 +18,7 @@ env='local'
 thread_list='4 8 16'
 mode='dry'
 
-while getopts "e:t:o:" opt; do
+while getopts "t:o:" opt; do
     case "$opt" in
     t)
         thread_list=$OPTARG
@@ -33,49 +33,46 @@ shift $((OPTIND-1))
 
 [ "$1" = "--" ] && shift
 
-timing_commands="timing_commands_t${threads}.sh"
-rm -f $timing_commands
-
 for threads in $thread_list
 do
-    rm -f ./commands_t${threads}.sh ./commands_t${threads}_shuf.sh
-    ./prepare_analyses.sh -t $threads -r $ATROPOS_ROOT -o $ATROPOS_RESULT
+    rm -f ./commands_t${threads} ./commands_t${threads}_shuf
+    ./prepare_analyses -t $threads -r $ATROPOS_ROOT -o $ATROPOS_RESULT
     # shuffle the commands just to make sure there's no bias associated with the ordering
-    shuf -o ./commands_t${threads}_shuf.sh ./commands_t${threads}.sh
+    shuf -o ./commands_t${threads}_shuf ./commands_t${threads}
     
     if [ "$mode" == "local" ]
     then
         # summarize timing
+        timing_commands="timing_commands_t${threads}"
+        rm -f $timing_commands
         echo "python summarize_timing_info.py -i $outdir/timing_local_t4.txt --output-format latex" \
           "-o $root/results/timing_local_table.latex --table-name 'local-timing'" \
           "--table-caption 'Execution time for programs running on desktop with 4 threads.'" >> $timing_commands
         
         rm -f timing_log_${threads}.txt
-        ./commands_t${threads}_shuf.sh 2>> ../results/timing_log_${threads}.txt && \
-        ./rename_outputs.sh && \
-        ./align_commands_t${threads}.sh && \
-        ./sort_commands_t${threads}.sh && \
-        ./bedops_commands_t${threads}.sh && \
-        ./summarize.sh && \
+        ./commands_t${threads}_shuf 2>> ../results/timing_log_${threads}.txt && \
+        ./rename_outputs && \
+        ./align_commands_t${threads} && \
+        ./sort_commands_t${threads} && \
+        ./bedops_commands_t${threads} && \
+        ./summarize && \
         ./$timing_commands
     elif [ "$mode" == "cluster" ]
     then
-        echo "cat commands_t*.e* | python summarize_timing_info.py --output-format latex" \
-          "-o $root/results/timing_cluster_table.latex --table-name 'cluster-timing'" \
-          "--table-caption 'Execution time for programs running on a cluster.'" >> $timing_commands
-        
-        trimJID=`swarm --jobid --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}.sh`
+        timing_commands="timing_commands_t${threads}"
+        rm -f $timing_commands
+        trimJID=`swarm --jobid --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}`
         # rename skewer outputs
-        renameJID=`qsub -hold_jid $trimJID rename_outputs.sh`
+        renameJID=`qsub -hold_jid $trimJID rename_outputs`
         # map reads
-        alignJID=`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}.sh`
+        alignJID=`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}`
         # summarize timing
-        swarm --hold_jid $alignHJID --file $timing_commands
+        qsub -b y -hold_jid $alignJID cat commands_t*.e* | python summarize_timing_info.py --output-format latex -o $root/results/timing_cluster_table.latex --table-name 'cluster-timing' --table-caption 'Execution time for programs running on a cluster.'
         # name-sort reads
-        sortJID=`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}.sh`
+        sortJID=`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}`
         # overlap RNA-seq alignments with GENCODE annotations
-        overlapJID=`swarm --jobid --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}.sh`
+        overlapJID=`swarm --jobid --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}`
         # summarize trimming accuracy
-        swarm --hold_jid $overlapJID --file summarize_commands.sh
+        swarm --hold_jid $overlapJID --file summarize_commands
     fi
 done

@@ -10,7 +10,7 @@
 # InfiniBand??). Atropos is run both with and without a separate Writer
 # process. The tests are run on both simulated data and real data.
 #
-# Call: prepare_simulated_analyses.sh \
+# Call: prepare_analyses.sh \
 # -t <threads> -r <root dir> -o <output dir> -g <genome> -a <annotations>
 
 # A POSIX variable; reset in case getopts has been used
@@ -52,15 +52,15 @@ shift $((OPTIND-1))
 
 [ "$1" = "--" ] && shift
 
-commands="commands_t$threads.sh"
+commands="commands_t$threads"
 rm -f $commands
-align_commands="align_commands_t${threads}.sh"
+align_commands="align_commands_t${threads}"
 rm -f $align_commands
-sort_commands="sort_commands_t${threads}.sh"
+sort_commands="sort_commands_t${threads}"
 rm -f $sort_commands
-bedops_commands="bedops_commands_t${threads}.sh"
+bedops_commands="bedops_commands_t${threads}"
 rm -f $bedops_commands
-summarize_commands="summarize_commands_t${threads}.sh"
+summarize_commands="summarize_commands_t${threads}"
 rm -f $summarize_commands
 
 echo "#!/bin/bash" >> $commands
