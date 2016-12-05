@@ -214,7 +214,7 @@ do
   then
       STAR_INDEX_DIR="$genome_dir/STAR"
       
-      if [ ! -f $STAR_INDEX_DIR ]
+      if [ ! -d $STAR_INDEX_DIR ]
       then
         echo "STAR index does not exist; make sure to build it before running the align commands"
       fi
