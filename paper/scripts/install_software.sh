@@ -43,7 +43,7 @@ automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 # If this file doesn't exist, the bwameth index won't be built.
 genome_dir=$root/data/reference
 genome=$genome_dir/ref.fa
-annotations=../data/gencode.v19.annotation.gtf
+annotations=$genome_dir/gencode.v19.annotation.gtf
 
 # For the benchmarking script, there is the option to compute
 # edit distance between the untrimmed and trimmed reads. We
