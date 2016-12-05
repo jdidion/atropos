@@ -98,6 +98,7 @@ do
   if [ "$err" == "real_rna" ]
   then
     outdir=$outdir_root/rna
+    echo "mkdir -p $outdir" >> $commands
     base=$root/data/rna/rna
     fq1=$root/data/rna/rna.1.fq.gz
     fq2=$root/data/rna/rna.2.fq.gz
@@ -119,6 +120,7 @@ do
   elif [ "$err" == "real_wgbs" ]
   then
       outdir=$outdir_root/wgbs
+      echo "mkdir -p $outdir" >> $commands
       fq1=$root/data/wgbs/GM12878_WGBS.1.fq.gz
       fq2=$root/data/wgbs/GM12878_WGBS.2.fq.gz
       # download data
@@ -137,6 +139,7 @@ do
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
   else
       outdir=$outdir_root/simulated
+      echo "mkdir -p $outdir" >> $commands
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
       quals='0'
