@@ -76,7 +76,7 @@ export DYLD_LIBRARY_PATH=\$DYLD_LIBRARY_PATH:${root}/software/bin
 # This line is required on my environment to have SeqPurge work.
 # If SeqPurge doesn't work for you, try uncommenting it and adjusting it for
 # your own environment.
-#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/didionjp/anaconda/envs/py3/lib:/usr/lib64:/lib64
+#export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/home/didionjp/anaconda/envs/py3/lib:/usr/lib64:/lib64
 EOM1
 
 for d in simulated wgbs rna
@@ -89,7 +89,7 @@ done
 # binaries
 ATROPOS=atropos
 SEQPURGE=$root/software/bin/SeqPurge
-SKEWER=$root/software/bin/skewer
+SKEWER=skewer
 BWA=bwa
 STAR=STAR
 BWAMETH=bwameth.py
@@ -349,17 +349,17 @@ ALIGN_GB_PER_PROCESS=64
 SORT_GB_PER_PROCESS=8
 OVERLAP_GB_PER_PROCESS=16
 # run trim commands
-trimJID=\`swarm --jobid --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}\`
+trimJID=\`swarm --jobid --threads-per-process ${threads} --gb-per-process \$GB_PER_PROCESS --file commands_t${threads}\`
 # rename skewer outputs
 renameJID=\`qsub -hold_jid $trimJID rename_outputs\`
 # map reads
-alignJID=\`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}\`
+alignJID=\`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process \$ALIGN_GB_PER_PROCESS --file align_commands_t${threads}\`
 # summarize timing
 qsub -b y -hold_jid $alignJID cat commands_t${threads}.e* | python summarize_timing_info.py --output-format latex -o $root/results/timing_cluster_table_t${threads}.latex --table-name 'cluster-timing' --table-caption 'Execution time for programs running with ${threads} threads on a cluster.'
 # name-sort reads
-sortJID=\`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}\`
+sortJID=\`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process \$SORT_GB_PER_PROCESS --file sort_commands_t${threads}\`
 # overlap RNA-seq alignments with GENCODE annotations
-overlapJID=\`swarm --jobid --hold_jid $sortJID --gb-per-process $OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}\`
+overlapJID=\`swarm --jobid --hold_jid $sortJID --gb-per-process \$OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}\`
 # summarize trimming accuracy
 swarm --hold_jid $overlapJID --file summarize_commands
 EOM3

@@ -78,16 +78,8 @@ mkdir ../software/build/art &&
 # Install version of Atropos on which manuscript is based
 pip install atropos==1.0.22
 
-# Install Skewer
-mkdir ../software/build/skewer &&
-    cd ../software/build/skewer &&
-    cp ../../skewer_2016.08.04.zip . &&
-    unzip skewer_2016.08.04.zip &&
-    cd skewer-master &&
-    sed -i -e 's/\/usr\/local\/bin/..\/..\/..\/bin/' Makefile &&
-    make &&
-    make install &&
-    cd ../../../scripts
+# Install Skewer from conda
+conda install skewer
 
 # Install SeqPurge
 mkdir ../software/build/seqpurge &&
