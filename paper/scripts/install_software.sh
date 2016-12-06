@@ -13,6 +13,7 @@
 #    * We recommend using a virtual environment, e.g.
 #      'conda create -n atropos python=3.5'
 #    * cython 0.25+
+#    * mako
 # 4. To install ART you need:
 #    * automake
 # 5. To install SeqPurge, you need

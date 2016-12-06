@@ -61,7 +61,6 @@ def format_table(raw_rows):
         for t in threads:
             if t in table[key]:
                 times = table[key][t]
-                assert len(times) > 1, "Missing timing info for {} {}".format(key, t)
                 min_time = min(times)
                 max_time = max(times)
                 row.append("{} - {}".format(min_time, max_time))
