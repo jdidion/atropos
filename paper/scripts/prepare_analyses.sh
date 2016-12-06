@@ -343,6 +343,10 @@ EOM2
 elif [ "$mode" == "cluster" ]
 then
 
+echo "cat commands_t${threads}.e* | python summarize_timing_info.py "\
+"--output-format latex -o $root/results/timing_cluster_table_t${threads}.latex" \
+"--table-name 'cluster-timing' --table-caption 'Execution time for programs running with ${threads} threads on a cluster.'" >> $timing_commands
+
 cat >> $run <<EOM3
 GB_PER_PROCESS=4
 ALIGN_GB_PER_PROCESS=64
@@ -355,7 +359,7 @@ renameJID=\`qsub -hold_jid $trimJID rename_outputs\`
 # map reads
 alignJID=\`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process \$ALIGN_GB_PER_PROCESS --file align_commands_t${threads}\`
 # summarize timing
-qsub -b y -hold_jid $alignJID cat commands_t${threads}.e* | python summarize_timing_info.py --output-format latex -o $root/results/timing_cluster_table_t${threads}.latex --table-name 'cluster-timing' --table-caption 'Execution time for programs running with ${threads} threads on a cluster.'
+qsub -b y -hold_jid $alignJID $timing_commands
 # name-sort reads
 sortJID=\`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process \$SORT_GB_PER_PROCESS --file sort_commands_t${threads}\`
 # overlap RNA-seq alignments with GENCODE annotations

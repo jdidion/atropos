@@ -24,8 +24,15 @@ def summarize_timing(lines):
             assert line.startswith('real')
             time = float(line.rstrip()[5:])
             if profile[0] == 'atropos':
-                prog, threads, err, qcut, aligner, writer = profile
+                if len(profile) == 7:
+                    prog, threads, err1, err2, qcut, aligner, writer = profile
+                    err = '{}_{}'.format(err1, err2)
+                else:
+                    prog, threads, err, qcut, aligner, writer = profile
                 prog = "{} ({} + {})".format(profile[0], aligner, writer)
+            elif len(profile) == 5:
+                prog, threads, err1, err2, qcut = profile
+                err = '{}_{}'.format(err1, err2)
             else:
                 prog, threads, err, qcut = profile
             err = '0.' + err
