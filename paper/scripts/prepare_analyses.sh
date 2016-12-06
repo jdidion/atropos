@@ -82,7 +82,7 @@ OVERLAP_GB_PER_PROCESS=16
 export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$ATROPOS_ROOT/software/bin
 EOM
 
-for $d in simulated wgbs rna
+for d in simulated wgbs rna
 do
     echo "mkdir -p $outdir_root/$d" >> $run
 done
