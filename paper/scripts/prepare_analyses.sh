@@ -323,9 +323,9 @@ chmod +x $timing_commands
 if [ "$mode" == "local" ]
 then
 
-echo "python summarize_timing_info.py -i $outdir/timing_local_t${threads}.txt --output-format latex" \\
-  "-o $root/results/timing_local_table.latex --table-name 'local-timing'" \\
-  "--table-caption 'Execution time for programs running on desktop with ${threads} threads.'" >> $timing_commands
+echo "python summarize_timing_info.py -i $outdir/timing_local_t${threads}.txt --output-format latex" \
+"-o $root/results/timing_local_table.latex --table-name 'local-timing'" \
+"--table-caption 'Execution time for programs running on desktop with ${threads} threads.'" >> $timing_commands
 
 cat >> $run <<EOM2
 # run commands
