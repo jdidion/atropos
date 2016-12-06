@@ -62,8 +62,9 @@ align_commands="align_commands_t${threads}"
 sort_commands="sort_commands_t${threads}"
 bedops_commands="bedops_commands_t${threads}"
 summarize_commands="summarize_commands_t${threads}"
+timing_commands="timing_commands_t${threads}"
 
-for f in $run $commands $align_commands $sort_commands $bedops_commands $summarize_commands
+for f in $run $commands $align_commands $sort_commands $bedops_commands $summarize_commands $timing_commands
 do
     rm -f $f
     echo "#!/bin/bash" >> $f
@@ -317,41 +318,39 @@ chmod +x $align_commands
 chmod +x $sort_commands
 chmod +x $bedops_commands
 chmod +x $summarize_commands
+chmod +x $timing_commands
 
 if [ "$mode" == "local" ]
 then
 
-cat >> $run <<EOM2
-# summarize timing
-timing_commands="timing_commands_t${threads}"
-rm -f $timing_commands
-echo "python summarize_timing_info.py -i $outdir/timing_local_t4.txt --output-format latex" \
-  "-o $root/results/timing_local_table.latex --table-name 'local-timing'" \
-  "--table-caption 'Execution time for programs running on desktop with 4 threads.'" >> $timing_commands
+echo "python summarize_timing_info.py -i $outdir/timing_local_t${threads}.txt --output-format latex" \\
+  "-o $root/results/timing_local_table.latex --table-name 'local-timing'" \\
+  "--table-caption 'Execution time for programs running on desktop with ${threads} threads.'" >> $timing_commands
 
+cat >> $run <<EOM2
+# run commands
 rm -f timing_log_${threads}.txt
-./commands_t${threads}_shuf 2>> ../results/timing_log_${threads}.txt && \
-./rename_outputs && \
-./align_commands_t${threads} && \
-./sort_commands_t${threads} && \
-./bedops_commands_t${threads} && \
-./summarize && \
-./$timing_commands
+./commands_t${threads} 2>> ../results/timing_log_${threads}.txt && \\
+./rename_outputs && \\
+./align_commands_t${threads} && \\
+./sort_commands_t${threads} && \\
+./bedops_commands_t${threads} && \\
+./summarize && \\
+./timing_commands_t${threads}
 EOM2
 
 elif [ "$mode" == "cluster" ]
 then
 
 cat >> $run <<EOM3
-timing_commands="timing_commands_t${threads}"
-rm -f $timing_commands
+# run trim commands
 trimJID=`swarm --jobid --threads-per-process ${threads} --gb-per-process $GB_PER_PROCESS --file commands_t${threads}`
 # rename skewer outputs
 renameJID=`qsub -hold_jid $trimJID rename_outputs`
 # map reads
 alignJID=`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process $ALIGN_GB_PER_PROCESS --file align_commands_t${threads}`
 # summarize timing
-qsub -b y -hold_jid $alignJID cat commands_t*.e* | python summarize_timing_info.py --output-format latex -o $root/results/timing_cluster_table.latex --table-name 'cluster-timing' --table-caption 'Execution time for programs running on a cluster.'
+qsub -b y -hold_jid $alignJID cat commands_t${threads}.e* | python summarize_timing_info.py --output-format latex -o $root/results/timing_cluster_table_t${threads}.latex --table-name 'cluster-timing' --table-caption 'Execution time for programs running with ${threads} threads on a cluster.'
 # name-sort reads
 sortJID=`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --gb-per-process $SORT_GB_PER_PROCESS --file sort_commands_t${threads}`
 # overlap RNA-seq alignments with GENCODE annotations
