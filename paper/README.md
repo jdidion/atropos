@@ -16,34 +16,11 @@ Simulate reads:
 
 Prepare the command scripts:
 
-  for threads in 4 8 16
-  do
-    ./prepare_analyses.sh -t $threads -r $ATROPOS_ROOT
-  done
+for threads in 4 8 16
+do
+    ./prepare_analyses.sh -t $threads -o <mode> [-r $ATROPOS_ROOT]
+done
 
-We executed the commands both locally (on a desktop computer) and on a remote cluster. On the cluster, we use the 'swarm' script written by Peter Chines (NHGRI), which is specific to Sun Grid Engine. Similar tools should be available for other queue management systems.
-  
-  # on desktop
-  for threads in 4 8 16
-  do
-    ./commands_t${threads}.sh 2> timing_${threads}
-    # summarize timing info
-    python summarize_timing_info.py -i timing_${threads} -o ../results/local_timing_t${threads}.txt
-  done
-  
-  # on cluster
-  for threads in 4 8 16
-  do
-    swarm --threads-per-process 16 --gb-per-process 4 --file commands_t${threads}.sh --name atropos_test_t${threads}
-    # SGE generates a .eXXX and .oXXX file for each process. Timing info is in the .eXXX file.
-    qsub -hold_jid atropos_test_t${threads} -b y \
-      cat commands_t${threads}.e* | python summarize_timing_info.py -o ../results/cluster_timing_t${threads}.txt
-  done
+Where <mode> is either 'local' or 'cluster'. This will generate a several command scripts, and a main script, named run_t{threads}_{mode}, that will execute all the necessary steps when run.
 
-Finally, we compute the accuracy benchmarks. Since (theoretically) the results should be exactly the same regardless of the number of threads used, we arbitrarily choose the 4 threads results to analyze.
-
-  for err in 001 005 01
-  do
-    for qcut in 0 20
-    do
-      python summarize_accuracy.py
+On the cluster, we use the 'swarm' script written by Peter Chines (NHGRI), which is specific to Sun Grid Engine. Similar tools should be available for other queue management systems.
