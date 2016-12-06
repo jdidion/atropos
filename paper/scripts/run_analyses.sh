@@ -36,7 +36,7 @@ shift $((OPTIND-1))
 for threads in $thread_list
 do
     rm -f ./commands_t${threads} ./commands_t${threads}_shuf
-    ./prepare_analyses -t $threads -r $ATROPOS_ROOT -o $ATROPOS_RESULT
+    ./prepare_analyses.sh -t $threads -r $ATROPOS_ROOT -o $ATROPOS_RESULT
     # shuffle the commands just to make sure there's no bias associated with the ordering
     shuf -o ./commands_t${threads}_shuf ./commands_t${threads} && chmod +x ./commands_t${threads}_shuf
     
