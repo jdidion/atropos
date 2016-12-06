@@ -365,4 +365,3 @@ swarm --hold_jid $overlapJID --file summarize_commands
 EOM
 
 fi
-done
