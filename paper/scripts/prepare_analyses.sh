@@ -309,6 +309,7 @@ do
   fi
 done
 
+chmod +x $run
 chmod +x $commands
 chmod +x $align_commands
 chmod +x $sort_commands
