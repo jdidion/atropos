@@ -453,7 +453,7 @@ class BatchIterator(object):
         
         try:
             read_index, record = next(self.iterable)
-        except StopIteration:
+        except:
             self.close()
             raise
         
@@ -472,6 +472,9 @@ class BatchIterator(object):
             except StopIteration:
                 self.close()
                 break
+            except:
+                self.close()
+                raise
         
         if self.max_reads and read_index >= self.max_reads:
             self.close()

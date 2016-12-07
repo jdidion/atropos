@@ -101,7 +101,12 @@ BEDMAP=bedmap
 MIN_LEN=25
 # number of reads to process in a batch
 # (also used as prefetch size for SeqPurge)
+if [ "$threads" == "4" ]
+then
+BATCH_SIZE=1000
+else
 BATCH_SIZE=5000
+fi
 
 for err in 001 005 01 real_rna real_wgbs
 do
