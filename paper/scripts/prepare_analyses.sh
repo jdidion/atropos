@@ -103,7 +103,7 @@ MIN_LEN=25
 # (also used as prefetch size for SeqPurge)
 if [ "$threads" == "4" ]
 then
-BATCH_SIZE=1000
+BATCH_SIZE=500
 else
 BATCH_SIZE=5000
 fi
