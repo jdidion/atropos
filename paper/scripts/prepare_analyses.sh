@@ -347,17 +347,21 @@ echo "cat commands_t${threads}.e* | python summarize_timing_info.py "\
 "--output-format latex -o $root/results/timing_cluster_table_t${threads}.latex" \
 "--table-name 'cluster-timing' --table-caption 'Execution time for programs running with ${threads} threads on a cluster.'" >> $timing_commands
 
+# For the commands we want to time, two or more programs trying to access the
+# same file concurrently could throw off the results, so we use --concurrent 1
+# to only allow one job at a time.
+
 cat >> $run <<EOM3
 GB_PER_PROCESS=4
 ALIGN_GB_PER_PROCESS=64
 SORT_GB_PER_PROCESS=8
 OVERLAP_GB_PER_PROCESS=16
 # run trim commands
-trimJID=\`swarm --jobid --threads-per-process ${threads} --gb-per-process \$GB_PER_PROCESS --file commands_t${threads}\`
+trimJID=\`swarm --concurrent 1 --jobid --threads-per-process ${threads} --gb-per-process \$GB_PER_PROCESS --file commands_t${threads}\`
 # rename skewer outputs
 renameJID=\`qsub -hold_jid $trimJID rename_outputs\`
 # map reads
-alignJID=\`swarm --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process \$ALIGN_GB_PER_PROCESS --file align_commands_t${threads}\`
+alignJID=\`swarm --concurrent 1 --jobid --hold_jid $renameJID --threads-per-process ${threads} --gb-per-process \$ALIGN_GB_PER_PROCESS --file align_commands_t${threads}\`
 # summarize timing
 qsub -b y -hold_jid $alignJID $timing_commands
 # name-sort reads
