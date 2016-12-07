@@ -123,7 +123,7 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
             with open(script_file, 'wt') as o:
                 o.write(script)
             with subprocess.Popen(
-                    [self.rscript_exe, "--vanilla", script_file]
+                    [self.rscript_exe, "--vanilla", script_file],
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
                 stdout, stderr = p.communicate()
                 if p.returncode != 0:

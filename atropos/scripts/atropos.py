@@ -280,7 +280,7 @@ class Command(object):
         group.add_argument(
             "--batch-size",
             type=int_or_str, metavar="SIZE",
-            help="Number of records to process in each batch. (5000)")
+            help="Number of records to process in each batch. (1000)")
     
     def add_command_options(self):
         """
@@ -375,7 +375,7 @@ standard input/output. Without the -o option, output is sent to standard output.
         parser.set_defaults(
             zero_cap=None,
             action='trim',
-            batch_size=5000,
+            batch_size=None,
             known_adapter=None)
         
         group = parser.add_argument_group("Finding adapters",
@@ -1079,7 +1079,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 if not options.writer_process:
                     parser.error("Writer compression and --no-writer-process are mutually exclusive")
                 elif threads == 2:
-                    logging.getLogger.warn("Writer compression requires > 2 threads; using worker compression instead")
+                    logging.getLogger().warn("Writer compression requires > 2 threads; using worker compression instead")
                     options.compression = "worker"
             
             # Set queue sizes if necessary.
@@ -1094,6 +1094,17 @@ standard input/output. Without the -o option, output is sent to standard output.
                 options.result_queue_size = threads * (100 if options.compression == "worker" else 1000)
             elif options.result_queue_size > 0:
                 assert options.result_queue_size >= threads
+        
+            max_queue_size = options.read_queue_size + options.result_queue_size
+            if options.batch_size is None:
+                options.batch_size = max(1000, max_queue_size / 10e6)
+            elif options.batch_size * max_queue_size > 10e6:
+                logging.getLogger().warn("Combination of batch size {} and total queue size {} "
+                                         "may lead to excessive memory usage".format(
+                                         options.batch_size, max_queue_size))
+        
+        if options.batch_size is None:
+            options.batch_size = 1000
 
 COMMANDS['trim'] = TrimCommand
 
