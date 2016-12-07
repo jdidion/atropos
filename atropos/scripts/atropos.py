@@ -1086,12 +1086,12 @@ standard input/output. Without the -o option, output is sent to standard output.
             # If we are using writer compression, the back-up will be in the result queue,
             # otherwise it will be in the read queue.
             if options.read_queue_size is None:
-                options.read_queue_size = threads * (100 if options.compression == "writer" else 1000)
+                options.read_queue_size = threads * (100 if options.compression == "writer" else 500)
             elif options.read_queue_size > 0:
                 assert options.read_queue_size >= threads
         
             if options.result_queue_size is None:
-                options.result_queue_size = threads * (100 if options.compression == "worker" else 1000)
+                options.result_queue_size = threads * (100 if options.compression == "worker" else 500)
             elif options.result_queue_size > 0:
                 assert options.result_queue_size >= threads
         
