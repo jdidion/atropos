@@ -1,6 +1,13 @@
 # Changes
 
-v1.0.22 (2012.12.02)
+v1.0.23 (2016.12.07)
+
+* Identified a subtle bug having to do with insufficient memory in multi-threaded mode. The main thread appears to hang waiting for the next read from the input file. This appears to occur only under a strictly-regulated memory cap such as on cluster environment. This bug is not fixed, but I added the following:
+    * Set the default batch size based on the queue sizes
+    * Warn the user if their combination of batch and queue sizes might lead to excessive memory usage.
+* Bug fixes
+
+v1.0.22 (2016.12.02)
 --------------------
 
 * Abstracted the ErrorEstimator class to enable alternate implementations.
