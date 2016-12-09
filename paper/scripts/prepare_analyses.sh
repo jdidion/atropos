@@ -354,7 +354,7 @@ echo "cat commands_t${threads}.e* | python summarize_timing_info.py "\
 # to only allow one job at a time.
 
 cat >> $run <<EOM3
-GB_PER_PROCESS=4
+GB_PER_PROCESS=${threads}
 ALIGN_GB_PER_PROCESS=64
 SORT_GB_PER_PROCESS=8
 OVERLAP_GB_PER_PROCESS=16
