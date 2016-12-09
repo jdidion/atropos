@@ -99,14 +99,6 @@ BAM2BED=bam2bed
 BEDMAP=bedmap
 # minimum read length after trimming
 MIN_LEN=25
-# number of reads to process in a batch
-# (also used as prefetch size for SeqPurge)
-if [ "$threads" == "4" ]
-then
-BATCH_SIZE=500
-else
-BATCH_SIZE=5000
-fi
 
 for err in 001 005 01 real_rna real_wgbs
 do
@@ -118,6 +110,9 @@ do
   
   if [ "$err" == "real_rna" ]
   then
+    # number of reads to process in a batch
+    # (also used as prefetch size for SeqPurge)
+    BATCH_SIZE=500
     outdir=$outdir_root/rna
     base=$root/data/rna/rna
     fq1=$root/data/rna/rna.1.fq.gz
@@ -139,6 +134,7 @@ do
     ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq Universal
   elif [ "$err" == "real_wgbs" ]
   then
+      BATCH_SIZE=5000
       outdir=$outdir_root/wgbs
       fq1=$root/data/wgbs/wgbs.1.fq.gz
       fq2=$root/data/wgbs/wgbs.2.fq.gz
@@ -157,6 +153,7 @@ do
       ADAPTER1="AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
       ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
   else
+      BATCH_SIZE=5000
       outdir=$outdir_root/simulated
       fq1=$root/data/simulated/sim_${err}.1.fq
       fq2=$root/data/simulated/sim_${err}.2.fq
