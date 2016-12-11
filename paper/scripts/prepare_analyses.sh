@@ -245,9 +245,9 @@ do
       "> ${outdir}/untrimmed.overlap.txt" >> $bedops_commands
 
       for profile in \
-        atropos_${threads}_real_wgs_q${qcut}_insert_workercomp \
-        seqpurge_${threads}_real_wgs_q${qcut} \
-        skewer_${threads}_real_wgs_q${qcut}
+        atropos_${threads}_real_rna_q${qcut}_insert_workercomp \
+        seqpurge_${threads}_real_rna_q${qcut} \
+        skewer_${threads}_real_rna_q${qcut}
       do
           echo "./star_align.sh ${profile} ${outdir}/${profile} $threads $STAR_INDEX_DIR" >> $align_commands
           echo "$SAMTOOLS sort -n -O bam -@ $threads -o ${outdir}/${profile}.sorted.bam" \
