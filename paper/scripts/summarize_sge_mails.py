@@ -1,3 +1,5 @@
+"""Summarize timing and memory usage from SGE result emails.
+"""
 from argparse import ArgumentParser, FileType
 from collections import defaultdict
 import csv

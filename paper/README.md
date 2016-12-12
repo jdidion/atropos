@@ -47,11 +47,12 @@ There are already 3 simulated datasets in the 'data' directory. If you'd like to
   
     ./simulate_reads.sh
 
-# 3. Prepare the command scripts
+# 3. Prepare and run the command scripts
 
     for threads in 4 8 16
     do
-         ./prepare_analyses.sh -t $threads -o <mode>
+        ./prepare_analyses.sh -t $threads -o <mode>
+        ./run_t${threads}_<mode>
     done
 
 Where <mode> is either 'local' or 'cluster'. For each number of threads, this will generate several command scripts, and a main script, named run_t{threads}_{mode}, that will execute all the necessary steps when run. This script will also download the real datasets if they don't exist already.

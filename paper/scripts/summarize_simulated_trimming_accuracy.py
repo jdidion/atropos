@@ -1,6 +1,5 @@
-
 #!/usr/bin/env python
-# Summarizes trimming accuracy for simulated reads.
+"""Summarizes trimming accuracy for simulated reads."""
 
 from argparse import ArgumentParser
 from atropos import xopen

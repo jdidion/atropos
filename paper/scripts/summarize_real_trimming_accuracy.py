@@ -1,7 +1,7 @@
-
 #!/usr/bin/env python
-# Summarize the mapping results of trimmed versus untrimmed reads.
-# This requires that both input bams be name-sorted.
+"""Summarize the mapping results of trimmed versus untrimmed reads.
+This requires that both input bams be name-sorted.
+"""
 
 import argparse
 from collections import defaultdict

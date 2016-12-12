@@ -339,7 +339,8 @@ rm -f timing_log_${threads}.txt
 ./sort_commands_t${threads} && \\
 ./bedops_commands_t${threads} && \\
 ./summarize_commands_t${threads} && \\
-./timing_commands_t${threads}
+./timing_commands_t${threads} && \\
+./plot_real_results.R
 EOM2
 
 elif [ "$mode" == "cluster" ]
@@ -371,7 +372,9 @@ sortJID=\`swarm --jobid --hold_jid $alignJID --threads-per-process ${threads} --
 # overlap RNA-seq alignments with GENCODE annotations
 overlapJID=\`swarm --jobid --hold_jid $sortJID --gb-per-process \$OVERLAP_GB_PER_PROCESS --file bedops_commands_t${threads}\`
 # summarize trimming accuracy
-swarm --hold_jid $overlapJID --file summarize_commands
+summarizeJID=\`swarm --hold_jid $overlapJID --file summarize_commands]\`
+# generate plots
+qsub -hold_jid $summarizeJID plot_real_results.R
 EOM3
 
 fi

@@ -1,83 +1,10 @@
+#!/usr/bin/env Rscript --vanilla
 library(reshape2)
 library(ggplot2)
 library(readr)
 library(cowplot)
 
-compare_mapping <- function(read, prog) {
-    untrimmed <- (read[1, 'read1_quality']+1) * (read[1, 'read2_quality']+1)
-    trimmed <- (read[prog, 'read1_quality']+1) * (read[prog, 'read2_quality']+1)
-    if (untrimmed == trimmed) {
-        'same_quality'
-    }
-    else if (untrimmed > trimmed) {
-        'worse_quality'
-    }
-    else {
-        'better_quality'
-    }
-}
-outcomes <- do.call(rbind, lapply(seq(1, nrow(tab), num.progs), function(i) {
-    if (((i-1)/num.progs) %% 1000 == 0) print((i-1)/num.progs)
-    read <- tab[i:(i+num.progs-1),]
-    #read <- read[match(progs, read[,1]),]
-    sapply(2:num.progs, function(prog) {
-        if (read[1, 'skipped']) {
-            'skipped'
-        }
-        else if (read[prog, 'discarded']) {
-            'discarded'
-        }
-        else if (any(read[c(1,prog), 'split'])) {
-            'split'
-        }
-        else {
-            # untrimmed and trimmed have different validity
-            if (read[1, 'valid'] != read[prog, 'valid']) {
-                if (read[1, 'valid']) {
-                    'valid->invalid'
-                }
-                else {
-                    'invalid->valid'
-                }
-            }
-            else if (!read[1, 'valid']) {
-                'both_invalid'
-            }
-            # untrimmed is mapped
-            else if (read[1, 'proper']) {
-                if (read[prog, 'proper']) {
-                    compare_mapping(read, prog)
-                }
-                else if (read[prog, 'read1_mapped'] || read[prog, 'read2_mapped']) {
-                    'proper->partial'
-                }
-                else {
-                    'proper->unmapped'
-                }
-            }
-            else if (read[1, 'read1_mapped'] || read[1, 'read2_mapped']) {
-                if (read[prog, 'proper']) {
-                    'partial->proper'
-                }
-                else {
-                    compare_mapping(read, prog)
-                }
-            }
-            # untrimmed is unmapped
-            else if (read[prog, 'proper']) {
-                'unmapped->proper'
-            }
-            else if (read[prog, 'read1_mapped'] || read[prog, 'read2_mapped']) {
-                'unmapped->partial'
-            }
-            else {
-                'unmapped->unmapped'
-            }
-        }
-    })
-}))
-
-process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
+process.wgbs <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
     progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
     N <- max(tab$read_idx)
     num.progs <- length(progs)
@@ -144,26 +71,23 @@ process <- function(tab, exclude.discarded=TRUE, has.regions=FALSE) {
     retval
 }
 
-x<-lapply(progs, function(prog)
-    tab$prog == prog & tab$read1_quality >= 30 & tab$read1_in_region == 1 & tab$read2_quality >= 30 & tab$read2_in_region == 1)
+# plot.data <- function(data, prog.labels) {
+#     pts <- data$pts
+#     progs <- data$progs
+#     pts$prog <- as.character(pts$prog)
+#     colnames(pts) <- c("MAPQ", "x", "Program", "y", "Delta")
+#     for (i in 1:length(prog.labels)) {
+#         pts[pts$Program == progs[i], 'Program'] <- prog.labels[i]
+#     }
+#     pts$Q <- 0
+#     pts[grep(pts$Program, pattern = 'Q20'), 'Q'] <- 20
+#     pts$Q <- factor(pts$Q)
+#     ggplot(pts[pts$Program != 'Untrimmed',], aes(x=MAPQ, y=Delta, colour=Program, shape=Q)) +
+#         geom_line() + geom_point() +
+#         labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
+# }
 
-plot.data <- function(data, prog.labels) {
-    pts <- data$pts
-    progs <- data$progs
-    pts$prog <- as.character(pts$prog)
-    colnames(pts) <- c("MAPQ", "x", "Program", "y", "Delta")
-    for (i in 1:length(prog.labels)) {
-        pts[pts$Program == progs[i], 'Program'] <- prog.labels[i]
-    }
-    pts$Q <- 0
-    pts[grep(pts$Program, pattern = 'Q20'), 'Q'] <- 20
-    pts$Q <- factor(pts$Q)
-    ggplot(pts[pts$Program != 'Untrimmed',], aes(x=MAPQ, y=Delta, colour=Program, shape=Q)) +
-        geom_line() + geom_point() +
-        labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
-}
-
-plot.data2 <- function(data, q.labels=NULL) {
+plot.wgbs.data <- function(data, q.labels=NULL) {
     pts <- data$pts
     progs <- data$progs
     pts$prog <- as.character(pts$prog)
@@ -184,21 +108,38 @@ plot.data2 <- function(data, q.labels=NULL) {
         labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
 }
 
-wgs <- read_tsv('wgs_results.txt')
-wgs.data <- process(wgs, has.regions=TRUE)
-
 wgbs <- read_tsv('wgbs_results.txt')
-wgbs.data <- process(wgbs)
+wgbs.data <- process.wgbs(wgbs, exclude.discarded=TRUE)
+pdf('Figure2.pdf')
+plot.wgbs.data(wgbs.data)
+dev.off()
+
+process.rna <- function(rna) {
+    r1 <- rna[,c('prog','read1_in_region','read1_quality')]
+    colnames(r1)[2:3] <- c('in_region', 'quality')
+    r2 <- rna[,c('prog','read2_in_region','read2_quality')]
+    colnames(r2)[2:3] <- c('in_region', 'quality')
+    rna.reads <- rbind(r1,r2)
+    rna.tab <- dlply(rna.reads, 'prog', table)
+    rna.tab.tidy <- lapply(rna.tab[1:3], melt)
+    rna.tab.tidy <- do.call(rbind, lapply(names(rna.tab.tidy), function(n) {
+        x<-rna.tab.tidy[[n]]
+        x$prog <- n
+        x
+    }))
+    for (i in 1:3) rna.tab.tidy[[i]] <- rna.tab.tidy[[i]][2:3, 2:5]
+    for (i in 1:3) rna.tab.tidy[[i]] <- (rna.tab.tidy[[i]][2,] - rna.tab.tidy[[4]][2,])
+    rna.tab.tidy <- melt(do.call(rbind, rna.tab.tidy[1:3]))
+    colnames(rna.tab.tidy) <- c('prog','MAPQ','delta')
+    rna.tab.tidy$MAPQ <- factor(rna.tab.tidy$MAPQ)
+    rna.tab.tidy
+}
 
 rna <- read_tsv('rnaseq_results.txt')
-rna.data <- process(rna, has.regions = TRUE)
-
-#sum(quals[,7] != -1 & quals[,3] != -1 & quals[,7] > quals[,3])
-#sum(quals[,7] != -1 & quals[,3] != -1 & quals[,7] < quals[,3])
-#sum(quals[,10] != -1 & quals[,3] != -1 & quals[,10] > quals[,3])
-#sum(quals[,10] != -1 & quals[,3] != -1 & quals[,10] < quals[,3])
-
-#w<-apply(quals[,c(3,10)], 1, function(x) any(x==-1))
-#q<-quals[!w,]
-#q[q<0] <- 0
-#apply(q[,3:10],2,mean)
+rna.data <- process.rna(rna)
+pdf('Figure3.pdf')
+ggplot(rna.data, aes(x=MAPQ, y=log10(delta), col=Program, group=Program)) +
+    geom_line() + geom_point() +
+    xlab('Mapping Quality Score (MAPQ) Cutoff') +
+    ylab('Log10(Difference versus\nUntrimmed Reads)')
+dev.off()
