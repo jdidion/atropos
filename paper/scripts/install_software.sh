@@ -1,41 +1,4 @@
 #!/bin/bash
-
-# This script installs all the software in the ../software
-# directory into the ../bin directory. It also installs
-# Atropos from pypi.
-
-# Prerequisites:
-# 1. We recommend using conda to install all of these packages. Conda is
-# available stand-alone (http://conda.pydata.org/miniconda.html) or as part of
-# the Anaconda python distribution (https://www.continuum.io/downloads).
-# 2. modern C++ compiler (we use gcc 5.1)
-# 3. python 3.3+
-#    * We recommend using a virtual environment, e.g.
-#      'conda create -n atropos python=3.5'
-#    * cython 0.25+
-#    * mako
-# 4. To install ART you need:
-#    * automake
-# 5. To install SeqPurge, you need
-#    * Qt 5.3+ with xmlpatterns and mysql packages
-#    * git
-#    * cmake
-# 6. To run the analyses on real data, you need the following, which are all
-# available in the bioconda repository: https://anaconda.org/bioconda):
-#    * BWA (the MEM command is required; we used version 0.7.15)
-#    * bwa-meth
-#    * STAR aligner
-#    * samtools
-#    * bedops
-#    * SRA tools
-# 7. Download the reference sequence and annotations and place them in $root/data
-#    * Reference genome NCBI GRCh37:
-#      ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/ARCHIVE/BUILD.37.3
-#        * If you download individual chromsome files, concatenate them all
-#          together into a single fasta
-#    * ENCODE v19 Annotations:
-#      ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz
-
 scripts=`pwd`
 root=`dirname $scripts`
 mkdir $root/software/build
