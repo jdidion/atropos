@@ -18,6 +18,8 @@ from atropos.xopen import open_output, xopen
 # Also, offer an option of whether to test the reverse complement, with
 # the default being false.
 
+# TODO: Maybe an alternative to khmer: https://github.com/abdullah009/kcmbt_mt
+
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,
                  match_frac2=None, reads=None):

@@ -159,6 +159,8 @@ MatchInfo = namedtuple("MatchInfo", (
 # 4. FOGSAA, modified for semi-global alignment.
 #    http://www.nature.com/articles/srep01746
 #    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
+# 5. EDLIB: edit distance-based alignment
+#    https://github.com/Martinsos/edlib
 #
 # Also think about different sequence encodings that might enable faster alignment
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
