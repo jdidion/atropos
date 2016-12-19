@@ -40,17 +40,18 @@ mkdir ../software/build/art &&
     cd ../../../scripts
 
 # Install version of Atropos on which manuscript is based
-pip install atropos==1.0.22
+pip install atropos==1.0.23
 
 # Install Skewer from conda
 conda install skewer
 
 # Install SeqPurge
-mkdir ../software/build/seqpurge &&
-    cd ../software/build/seqpurge &&
-    cp ../../ngs-bits_2016.08.04.zip . &&
-    unzip ngs-bits_2016.08.04.zip &&
+# We tested using the version from GitHub represented by commit
+# 8713481a9a7404cb3e69f7660b94d9847dbe632b
+cd ../software/build &&
+    git clone --recursive https://github.com/imgag/ngs-bits.git &&
     cd ngs-bits &&
+    git checkout 8713481a9a7404cb3e69f7660b94d9847dbe632b &&
     make build_3rdparty &&
     make build_tools_release &&
     ln -s bin/SeqPurge ../../../bin &&
