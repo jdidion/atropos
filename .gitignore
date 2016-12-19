@@ -26,9 +26,8 @@ paper/scripts/atropos
 paper/scripts/skewer
 paper/scripts/seqpurge
 paper/scripts/results*
-paper/scripts/commands*
-paper/scripts/bwameth_commands*
-paper/scripts/summarize_commands
+paper/scripts/*commands_t*
+paper/scripts/run_t*
 paper/scripts/real*
 paper/data/real/
 .contaminants
