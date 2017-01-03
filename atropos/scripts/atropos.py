@@ -958,7 +958,7 @@ standard input/output. Without the -o option, output is sent to standard output.
             #    options.quality_cutoff = "20,20"
             if options.bisulfite == "swift" and paired != "both":
                 parser.error("Swift trimming is only compatible with paired-end reads")
-            if options.bisulfite not in ("rrbs", "non-directional", "truseq", "epignome", "swift"):
+            if options.bisulfite not in ("rrbs", "non-directional", "truseq", "epignome", "swift", "non-directional-rrbs"):
                 def parse_bisulfite_params(r):
                     try:
                         parts = [int(p) for p in r.split(",")]
