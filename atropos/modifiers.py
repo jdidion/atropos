@@ -147,6 +147,9 @@ class AdapterCutter(object):
         self.with_adapters += 1
         return trimmed_read
 
+# Other error correction approaches:
+# https://www.ncbi.nlm.nih.gov/pubmed/25161220
+
 class ErrorCorrectorMixin(object):
     """Provides a method for error correction.
     
