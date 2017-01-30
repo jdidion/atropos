@@ -19,8 +19,9 @@ from atropos.xopen import open_output, xopen
 # the default being false.
 
 # TODO: Alternative to khmer:
-# https://github.com/abdullah009/kcmbt_mt
-# https://github.com/TGAC/KAT
+# kcMBT https://github.com/abdullah009/kcmbt_mt
+# KAT https://github.com/TGAC/KAT
+# KMC3 https://github.com/refresh-bio/KMC
 
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,
@@ -190,7 +191,8 @@ class Detector(object):
             self._filter_and_sort(**kwargs)
         return self._matches
     
-    def _filter_and_sort(self, include="all", min_len=None, min_complexity=1.1, min_match_frac=0.1, limit=20):
+    def _filter_and_sort(self, include="all", min_len=None, min_complexity=1.1,
+                         min_match_frac=0.1, limit=20):
         """
         Identify, filter, and sort contaminants.
         """

@@ -1226,7 +1226,7 @@ def main(args):
     Returns:
         Tuple (rc, "msg", {details})
     """
-    if len(args) == 0 or any(h in args for h in ('-h', '--help')):
+    if len(args) == 0 or args[0] in ('-h', '--help'):
         print_subcommands()
         return (2, None, {})
     
