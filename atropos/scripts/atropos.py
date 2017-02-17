@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # kate: word-wrap off; remove-trailing-spaces all;
-
 from argparse import ArgumentParser, HelpFormatter
 from collections import OrderedDict
 import copy
@@ -184,6 +183,7 @@ COMMANDS = OrderedDict()
 class Command(object):
     def __init__(self, args):
         self.orig_args = copy.copy(args)
+        self.groups = {}
         self.create_parser()
         self.add_common_options()
         self.add_command_options()
@@ -197,6 +197,24 @@ class Command(object):
             usage=self.usage,
             description=self.description.format(version=__version__),
             formatter_class=ParagraphHelpFormatter)
+    
+    def add_group(
+            self, name, title=None, description=None, mutex=False,
+            required=False):
+        if name in self.groups:
+            raise ValueError("Group already exists: {}".format(name))
+        if mutex:
+            group = self.parser.add_mutually_exclusive_group(required)
+        else:
+            group = self.parser.add_argument_group(title or name, description)
+        self.groups[name] = group
+        return group
+    
+    def get_group(self, name):
+        if name in self.groups:
+            return self.groups[name]
+        else:
+            return self.add_group(name)
     
     def add_common_options(self):
         # Add common options
@@ -225,7 +243,7 @@ class Command(object):
             type=writeable_file, default=None, metavar="FILE",
             help="File to write logging info. (stdout)")
         
-        group = self.parser.add_argument_group("Input")
+        group = self.add_group("Input")
         group.add_argument(
             "-pe1",
             "--input1",
@@ -349,7 +367,7 @@ class Command(object):
         return cmd(self.options, self.parser)
 
 class TrimCommand(Command):
-    """trim sequencing reads."""
+    """Trim sequencing reads."""
     name = "trim"
     usage = """
 atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
@@ -371,14 +389,15 @@ standard input/output. Without the -o option, output is sent to standard output.
 """
     
     def add_command_options(self):
-        parser = self.parser
-        parser.set_defaults(
+        self.parser.set_defaults(
             zero_cap=None,
             action='trim',
             batch_size=None,
             known_adapter=None)
         
-        group = parser.add_argument_group("Finding adapters",
+        group = self.add_group(
+            "Adapters",
+            title="Finding adapters",
             description="Parameters -a, -g, -b specify adapters to be removed from "
                 "each read (or from the first read in a pair if data is paired). "
                 "If specified multiple times, only the best matching adapter is "
@@ -544,7 +563,8 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "'N' means to set the base to N. If exactly one base is ambiguous, the non-ambiguous base "
                  "is always used. (no error correction)")
         
-        group = parser.add_argument_group("Additional read modifications")
+        group = self.add_group(
+            "Modifications", title="Additional read modifications")
         group.add_argument(
             "--op-order",
             type=char_list(choices=('A','C','G','Q','W')), default="CGQAW",
@@ -617,7 +637,8 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "length of the trimmed read. For example, use --length-tag 'length=' "
                 "to correct fields like 'length=123'. (no)")
         
-        group = parser.add_argument_group("Filtering of processed reads")
+        group = self.add_group(
+            "Filtering", title="Filtering of processed reads")
         group.add_argument(
             "--discard-trimmed", "--discard",
             action='store_true', default=False,
@@ -650,7 +671,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "and 1, it is treated as the proportion of N's allowed in a read. "
                 "(no)")
         
-        group = parser.add_argument_group("Output")
+        group = self.add_group("Output")
         group.add_argument(
             "-o",
             "--output",
@@ -700,8 +721,12 @@ standard input/output. Without the -o option, output is sent to standard output.
             "--report-file",
             type=writeable_file, default=None, metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)")
+        group.add_argument(
+            "--stats-file",
+            type=writeable_file, default=None, metavar="FILE",
+            help="Write stats to file rather than stdout/stderr. (no)")
         
-        group = parser.add_argument_group("Colorspace options")
+        group = self.add_group("Colorspace options")
         group.add_argument(
             "-d",
             "--double-encode",
@@ -736,9 +761,12 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "by default when -c/--colorspace is also enabled. Use the above option "
                 "to disable it. (no)")
         
-        group = parser.add_argument_group("Paired-end options", description="The "
-            "-A/-G/-B/-U/-I options work like their -a/-b/-g/-u/-i counterparts, but "
-            "are applied to the second read in each pair.")
+        group = self.add_group(
+            "Paired",
+            title="Paired-end options",
+            description="The -A/-G/-B/-U/-I options work like their "
+                "-a/-b/-g/-u/-i counterparts, but are applied to the second read "
+                "in each pair.")
         group.add_argument(
             "-A",
             action='append', dest='adapters2', default=[], metavar='ADAPTER',
@@ -807,7 +835,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "Use together with --too-long-output. (no - too long reads are "
                 "discarded)")
         
-        group = parser.add_argument_group("Method-specific options")
+        group = self.add_group("Method-specific options")
         group = group.add_mutually_exclusive_group()
         group.add_argument(
             "--bisulfite",
@@ -825,7 +853,8 @@ standard input/output. Without the -o option, output is sent to standard output.
             action="store_true", default=False,
             help="Set default option values for miRNA data. (no)")
         
-        group = parser.add_argument_group("Parallel (multi-core) options")
+        group = self.add_group(
+            "Parallel", title="Parallel (multi-core) options")
         group.add_argument(
             "-T",
             "--threads",
@@ -861,6 +890,16 @@ standard input/output. Without the -o option, output is sent to standard output.
             help="Where data compression should be performed. Defaults to 'writer' if "
                  "system-level compression can be used and (1 < threads < 8), otherwise "
                  "defaults to 'worker'.")
+        
+        group = self.add_group(
+            "Stats", title="Read statistics options")
+        group.add_argument(
+            "--stats",
+            choices=("none", "pre", "post", "both"), default="both",
+            help="How to compute read-level statistics: none=don't compute; "
+                 "pre=only compute pre-trimming stats; post=only compute "
+                 "post-trimming stats; both=compute both pre- and post-trimming "
+                 "stats. (both)")
     
     def validate_command_options(self):
         options = self.options
@@ -1057,15 +1096,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 parser.error("You cannot remove bases from the same end twice.")
         
         if options.threads is not None:
-            if options.debug:
-                parser.error("Cannot use debug mode with multiple threads")
-            
-            threads = options.threads
-            if threads <= 0:
-                threads = cpu_count()
-            elif threads == 1:
-                parser.error("--threads must be >= 2")
-            options.threads = threads
+            threads = _configure_threads(options, parser)
             
             if options.compression is None:
                 # Our tests show that with 8 or more threads, worker compression is
@@ -1108,6 +1139,65 @@ standard input/output. Without the -o option, output is sent to standard output.
 
 COMMANDS['trim'] = TrimCommand
 
+class StatsCommand(Command):
+    """Compute read stats."""
+    name = "stats"
+    usage = """
+atropos stats -se input.fastq
+atropos stats -pe1 in1.fastq -pe2 in2.fastq
+"""
+    description = """
+Compute read-level statistics. The output is identical to running the 'trim'
+command with '--stats pre'.
+
+* Read count
+* At both the per-position and whole-sequence level,
+    * GC content
+    * Quality
+    * Nucleotide content
+* Over-represented sequences
+"""
+
+    def add_command_options(self):
+        self.parser.set_defaults(
+            action='stats',
+            batch_size=None)
+        
+        group = self.add_group("Output")
+        group.add_argument(
+            "-o",
+            "--output",
+            type=writeable_file, metavar="FILE",
+            help="Write stats to file rather than stdout.")
+        
+        group = self.add_group(
+            "Parallel", title="Parallel (multi-core) options")
+        group.add_argument(
+            "-T",
+            "--threads",
+            type=positive(int, True), default=None, metavar="THREADS",
+            help="Number of threads to use for read trimming. Set to 0 to use "
+                 "max available threads. (Do not use multithreading)")
+    
+    def validate_command_options(self):
+        if options.threads is not None:
+            _configure_threads(self.options, self.parser)
+        if options.batch_size is None:
+            options.batch_size = 1000
+
+COMMANDS['stats'] = StatsCommand
+
+def _configure_threads(options, parser):
+    if options.debug:
+        parser.error("Cannot use debug mode with multiple threads")
+    threads = options.threads
+    if threads <= 0:
+        threads = cpu_count()
+    elif threads == 1:
+        parser.error("--threads must be >= 2")
+    options.threads = threads
+    return threads
+
 class DetectCommand(Command):
     """detect adapter and other contaminant sequences."""
     name = "detect"
@@ -1138,7 +1228,7 @@ class DetectCommand(Command):
             type=positive(), default=None,
             help="The maximum number of candidate adapters to report. (report all)")
         
-        group = parser.add_argument_group("Contaminants")
+        group = self.add_group("Contaminants")
         group.add_argument(
             "-i",
             "--include-contaminants",

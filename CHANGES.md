@@ -1,6 +1,14 @@
 # Changes
 
+v1.1.0 (dev)
+-------------
+* Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
+* In progress:
+    * New 'stats' command computes read-level statistics.
+    * The 'trim' command can also compute read-level statistic pre- and/or post-trimming. 
+
 v1.0.23 (2016.12.07)
+--------------------
 
 * Identified a subtle bug having to do with insufficient memory in multi-threaded mode. The main thread appears to hang waiting for the next read from the input file. This appears to occur only under a strictly-regulated memory cap such as on cluster environment. This bug is not fixed, but I added the following:
     * Set the default batch size based on the queue sizes

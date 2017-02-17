@@ -61,8 +61,8 @@ def error(options, parser):
         BaseQualityErrorEstimator, ShadowRegressionErrorEstimator,
         PairedErrorEstimator)
     
-    batch_iterator, names, qualities = create_reader(
-        options, parser, counter_magnitude="K")[0:3]
+    batch_iterator, names, qualities, _ = create_reader(
+        options, parser, counter_magnitude="K")
     try:
         if not qualities:
             parser.error("Cannot estimate error rate without base qualities")
@@ -89,12 +89,18 @@ def error(options, parser):
     
     return (0, None, {})
 
+def stats(options, parser):
+    if options.threads is None:
+        pass
+    else:
+        pass
+
 def trim(options, parser):
     import time
     import textwrap
     from atropos.report import print_report
     
-    params = create_atropos_params(options, parser, options.default_outfile)
+    params = create_trim_params(options, parser, options.default_outfile)
     num_adapters = sum(len(a) for a in params.modifiers.get_adapters())
     
     logger = logging.getLogger()
@@ -129,14 +135,14 @@ def trim(options, parser):
     
     stop_wallclock_time = time.time()
     stop_cpu_time = time.clock()
-    stats = print_report(
+    adapter_stats = print_report(
         options,
         stop_wallclock_time - start_wallclock_time,
         stop_cpu_time - start_cpu_time,
         summary,
         params.modifiers.get_trimmer_classes())
     
-    details['stats'] = stats
+    details['stats'] = adapter_stats
     return (rc, None, details)
 
 def create_reader(options, parser, counter_magnitude="M"):
@@ -213,7 +219,7 @@ def subsample(reader, frac):
 from collections import namedtuple
 AtroposParams = namedtuple("AtroposParams", ("reader", "modifiers", "filters", "formatters", "writers"))
 
-def create_atropos_params(options, parser, default_outfile):
+def create_trim_params(options, parser, default_outfile):
     from atropos.adapters import AdapterParser, BACK
     from atropos.modifiers import (
         Modifiers, AdapterCutter, InsertAdapterCutter, UnconditionalCutter,
