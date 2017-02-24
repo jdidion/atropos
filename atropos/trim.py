@@ -131,7 +131,7 @@ class TrimWorkerProcess(ResultHandlerWorkerProcess):
     """
     def __init__(self, index, input_queue, summary_queue, timeout,
                  result_handler, pipeline, formatters):
-        super().__init__(index, input_queue, result_handler, summary_queue, timeout)
+        super().__init__(index, input_queue, summary_queue, timeout, result_handler)
         self.pipeline = pipeline
         self.formatters = formatters
     

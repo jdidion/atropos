@@ -4,8 +4,8 @@ v1.1.0 (dev)
 -------------
 * Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
 * In progress:
-    * New 'stats' command computes read-level statistics.
-    * The 'trim' command can also compute read-level statistic pre- and/or post-trimming. 
+    * New 'qc' command computes read-level statistics.
+    * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
 
 v1.0.23 (2016.12.07)
 --------------------

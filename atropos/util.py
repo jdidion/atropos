@@ -167,5 +167,5 @@ def run_interruptible_with_result(func, *args, **kwargs):
     return (rc, result)
 
 def run_interruptible(func, *args, **kwargs):
-    rc, result = run_interruptible_with_result(*args, **kwargs)
+    rc, result = run_interruptible_with_result(func, *args, **kwargs)
     return rc
