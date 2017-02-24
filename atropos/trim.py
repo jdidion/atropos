@@ -145,7 +145,7 @@ class TrimWorkerProcess(ResultHandlerWorkerProcess):
         else:
             process_stats = collect_process_statistics(
                 self.processed_reads, self.pipeline.total_bp1, self.pipeline.total_bp2,
-                self.pipeline.modifers, self.pipeline.filters, self.formatters)
+                self.pipeline.modifiers, self.pipeline.filters, self.formatters)
             adapter_stats = self.pipeline.summarize_adapters()
         return (self.index, self.seen_batches, process_stats, adapter_stats)
 

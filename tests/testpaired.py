@@ -336,4 +336,3 @@ def test_no_writer_process():
         aligners=BACK_ALIGNERS, assert_files_equal=False,
         callback=check_multifile
     )
-    

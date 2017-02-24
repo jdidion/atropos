@@ -1,5 +1,6 @@
 """Classes and methods to support parallel operations.
 """
+from collections import defaultdict
 import inspect
 import logging
 from multiprocessing import Process, Queue, Value, cpu_count
