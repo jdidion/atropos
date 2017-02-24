@@ -10,7 +10,7 @@ from .utils import run, files_equal, datapath, cutpath, redirect_stderr, tempora
 BACK_ALIGNERS = ('adapter', 'insert')
 
 def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
-               callback=None, assert_files_equal=True):
+               callback=None, assert_files_equal=True, error_on_rc=True):
     if type(params) is str:
         params = params.split()
     for aligner in aligners:
@@ -23,6 +23,8 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                 result = atropos.main(p)
                 assert isinstance(result, tuple)
                 assert len(result) == 3
+                if error_on_rc:
+                    assert result[0] == 0, "Return code {} != 0".format(result[0])
                 if assert_files_equal:
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
@@ -329,7 +331,8 @@ def test_no_writer_process():
         assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.1.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.0.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.1.fastq'))
-
+        # TODO: check contents
+    
     run_paired('--threads 2 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG" -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
         in1='big.1.fq', in2='big.2.fq',
         expected1='out.1.fastq', expected2='out.2.fastq',
