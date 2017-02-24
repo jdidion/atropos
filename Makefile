@@ -1,7 +1,7 @@
 test = tests
 build = python setup.py build_ext -i && \
 		python setup.py install && \
-		nosetests -P $(tests)
+		nosetests -P $(test)
 
 install:
 	$(call build,)

@@ -1,4 +1,10 @@
+import logging
 import math
+
+class AtroposError(Exception):
+    """Base class for Atropos-specific errors.
+    """
+    pass
 
 base_complements = {
     'A' : 'T',
@@ -137,3 +143,29 @@ class RandomMatchProbability(object):
             i = next_i
             next_i += 1
         self.max_n = i
+
+def run_interruptible_with_result(func, *args, **kwargs):
+    # Return code (0=normal, anything else is an error)
+    rc = 0
+    result = None
+    try:
+        result = func(*args, **kwargs)
+    except KeyboardInterrupt as e:
+        logging.getLogger().error("Interrupted")
+        rc = 130
+    except IOError as e:
+        if e.errno == errno.EPIPE:
+            rc = 1
+        else:
+            raise
+    except (AtroposError, EOFError) as e:
+        logging.getLogger().error("Atropos error", exc_info=True)
+        rc = 1
+    except Exception as e:
+        logging.getLogger().error("Unknown error", exc_info=True)
+        rc = 1
+    return (rc, result)
+
+def run_interruptible(func, *args, **kwargs):
+    rc, result = run_interruptible_with_result(*args, **kwargs)
+    return rc

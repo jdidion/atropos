@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from atropos.stats import ReadStatistics
 from atropos.seqio import UnknownFileType, BatchIterator, open_reader
 from atropos.xopen import STDOUT, STDERR, open_output
 
@@ -15,7 +16,7 @@ def detect(options, parser):
     overrep_cutoff = 100
     include = options.include_contaminants or "all"
     known_contaminants = load_known_adapters(options) if include != 'unknown' else None
-    batch_iterator, names = create_reader(options, parser, counter_magnitude="K")[0:2]
+    batch_iterator, names, _, _ = create_reader(options, parser, counter_magnitude="K")
     
     detector = options.detector
     if not detector:
@@ -89,25 +90,41 @@ def error(options, parser):
     
     return (0, None, {})
 
-def stats(options, parser):
+def qc(options, parser):
+    #from atropos.report import print_read_stats
+    
+    reader, names, qualities, _ = create_reader(options, parser)
+    stats = ReadStatistics(
+        'pre', options.paired, qualities=qualities,
+        tile_key_regexp=options.tile_key_regexp)
+    
     if options.threads is None:
-        pass
+        from atropos.qc import run_serial
+        rc, report, details = run_serial(reader, stats)
     else:
-        pass
+        from atropos.qc import run_parallel
+        rc, report, details = run_parallel(
+            reader, stats, options.threads, options.process_timeout,
+            options.read_queue_size)
+    
+    #print_read_stats(summary)
+    return (rc, None, details)
 
 def trim(options, parser):
     import time
     import textwrap
+    import atropos.trim
     from atropos.report import print_report
     
-    params = create_trim_params(options, parser, options.default_outfile)
-    num_adapters = sum(len(a) for a in params.modifiers.get_adapters())
+    reader, pipeline, formatters, writers = create_trim_params(
+        options, parser, options.default_outfile)
+    num_adapters = sum(len(a) for a in pipeline.modifiers.get_adapters())
     
     logger = logging.getLogger()
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[options.paired])
-    if options.paired == 'first' and (len(params.modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
+    if options.paired == 'first' and (len(pipeline.modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
         logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
             'modifications are applied only to the first '
             'read since backwards compatibility mode is enabled. '
@@ -119,16 +136,18 @@ def trim(options, parser):
     
     if options.threads is None:
         # Run single-threaded version
-        import atropos.serial
-        rc, summary, details = atropos.serial.run_serial(*params)
+        from atropos.trim import run_serial
+        rc, summary, details = run_serial(reader, pipeline, formatters, writers)
     else:
         # Run multiprocessing version
-        import atropos.multicore
-        rc, summary, details = atropos.multicore.run_parallel(
-            params.reader, params.modifiers, params.filters, params.formatters,
-            params.writers, options.threads, options.process_timeout,
-            options.preserve_order, options.read_queue_size,
-            options.result_queue_size, options.writer_process, options.compression)
+        from atropos.trim import run_parallel
+        rc, summary, details = run_parallel(
+            reader, pipeline, formatters, writers, options.threads,
+            options.process_timeout, options.preserve_order,
+            options.read_queue_size, options.result_queue_size,
+            options.writer_process, options.compression)
+    
+    reader.close()
     
     if rc != 0:
         return (rc, None, details)
@@ -140,7 +159,7 @@ def trim(options, parser):
         stop_wallclock_time - start_wallclock_time,
         stop_cpu_time - start_cpu_time,
         summary,
-        params.modifiers.get_trimmer_classes())
+        pipeline.modifiers.get_trimmer_classes())
     
     details['stats'] = adapter_stats
     return (rc, None, details)
@@ -216,9 +235,6 @@ def subsample(reader, frac):
         if random() < frac:
             yield reads
 
-from collections import namedtuple
-AtroposParams = namedtuple("AtroposParams", ("reader", "modifiers", "filters", "formatters", "writers"))
-
 def create_trim_params(options, parser, default_outfile):
     from atropos.adapters import AdapterParser, BACK
     from atropos.modifiers import (
@@ -231,6 +247,7 @@ def create_trim_params(options, parser, default_outfile):
         Filters, FilterFactory, TooShortReadFilter, TooLongReadFilter,
         NContentFilter, TrimmedFilter, UntrimmedFilter, NoFilter,
         MergedReadFilter)
+    from atropos.trim import Pipeline, PipelineWithStats
     from atropos.seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
     from atropos.util import RandomMatchProbability
     
@@ -473,4 +490,12 @@ def create_trim_params(options, parser, default_outfile):
     
     writers = Writers(force_create)
     
-    return AtroposParams(reader, modifiers, filters, formatters, writers)
+    if options.stats:
+        read_stats = ReadStatistics(
+            options.stats, options.paired, qualities=qualities,
+            tile_key_regexp=options.tile_key_regexp)
+        pipeline = PipelineWithStats(modifiers, filters, read_stats)
+    else:
+        pipeline = Pipeline(modifiers, filters)
+    
+    return (reader, pipeline, formatters, writers)

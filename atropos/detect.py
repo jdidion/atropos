@@ -18,10 +18,8 @@ from atropos.xopen import open_output, xopen
 # Also, offer an option of whether to test the reverse complement, with
 # the default being false.
 
-# TODO: Alternative to khmer:
-# kcMBT https://github.com/abdullah009/kcmbt_mt
-# KAT https://github.com/TGAC/KAT
-# KMC3 https://github.com/refresh-bio/KMC
+# Look at CountTable in khmer 2.1. Otherwise move to pymer.
+# pymer https://github.com/kdmurray91/pymer/tree/master/pymer
 
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,

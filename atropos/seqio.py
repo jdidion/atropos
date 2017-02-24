@@ -15,6 +15,7 @@ import sys
 
 from atropos.filters import NoFilter
 from atropos.xopen import STDOUT, STDERR, xopen, open_output
+from atropos.util import AtroposError
 
 def _shorten(s, n=100):
     """Shorten string s to at most n characters, appending "..." if necessary."""
@@ -24,12 +25,12 @@ def _shorten(s, n=100):
         s = s[:n-3] + '...'
     return s
 
-class FormatError(Exception):
+class FormatError(AtroposError):
     """
     Raised when an input file (FASTA or FASTQ) is malformatted.
     """
 
-class UnknownFileType(Exception):
+class UnknownFileType(AtroposError):
     """
     Raised when open could not autodetect the file type.
     """
@@ -825,7 +826,8 @@ class Formatters(object):
         assert self.multiplexed
         if name not in self.mux_formatters:
             path = self.output.format(name=name)
-            self.mux_formatters[name] = create_seq_formatter(path, **self.seq_formatter_args)
+            self.mux_formatters[name] = create_seq_formatter(
+                path, **self.seq_formatter_args)
         return self.mux_formatters[name]
     
     def get_seq_formatters(self):

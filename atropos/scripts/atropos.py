@@ -722,9 +722,17 @@ standard input/output. Without the -o option, output is sent to standard output.
             type=writeable_file, default=None, metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)")
         group.add_argument(
-            "--stats-file",
-            type=writeable_file, default=None, metavar="FILE",
-            help="Write stats to file rather than stdout/stderr. (no)")
+            "--stats",
+            choices=("pre", "post", "both"), default=None,
+            help="How to compute read-level statistics: none=don't compute; "
+                 "pre=only compute pre-trimming stats; post=only compute "
+                 "post-trimming stats; both=compute both pre- and post-trimming "
+                 "stats. (both)")
+        group.add_argument(
+            "--tile-key-regexp",
+            default="@(((?:[^\:]+)\:){5})",
+            help="Regular expression to extract key portions of read names to "
+                 "collect tile-specific statistics.")
         
         group = self.add_group("Colorspace options")
         group.add_argument(
@@ -890,16 +898,6 @@ standard input/output. Without the -o option, output is sent to standard output.
             help="Where data compression should be performed. Defaults to 'writer' if "
                  "system-level compression can be used and (1 < threads < 8), otherwise "
                  "defaults to 'worker'.")
-        
-        group = self.add_group(
-            "Stats", title="Read statistics options")
-        group.add_argument(
-            "--stats",
-            choices=("none", "pre", "post", "both"), default="both",
-            help="How to compute read-level statistics: none=don't compute; "
-                 "pre=only compute pre-trimming stats; post=only compute "
-                 "post-trimming stats; both=compute both pre- and post-trimming "
-                 "stats. (both)")
     
     def validate_command_options(self):
         options = self.options
@@ -1095,6 +1093,9 @@ standard input/output. Without the -o option, output is sent to standard output.
             if len(options.cut_min2) == 2 and options.cut_min2[0] * options.cut_min2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
         
+        if options.tile_key_regexp:
+            options.tile_key_regexp = re.compile(options.tile_key_regexp)
+        
         if options.threads is not None:
             threads = _configure_threads(options, parser)
             
@@ -1118,13 +1119,13 @@ standard input/output. Without the -o option, output is sent to standard output.
             # otherwise it will be in the read queue.
             if options.read_queue_size is None:
                 options.read_queue_size = threads * (100 if options.compression == "writer" else 500)
-            elif options.read_queue_size > 0:
-                assert options.read_queue_size >= threads
+            elif options.read_queue_size > 0 and options.read_queue_size < threads:
+                parser.error("Read queue size must be >= 'threads'")
         
             if options.result_queue_size is None:
                 options.result_queue_size = threads * (100 if options.compression == "worker" else 500)
-            elif options.result_queue_size > 0:
-                assert options.result_queue_size >= threads
+            elif options.result_queue_size > 0 and options.result_queue_size < threads:
+                parser.error("Result queue size must be >= 'threads'")
         
             max_queue_size = options.read_queue_size + options.result_queue_size
             if options.batch_size is None:
@@ -1139,28 +1140,21 @@ standard input/output. Without the -o option, output is sent to standard output.
 
 COMMANDS['trim'] = TrimCommand
 
-class StatsCommand(Command):
+class QcCommand(Command):
     """Compute read stats."""
-    name = "stats"
+    name = "qc"
     usage = """
-atropos stats -se input.fastq
-atropos stats -pe1 in1.fastq -pe2 in2.fastq
+atropos qc -se input.fastq
+atropos qc -pe1 in1.fastq -pe2 in2.fastq
 """
     description = """
 Compute read-level statistics. The output is identical to running the 'trim'
 command with '--stats pre'.
-
-* Read count
-* At both the per-position and whole-sequence level,
-    * GC content
-    * Quality
-    * Nucleotide content
-* Over-represented sequences
 """
 
     def add_command_options(self):
         self.parser.set_defaults(
-            action='stats',
+            action='qc',
             batch_size=None)
         
         group = self.add_group("Output")
@@ -1169,6 +1163,11 @@ command with '--stats pre'.
             "--output",
             type=writeable_file, metavar="FILE",
             help="Write stats to file rather than stdout.")
+        group.add_argument(
+            "--tile_key_regexp",
+            default="@(((?:[^\:]+)\:){5})",
+            help="Regular expression to extract key portions of read names to "
+                 "collect tile-specific statistics.")
         
         group = self.add_group(
             "Parallel", title="Parallel (multi-core) options")
@@ -1178,14 +1177,29 @@ command with '--stats pre'.
             type=positive(int, True), default=None, metavar="THREADS",
             help="Number of threads to use for read trimming. Set to 0 to use "
                  "max available threads. (Do not use multithreading)")
+        group.add_argument(
+            "--process-timeout",
+            type=positive(int, True), default=60, metavar="SECONDS",
+            help="Number of seconds process should wait before escalating messages "
+                 "to ERROR level. (60)")
+        group.add_argument(
+            "--read-queue-size",
+            type=int_or_str, default=None, metavar="SIZE",
+            help="Size of queue for batches of reads to be processed. (THREADS * 100)")
     
     def validate_command_options(self):
         if options.threads is not None:
             _configure_threads(self.options, self.parser)
+            if options.read_queue_size is None:
+                options.read_queue_size = threads * 100
+            elif options.read_queue_size > 0 and options.read_queue_size < threads:
+                self.parser.error("Read queue size must be >= than 'threads'")
         if options.batch_size is None:
             options.batch_size = 1000
+        if options.tile_key_regexp:
+            options.tile_key_regexp = re.compile(options.tile_key_regexp)
 
-COMMANDS['stats'] = StatsCommand
+COMMANDS['qc'] = QcCommand
 
 def _configure_threads(options, parser):
     if options.debug:
