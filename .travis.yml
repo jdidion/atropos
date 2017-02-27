@@ -12,6 +12,7 @@ python:
 install:
   - pip install --upgrade pip wheel
   - pip install Cython
+  - pip install pytest
   - pip install .
 
 script:
