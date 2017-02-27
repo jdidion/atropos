@@ -128,6 +128,7 @@ setup(
     ext_modules = extensions,
     packages = ['atropos', 'atropos.scripts'],
     scripts = ['bin/atropos'],
+    tests_require = ['pytest']
     extras_require = {
         'progressbar' : ['progressbar2'],
         'tqdm' : ['tqdm'],
