@@ -2,12 +2,10 @@
 # TODO
 # test with the --output option
 # test reading from standard input
-from __future__ import print_function, division, absolute_import
-
+from pytest import raises
+from io import StringIO
 import os
 import sys
-from io import StringIO
-from nose.tools import raises
 from atropos.scripts import atropos
 from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
 
@@ -266,9 +264,8 @@ except ImportError:
     pass
 
 
-@raises(SystemExit)
 def test_qualfile_only():
-    with redirect_stderr():
+    with raises(SystemExit), redirect_stderr():
         atropos.main(['-sq', datapath('E3M.qual')])
 
 
@@ -280,9 +277,8 @@ def test_no_args():
         assert result[0] != 0
 
 
-@raises(SystemExit)
 def test_two_fastqs():
-    with redirect_stderr():
+    with raises(SystemExit), redirect_stderr():
         atropos.main(['-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 

@@ -1,11 +1,9 @@
 # coding: utf-8
-from __future__ import print_function, division, absolute_import
+from pytest import raises
+import io
 from multiprocessing import Process, Queue
 import time
-import io
 from atropos.multicore import *
-
-from nose.tools import raises
 
 class TimeoutException(Exception): pass
 
@@ -51,25 +49,25 @@ def test_wait_on():
     assert c.j == 4
     #assert_log("DEBUG: waiting for {} seconds".format())
 
-@raises(TimeoutException)
 def test_timeout():
-    def condition(): return False
-    wait_on(condition, timeout=2, wait=1, timeout_callback=TimeoutException)
+    with raises(TimeoutException):
+        def condition(): return False
+        wait_on(condition, timeout=2, wait=1, timeout_callback=TimeoutException)
 
 def test_enqueue_dequeue():
     q = Queue(1)
     enqueue(q, 1)
     assert dequeue(q) == 1
 
-@raises(TimeoutException)
 def test_enqueue_timeout():
-    q = Queue(1)
-    q.put(1)
-    enqueue(q, 2, timeout=1, block_timeout=2, timeout_callback=TimeoutException)
+    with raises(TimeoutException):
+        q = Queue(1)
+        q.put(1)
+        enqueue(q, 2, timeout=1, block_timeout=2, timeout_callback=TimeoutException)
 
-@raises(TimeoutException)
 def test_dequeue_timeout():
-    dequeue(Queue(1), timeout=1, block_timeout=2, timeout_callback=TimeoutException)
+    with raises(TimeoutException):
+        dequeue(Queue(1), timeout=1, block_timeout=2, timeout_callback=TimeoutException)
 
 # TODO: port tests from testparallel here
 # Test worker vs writer compression

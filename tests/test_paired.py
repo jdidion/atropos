@@ -1,9 +1,7 @@
 # coding: utf-8
-from __future__ import print_function, division, absolute_import
-
-import shutil
+from pytest import raises
 import os
-from nose.tools import raises
+import shutil
 from atropos.scripts import atropos
 from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
 
@@ -106,12 +104,10 @@ def test_no_trimming():
     # make sure that this doesn't divide by zero
     atropos.main(['-a', 'XXXXX', '-A', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
-@raises(SystemExit)
 def test_missing_file():
-    with redirect_stderr():
+    with raises(SystemExit), redirect_stderr():
         atropos.main(['-a', 'XX', '--paired-output', 'out.fastq', datapath('paired.1.fastq')])
 
-@raises(SystemExit)
 def test_first_too_short():
     with temporary_path("truncated.1.fastq") as trunc1:
         # Create a truncated file in which the last read is missing
@@ -120,10 +116,9 @@ def test_first_too_short():
             lines = lines[:-4]
         with open(trunc1, 'w') as f:
             f.writelines(lines)
-        with redirect_stderr():
+        with raises(SystemExit), redirect_stderr():
             atropos.main('-a XX --paired-output out.fastq'.split() + [trunc1, datapath('paired.2.fastq')])
 
-@raises(SystemExit)
 def test_second_too_short():
     with temporary_path("truncated.2.fastq") as trunc2:
         # Create a truncated file in which the last read is missing
@@ -132,7 +127,7 @@ def test_second_too_short():
             lines = lines[:-4]
         with open(trunc2, 'w') as f:
             f.writelines(lines)
-        with redirect_stderr():
+        with raises(SystemExit), redirect_stderr():
             atropos.main('-a XX --paired-output out.fastq'.split() + [datapath('paired.1.fastq'), trunc2])
 
 def test_unmatched_read_names():
@@ -225,12 +220,11 @@ def test_interleaved():
         aligners=BACK_ALIGNERS
     )
 
-@raises(SystemExit)
 def test_interleaved_no_paired_output():
     with temporary_path("temp-paired.1.fastq") as p1:
         with temporary_path("temp-paired.2.fastq") as p2:
             params = '-a XX --interleaved'.split()
-            with redirect_stderr():
+            with raises(SystemExit), redirect_stderr():
                 params += [ '-o', p1, '-p1', p2, 'paired.1.fastq', 'paired.2.fastq']
                 atropos.main(params)
 
@@ -276,9 +270,8 @@ def test_too_long_output():
                 aligners=BACK_ALIGNERS, callback=callback
             )
 
-@raises(SystemExit)
 def test_too_short_output_paired_option_missing():
-    with temporary_path("temp-too-short.1.fastq") as p1:
+    with raises(SystemExit), temporary_path("temp-too-short.1.fastq") as p1:
         run_paired('-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output '
             '{0}'.format(p1),
             in1='paired.1.fastq', in2='paired.2.fastq',

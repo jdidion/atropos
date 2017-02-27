@@ -1,6 +1,4 @@
 # coding: utf-8
-from __future__ import print_function, division, absolute_import
-
 from atropos.seqio import Sequence
 from atropos.modifiers import *
 from atropos.adapters import *

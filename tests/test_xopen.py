@@ -3,7 +3,6 @@ import gzip
 import os
 import random
 import sys
-from nose.tools import raises
 from atropos.xopen import xopen, open_output
 from atropos.compression import get_compressor
 from .utils import temporary_path
@@ -49,7 +48,7 @@ def test_append():
                 except AttributeError:
                     pass
                 for appended in f:
-                	assert appended == reference
+                    assert appended == reference
 
 def test_xopen_text():
     for name in files:

@@ -1,8 +1,7 @@
 # coding: utf-8
-from __future__ import print_function, division, absolute_import
-
-import sys, os
 from contextlib import contextmanager
+import os
+import sys
 from atropos.scripts import atropos
 
 @contextmanager

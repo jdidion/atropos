@@ -1,6 +1,4 @@
 # coding: utf-8
-from __future__ import print_function, division, absolute_import
-
 from atropos.align import locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
 from atropos.util import RandomMatchProbability
 from atropos.adapters import BACK
