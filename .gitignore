@@ -36,3 +36,4 @@ atropos-*/
 .adapters
 paper/data/rna/
 paper/data/wgbs/
+.cache

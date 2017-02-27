@@ -3,6 +3,7 @@
 v1.1.0 (dev)
 -------------
 * Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
+* Switched to pytest for testing
 * In progress:
     * New 'qc' command computes read-level statistics.
     * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
