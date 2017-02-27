@@ -11,6 +11,5 @@ python:
 install:
   - pip install --upgrade pip wheel
   - pip install tox-travis
-  - pip install Cython
 script:
   - tox
