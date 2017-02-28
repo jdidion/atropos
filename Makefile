@@ -1,7 +1,7 @@
 tests  = tests
 
 BUILD = python setup.py build_ext -i && python setup.py install
-TEST  = pytest $(tests)
+TEST  = py.test $(tests)
 
 all:
 	$(BUILD)
