@@ -1,16 +1,24 @@
-test = tests
-build = python setup.py build_ext -i && \
-		python setup.py install && \
-		pytest $(test)
+tests  = tests
+
+BUILD = python setup.py build_ext -i && python setup.py install
+TEST  = pytest $(tests)
+
+all:
+	$(BUILD)
+	$(TEST)
 
 install:
-	$(call build,)
+	$(BUILD)
+
+test:
+	$(TEST)
 
 release:
 	# tag
 	git tag $(version)
 	# build
-	$(call build,)
+	$(BUILD)
+	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
 	twine register dist/atropos-$(version).tar.gz
