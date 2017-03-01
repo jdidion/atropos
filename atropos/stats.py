@@ -82,6 +82,11 @@ class MergingDict(OrderedDict):
 class CountingDict(dict):
     def __getitem__(self, name):
         return self.get(name, 0)
+    
+    def sorted_items(self, by='key'):
+        """Sort items"""
+        return tuple(sorted(
+            self.items(), key=lambda item: item[0 if by == 'key' else 1]))
 
 class NestedDict(dict):
     def __getitem__(self, name):
@@ -90,7 +95,8 @@ class NestedDict(dict):
         return self.get(name)
 
 class ReadStatistics(object):
-    """
+    """Manages :class:`ReadStatCollector`s for pre- and post-trimming stats.
+    
     Args:
         tile_key_regexp: Regular expression to parse read names and capture the
             read's 'tile' ID.
@@ -99,36 +105,51 @@ class ReadStatistics(object):
         self.mode = mode
         self.paired = paired
         self.pre = None
-        self.post = {}
+        self.post = None
         self.collector_args = kwargs
         
         if mode in ('pre', 'both'):
             self.pre = self._make_collectors()
+        if mode in ('post', 'both'):
+            self.post = {}
     
     def _make_collectors(self):
-        if self.paired:
-            return [
-                ReadStatCollector(**self.collector_args),
-                ReadStatCollector(**self.collector_args)]
-        else:
-            return ReadStatCollector(**self.collector_args)
+        return [
+            ReadStatCollector(**self.collector_args)
+            for i in range(2 if self.paired else 1)]
     
     def pre_trim(self, record):
+        if self.pre is None:
+            return
         if self.paired:
             self.pre[0].collect(record[0])
             self.pre[1].collect(record[1])
         else:
-            self.pre.collect(record)
+            self.pre[0].collect(record)
     
     def post_trim(self, dest, record):
+        if self.post is None:
+            return
         if dest not in self.post:
             self.post[dest] = self._make_collectors()
         post = self.post[dest]
+        post[0].collect(record[0])
         if self.paired:
-            post[0].collect(record[0])
             post[1].collect(record[1])
-        else:
-            post.collect(record[0])
+    
+    def finish(self):
+        result = {}
+        if self.pre is not None:
+            result['pre'] = dict(
+                ('read{}'.format(read), stats.finish())
+                for read, stats in enumerate(self.pre, 1))
+        if self.post is not None:
+            result['post'] = {}
+            for dest, collectors in self.post.items():
+                result[post][dest] = dict(
+                    ('read{}'.format(read), stats.finish())
+                    for read, stats in enumerate(collectors, 1))
+        return result
 
 class ReadStatCollector(object):
     def __init__(self, qualities=None, tile_key_regexp=None):
@@ -146,6 +167,7 @@ class ReadStatCollector(object):
         # whether to collect base quality stats
         self.tile_key_regexp = tile_key_regexp
         self.qualities = qualities
+        self.sequence_qualities = self.base_qualities = self.tile_qualities = None
         if qualities or tile_key_regexp:
             self._init_qualities()
             if tile_key_regexp:
@@ -155,10 +177,10 @@ class ReadStatCollector(object):
         self._cache = {}
     
     def _init_qualities(self):
-        # per-position quality composition
-        self.base_qualities = []
         # per-sequence mean qualities
         self.sequence_qualities = CountingDict()
+        # per-position quality composition
+        self.base_qualities = []
     
     # These are attributes that are computed on the fly. If called by name
     # (without leading '_'), __getattr__ uses the method to compute the value
@@ -173,7 +195,10 @@ class ReadStatCollector(object):
     
     def __getattr__(self, name):
         if name not in self._cache:
-            func = getattr(self, '_' + name)
+            func_name = '_' + name
+            if not hasattr(self, func_name):
+                raise ValueError("No function named {}".format(func_name))
+            func = getattr(self, func_name)
             self._cache[name] = func()
         return self._cache[name]
     
@@ -191,8 +216,8 @@ class ReadStatCollector(object):
         gc = round((seq.count('C') + seq.count('G')) * 100 / seqlen)
         
         self.count += 1
-        self.lengths[seqlen] += 1
-        self.gc[gc] += 1
+        self.sequence_lengths[seqlen] += 1
+        self.sequence_gc[gc] += 1
         
         if seqlen > self.max_read_len:
             self._extend_bases(seqlen)
@@ -203,7 +228,7 @@ class ReadStatCollector(object):
             quals = record.qualities
             # mean read quality
             meanqual = round(sum(ord(q) for q in quals) / seqlen)
-            self.qualities[meanqual] += 1
+            self.sequence_qualities[meanqual] += 1
             # tile ID
             if self.track_tiles:
                 tile = self.tile_key_regexp.match(record.name)
@@ -225,7 +250,21 @@ class ReadStatCollector(object):
         for i in range(len(self.bases), new_size):
             self.bases.append(CountingDict())
             if self.qualities:
-                self.qualities.append(CountingDict())
+                self.base_qualities.append(CountingDict())
+    
+    def finish(self):
+        result = dict(
+            count=self.count,
+            length=self.sequence_lengths.sorted_items(),
+            gc=self.sequence_gc.sorted_items(),
+            bases=self.bases)
+        if self.sequence_qualities:
+            result['qualities'] = self.sequence_qualities.sorted_items()
+        if self.base_qualities:
+            result['base_qualities'] = self.base_qualities
+        if self.tile_qualities:
+            result['tile_qualities'] = self.tile_qualities
+        return result
 
 def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, formatters):
     """

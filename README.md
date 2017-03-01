@@ -63,24 +63,31 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ### 1.1
 
-* Migrate to xphyle (https://github.com/jdidion/xphyle) for file management.
+* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
+    * Integrate with MultiQC
+    * https://github.com/marcelm/cutadapt/issues/112
+    * Also look at the QCML used in ngs-bits
 * Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
+
+### 1.2
+
+* Migrate to xphyle (https://github.com/jdidion/xphyle) for file management.
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
 * Expand the list of contaminants that are detected by default.
 
-### 1.2
+### 1.3
 
 * Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 
-### 1.3
+### 1.4
 
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
 * General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
 
-### 1.4
+### 1.5
 
 * Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
 * Support for paired-end demultiplexing (i.e. when barcodes are used in both paired-end adapters): https://github.com/marcelm/cutadapt/issues/118.
@@ -89,12 +96,9 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
 * Add option to InsertAdapter to trim overhangs without adapter matching.
 
-### 1.5
+### 1.6
 
 * Implement a public plugin API.
-* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
-    * https://github.com/marcelm/cutadapt/issues/112
-    * Also look at the QCML used in ngs-bits
 
 ### 2.0
 

@@ -1,6 +1,9 @@
 # coding: utf-8
 """Implementation of the 'qc' command.
 """
+from atropos.multicore import *
+from atropos.stats import Summary
+import logging
 
 def run_serial(reader, read_stats):
     def _run():
@@ -8,7 +11,9 @@ def run_serial(reader, read_stats):
             for record in batch:
                 read_stats.pre_trim(record)
     rc = run_interruptible(_run)
-    report = Summary().finish() if rc == 0 else None
+    report = read_stats.finish() if rc == 0 else None
+    import pprint
+    pprint.pprint(report, indent=2)
     details = dict(mode='serial', threads=1)
     return (rc, report, details)
 
@@ -61,7 +66,8 @@ def run_parallel(reader, read_stats, threads=2, timeout=30, input_queue_size=0):
     worker_args = (input_queue, summary_queue, timeout, read_stats)
     worker_processes = launch_workers(threads - 1, QcWorker, worker_args)
     
-    def ensure_alive(): ensure_processes(worker_processes)
+    def ensure_alive():
+        ensure_processes(worker_processes)
     
     def _run():
         # Add batches of reads to the input queue. Provide a timeout callback

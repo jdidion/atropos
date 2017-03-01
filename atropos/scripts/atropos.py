@@ -1141,7 +1141,7 @@ standard input/output. Without the -o option, output is sent to standard output.
 COMMANDS['trim'] = TrimCommand
 
 class QcCommand(Command):
-    """Compute read stats."""
+    """Compute read-level statistics."""
     name = "qc"
     usage = """
 atropos qc -se input.fastq
@@ -1163,6 +1163,9 @@ command with '--stats pre'.
             "--output",
             type=writeable_file, metavar="FILE",
             help="Write stats to file rather than stdout.")
+        
+        group = self.add_group(
+            "Report", title="Report content and formatting options")
         group.add_argument(
             "--tile_key_regexp",
             default="@(((?:[^\:]+)\:){5})",
@@ -1188,16 +1191,16 @@ command with '--stats pre'.
             help="Size of queue for batches of reads to be processed. (THREADS * 100)")
     
     def validate_command_options(self):
-        if options.threads is not None:
+        if self.options.threads is not None:
             _configure_threads(self.options, self.parser)
-            if options.read_queue_size is None:
-                options.read_queue_size = threads * 100
-            elif options.read_queue_size > 0 and options.read_queue_size < threads:
+            if self.options.read_queue_size is None:
+                self.options.read_queue_size = threads * 100
+            elif self.options.read_queue_size > 0 and self.options.read_queue_size < threads:
                 self.parser.error("Read queue size must be >= than 'threads'")
-        if options.batch_size is None:
-            options.batch_size = 1000
-        if options.tile_key_regexp:
-            options.tile_key_regexp = re.compile(options.tile_key_regexp)
+        if self.options.batch_size is None:
+            self.options.batch_size = 1000
+        if self.options.tile_key_regexp:
+            self.options.tile_key_regexp = re.compile(self.options.tile_key_regexp)
 
 COMMANDS['qc'] = QcCommand
 
@@ -1213,7 +1216,7 @@ def _configure_threads(options, parser):
     return threads
 
 class DetectCommand(Command):
-    """detect adapter and other contaminant sequences."""
+    """Detect adapter and other contaminant sequences."""
     name = "detect"
     usage = "atropos -se input.fastq detect\natropos -pe1 in1.fq -pe2 in2.fq detect"
     description = "Detect adapter sequences directly from read sequences."
@@ -1278,7 +1281,7 @@ class DetectCommand(Command):
 COMMANDS['detect'] = DetectCommand
 
 class ErrorCommand(Command):
-    """estimate the sequencing error rate."""
+    """Estimate the sequencing error rate."""
     name = "error"
     usage = "atropos -se input.fastq error\natropos -pe in1.fq -pe2 in2.fq error"
     description = """
