@@ -200,9 +200,7 @@ def create_reader(options, parser, counter_magnitude="M"):
     return (reader, (input1, input2), qualities, qualfile is not None)
 
 # TODO: specify this externally rather than hard-coding
-DEFAULT_ADAPTERS_URL = \
-    "https://gist.githubusercontent.com/jdidion/c151526b8ccd84945cd31dfa4f83591d/raw/" \
-    "eaa6b2d99983f5b14f75357c93c1540142436a49/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_URL = "https://github.com/jdidion/atropos/blob/master/adapters/sequencing_adapters.fa"
 
 def load_known_adapters(options):
     from atropos.adapters import AdapterCache
