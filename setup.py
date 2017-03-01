@@ -16,7 +16,7 @@ from distutils.command.build_ext import build_ext as _build_ext
 
 import versioneer
 
-MIN_CYTHON_VERSION = '0.25'
+MIN_CYTHON_VERSION = '0.25.2'
 
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
