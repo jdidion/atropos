@@ -18,8 +18,15 @@ from atropos.xopen import open_output, xopen
 # Also, offer an option of whether to test the reverse complement, with
 # the default being false.
 
-# Look at CountTable in khmer 2.1. Otherwise move to pymer.
+# TODO: Look at CountTable in khmer 2.1. Otherwise move to pymer.
 # pymer https://github.com/kdmurray91/pymer/tree/master/pymer
+
+# TODO: Import kmers from FastQC output.
+
+# TODO: In KnownContaminantDetector, accept template sequences with wildcards
+# to match against.
+
+# TODO: Re-download sequencing_adapters.fa if it has been updated since last download.
 
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,

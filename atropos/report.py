@@ -11,7 +11,8 @@ from atropos.adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
 #   * Reliably line things up in columns.
 #   * Fix https://github.com/marcelm/cutadapt/issues/128
 # * Enhancements:
-#   * HTML viewer from JSON
+#   * Integrate with MultiQC
+#
 
 def print_report(options, wallclock_time, cpu_time, stats, trimmer_classes):
     outfile = options.report_file
