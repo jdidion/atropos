@@ -9,6 +9,7 @@ v1.1.0 (dev)
     * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
     * Major refactoring and improvement of reporting
     * Integration with MultiQC
+* Fixed adapter masking in InsertAligner (issue #7, thanks @lllaaa).
 
 v1.0.23 (2016.12.07)
 --------------------

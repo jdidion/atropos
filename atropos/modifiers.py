@@ -347,7 +347,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
             if self.action == 'mask':
                 # add N from last modification
                 masked_sequence = trimmed_read.sequence
-                masked_sequence += ('N' * len(read) - len(trimmed_read))
+                masked_sequence += 'N' * (len(read) - len(trimmed_read))
                 # set masked sequence as sequence with original quality
                 trimmed_read.sequence = masked_sequence
                 trimmed_read.qualities = read.qualities

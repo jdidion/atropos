@@ -199,6 +199,13 @@ def test_paired_end_A_only():
         expected1='paired-onlyA.1.fastq', expected2='paired-onlyA.2.fastq'
     )
 
+def test_paired_end_mask_adapter():
+    '''mask adapter with N (reads maintain the same length)'''
+    run_paired("-a CAAG -A TCGA -n 3 --mask-adapter",
+        in1="back_repeat.1.fastq", in2="back_repeat.2.fastq",
+        expected1="back_repeat.1.fastq", expected2="back_repeat.2.fastq",
+        aligners=BACK_ALIGNERS)
+
 def test_discard_untrimmed():
     # issue #146
     # the first adapter is a sequence cut out from the first read

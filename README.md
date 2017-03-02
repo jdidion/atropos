@@ -68,6 +68,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
     * https://github.com/marcelm/cutadapt/issues/112
     * Also look at the QCML used in ngs-bits
 * Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
+* Add developer/contributor documentation and guidelines.
 
 ### 1.2
 
