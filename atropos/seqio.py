@@ -356,6 +356,8 @@ class InterleavedSequenceReader(object):
     def __exit__(self, *args):
         self.close()
 
+# TODO: SAM/BAM classes need unit tests
+
 class SAMReader(object):
     """
     Reader for SAM/BAM files. Paired-end files must be name-sorted. Does

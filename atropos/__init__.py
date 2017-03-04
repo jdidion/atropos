@@ -1,5 +1,5 @@
 # coding: utf-8
-from __future__ import print_function, division, absolute_import
+import os
 import sys
 
 from atropos._version import get_versions
@@ -25,3 +25,7 @@ See the documentation for alternative ways of installing the program.
 The original error message follows.
 """.format(sys.executable))
         raise
+
+def get_package_data(subdir, path):
+    return os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), subdir, path)

@@ -1343,6 +1343,9 @@ def main(args):
         command_name = args[0]
         del args[0]
     
+    if command_name not in COMMANDS:
+        return (1, "Invalid command: {}".format(command_name))
+    
     command_class = COMMANDS[command_name]
     command = command_class(args)
     return command.execute()

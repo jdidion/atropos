@@ -1,0 +1,701 @@
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.40 (commands_t8) Complete
+Date: December 9, 2016 at 3:31:48 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.40 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:30:47
+End Time         = 12/09/2016 15:31:46
+User Time        = 00:05:09
+System Time      = 00:00:59
+Wallclock Time   = 00:00:59
+CPU              = 00:06:09
+Max vmem         = 9.223M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.39 (commands_t8) Complete
+Date: December 9, 2016 at 3:30:45 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.39 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:29:48
+End Time         = 12/09/2016 15:30:44
+User Time        = 00:02:38
+System Time      = 00:01:46
+Wallclock Time   = 00:00:56
+CPU              = 00:04:25
+Max vmem         = 13.586M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.38 (commands_t8) Complete
+Date: December 9, 2016 at 3:29:46 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.38 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:28:47
+End Time         = 12/09/2016 15:29:44
+User Time        = 00:06:25
+System Time      = 00:00:08
+Wallclock Time   = 00:00:57
+CPU              = 00:06:34
+Max vmem         = 791.605M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.37 (commands_t8) Complete
+Date: December 9, 2016 at 3:28:45 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.37 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:26:52
+End Time         = 12/09/2016 15:28:43
+User Time        = 00:13:22
+System Time      = 00:00:08
+Wallclock Time   = 00:01:51
+CPU              = 00:13:30
+Max vmem         = 2.185G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.36 (commands_t8) Complete
+Date: December 9, 2016 at 3:26:50 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.36 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:25:06
+End Time         = 12/09/2016 15:26:49
+User Time        = 00:06:34
+System Time      = 00:00:09
+Wallclock Time   = 00:01:43
+CPU              = 00:06:43
+Max vmem         = 809.168M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.35 (commands_t8) Complete
+Date: December 9, 2016 at 3:25:04 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.35 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:24:00
+End Time         = 12/09/2016 15:25:02
+User Time        = 00:05:11
+System Time      = 00:00:48
+Wallclock Time   = 00:01:02
+CPU              = 00:05:59
+Max vmem         = 9.211M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.34 (commands_t8) Complete
+Date: December 9, 2016 at 3:23:58 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.34 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:23:04
+End Time         = 12/09/2016 15:23:56
+User Time        = 00:02:28
+System Time      = 00:00:36
+Wallclock Time   = 00:00:52
+CPU              = 00:03:05
+Max vmem         = 13.430M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.33 (commands_t8) Complete
+Date: December 9, 2016 at 3:23:02 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.33 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:22:08
+End Time         = 12/09/2016 15:23:01
+User Time        = 00:06:10
+System Time      = 00:00:07
+Wallclock Time   = 00:00:53
+CPU              = 00:06:18
+Max vmem         = 867.926M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.32 (commands_t8) Complete
+Date: December 9, 2016 at 3:22:06 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.32 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:20:11
+End Time         = 12/09/2016 15:22:05
+User Time        = 00:13:48
+System Time      = 00:00:07
+Wallclock Time   = 00:01:54
+CPU              = 00:13:56
+Max vmem         = 2.250G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.31 (commands_t8) Complete
+Date: December 9, 2016 at 3:20:09 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.31 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:18:20
+End Time         = 12/09/2016 15:20:07
+User Time        = 00:06:40
+System Time      = 00:00:12
+Wallclock Time   = 00:01:47
+CPU              = 00:06:53
+Max vmem         = 724.785M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.30 (commands_t8) Complete
+Date: December 9, 2016 at 3:18:18 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.30 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:14:02
+End Time         = 12/09/2016 15:18:17
+User Time        = 00:21:00
+System Time      = 00:03:49
+Wallclock Time   = 00:04:15
+CPU              = 00:24:50
+Max vmem         = 9.258M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.29 (commands_t8) Complete
+Date: December 9, 2016 at 3:14:00 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.29 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:08:44
+End Time         = 12/09/2016 15:13:58
+User Time        = 00:12:36
+System Time      = 00:16:48
+Wallclock Time   = 00:05:14
+CPU              = 00:29:24
+Max vmem         = 10.875M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.28 (commands_t8) Complete
+Date: December 9, 2016 at 3:08:42 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.28 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 15:03:14
+End Time         = 12/09/2016 15:08:40
+User Time        = 00:33:27
+System Time      = 00:00:29
+Wallclock Time   = 00:05:26
+CPU              = 00:33:56
+Max vmem         = 1.191G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.27 (commands_t8) Complete
+Date: December 9, 2016 at 3:03:12 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.27 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:56:16
+End Time         = 12/09/2016 15:03:10
+User Time        = 00:45:50
+System Time      = 00:00:28
+Wallclock Time   = 00:06:54
+CPU              = 00:46:18
+Max vmem         = 5.093G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.26 (commands_t8) Complete
+Date: December 9, 2016 at 2:56:14 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.26 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:50:57
+End Time         = 12/09/2016 14:56:12
+User Time        = 00:33:22
+System Time      = 00:00:38
+Wallclock Time   = 00:05:15
+CPU              = 00:34:00
+Max vmem         = 1.154G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.25 (commands_t8) Complete
+Date: December 9, 2016 at 2:50:55 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.25 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:49:47
+End Time         = 12/09/2016 14:50:54
+User Time        = 00:03:48
+System Time      = 00:00:17
+Wallclock Time   = 00:01:07
+CPU              = 00:04:05
+Max vmem         = 8.820M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.24 (commands_t8) Complete
+Date: December 9, 2016 at 2:49:45 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.24 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:49:01
+End Time         = 12/09/2016 14:49:43
+User Time        = 00:01:38
+System Time      = 00:00:19
+Wallclock Time   = 00:00:42
+CPU              = 00:01:57
+Max vmem         = 13.219M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.23 (commands_t8) Complete
+Date: December 9, 2016 at 2:48:59 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.23 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:48:06
+End Time         = 12/09/2016 14:48:58
+User Time        = 00:05:02
+System Time      = 00:00:06
+Wallclock Time   = 00:00:52
+CPU              = 00:05:09
+Max vmem         = 1.138G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.22 (commands_t8) Complete
+Date: December 9, 2016 at 2:48:04 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.22 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:46:17
+End Time         = 12/09/2016 14:48:03
+User Time        = 00:12:05
+System Time      = 00:00:05
+Wallclock Time   = 00:01:46
+CPU              = 00:12:11
+Max vmem         = 1.951G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.21 (commands_t8) Complete
+Date: December 9, 2016 at 2:46:15 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.21 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute72.gc.nih.gov
+Host             = kcompute72.gc.nih.gov
+Start Time       = 12/09/2016 14:44:18
+End Time         = 12/09/2016 14:46:13
+User Time        = 00:04:51
+System Time      = 00:00:07
+Wallclock Time   = 00:01:55
+CPU              = 00:04:58
+Max vmem         = 595.219M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.20 (commands_t8) Complete
+Date: December 9, 2016 at 2:44:17 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.20 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute72.gc.nih.gov
+Host             = kcompute72.gc.nih.gov
+Start Time       = 12/09/2016 14:43:28
+End Time         = 12/09/2016 14:44:15
+User Time        = 00:04:42
+System Time      = 00:00:07
+Wallclock Time   = 00:00:47
+CPU              = 00:04:49
+Max vmem         = 448.102M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.19 (commands_t8) Complete
+Date: December 9, 2016 at 2:43:26 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.19 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute72.gc.nih.gov
+Host             = kcompute72.gc.nih.gov
+Start Time       = 12/09/2016 14:41:46
+End Time         = 12/09/2016 14:43:24
+User Time        = 00:11:18
+System Time      = 00:00:06
+Wallclock Time   = 00:01:38
+CPU              = 00:11:24
+Max vmem         = 1.885G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.18 (commands_t8) Complete
+Date: December 9, 2016 at 2:41:45 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.18 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:39:50
+End Time         = 12/09/2016 14:41:43
+User Time        = 00:03:56
+System Time      = 00:00:05
+Wallclock Time   = 00:01:53
+CPU              = 00:04:02
+Max vmem         = 533.000M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.17 (commands_t8) Complete
+Date: December 9, 2016 at 2:39:48 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.17 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:38:47
+End Time         = 12/09/2016 14:39:46
+User Time        = 00:03:52
+System Time      = 00:00:25
+Wallclock Time   = 00:00:59
+CPU              = 00:04:17
+Max vmem         = 8.676M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.16 (commands_t8) Complete
+Date: December 9, 2016 at 2:38:45 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.16 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:37:57
+End Time         = 12/09/2016 14:38:43
+User Time        = 00:01:35
+System Time      = 00:00:15
+Wallclock Time   = 00:00:46
+CPU              = 00:01:51
+Max vmem         = 13.242M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.15 (commands_t8) Complete
+Date: December 9, 2016 at 2:37:55 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.15 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:37:01
+End Time         = 12/09/2016 14:37:53
+User Time        = 00:05:10
+System Time      = 00:00:06
+Wallclock Time   = 00:00:52
+CPU              = 00:05:16
+Max vmem         = 991.559M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.14 (commands_t8) Complete
+Date: December 9, 2016 at 2:36:59 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.14 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:35:11
+End Time         = 12/09/2016 14:36:57
+User Time        = 00:12:32
+System Time      = 00:00:05
+Wallclock Time   = 00:01:46
+CPU              = 00:12:38
+Max vmem         = 1.855G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.13 (commands_t8) Complete
+Date: December 9, 2016 at 2:35:09 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.13 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:33:16
+End Time         = 12/09/2016 14:35:07
+User Time        = 00:04:55
+System Time      = 00:00:05
+Wallclock Time   = 00:01:51
+CPU              = 00:05:00
+Max vmem         = 551.562M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.12 (commands_t8) Complete
+Date: December 9, 2016 at 2:33:14 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.12 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:32:26
+End Time         = 12/09/2016 14:33:12
+User Time        = 00:04:10
+System Time      = 00:00:05
+Wallclock Time   = 00:00:46
+CPU              = 00:04:16
+Max vmem         = 931.598M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.11 (commands_t8) Complete
+Date: December 9, 2016 at 2:32:24 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.11 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:30:34
+End Time         = 12/09/2016 14:32:22
+User Time        = 00:12:03
+System Time      = 00:00:05
+Wallclock Time   = 00:01:48
+CPU              = 00:12:08
+Max vmem         = 1.805G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.10 (commands_t8) Complete
+Date: December 9, 2016 at 2:30:32 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.10 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:28:35
+End Time         = 12/09/2016 14:30:30
+User Time        = 00:04:04
+System Time      = 00:00:05
+Wallclock Time   = 00:01:55
+CPU              = 00:04:10
+Max vmem         = 551.211M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.9 (commands_t8) Complete
+Date: December 9, 2016 at 2:28:33 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.9 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:27:30
+End Time         = 12/09/2016 14:28:32
+User Time        = 00:03:42
+System Time      = 00:00:15
+Wallclock Time   = 00:01:02
+CPU              = 00:03:58
+Max vmem         = 8.887M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.8 (commands_t8) Complete
+Date: December 9, 2016 at 2:27:28 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.8 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:26:42
+End Time         = 12/09/2016 14:27:26
+User Time        = 00:01:34
+System Time      = 00:00:14
+Wallclock Time   = 00:00:44
+CPU              = 00:01:49
+Max vmem         = 13.258M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.7 (commands_t8) Complete
+Date: December 9, 2016 at 2:26:40 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.7 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:25:57
+End Time         = 12/09/2016 14:26:39
+User Time        = 00:04:54
+System Time      = 00:00:05
+Wallclock Time   = 00:00:42
+CPU              = 00:04:59
+Max vmem         = 1.036G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.6 (commands_t8) Complete
+Date: December 9, 2016 at 2:25:55 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.6 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:24:03
+End Time         = 12/09/2016 14:25:53
+User Time        = 00:13:01
+System Time      = 00:00:05
+Wallclock Time   = 00:01:50
+CPU              = 00:13:07
+Max vmem         = 1.915G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.5 (commands_t8) Complete
+Date: December 9, 2016 at 2:24:01 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.5 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:22:08
+End Time         = 12/09/2016 14:24:00
+User Time        = 00:05:00
+System Time      = 00:00:06
+Wallclock Time   = 00:01:52
+CPU              = 00:05:06
+Max vmem         = 730.242M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.4 (commands_t8) Complete
+Date: December 9, 2016 at 2:22:06 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.4 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:21:31
+End Time         = 12/09/2016 14:22:05
+User Time        = 00:03:53
+System Time      = 00:00:05
+Wallclock Time   = 00:00:34
+CPU              = 00:03:58
+Max vmem         = 526.512M
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.3 (commands_t8) Complete
+Date: December 9, 2016 at 2:21:29 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.3 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:19:40
+End Time         = 12/09/2016 14:21:27
+User Time        = 00:12:18
+System Time      = 00:00:05
+Wallclock Time   = 00:01:47
+CPU              = 00:12:24
+Max vmem         = 1.737G
+Exit Status      = 0
+
+From: root <root@trek.nhgri.nih.gov>
+Subject: Job-array task 4337818.2 (commands_t8) Complete
+Date: December 9, 2016 at 2:19:38 PM EST
+To: <john.didion@nih.gov>
+
+Job-array task 4337818.2 (commands_t8) Complete
+User             = didionjp
+Queue            = low6.q@kcompute76.gc.nih.gov
+Host             = kcompute76.gc.nih.gov
+Start Time       = 12/09/2016 14:17:42
+End Time         = 12/09/2016 14:19:36
+User Time        = 00:04:01
+System Time      = 00:00:05
+Wallclock Time   = 00:01:54
+CPU              = 00:04:07
+Max vmem         = 528.039M
+Exit Status      = 0

@@ -12,8 +12,6 @@ def run_serial(reader, read_stats):
                 read_stats.pre_trim(record)
     rc = run_interruptible(_run)
     report = read_stats.finish() if rc == 0 else None
-    import pprint
-    pprint.pprint(report, indent=2)
     details = dict(mode='serial', threads=1)
     return (rc, report, details)
 

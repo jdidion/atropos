@@ -6,8 +6,8 @@ Cython is run when
 * or the pre-generated C sources are out of date,
 * or when --cython is given on the command line.
 """
-import sys
 import os.path
+import sys
 
 from setuptools import setup, Extension
 from distutils.version import LooseVersion
@@ -128,12 +128,17 @@ setup(
     ext_modules = extensions,
     packages = ['atropos', 'atropos.scripts'],
     scripts = ['bin/atropos'],
-    tests_require = ['pytest'],
+    package_data = { 'atropos' : [
+        'adapters/*.fa',
+        'templates/*.mako'
+    ] },
+    tests_require = ['pytest'], #, 'mako', 'pysam'],
     extras_require = {
         'progressbar' : ['progressbar2'],
         'tqdm' : ['tqdm'],
         'khmer' : ['khmer'],
-        'pysam' : ['pysam']
+        'pysam' : ['pysam'],
+        'mako' : ['mako']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

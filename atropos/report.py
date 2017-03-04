@@ -12,7 +12,66 @@ from atropos.adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
 #   * Fix https://github.com/marcelm/cutadapt/issues/128
 # * Enhancements:
 #   * Integrate with MultiQC
-#
+
+def generate_mako(stats, outfile, template, **kwargs):
+    from mako import Template
+    if not os.path.isabs(template):
+        from atropos import get_package_data
+        template = get_package_data('templates', template)
+    template = Template(filename=template)
+    args = dict(stats)
+    args.update(kwargs)
+    with open(outfile, 'wt') as out:
+        out.write(template.render(**args))
+
+def print_read_stats(options, stats):
+    outfile = options.output
+    close = False
+    
+    if outfile is not None:
+        outfile = open(outfile, "w")
+        close = True
+    elif not options.quiet:
+        outfile = sys.stderr if options.output is None else sys.stdout
+    else:
+        return None
+    
+    try:
+        #try:
+        #    generate_mako(stats, outfile, "stats.txt")
+        #except:
+        generate_read_stats(stats, outfile)
+        return stats
+    finally:
+        if close:
+            outfile.close()
+
+def generate_read_stats(stats, outfile):
+    def _print(*args, colwidths=(40, 10, 10), justification=('<', '>', '>'), **kwargs):
+        fmt_str = []
+        fmt_args = []
+        for i, (txt, width, just) in enumerate(zip(args, colwidths, justification)):
+            txt = str(txt)
+            if len(txt) > width:
+                txt = textwrap.wrap(txt, width)
+            fmt_str.append('{' + str(i) + ':' + just + str(width) + '}')
+            fmt_args.append(txt)
+        fmt_str = ' '.join(fmt_str)
+        print(fmt_str.format(*fmt_args), file=outfile, **kwargs)
+    
+    def _print_stats(title, data):
+        paired = 'read2' in data
+        print(title, file=outfile)
+        _print('', 'Read1', 'Read2')
+        _print(
+            "Read pairs:" if paired else "Reads:",
+            data['read1']['count'],
+            data['read2']['count'])
+    
+    if 'pre' in stats:
+        _print_stats('Pre-trimming stats', stats['pre'])
+    if 'post' in stats:
+        _print_stats('Post-trimming stats', stats['post'])
 
 def print_report(options, wallclock_time, cpu_time, stats, trimmer_classes):
     outfile = options.report_file
@@ -33,18 +92,14 @@ def print_report(options, wallclock_time, cpu_time, stats, trimmer_classes):
     stats['pairs_or_reads'] = "Pairs" if paired else "Reads"
     
     try:
-        # TODO: rewrite generate_report so that this call
-        # receives a string result and writes it to outfile
-        # outfile.write(generate_report(paired, time, stats))
+        #try:
+        #    generate_mako(stats, outfile, "report.txt", trimmer_classes=trimmer_classes)
+        #except:
         generate_report(stats, trimmer_classes, outfile)
         return stats
     finally:
-        if close and outfile is not None:
+        if close:
             outfile.close()
-    
-        # def get_values(self):
-        #	values = var(self)
-        #	return values
 
 def generate_report(stats, trimmer_classes, outfile):
     def _print(*args, **kwargs): print(*args, file=outfile, **kwargs)

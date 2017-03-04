@@ -91,7 +91,7 @@ def error(options, parser):
     return (0, None, {})
 
 def qc(options, parser):
-    #from atropos.report import print_read_stats
+    from atropos.report import print_read_stats
     
     reader, names, qualities, _ = create_reader(options, parser)
     stats = ReadStatistics(
@@ -107,7 +107,7 @@ def qc(options, parser):
             reader, stats, options.threads, options.process_timeout,
             options.read_queue_size)
     
-    #print_read_stats(summary)
+    print_read_stats(options, report)
     return (rc, None, details)
 
 def trim(options, parser):
@@ -200,7 +200,7 @@ def create_reader(options, parser, counter_magnitude="M"):
     return (reader, (input1, input2), qualities, qualfile is not None)
 
 # TODO: specify this externally rather than hard-coding
-DEFAULT_ADAPTERS_URL = "https://github.com/jdidion/atropos/blob/master/adapters/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_URL = "https://github.com/jdidion/atropos/blob/master/atropos/adapters/sequencing_adapters.fa"
 
 def load_known_adapters(options):
     from atropos.adapters import AdapterCache
@@ -210,8 +210,11 @@ def load_known_adapters(options):
         try:
             adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
         except:
-            logging.getLogger().error(
-                "Error loading adapters from URL %s", DEFAULT_ADAPTERS_URL)
+            logging.getLogger().warn(
+                "Error loading adapters from URL %s; loading from file", DEFAULT_ADAPTERS_URL)
+            from atropos import get_package_data
+            adapter_cache.load_from_file(
+                get_package_data('adapters', 'sequencing_adapters.fa'))
     if options.known_adapter:
         for s in options.known_adapter:
             name, seq = s.split('=')
