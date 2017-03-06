@@ -116,6 +116,10 @@ def generate_read_stats(stats, outfile):
                     for count in base_counts + [total_count])
                 _print(i, *base_pcts, colwidths=widths, justification=justification)
         
+        def _print_tile_histogram(title, hist):
+            _print_header(title)
+            
+        
         _print_header(title, underline='=', overline=True)
         _print('', 'Read1', 'Read2')
         _print(
@@ -128,6 +132,12 @@ def generate_read_stats(stats, outfile):
             data['read1']['length'],
             data['read2']['length'])
         _print()
+        if 'qualities' in data['read1']:
+            _print_histogram(
+                "Sequence qualities:",
+                data['read1']['qualities'],
+                data['read2']['qualities'])
+            _print()
         _print_histogram(
             "Sequence GC content (%):",
             data['read1']['gc'],
@@ -140,6 +150,21 @@ def generate_read_stats(stats, outfile):
         _print_base_histogram(
             "Base composition (Read 2)",
             data['read2']['bases'])
+        if 'base_qualities' in data['read1']:
+            _print_histogram(
+                "Base qualities:",
+                data['read1']['base_qualities'],
+                data['read2']['base_qualities'])
+            _print()
+        if 'tile_qualities' in data['read1']:
+            _print_tile_histogram(
+                "Per-tile qualities (Read 1)",
+                data['read1']['tile_qualities'])
+            _print()
+            _print_tile_histogram(
+                "Per-tile qualities (Read 2)",
+                data['read2']['tile_qualities'])
+            _print()
     
     if 'pre' in stats:
         _print_stats('Pre-trimming stats', stats['pre'])

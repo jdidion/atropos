@@ -94,6 +94,47 @@ class NestedDict(dict):
             self[name] = CountingDict()
         return self.get(name)
 
+class BaseDicts(object):
+    def __init__(self, dict_class):
+        self.dict_class = dict_class
+        self.dicts = []
+    
+    def __getitem__(self, idx):
+        return self.dicts[idx]
+    
+    def extend(self, size):
+        n = size - len(self.dicts)
+        if n > 0:
+            for i in range(n):
+                self.dicts.append(self.dict_class())
+
+class BaseCountingDicts(BaseDicts):
+    def flatten(self):
+        keys = set()
+        for d in self.dicts:
+            keys.update(d.keys())
+        keys = tuple(sorted(keys))
+        return [
+            (i,) + tuple(d.get(k, 0) for k in keys)
+            for i, d in enumerate(self.dicts, 1)
+        ]
+
+class BaseNestingDicts(BaseDicts):
+    def flatten(self):
+        keys1 = set()
+        keys2 = set()
+        for d1 in self.dicts:
+            keys1.update(d1.keys())
+            for d2 in d1.values():
+                keys2.update(d2.keys())
+        keys1 = tuple(sorted(keys1))
+        keys2 = tuple(sorted(keys2))
+        return [
+            (i, k1, tuple(d[k1].get(k2, 0) for k2 in keys2))
+            for k1 in keys1
+            for i, d in enumerate(self.dicts, 1)
+        ]
+
 class ReadStatistics(object):
     """Manages :class:`ReadStatCollector`s for pre- and post-trimming stats.
     
@@ -162,7 +203,7 @@ class ReadStatCollector(object):
         # per-sequence GC percentage
         self.sequence_gc = CountingDict()
         # per-position base composition
-        self.bases = []
+        self.bases = BaseCountingDicts()
         
         # whether to collect base quality stats
         self.tile_key_regexp = tile_key_regexp
@@ -171,7 +212,8 @@ class ReadStatCollector(object):
         if qualities or tile_key_regexp:
             self._init_qualities()
             if tile_key_regexp:
-                self.tile_qualities = NestedDict()
+                self.tile_qualities = BaseNestedDicts()
+                self.tile_sequence_qualities = NestedDict()
         
         # cache of computed values
         self._cache = {}
@@ -180,7 +222,7 @@ class ReadStatCollector(object):
         # per-sequence mean qualities
         self.sequence_qualities = CountingDict()
         # per-position quality composition
-        self.base_qualities = []
+        self.base_qualities = BaseCountingDicts()
     
     # These are attributes that are computed on the fly. If called by name
     # (without leading '_'), __getattr__ uses the method to compute the value
@@ -232,6 +274,7 @@ class ReadStatCollector(object):
             # tile ID
             if self.track_tiles:
                 tile = self.tile_key_regexp.match(record.name)
+                self.tile_sequence_qualities[tile][meanqual] += 1
         
         # per-base nucleotide and quality composition
         for i, (base, qual) in enumerate(zip(seq, quals)):
@@ -247,10 +290,11 @@ class ReadStatCollector(object):
                 self.tile_qualities[i][tile][qual] += 1
     
     def _extend_bases(self, new_size):
-        for i in range(len(self.bases), new_size):
-            self.bases.append(CountingDict())
-            if self.qualities:
-                self.base_qualities.append(CountingDict())
+        self.bases.extend(new_size)
+        if self.qualities:
+            self.base_qualities.extend(new_size)
+            if self.track_tiles:
+                self.tile_qualities.extend(new_size)
     
     def finish(self):
         result = dict(
@@ -261,9 +305,10 @@ class ReadStatCollector(object):
         if self.sequence_qualities:
             result['qualities'] = self.sequence_qualities.sorted_items()
         if self.base_qualities:
-            result['base_qualities'] = self.base_qualities
-        if self.tile_qualities:
-            result['tile_qualities'] = self.tile_qualities
+            result['base_qualities'] = self.base_qualities.flatten()
+        if self.track_tiles:
+            result['tile_qualities'] = self.tile_qualities.flatten()
+            result['tile_sequence_qualities'] = self.tile_sequence_qualities.flatten()
         return result
 
 def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, formatters):
