@@ -47,26 +47,99 @@ def print_read_stats(options, stats):
             outfile.close()
 
 def generate_read_stats(stats, outfile):
-    def _print(*args, colwidths=(40, 10, 10), justification=('<', '>', '>'), **kwargs):
-        fmt_str = []
-        fmt_args = []
-        for i, (txt, width, just) in enumerate(zip(args, colwidths, justification)):
-            txt = str(txt)
-            if len(txt) > width:
-                txt = textwrap.wrap(txt, width)
-            fmt_str.append('{' + str(i) + ':' + just + str(width) + '}')
-            fmt_args.append(txt)
-        fmt_str = ' '.join(fmt_str)
-        print(fmt_str.format(*fmt_args), file=outfile, **kwargs)
-    
     def _print_stats(title, data):
+        
         paired = 'read2' in data
-        print(title, file=outfile)
+        max_width = len(str(max(data['read1']['count'], data['read2']['count'])))
+        # add space for commas and column separation
+        max_width += (max_width // 3) + 1
+        
+        def _print(
+                *args, colwidths=(25, max_width, max_width),
+                justification=('<', '>', '>'), **kwargs):
+            ncols = len(args)
+            if ncols == 0:
+                print(file=outfile)
+                return
+            
+            fmt_str = []
+            fmt_args = []
+            if ncols < len(colwidths):
+                colwidths = colwidths[:ncols]
+                justification = justification[:ncols]
+            for i, (value, width, just) in enumerate(zip(args, colwidths, justification)):
+                if isinstance(value, str):
+                    typ = 's'
+                    if len(value) > width:
+                        value = textwrap.wrap(value, width)
+                elif isinstance(value, float):
+                    typ = '.1f'
+                else:
+                    typ = ',d'
+                fmt_str.append('{' + str(i) + ':' + just + str(width) + typ + '}')
+                fmt_args.append(value)
+            fmt_str = ' '.join(fmt_str)
+            print(fmt_str.format(*fmt_args), file=outfile, **kwargs)
+        
+        def _print_header(title, underline='-', overline=None):
+            if overline is True:
+                overline = underline
+            width = len(title)
+            if overline:
+                print(overline * width, file=outfile)
+            print(title, file=outfile)
+            if underline:
+                print(underline * width, file=outfile)
+        
+        def _print_histogram(title, hist1, hist2=None):
+            _print_header(title)
+            if hist2:
+                hist = ((h1[0], h1[1], h2[1]) for h1, h2 in zip(hist1, hist2))
+            else:
+                hist = h1
+            for h in hist:
+                _print(*h)
+        
+        def _print_base_histogram(title, hist):
+            _print_header(title)
+            widths = (25, 4, 4, 4, 4, 4)
+            justification = ('<', '>', '>', '>', '>', '>')
+            _print('Position', 'A', 'C', 'G', 'T', 'N', colwidths=widths,
+                   justification=justification)
+            for i, counts in enumerate(hist, 1):
+                base_counts = list(
+                    counts[base]
+                    for base in ('A', 'C', 'G', 'T'))
+                total_count = sum(counts.values())
+                base_pcts = (
+                    round(count * 100 / total_count, 1)
+                    for count in base_counts + [total_count])
+                _print(i, *base_pcts, colwidths=widths, justification=justification)
+        
+        _print_header(title, underline='=', overline=True)
         _print('', 'Read1', 'Read2')
         _print(
             "Read pairs:" if paired else "Reads:",
             data['read1']['count'],
             data['read2']['count'])
+        _print()
+        _print_histogram(
+            "Sequence lengths:",
+            data['read1']['length'],
+            data['read2']['length'])
+        _print()
+        _print_histogram(
+            "Sequence GC content (%):",
+            data['read1']['gc'],
+            data['read2']['gc'])
+        _print()
+        _print_base_histogram(
+            "Base composition (Read 1)",
+            data['read1']['bases'])
+        _print()
+        _print_base_histogram(
+            "Base composition (Read 2)",
+            data['read2']['bases'])
     
     if 'pre' in stats:
         _print_stats('Pre-trimming stats', stats['pre'])
