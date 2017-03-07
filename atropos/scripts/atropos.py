@@ -1167,10 +1167,11 @@ command with '--stats pre'.
         group = self.add_group(
             "Report", title="Report content and formatting options")
         group.add_argument(
-            "--tile_key_regexp",
-            default="@(((?:[^\:]+)\:){5})",
+            "--tile-key-regexp",
+            nargs="?", const="^(?:[^\:]+\:){4}([^\:]+)", default=None,
             help="Regular expression to extract key portions of read names to "
-                 "collect tile-specific statistics.")
+                 "collect tile-specific statistics. If no regexp is provided "
+                 "a default (Illumina) regexp is used.")
         
         group = self.add_group(
             "Parallel", title="Parallel (multi-core) options")

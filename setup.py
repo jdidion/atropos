@@ -126,19 +126,24 @@ setup(
     description = 'trim adapters from high-throughput sequencing reads',
     license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
     ext_modules = extensions,
-    packages = ['atropos', 'atropos.scripts'],
+    packages = [
+        'atropos',
+        'atropos.report',
+        'atropos.scripts'
+    ],
     scripts = ['bin/atropos'],
     package_data = { 'atropos' : [
         'adapters/*.fa',
-        'templates/*.mako'
+        'templates/*'
     ] },
-    tests_require = ['pytest'], #, 'mako', 'pysam'],
+    tests_require = ['pytest'], #, 'jinja2', 'pysam'],
     extras_require = {
         'progressbar' : ['progressbar2'],
         'tqdm' : ['tqdm'],
         'khmer' : ['khmer'],
         'pysam' : ['pysam'],
-        'mako' : ['mako']
+        'jinja' : ['jinja2'],
+        'multiqc' : ['multiqc']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

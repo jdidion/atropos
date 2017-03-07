@@ -3,7 +3,6 @@ include README.rst
 include CHANGES.md
 include CITATION
 include LICENSE.txt
-include adapters/*
 include doc/*.rst
 include doc/conf.py
 include doc/Makefile
@@ -11,8 +10,10 @@ include atropos/*.pyx
 include atropos/_align.c
 include atropos/_qualtrim.c
 include atropos/_seqio.c
+include atropos/report/*
+include atropos/adapters/*
+include atropos/templates/*
 include bin/_preamble.py
-include templates/*
 include tests/test*.py
 include tests/utils.py
 graft tests/data

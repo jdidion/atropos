@@ -15,6 +15,7 @@ import re
 from atropos.adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
 from atropos.modifiers import *
 from atropos.filters import *
+from atropos.util import qual2int
 
 def check_equal_merger(dest, src):
     assert dest == src
@@ -93,10 +94,27 @@ class NestedDict(dict):
         if name not in self:
             self[name] = CountingDict()
         return self.get(name)
+    
+    def flatten(self, shape="long"):
+        keys1 = sorted(self.keys())
+        if shape == "long":
+            return [
+                (key1, key2, value)
+                for key1 in keys1
+                for key2, value in self[key1].items()
+            ]
+        else:
+            keys2 = set()
+            for child in self.values():
+                keys2.update(child.keys())
+            keys2 = tuple(sorted(keys2))
+            return (keys2, [
+                (key1,) + tuple(self[key1].get(key2, 0) for key2 in keys2)
+                for key1 in keys1
+            ])
 
 class BaseDicts(object):
-    def __init__(self, dict_class):
-        self.dict_class = dict_class
+    def __init__(self):
         self.dicts = []
     
     def __getitem__(self, idx):
@@ -109,18 +127,32 @@ class BaseDicts(object):
                 self.dicts.append(self.dict_class())
 
 class BaseCountingDicts(BaseDicts):
-    def flatten(self):
+    dict_class = CountingDict
+    
+    def flatten(self, datatype=None):
+        """
+        Args:
+            datatype: 'b' for bases, 'q' for qualities, or None.
+        """
         keys = set()
         for d in self.dicts:
             keys.update(d.keys())
-        keys = tuple(sorted(keys))
-        return [
+        if datatype == "n":
+            acgt = ('A','C','G','T')
+            N = ('N',) if 'N' in keys else ()
+            keys = acgt + tuple(keys - set(acgt + N)) + N
+        else:
+            keys = tuple(sorted(keys))
+        header = tuple(qual2int(k) for k in keys) if datatype == "q" else keys
+        return (header, [
             (i,) + tuple(d.get(k, 0) for k in keys)
             for i, d in enumerate(self.dicts, 1)
-        ]
+        ])
 
-class BaseNestingDicts(BaseDicts):
-    def flatten(self):
+class BaseNestedDicts(BaseDicts):
+    dict_class = NestedDict
+    
+    def flatten(self, datatype=None):
         keys1 = set()
         keys2 = set()
         for d1 in self.dicts:
@@ -129,11 +161,12 @@ class BaseNestingDicts(BaseDicts):
                 keys2.update(d2.keys())
         keys1 = tuple(sorted(keys1))
         keys2 = tuple(sorted(keys2))
-        return [
-            (i, k1, tuple(d[k1].get(k2, 0) for k2 in keys2))
+        header = tuple(qual2int(k) for k in keys2) if datatype == "q" else keys2
+        return (header, [
+            (i, k1,) + tuple(d[k1].get(k2, 0) for k2 in keys2)
             for k1 in keys1
             for i, d in enumerate(self.dicts, 1)
-        ]
+        ])
 
 class ReadStatistics(object):
     """Manages :class:`ReadStatCollector`s for pre- and post-trimming stats.
@@ -208,12 +241,9 @@ class ReadStatCollector(object):
         # whether to collect base quality stats
         self.tile_key_regexp = tile_key_regexp
         self.qualities = qualities
-        self.sequence_qualities = self.base_qualities = self.tile_qualities = None
-        if qualities or tile_key_regexp:
+        self.sequence_qualities = self.base_qualities = self.tile_base_qualities = None
+        if qualities:
             self._init_qualities()
-            if tile_key_regexp:
-                self.tile_qualities = BaseNestedDicts()
-                self.tile_sequence_qualities = NestedDict()
         
         # cache of computed values
         self._cache = {}
@@ -223,6 +253,9 @@ class ReadStatCollector(object):
         self.sequence_qualities = CountingDict()
         # per-position quality composition
         self.base_qualities = BaseCountingDicts()
+        if self.tile_key_regexp:
+            self.tile_base_qualities = BaseNestedDicts()
+            self.tile_sequence_qualities = NestedDict()
     
     # These are attributes that are computed on the fly. If called by name
     # (without leading '_'), __getattr__ uses the method to compute the value
@@ -273,8 +306,13 @@ class ReadStatCollector(object):
             self.sequence_qualities[meanqual] += 1
             # tile ID
             if self.track_tiles:
-                tile = self.tile_key_regexp.match(record.name)
-                self.tile_sequence_qualities[tile][meanqual] += 1
+                tile_match = self.tile_key_regexp.match(record.name)
+                if tile_match:
+                    tile = tile_match.group(1)
+                    self.tile_sequence_qualities[tile][meanqual] += 1
+                else:
+                    raise Exception("{} did not match {}".format(
+                        self.tile_key_regexp, record.name))
         
         # per-base nucleotide and quality composition
         for i, (base, qual) in enumerate(zip(seq, quals)):
@@ -287,28 +325,28 @@ class ReadStatCollector(object):
         if qual:
             self.base_qualities[i][qual] += 1
             if tile:
-                self.tile_qualities[i][tile][qual] += 1
+                self.tile_base_qualities[i][tile][qual] += 1
     
     def _extend_bases(self, new_size):
         self.bases.extend(new_size)
         if self.qualities:
             self.base_qualities.extend(new_size)
             if self.track_tiles:
-                self.tile_qualities.extend(new_size)
+                self.tile_base_qualities.extend(new_size)
     
     def finish(self):
         result = dict(
             count=self.count,
             length=self.sequence_lengths.sorted_items(),
             gc=self.sequence_gc.sorted_items(),
-            bases=self.bases)
+            bases=self.bases.flatten(datatype="n"))
         if self.sequence_qualities:
             result['qualities'] = self.sequence_qualities.sorted_items()
         if self.base_qualities:
-            result['base_qualities'] = self.base_qualities.flatten()
+            result['base_qualities'] = self.base_qualities.flatten(datatype="q")
         if self.track_tiles:
-            result['tile_qualities'] = self.tile_qualities.flatten()
-            result['tile_sequence_qualities'] = self.tile_sequence_qualities.flatten()
+            result['tile_base_qualities'] = self.tile_base_qualities.flatten(datatype="q")
+            result['tile_sequence_qualities'] = self.tile_sequence_qualities.flatten(shape="wide")
         return result
 
 def collect_process_statistics(N, total_bp1, total_bp2, modifiers, filters, formatters):

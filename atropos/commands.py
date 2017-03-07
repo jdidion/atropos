@@ -91,7 +91,7 @@ def error(options, parser):
     return (0, None, {})
 
 def qc(options, parser):
-    from atropos.report import print_read_stats
+    from atropos.report.text import print_read_stats
     
     reader, names, qualities, _ = create_reader(options, parser)
     stats = ReadStatistics(
@@ -114,7 +114,7 @@ def trim(options, parser):
     import time
     import textwrap
     import atropos.trim
-    from atropos.report import print_report
+    from atropos.report.text import print_report
     
     reader, pipeline, formatters, writers = create_trim_params(
         options, parser, options.default_outfile)

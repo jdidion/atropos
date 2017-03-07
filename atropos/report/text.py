@@ -1,28 +1,16 @@
 # coding: utf-8
-"""Routines for printing a report.
+"""Routines for printing a report. This is the legacy code for generating
+text-based reports. This will eventually be deprecated in favor of the jinja
+and multiqc reports.
 """
+import math
 import sys
 import textwrap
 from atropos.adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
 
 # TODO:
-# * Refactor: Text report generated using template engine
-#   * This module generates report from dict
-#   * Reliably line things up in columns.
-#   * Fix https://github.com/marcelm/cutadapt/issues/128
-# * Enhancements:
-#   * Integrate with MultiQC
-
-def generate_mako(stats, outfile, template, **kwargs):
-    from mako import Template
-    if not os.path.isabs(template):
-        from atropos import get_package_data
-        template = get_package_data('templates', template)
-    template = Template(filename=template)
-    args = dict(stats)
-    args.update(kwargs)
-    with open(outfile, 'wt') as out:
-        out.write(template.render(**args))
+# * Reliably line things up in columns.
+# * Fix https://github.com/marcelm/cutadapt/issues/128
 
 def print_read_stats(options, stats):
     outfile = options.output
@@ -100,28 +88,35 @@ def generate_read_stats(stats, outfile):
             for h in hist:
                 _print(*h)
         
-        def _print_base_histogram(title, hist):
+        def _print_base_histogram(title, col_names, hist):
             _print_header(title)
-            widths = (25, 4, 4, 4, 4, 4)
-            justification = ('<', '>', '>', '>', '>', '>')
-            _print('Position', 'A', 'C', 'G', 'T', 'N', colwidths=widths,
-                   justification=justification)
-            for i, counts in enumerate(hist, 1):
-                base_counts = list(
-                    counts[base]
-                    for base in ('A', 'C', 'G', 'T'))
-                total_count = sum(counts.values())
+            widths = (25,) + ((4,) * len(col_names))
+            justification = ('<',) + (('>',) * len(col_names))
+            _print('Position', *col_names, colwidths=widths, justification=justification)
+            for row in hist:
+                total_count = sum(row[1:])
                 base_pcts = (
                     round(count * 100 / total_count, 1)
-                    for count in base_counts + [total_count])
-                _print(i, *base_pcts, colwidths=widths, justification=justification)
+                    for count in row[1:])
+                _print(row[0], *base_pcts, colwidths=widths, justification=justification)
         
-        def _print_tile_histogram(title, hist):
+        def _print_tile_histogram(
+                title, value_cols, hist, index_cols=('Tile',), index_widths=(5,)):
             _print_header(title)
-            
+            ncol = len(value_cols)
+            # As far as I know, tiles are max 4 digits
+            max_width = max(
+                4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
+            widths = index_widths + ((max_width,) * ncol)
+            justification = (('<',) * len(index_cols)) + (('>',) * ncol)
+            _print(*index_cols, *value_cols, colwidths=widths, justification=justification)
+            for row in hist:
+                _print(*row, colwidths=widths, justification=justification)
         
         _print_header(title, underline='=', overline=True)
         _print('', 'Read1', 'Read2')
+        
+        # Sequence-level stats
         _print(
             "Read pairs:" if paired else "Reads:",
             data['read1']['count'],
@@ -143,27 +138,45 @@ def generate_read_stats(stats, outfile):
             data['read1']['gc'],
             data['read2']['gc'])
         _print()
+        
+        if 'tile_sequence_qualities' in data['read1']:
+            _print_tile_histogram(
+                "Per-tile sequence qualities (Read 1):",
+                *data['read1']['tile_sequence_qualities'])
+            _print()
+            _print_tile_histogram(
+                "Per-tile sequence qualities (Read 2):",
+                *data['read2']['tile_sequence_qualities'])
+            _print()
+        
+        # Base-level stats
+        if 'base_qualities' in data['read1']:
+            _print_base_histogram(
+                "Base qualities (Read 1):",
+                *data['read1']['base_qualities'])
+            _print()
+            _print_base_histogram(
+                "Base qualities (Read 2):",
+                *data['read2']['base_qualities'])
+            _print()
         _print_base_histogram(
-            "Base composition (Read 1)",
-            data['read1']['bases'])
+            "Base composition (Read 1):",
+            *data['read1']['bases'])
         _print()
         _print_base_histogram(
-            "Base composition (Read 2)",
-            data['read2']['bases'])
-        if 'base_qualities' in data['read1']:
-            _print_histogram(
-                "Base qualities:",
-                data['read1']['base_qualities'],
-                data['read2']['base_qualities'])
-            _print()
-        if 'tile_qualities' in data['read1']:
+            "Base composition (Read 2):",
+            *data['read2']['bases'])
+        _print()
+        if 'tile_base_qualities' in data['read1']:
             _print_tile_histogram(
-                "Per-tile qualities (Read 1)",
-                data['read1']['tile_qualities'])
+                "Per-tile base qualities (Read 1):",
+                *data['read1']['tile_base_qualities'],
+                ('Position', 'Tile'), (25, 5))
             _print()
             _print_tile_histogram(
-                "Per-tile qualities (Read 2)",
-                data['read2']['tile_qualities'])
+                "Per-tile base qualities (Read 2):",
+                *data['read2']['tile_base_qualities'],
+                ('Position', 'Tile'), (25, 5))
             _print()
     
     if 'pre' in stats:
