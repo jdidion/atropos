@@ -6,8 +6,6 @@ from atropos._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
-#__version__ = '1.0.16'
-
 def check_importability():  # pragma: no cover
     try:
         import atropos._align
@@ -29,3 +27,8 @@ The original error message follows.
 def get_package_data(subdir, path):
     return os.path.join(
         os.path.abspath(os.path.dirname(__file__)), subdir, path)
+
+class AtroposError(Exception):
+    """Base class for Atropos-specific errors.
+    """
+    pass

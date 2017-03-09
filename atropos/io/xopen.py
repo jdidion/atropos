@@ -6,7 +6,7 @@ import io
 import os
 import sys
 
-from .compression import get_file_opener
+from atropos.io.compression import get_file_opener
 
 STDOUT = '-'
 STDERR = '_'

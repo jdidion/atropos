@@ -20,7 +20,7 @@ check_importability()
 from atropos import __version__
 import atropos.commands
 from atropos.util import MAGNITUDE
-from atropos.xopen import STDOUT, STDERR, resolve_path, check_path, check_writeable
+from atropos.io.xopen import STDOUT, STDERR, resolve_path, check_path, check_writeable
 
 # Extensions to argparse
 
@@ -363,8 +363,8 @@ class Command(object):
         Returns:
             Tuple (rc, "msg", {details})
         """
-        cmd = getattr(atropos.commands, self.name)
-        return cmd(self.options, self.parser)
+        mod = atropos.commands.get_command_module(self.name)
+        return mod.execute(self.options, self.parser)
 
 class TrimCommand(Command):
     """Trim sequencing reads."""

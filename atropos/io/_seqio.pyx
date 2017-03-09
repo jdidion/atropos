@@ -1,9 +1,8 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
-from __future__ import print_function, division, absolute_import
 import copy
-from atropos.xopen import xopen
-from atropos.seqio import _shorten, FormatError, SequenceReader
+from atropos.io.xopen import xopen
+from atropos.io.seqio import _shorten, FormatError, SequenceReader
 from atropos.util import reverse_complement
 
 cdef class Sequence(object):

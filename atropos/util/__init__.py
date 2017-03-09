@@ -1,11 +1,6 @@
 import logging
 import math
 
-class AtroposError(Exception):
-    """Base class for Atropos-specific errors.
-    """
-    pass
-
 base_complements = {
     'A' : 'T',
     'C' : 'G',

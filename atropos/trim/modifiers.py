@@ -8,7 +8,7 @@ need to be stored, and as a class with a __call__ method if there are parameters
 import copy
 import logging
 import re
-from atropos.qualtrim import quality_trim_index, nextseq_trim_index
+from atropos.trim.qualtrim import quality_trim_index, nextseq_trim_index
 from atropos.align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
 from atropos.util import base_complements, reverse_complement, mean, quals2ints
 
