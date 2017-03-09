@@ -171,12 +171,14 @@ def generate_read_stats(stats, outfile):
             _print_tile_histogram(
                 "Per-tile base qualities (Read 1):",
                 *data['read1']['tile_base_qualities'],
-                ('Position', 'Tile'), (25, 5))
+                index_cols=('Position', 'Tile'),
+                index_widths=(25, 5))
             _print()
             _print_tile_histogram(
                 "Per-tile base qualities (Read 2):",
                 *data['read2']['tile_base_qualities'],
-                ('Position', 'Tile'), (25, 5))
+                index_cols=('Position', 'Tile'),
+                index_widths=(25, 5))
             _print()
     
     if 'pre' in stats:
