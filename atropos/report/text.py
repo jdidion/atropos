@@ -109,7 +109,7 @@ def generate_read_stats(stats, outfile):
                 4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
             widths = index_widths + ((max_width,) * ncol)
             justification = (('<',) * len(index_cols)) + (('>',) * ncol)
-            _print(*index_cols, *value_cols, colwidths=widths, justification=justification)
+            _print(*(index_cols + value_cols), colwidths=widths, justification=justification)
             for row in hist:
                 _print(*row, colwidths=widths, justification=justification)
         
