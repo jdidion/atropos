@@ -28,6 +28,53 @@ from atropos.xopen import open_output, xopen
 
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last download.
 
+def execute(options, parser):
+    k = options.kmer_size or 12
+    n_reads = options.max_reads
+    overrep_cutoff = 100
+    include = options.include_contaminants or "all"
+    known_contaminants = load_known_adapters(options) if include != 'unknown' else None
+    batch_iterator, names, _, _ = create_reader(options, parser, counter_magnitude="K")
+    
+    detector = options.detector
+    if not detector:
+        if known_contaminants and include == 'known':
+            detector = 'known'
+        elif n_reads <= 50000:
+            detector = 'heuristic'
+        else:
+            detector = 'khmer'
+    
+    if detector == 'known':
+        logging.getLogger().debug("Detecting contaminants using the known-only algorithm")
+        detector_class = KnownContaminantDetector
+    elif detector == 'heuristic':
+        logging.getLogger().debug("Detecting contaminants using the heuristic algorithm")
+        detector_class = HeuristicDetector
+    elif detector == 'khmer':
+        logging.getLogger().debug("Detecting contaminants using the kmer-based algorithm")
+        detector_class = KhmerDetector
+    
+    try:
+        detector_args = dict(
+            k=k, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
+            known_contaminants=known_contaminants)
+        if options.paired:
+            d = PairedDetector(detector_class, **detector_args)
+        else:
+            d = detector_class(**detector_args)
+            names = names[0]
+        
+        with open_output(options.output) as o:
+            print("\nDetecting adapters and other potential contaminant sequences based on "
+                  "{}-mers in {} reads".format(k, n_reads), file=o)
+            d.consume_all_batches(batch_iterator)
+            d.summarize(o, names, include=include)
+    finally:
+        batch_iterator.close()
+    
+    return (0, None, {})
+
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,
                  match_frac2=None, reads=None):

@@ -24,6 +24,36 @@ SUFFIX = align.START_WITHIN_SEQ2
 ANYWHERE = align.SEMIGLOBAL
 LINKED = 'linked'
 
+# TODO: specify this externally rather than hard-coding
+DEFAULT_ADAPTERS_URL = "https://github.com/jdidion/atropos/blob/master/atropos/adapters/sequencing_adapters.fa"
+
+def load_known_adapters(options):
+    cache_file = options.adapter_cache_file if options.cache_adapters else None
+    adapter_cache = AdapterCache(cache_file)
+    if adapter_cache.empty and options.default_adapters:
+        try:
+            adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
+        except:
+            logging.getLogger().warn(
+                "Error loading adapters from URL %s; loading from file", DEFAULT_ADAPTERS_URL)
+            from atropos import get_package_data
+            adapter_cache.load_from_file(
+                get_package_data('adapters', 'sequencing_adapters.fa'))
+    if options.known_adapter:
+        for s in options.known_adapter:
+            name, seq = s.split('=')
+            adapter_cache.add(name, seq)
+    if options.known_adapters_file:
+        for f in options.known_adapters_file:
+            try:
+                adapter_cache.load_from_url(f)
+            except:
+                logging.getLogger().error(
+                    "Error loading adapters from url/file %s", f)
+    if options.cache_adapters:
+        adapter_cache.save()
+    return adapter_cache
+
 def parse_braces(sequence):
     """
     Replace all occurrences of ``x{n}`` (where x is any character) with n

@@ -2,9 +2,40 @@
 
 from collections import defaultdict
 import csv
+import logging
 import re
 from atropos.seqio import FastqReader
 from atropos.util import enumerate_range
+from atropos.io.xopen import open_output
+
+def error(options, parser):
+    batch_iterator, names, qualities, _ = create_reader(
+        options, parser, counter_magnitude="K")
+    try:
+        if not qualities:
+            parser.error("Cannot estimate error rate without base qualities")
+        
+        if options.algorithm == 'quality':
+            estimator_class = BaseQualityErrorEstimator
+        elif options.algorithm == 'shadow':
+            estimator_class = ShadowRegressionErrorEstimator
+        
+        if options.paired:
+            e = PairedErrorEstimator(
+                max_read_len=options.max_bases,
+                estimator_class=estimator_class)
+        else:
+            e = estimator_class(max_read_len=options.max_bases)
+        
+        e.consume_all_batches(batch_iterator)
+    
+    finally:
+        batch_iterator.close()
+    
+    with open_output(options.output) as o:
+        e.summarize(o, names)
+    
+    return (0, None, {})
 
 class ErrorEstimator(object):
     def consume_all_batches(self, batch_iterator):

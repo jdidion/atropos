@@ -363,8 +363,8 @@ class Command(object):
         Returns:
             Tuple (rc, "msg", {details})
         """
-        mod = atropos.commands.get_command_module(self.name)
-        return mod.execute(self.options, self.parser)
+        return atropos.commands.execute_command(
+            self.name, self.options, self.parser)
 
 class TrimCommand(Command):
     """Trim sequencing reads."""

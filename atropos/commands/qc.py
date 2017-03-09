@@ -1,9 +1,29 @@
 # coding: utf-8
 """Implementation of the 'qc' command.
 """
-from atropos.multicore import *
-from atropos.stats import Summary
 import logging
+from atropos.commands.multicore import *
+from atropos.commands.stats import Summary, ReadStatistics
+
+def qc(options, parser):
+    from atropos.report.text import print_read_stats
+    
+    reader, names, qualities, _ = create_reader(options, parser)
+    stats = ReadStatistics(
+        'pre', options.paired, qualities=qualities,
+        tile_key_regexp=options.tile_key_regexp)
+    
+    if options.threads is None:
+        from atropos.qc import run_serial
+        rc, report, details = run_serial(reader, stats)
+    else:
+        from atropos.qc import run_parallel
+        rc, report, details = run_parallel(
+            reader, stats, options.threads, options.process_timeout,
+            options.read_queue_size)
+    
+    print_read_stats(options, report)
+    return (rc, None, details)
 
 def run_serial(reader, read_stats):
     def _run():
