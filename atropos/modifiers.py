@@ -839,7 +839,7 @@ class Modifiers(object):
         ]
     
     def modify(self, record):
-        bp = [0,0]
+        bp = [0, 0]
         if self.paired:
             read1, read2 = record
             bp[0] = len(read1.sequence)
@@ -852,11 +852,11 @@ class Modifiers(object):
                         read1 = mods[0](read1)
                     if mods[1] is not None:
                         read2 = mods[1](read2)
-            reads = [read1, read2]
+            reads = (read1, read2)
         else:
             read = record
             bp[0] = len(read.sequence)
             for mods in self.modifiers:
                 read = mods[0](read)
-            reads = [read]
+            reads = (read,)
         return (reads, bp)

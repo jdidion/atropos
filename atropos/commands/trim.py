@@ -326,7 +326,8 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
     def _run(worker_processes):
         # Add batches of reads to the input queue. Provide a timeout callback
         # to check that subprocesses are alive.
-        num_batches = enqueue_all(enumerate(reader, 1), input_queue, timeout, ensure_alive)
+        num_batches = enqueue_all(
+            enumerate(reader, 1), input_queue, timeout, ensure_alive)
         logging.getLogger().debug(
             "Main loop complete; saw {} batches".format(num_batches))
         

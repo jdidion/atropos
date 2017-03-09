@@ -12,7 +12,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 4. A new command ('detect') that will detect adapter sequences and other potential contaminants (this is experimental).
 5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
 5. The ability to merge overlapping reads (this is experimental and the functionality is limited).
-6. Summary report includes read statistics and can be viewed in [MultiQC](multiqc.info).
+6. Summary report includes read statistics and can be viewed in [MultiQC](http://multiqc.info).
 7. The ability to write the summary report and log messages to separate files.
 8. The ability to read and write interleaved FASTQ files.
 9. A progress bar, and other minor usability enhancements.
