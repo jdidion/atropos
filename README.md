@@ -80,7 +80,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ### 1.3
 
-* Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120).
+* Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 
 ### 1.4
@@ -104,7 +104,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ### 2.0
 
-* Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+* Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
 
 ### Beyond 2.0
 

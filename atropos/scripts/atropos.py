@@ -19,8 +19,8 @@ check_importability()
 
 from atropos import __version__
 import atropos.commands
+from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
 from atropos.util import MAGNITUDE
-from atropos.io.xopen import STDOUT, STDERR, resolve_path, check_path, check_writeable
 
 # Extensions to argparse
 
@@ -1320,7 +1320,7 @@ COMMANDS['error'] = ErrorCommand
 # Main
 
 def main_from_commandline():
-    rc, message, _ = main(sys.argv[1:])
+    rc, message = main(sys.argv[1:])
     if message:
         print(message)
     sys.exit(rc)

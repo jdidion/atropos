@@ -12,11 +12,9 @@ import io
 from os.path import splitext
 import re
 import sys
-
 from atropos import AtroposError
+from atropos.io import STDOUT, STDERR, xopen, open_output
 from atropos.trim.filters import NoFilter
-from atropos.io.xopen import STDOUT, STDERR, xopen, open_output
-
 
 def _shorten(s, n=100):
     """Shorten string s to at most n characters, appending "..." if necessary."""

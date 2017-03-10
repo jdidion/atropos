@@ -8,9 +8,9 @@ import re
 import statistics as stats
 import sys
 from atropos.align import Aligner, SEMIGLOBAL
-from atropos.seqio import open_reader
+from atropos.io import open_output, xopen
+from atropos.io.seqio import open_reader
 from atropos.util import reverse_complement, sequence_complexity, enumerate_range
-from atropos.xopen import open_output, xopen
 
 # TODO: Test whether using rc=True in parse_known_contaminants is as fast
 # and as accurate as testing both the forward and reverse complement

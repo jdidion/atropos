@@ -3,8 +3,8 @@ import gzip
 import os
 import random
 import sys
-from atropos.xopen import xopen, open_output
-from atropos.compression import get_compressor
+from atropos.io import xopen, open_output
+from atropos.io.compression import get_compressor
 from .utils import temporary_path
 
 base = "tests/data/small.fastq"

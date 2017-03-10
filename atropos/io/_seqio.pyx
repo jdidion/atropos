@@ -1,7 +1,7 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 import copy
-from atropos.io.xopen import xopen
+from atropos.io import xopen
 from atropos.io.seqio import _shorten, FormatError, SequenceReader
 from atropos.util import reverse_complement
 

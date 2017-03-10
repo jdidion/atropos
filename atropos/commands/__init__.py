@@ -1,6 +1,71 @@
 import importlib
 from atropos.io.seqio import UnknownFileType, BatchIterator, open_reader
 
+class Pipeline(object):
+    """
+    Args:
+        paired: Whether each record will contain a pair of reads.
+    """
+    def __init__(self):
+        self.record_counts = {}
+        self.bp_counts = {}
+    
+    def __call__(self, reader, **kwargs):
+        self.start(**kwargs)
+        for batch in reader:
+            self.process_batch(batch)
+        return self.finish()
+    
+    def start(self, **kwargs):
+        pass
+    
+    def process_batch(self, batch):
+        """Run the pipeline on a batch of records.
+        
+        Args:
+            batch: A batch of reads. A batch has the format
+            (batch_source, batch_size, records).
+        
+        Returns:
+            
+        """
+        batch_source, batch_size, records = batch
+        if not batch_source in record_count:
+            self.record_counts[batch_source] = 0
+            self.bp_counts[batch_source] = [0, 0]
+        self.record_counts[batch_source] += batch_size
+        context = self.get_context(batch_num, batch_source)
+        self.handle_records(context, records)
+    
+    def get_context(self, batch_num, batch_source):
+        return dict(
+            batch_num=batch_num,
+            batch_source=batch_source,
+            bp=self.bp_counts[batch_source])
+    
+    def handle_records(self, context, records):
+        for record in records:
+            self.handle_record(context, record)
+    
+    def handle_reads(self, context, read1, read2=None):
+        raise NotImplementedError()
+    
+    def finish(self):
+        raise NotImplementedError()
+
+class SingleEndPipelineMixin(object):
+    def handle_record(self, context, record):
+        context['bp'][0] += len(record)
+        return self.handle_reads(context, record)
+
+class PairedEndPipelineMixin(object):
+    def handle_record(self, context, record):
+        read1, read2 = record
+        bp = context['bp']
+        bp[0] += len(read1.sequence)
+        bp[1] += len(read2.sequence)
+        return self.handle_reads(context, read1, read2)
+
 def execute_command(name, options, parser):
     mod = importlib.import_module("atropos.commands.{}".format(name))
     return mod.execute(options, parser)

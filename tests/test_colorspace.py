@@ -1,5 +1,5 @@
 # coding: utf-8
-from atropos.colorspace import encode, decode
+from atropos.util.colorspace import encode, decode
 from atropos.scripts.atropos import main
 from .utils import run, datapath
 

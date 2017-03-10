@@ -13,8 +13,8 @@
 from collections import OrderedDict, defaultdict
 import re
 from atropos.adapters import BACK, FRONT, PREFIX, SUFFIX, ANYWHERE, LINKED
-from atropos.modifiers import *
-from atropos.filters import *
+from atropos.trim.modifiers import *
+from atropos.trim.filters import *
 from atropos.util import qual2int
 
 def check_equal_merger(dest, src):

@@ -80,9 +80,9 @@ def check_cython_version():
         sys.exit(1)
 
 extensions = [
-    Extension('atropos._align', sources=['atropos/_align.pyx']),
-    Extension('atropos._qualtrim', sources=['atropos/_qualtrim.pyx']),
-    Extension('atropos._seqio', sources=['atropos/_seqio.pyx']),
+    Extension('atropos.align._align', sources=['atropos/align/_align.pyx']),
+    Extension('atropos.trim._qualtrim', sources=['atropos/trim/_qualtrim.pyx']),
+    Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
 ]
 
 cmdclass = versioneer.get_cmdclass()
@@ -128,13 +128,19 @@ setup(
     ext_modules = extensions,
     packages = [
         'atropos',
-        'atropos.report',
-        'atropos.scripts'
+        'atropos.adapters',
+        'atropos.align',
+        'atropos.commands',
+        'atropos.io',
+        'atropos.reports',
+        'atropos.scripts',
+        'atropos.trim',
+        'atropos.util'
     ],
     scripts = ['bin/atropos'],
     package_data = { 'atropos' : [
         'adapters/*.fa',
-        'templates/*'
+        'reports/templates/*'
     ] },
     tests_require = ['pytest'], #, 'jinja2', 'pysam'],
     extras_require = {
@@ -142,8 +148,7 @@ setup(
         'tqdm' : ['tqdm'],
         'khmer' : ['khmer'],
         'pysam' : ['pysam'],
-        'jinja' : ['jinja2'],
-        'multiqc' : ['multiqc']
+        'jinja' : ['jinja2']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

@@ -1,6 +1,6 @@
 # coding: utf-8
-from atropos.seqio import Sequence
-from atropos.modifiers import *
+from atropos.io.seqio import Sequence
+from atropos.trim.modifiers import *
 from atropos.adapters import *
 from atropos.align import MatchInfo
 from atropos.util import reverse_complement as rc

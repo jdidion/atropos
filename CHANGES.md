@@ -8,9 +8,10 @@ v1.1.0 (dev)
     * New 'qc' command computes read-level statistics.
     * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
     * Major refactoring and improvement of reporting.
-    * Added optional dependency on mako, which enables generating reports using templates.
+    * Added optional dependency on jinja2, which enables generating reports using templates.
     * Integration with MultiQC.
 * Fixed adapter masking in InsertAligner (issue #7, thanks @lllaaa).
+* Internal code reorganization.
 
 v1.0.23 (2016.12.07)
 --------------------

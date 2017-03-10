@@ -1,8 +1,7 @@
 # coding: utf-8
+from atropos.adapters import BACK
 from atropos.align import locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
 from atropos.util import RandomMatchProbability
-from atropos.adapters import BACK
-
 
 class TestAligner():
     def test(self):

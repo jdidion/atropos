@@ -9,8 +9,8 @@ galaxy/package/
 .pydevproject
 .project
 .settings
-cutadapt/_*.c
-cutadapt/*.so
+atropos/**/_*.c
+atropos/**/*.so
 doc/_build
 *.pyo
 .idea/

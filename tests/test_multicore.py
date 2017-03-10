@@ -3,7 +3,7 @@ from pytest import raises
 import io
 from multiprocessing import Process, Queue
 import time
-from atropos.multicore import *
+from atropos.commands.multicore import *
 
 class TimeoutException(Exception): pass
 

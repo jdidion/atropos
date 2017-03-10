@@ -1,6 +1,6 @@
 # coding: utf-8
 from pytest import raises
-from atropos.seqio import Sequence
+from atropos.io.seqio import Sequence
 from atropos.adapters import (Adapter, Match, ColorspaceAdapter, FRONT, BACK,
     parse_braces, LinkedAdapter)
 

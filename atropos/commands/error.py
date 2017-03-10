@@ -4,9 +4,9 @@ from collections import defaultdict
 import csv
 import logging
 import re
-from atropos.seqio import FastqReader
+from atropos.io import open_output
+from atropos.io.seqio import FastqReader
 from atropos.util import enumerate_range
-from atropos.io.xopen import open_output
 
 def error(options, parser):
     batch_iterator, names, qualities, _ = create_reader(

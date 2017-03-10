@@ -6,11 +6,172 @@ import sys
 import time
 import textwrap
 
-import atropos.trim
 from atropos.commands.stats import *
-from atropos.io.xopen import STDOUT
+from atropos.adapters import AdapterParser, BACK
+from atropos.trim.modifiers import *
+from atropos.trim.filters import *
+from atropos.io import STDOUT
+from atropos.io.seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
 from atropos.report.text import print_report
-from atropos.util import run_interruptible, run_interruptible_with_result
+from atropos.util import RandomMatchProbability, run_interruptible, run_interruptible_with_result
+
+class TrimPipeline(Pipeline):
+    def __init__(self, record_handler, result_handler):
+        super().__init__()
+        self.record_handler = record_handler
+        self.result_handler = result_handler
+    
+    def start(self, worker=None):
+        self.result_handler.start(worker)
+    
+    def get_context(self, batch_num, batch_source):
+        context = super().get_context(batch_num, batch_source)
+        context['results'] = defaultdict(lambda: [])
+        return context
+    
+    def handle_records(self, context, records):
+        super().handle_records(context, records)
+        self.result_handler.write_result(
+            context['batch_num'], context['results'])
+    
+    def handle_reads(self, context, read1, read2):
+        self.record_handler.handle_record(context, read1, read2)
+    
+    def finish(self):
+        self.result_handler.finish()
+        return self.record_handler.finish()
+
+class SerialTrimPipeline(TrimPipeline):
+    def __init__(self, record_handler, writers):
+        result_handler = WorkerResultHandler(WriterResultHandler(writers))
+        super().__init__(record_handler, result_handler)
+
+class ParallelTrimPipeline(TrimPipeline):
+    def __init__(self, record_handler, result_handler):
+        super().__init__()
+        self.seen_batches = set()
+    
+    def process_batch(self, batch):
+        batch_num, batch_data = batch
+        self.seen_batches.add(batch_num)
+        super().process_batch(batch_data)
+
+class RecordHandler(object):
+    def __init__(self, modifiers, filters, formatters):
+        self.modifiers = modifiers
+        self.filters = filters
+        self.formatters = formatters
+    
+    def handle_record(self, context, read1, read2=None):
+        read1, read2 = self.modifiers.modify(read1, read2)
+        dest = self.filters.filter(read1, read2)
+        self.formatters.format(context['results'], dest, read1, read2)
+        return (dest, read1, read2)
+    
+    def finish(self):
+        # TODO
+        # return Summary(
+        #     collect_process_statistics(
+        #         n, pipeline.total_bp1, pipeline.total_bp2, pipeline.modifiers,
+        #         pipeline.filters, formatters),
+        #     pipeline.summarize_adapters(),
+        #     pipeline.modifiers.get_trimmer_classes())
+        pass
+
+class StatsRecordHandlerWrapper(object):
+    def __init__(self, record_handler, paired, mode='both', **kwargs):
+        self.record_handler = record_handler
+        self.paired = paired
+        self.pre = self.post = None
+        if mode in ('pre', 'both'):
+            self.pre = {}
+        if mode in ('post', 'both'):
+            self.post = {}
+        self.stats_kwargs = kwargs
+    
+    def handle_record(self, context, read1, read2=None):
+        if self.pre:
+            self.collect(self.pre, context['batch_source'], read1, read2)
+        dest, read1, read2 = self.record_handler.handle_record(context, read1, read2)
+        if self.post:
+            if dest not in self.post:
+                self.post[dest] = {}
+            self.collect(self.post[dest], context['batch_source'], read1, read2)
+        return (dest, read1, read2)
+    
+    def collect(self, stats, source, read1, read2=None):
+        if paired:
+            self._collect(stats, source[0], read1)
+            self._collect(stats, source[1], read2)
+        else:
+            self._collect(stats, source, read1)
+    
+    def _collect(self, stats, source, read):
+        if source not in self.stats:
+            stats[source] = ReadStatCollector(**self.stats_kwargs)
+        self.stats[source].collect(read)
+
+class ResultHandler(object):
+    def start(self, worker):
+        pass
+    
+    def finish(self, total_batches=None):
+        pass
+    
+    def write_result(self, batch_num, result):
+        raise NotImplementedError()
+
+class ResultHandlerWrapper(ResultHandler):
+    """Wraps a ResultHandler.
+    """
+    def __init__(self, handler):
+        self.handler = handler
+    
+    def start(self, worker):
+        self.handler.start(worker)
+    
+    def write_result(self, batch_num, result):
+        self.handler.write_result(batch_num, result)
+    
+    def finish(self, total_batches=None):
+        self.handler.finish(total_batches=total_batches)
+
+class WorkerResultHandler(ResultHandlerWrapper):
+    """Wraps a ResultHandler and compresses results prior to writing.
+    """
+    def write_result(self, batch_num, result):
+        """
+        Given a dict mapping files to lists of strings,
+        join the strings and compress them (if necessary)
+        and then return the property formatted result
+        dict.
+        """
+        self.handler.write_result(
+            batch_num, dict(
+                self.prepare_file(*item)
+                for item in result.items()))
+    
+    def prepare_file(self, path, strings):
+        return (path, "".join(strings))
+
+class WriterResultHandler(ResultHandler):
+    """
+    ResultHandler that writes results to disk.
+    """
+    def __init__(self, writers, compressed=False, use_suffix=False):
+        self.writers = writers
+        self.compressed = compressed
+        self.use_suffix = use_suffix
+    
+    def start(self, worker):
+        if self.use_suffix:
+            self.writers.suffix = ".{}".format(worker.index)
+    
+    def write_result(self, batch_num, result):
+        self.writers.write_result(result, self.compressed)
+    
+    def finish(self, total_batches=None):
+        self.writers.close()
 
 def trim(options, parser):
     reader, pipeline, formatters, writers = create_trim_params(
@@ -33,50 +194,30 @@ def trim(options, parser):
     
     if options.threads is None:
         # Run single-threaded version
-        from atropos.trim import run_serial
-        rc, summary, details = run_serial(reader, pipeline, formatters, writers)
+        rc, summary = run_interruptible_with_result(pipeline, reader)
     else:
         # Run multiprocessing version
-        from atropos.trim import run_parallel
-        rc, summary, details = run_parallel(
-            reader, pipeline, formatters, writers, options.threads,
+        rc, summary = run_parallel(
+            reader, pipeline, options.threads,
             options.process_timeout, options.preserve_order,
             options.read_queue_size, options.result_queue_size,
             options.writer_process, options.compression)
     
     reader.close()
     
-    if rc != 0:
-        return (rc, None, details)
+    if rc == 0:
+        stop_wallclock_time = time.time()
+        stop_cpu_time = time.clock()
+        print_report(
+            options,
+            stop_wallclock_time - start_wallclock_time,
+            stop_cpu_time - start_cpu_time,
+            summary,
+            pipeline.modifiers.get_trimmer_classes())
     
-    stop_wallclock_time = time.time()
-    stop_cpu_time = time.clock()
-    adapter_stats = print_report(
-        options,
-        stop_wallclock_time - start_wallclock_time,
-        stop_cpu_time - start_cpu_time,
-        summary,
-        pipeline.modifiers.get_trimmer_classes())
-    
-    details['stats'] = adapter_stats
-    return (rc, None, details)
+    return (rc, None)
 
 def create_trim_params(options, parser, default_outfile):
-    from atropos.adapters import AdapterParser, BACK
-    from atropos.modifiers import (
-        Modifiers, AdapterCutter, InsertAdapterCutter, UnconditionalCutter,
-        NextseqQualityTrimmer, QualityTrimmer, NonDirectionalBisulfiteTrimmer,
-        RRBSTrimmer, SwiftBisulfiteTrimmer, MinCutter, NEndTrimmer,
-        LengthTagModifier, SuffixRemover, PrefixSuffixAdder, DoubleEncoder,
-        ZeroCapper, PrimerTrimmer, MergeOverlapping, OverwriteRead)
-    from atropos.filters import (
-        Filters, FilterFactory, TooShortReadFilter, TooLongReadFilter,
-        NContentFilter, TrimmedFilter, UntrimmedFilter, NoFilter,
-        MergedReadFilter)
-    from atropos.trim import Pipeline, PipelineWithStats
-    from atropos.seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
-    from atropos.util import RandomMatchProbability
-    
     reader, input_names, qualities, has_qual_file = create_reader(options, parser)
     
     if options.adapter_max_rmp or options.aligner == 'insert':
@@ -326,73 +467,6 @@ def create_trim_params(options, parser, default_outfile):
     
     return (reader, pipeline, formatters, writers)
 
-class Pipeline(object):
-    def __init__(self, modifiers, filters):
-        self.modifiers = modifiers
-        self.filters = filters
-        self.total_bp1 = 0
-        self.total_bp2 = 0
-    
-    def __call__(self, record):
-        reads, bp = self.modifiers.modify(record)
-        self.total_bp1 += bp[0]
-        self.total_bp2 += bp[1]
-        dest = self.filters.filter(*reads)
-        return (dest, reads)
-    
-    def summarize_adapters(self):
-        adapters = self.modifiers.get_adapters()
-        summary = [{}, {}]
-        if adapters[0]:
-            summary[0] = collect_adapter_statistics(adapters[0])
-        if adapters[1]:
-            summary[1] = collect_adapter_statistics(adapters[1])
-        return summary
-
-class PipelineWithStats(Pipeline):
-    def __init__(self, modifiers, filters, read_stats):
-        super().__init__(modifiers, filters)
-        self.read_stats = read_stats
-    
-    def __call__(self, record):
-        self.read_stats.pre_trim(record)
-        dest, reads = super().__call__(record)
-        self.read_stats.post_trim(dest, reads)
-        return (dest, reads)
-
-def run_serial(reader, pipeline, formatters, writers):
-    def _run():
-        n = 0
-        for batch_size, batch in reader:
-            n += batch_size
-            result = defaultdict(lambda: [])
-            for record in batch:
-                dest, reads = pipeline(record)
-                formatters.format(result, dest, *reads)
-            result = dict((path, "".join(strings))
-                for path, strings in result.items())
-            writers.write_result(result)
-        return n
-    
-    try:
-        rc, n = run_interruptible_with_result(_run)
-    finally:
-        reader.close()
-        writers.close()
-    
-    report = None
-    if rc == 0:
-        report = Summary(
-            collect_process_statistics(
-                n, pipeline.total_bp1, pipeline.total_bp2, pipeline.modifiers,
-                pipeline.filters, formatters),
-            pipeline.summarize_adapters(),
-            pipeline.modifiers.get_trimmer_classes()
-        ).finish()
-    
-    details = dict(mode='serial', threads=1)
-    return (rc, report, details)
-
 # Parallel implementation of run_atropos. Works as follows:
 #
 # 1. Main thread creates N worker processes (where N is the number of threads to be allocated) and
@@ -436,8 +510,8 @@ def run_serial(reader, pipeline, formatters, writers):
 
 import logging
 from multiprocessing import Queue
-from atropos.multicore import *
-from atropos.compression import get_compressor, can_use_system_compression
+from atropos.commands.multicore import *
+from atropos.io.compression import get_compressor, can_use_system_compression
 
 class TrimWorkerProcess(ResultHandlerWorkerProcess):
     """
@@ -471,23 +545,118 @@ class TrimWorkerProcess(ResultHandlerWorkerProcess):
             adapter_stats = self.pipeline.summarize_adapters()
         return (self.index, self.seen_batches, process_stats, adapter_stats)
 
-class WorkerResultHandler(ResultHandlerWrapper):
-    """Wraps a ResultHandler and compresses results prior to writing.
-    """
-    def write_result(self, batch_num, result):
-        """
-        Given a dict mapping files to lists of strings,
-        join the strings and compress them (if necessary)
-        and then return the property formatted result
-        dict.
-        """
-        self.handler.write_result(
-            batch_num, dict(
-                self.prepare_file(*item)
-                for item in result.items()))
+class ResultHandlerWorkerProcess(WorkerProcess):
+    """Parent class for worker processes that operate on batches of reads and
+    handles each record.
     
-    def prepare_file(self, path, strings):
-        return (path, "".join(strings))
+    Args:
+        index: A unique ID for the process
+        input_queue: queue with batches of records to process
+        result_handler:
+        summary_queue: queue where summary information is written
+        timeout: time to wait upon queue full/empty
+    """
+    def __init__(self, index, input_queue, summary_queue, timeout, result_handler):
+        super().__init__(index, input_queue, summary_queue, timeout)
+        self.result_handler = result_handler
+    
+    def _on_start(self):
+        self.result_handler.start(self)
+    
+    def _on_finish(self):
+        self.result_handler.finish()
+    
+    def _handle_records(self, batch_num, batch_size, records):
+        result = defaultdict(lambda: [])
+        for record in records:
+            self._handle_record(record, result)
+        self.result_handler.write_result(batch_num, result)
+    
+    def _handle_record(self, record, result):
+        raise NotImplementedError()
+
+class ResultProcess(Process):
+    """Thread that accepts results from the worker threads and process them
+    using a ResultHandler. Each batch is expected to be
+    (batch_num, path, records), where path is the destination file and records
+    is a string. Not guaranteed to preserve the original order of sequence records.
+
+    result_handler: A ResultHandler object.
+    queue: input queue.
+    control: a shared value for communcation with the main process.
+    timeout: seconds to wait for next batch before complaining
+    """
+    def __init__(self, result_handler, queue, control, timeout=60):
+        super(WriterProcess, self).__init__(name="Writer process")
+        self.result_handler = result_handler
+        self.queue = queue
+        self.control = control
+        self.timeout = timeout
+        self.seen_batches = set()
+        self.num_batches = None
+    
+    def run(self):
+        logging.getLogger().debug("Writer process running under pid {}".format(self.name, os.getpid()))
+        
+        class Done(Exception): pass
+        class Killed(Exception): pass
+        
+        def fail_callback():
+            if self.num_batches is None and self.control.check_value_positive():
+                self.num_batches = self.control.get_value()
+            if self.num_batches is not None and len(self.seen_batches) >= self.num_batches:
+                raise Done()
+        
+        def timeout_callback():
+            if self.num_batches is not None:
+                missing = set(range(1, self.num_batches+1)) - self.seen_batches
+                logging.getLogger().error("Result thread still missing batches {} of {}".format(
+                    ",".join(str(i) for i in missing), self.num_batches))
+        
+        def iter_batches():
+            while True:
+                batch = dequeue(
+                    self.queue,
+                    wait_message="Result process waiting on result {}",
+                    timeout=self.timeout,
+                    fail_callback=fail_callback,
+                    timeout_callback=timeout_callback)
+                yield batch
+
+        try:
+            self.result_handler.start(self)
+            
+            for batch_num, result in iter_batches():
+                self.seen_batches.add(batch_num)
+                self.result_handler.write_result(batch_num, result)
+        except Done:
+            logging.getLogger().debug("Writer process exiting normally")
+        except Killed:
+            logging.getLogger().debug("Writer process exited early")
+        except:
+            logging.getLogger().error("Unexpected error in writer process", exc_info=True)
+            self.control.set_value(CONTROL_ERROR)
+        finally:
+            num_batches = self.control.get_value(lock=True)
+            self.result_handler.finish(num_batches if num_batches > 0 else None)
+
+class QueueResultHandler(ResultHandler):
+    """
+    ResultHandler that writes results to the output queue.
+    """
+    def __init__(self, queue):
+        self.queue = queue
+    
+    def start(self, worker):
+        self.message = "{} waiting to queue result {{}}".format(worker.name)
+        self.timeout = worker.timeout
+    
+    def write_result(self, batch_num, result):
+        enqueue(
+            self.queue,
+            (batch_num, result),
+            wait_message=self.message,
+            timeout=self.timeout)
 
 class CompressingWorkerResultHandler(WorkerResultHandler):
     """
@@ -510,25 +679,6 @@ class CompressingWorkerResultHandler(WorkerResultHandler):
         if filename not in self.file_compressors:
             self.file_compressors[filename] = get_compressor(filename)
         return self.file_compressors[filename]
-
-class WriterResultHandler(ResultHandler):
-    """
-    ResultHandler that writes results to disk.
-    """
-    def __init__(self, writers, compressed=False, use_suffix=False):
-        self.writers = writers
-        self.compressed = compressed
-        self.use_suffix = use_suffix
-    
-    def start(self, worker):
-        if self.use_suffix:
-            self.writers.suffix = ".{}".format(worker.index)
-    
-    def write_result(self, batch_num, result):
-        self.writers.write_result(result, self.compressed)
-    
-    def finish(self, total_batches=None):
-        self.writers.close()
 
 class OrderPreservingWriterResultHandler(WriterResultHandler):
     """

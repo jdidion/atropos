@@ -5,6 +5,27 @@ import logging
 from atropos.commands.multicore import *
 from atropos.commands.stats import Summary, ReadStatistics
 
+class QcPipeline(Pipeline):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.stats = {}
+        self.stats_kwargs = kwargs
+    
+    def get_stats(self, source):
+        if source not in self.stats:
+            self.stats[source] = ReadStatCollector(**self.stats_kwargs)
+        return self.stats[source]
+
+class SingleEndQcPipeline(QcPipeline, SingleEndPipelineMixin):
+    def handle_reads(self, context, read):
+        self.get_stats(context['batch_source']).collect(read)
+
+class PairedEndQcPipeline(QcPipeline, PairedEndPipelineMixin):
+    def handle_reads(self, context, read1, read2):
+        src1, src2 = context['batch_source']
+        self.get_stats(src1).collect(read1)
+        self.get_stats(src2).collect(read2)
+
 def qc(options, parser):
     from atropos.report.text import print_read_stats
     
