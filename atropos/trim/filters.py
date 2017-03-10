@@ -18,23 +18,37 @@ from collections import OrderedDict
 DISCARD = True
 KEEP = False
 
-class SingleWrapper(object):
+class FilterWrapper(object):
+    def __init__(self, f):
+        self.filtered = 0
+        self.filter = f
+    
+    def __call__(self, read1, read2=None):
+        if self._filter(read1, read2):
+            self.filtered += 1
+            return DISCARD
+        return KEEP
+    
+    @property
+    def name(self):
+        if hasattr(self.filter, 'name'):
+            return self.filter.name
+        else:
+            return self.filter.__class__.__name__
+    
+    def summarize(self):
+        return dict(records_filtered=self.filtered)
+
+class SingleWrapper(FilterWrapper):
     """
     This is for single-end reads and for paired-end reads, using the 'legacy' filtering mode
     (backwards compatibility). That is, if the first read matches the filtering criteria, the
     pair is discarded. The second read is not inspected.
     """
-    def __init__(self, f):
-        self.filtered = 0
-        self.filter = f
-        
-    def __call__(self, read1, read2=None):
-        if self.filter(read1):
-            self.filtered += 1
-            return DISCARD
-        return KEEP
+    def _filter(self, read1, read2=None):
+        return self.filter(read1)
 
-class PairedWrapper(object):
+class PairedWrapper(FilterWrapper):
     """
     This is for paired-end reads, using the 'new-style' filtering where both reads are inspected.
     That is, the entire pair is discarded if at least 1 or 2 of the reads match the
@@ -46,22 +60,18 @@ class PairedWrapper(object):
             1 means: the pair is discarded if any read matches
             2 means: the pair is discarded if both reads match
         """
+        super().__init__(f)
         if not min_affected in (1, 2):
             raise ValueError("min_affected must be 1 or 2")
-        self.filtered = 0
-        self.filter = f
         self.min_affected = min_affected
 
-    def __call__(self, read1, read2):
+    def _filter(self, read1, read2):
         failures = 0
         if self.filter(read1):
             failures += 1
         if (self.min_affected - failures == 1) and (read2 is None or self.filter(read2)):
             failures += 1
-        if failures >= self.min_affected:
-            self.filtered += 1
-            return DISCARD
-        return KEEP
+        return failures >= self.min_affected
 
 class FilterFactory(object):
     def __init__(self, paired, min_affected):
@@ -80,6 +90,8 @@ class MergedReadFilter(object):
         return read.merged
 
 class TooShortReadFilter(object):
+    name = "too_short"
+    
     def __init__(self, minimum_length):
         self.minimum_length = minimum_length
     
@@ -87,6 +99,8 @@ class TooShortReadFilter(object):
         return len(read) < self.minimum_length
 
 class TooLongReadFilter(object):
+    name = "too_long"
+    
     def __init__(self, maximum_length):
         self.maximum_length = maximum_length
     
@@ -99,6 +113,8 @@ class NContentFilter(object):
     counts of Ns as well as proportions. Note, for raw counts, it is a greater than comparison,
     so a cutoff of '1' will keep reads with a single N in it.
     """
+    name = "too_many_n"
+    
     def __init__(self, count):
         """
         Count -- if it is below 1.0, it will be considered a proportion, and above and equal to
@@ -158,3 +174,8 @@ class Filters(object):
     
     def __getitem__(self, filter_type):
         return self.filters[filter_type]
+    
+    def summarize(self):
+        return dict(
+            (f.name, f.summarize())
+            for f in self.filters)

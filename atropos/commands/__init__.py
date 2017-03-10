@@ -51,7 +51,12 @@ class Pipeline(object):
         raise NotImplementedError()
     
     def finish(self):
-        raise NotImplementedError()
+        pass
+    
+    def summarize(self):
+        return dict(
+            record_counts=self.record_counts,
+            bp_counts=self.bp_counts)
 
 class SingleEndPipelineMixin(object):
     def handle_record(self, context, record):

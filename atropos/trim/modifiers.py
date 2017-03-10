@@ -5,6 +5,7 @@ A modifier must be callable. It is implemented as a function if no parameters
 need to be stored, and as a class with a __call__ method if there are parameters
 (or statistics).
 """
+from collections import OrderedDict
 import copy
 import logging
 import re
@@ -15,10 +16,14 @@ from atropos.util import base_complements, reverse_complement, mean, quals2ints
 # Base classes
 
 class Modifier(object):
+    @property
+    def name(self):
+        return self.__class__.__name__
+    
     def summarize(self):
         """Returns a summary of the modifier's activity as a dict.
         """
-        pass
+        return {}
 
 class ReadPairModifier(Modifier):
     """Base class of modifiers that edit a pair of reads simultaneously.
@@ -52,7 +57,7 @@ class Trimmer(Modifier):
             return read
     
     def summarize(self):
-        return dict(trimmed_bases=self.trimmed_bases)
+        return dict(bp_trimmed=self.trimmed_bases)
 
 # Modifiers
 
@@ -153,6 +158,14 @@ class AdapterCutter(Modifier):
         
         self.with_adapters += 1
         return trimmed_read
+    
+    def summarize(self):
+        adapters_summary = OrderedDict()
+        for adapter in self.adapters:
+            adapters_summary[adapter.name] = adapter.summarize()
+        return dict(
+            records_with_adapters=self.with_adapters,
+            adapters=adapters_summary)
 
 # Other error correction approaches:
 # https://www.ncbi.nlm.nih.gov/pubmed/25161220
@@ -269,6 +282,11 @@ class ErrorCorrectorMixin(object):
                 read2.corrected = r2_changed
                 if has_quals:
                     read2.qualities = ''.join(r2_qual)
+    
+    def summarize(self):
+        return dict(
+            records_corrected=self.corrected_pairs,
+            bp_corrected=self.corrected_bp)
 
 class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
     """
@@ -369,6 +387,11 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         
         self.with_adapters[read_idx] += 1
         return trimmed_read
+    
+    def summarize(self):
+        d = dict(records_with_adapters=self.with_adapters)
+        d.update(ErrorCorrectorMixin.summarize(self))
+        return d
 
 class OverwriteRead(ReadPairModifier):
     """If one read is of significantly worse quality than the other, overwrite
@@ -838,12 +861,6 @@ class Modifiers(object):
             adapters[0] = [m.adapter1]
             adapters[1] = [m.adapter2]
         return adapters
-    
-    def get_trimmer_classes(self):
-        return [
-            klass for klass in self.modifier_indexes.keys()
-            if issubclass(klass, Trimmer)
-        ]
 
 class PairedEndModifiers(Modifiers):
     def modify(self, read1, read2=None):
@@ -856,9 +873,31 @@ class PairedEndModifiers(Modifiers):
                 if mods[1] is not None:
                     read2 = mods[1](read2)
         return (read1, read2)
+    
+    def summarize(self):
+        summary = {}
+        for mods in self.modifiers:
+            if isinstance(mods, ReadPairModifier):
+                summary[mods.name] = mods.summarize()
+            else:
+                s1 = mods[0].summarize()
+                s2 = mods[1].summarize()
+                name = s1.name
+                keys = set(s1.keys())
+                assert name != s2.name
+                assert keys == set(s2.keys())
+                summary[name] = dict((key, [s1[key], s2[key]]) for key in keys)
+        return summary
 
 class SingleEndModifiers(Modifiers):
     def modify(self, read1, read2=None):
         for mods in self.modifiers:
             read1 = mods[0](read1)
         return (read1,)
+    
+    def summarize(self):
+        summary = {}
+        for mods in self.modifiers:
+            mod = mods[0]
+            summary[mod.name] = mod.summarize()
+        return summary

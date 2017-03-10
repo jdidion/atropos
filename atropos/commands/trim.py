@@ -39,7 +39,11 @@ class TrimPipeline(Pipeline):
     
     def finish(self):
         self.result_handler.finish()
-        return self.record_handler.finish()
+    
+    def summarize(self):
+        summary = super().summarize()
+        summary['trim'] = self.record_handler.summarize()
+        return summary
 
 class SerialTrimPipeline(TrimPipeline):
     def __init__(self, record_handler, writers):
@@ -68,15 +72,11 @@ class RecordHandler(object):
         self.formatters.format(context['results'], dest, read1, read2)
         return (dest, read1, read2)
     
-    def finish(self):
-        # TODO
-        # return Summary(
-        #     collect_process_statistics(
-        #         n, pipeline.total_bp1, pipeline.total_bp2, pipeline.modifiers,
-        #         pipeline.filters, formatters),
-        #     pipeline.summarize_adapters(),
-        #     pipeline.modifiers.get_trimmer_classes())
-        pass
+    def summarize(self):
+        return dict(
+            modifiers=self.modifiers.summarize(),
+            filters=self.filters.summarize(),
+            formatters=self.formatters.summarize())
 
 class StatsRecordHandlerWrapper(object):
     def __init__(self, record_handler, paired, mode='both', **kwargs):
@@ -110,6 +110,14 @@ class StatsRecordHandlerWrapper(object):
         if source not in self.stats:
             stats[source] = ReadStatCollector(**self.stats_kwargs)
         self.stats[source].collect(read)
+    
+    def summarize(self):
+        summary = self.record_handler.summarize()
+        if self.pre:
+            summary['pre'] = self.pre
+        if self.post:
+            summary['post'] = self.post
+        return summary
 
 class ResultHandler(object):
     def start(self, worker):
@@ -204,6 +212,8 @@ def trim(options, parser):
             options.writer_process, options.compression)
     
     reader.close()
+    
+    add_marginal_stats(summary)
     
     if rc == 0:
         stop_wallclock_time = time.time()
@@ -466,6 +476,62 @@ def create_trim_params(options, parser, default_outfile):
         pipeline = Pipeline(modifiers, filters)
     
     return (reader, pipeline, formatters, writers)
+
+def add_marginal_stats(summary):
+    """For trim stats, any value with a name that starts with 'records_' will
+    have 'fraction_<var>' computed as value / total_reads, and any value with a
+    name that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>'
+    computed.
+    """
+    record_counts = summary['record_counts']
+    total_records = sum(record_counts.values())
+    
+    bp_counts = summary['bp_counts']
+    total_bp = [sum(counts) for counts in zip(*bp_counts.values())]
+    
+    def _recurse(d):
+        for key, value in d.items():
+            if isinstance(value, dict):
+                _recurse(value)
+            elif key.startswith('records_'):
+                d["fraction_{}".format(key)] = value / total_records
+            elif key.startswith('bp_'):
+                d["fraction_{}".format(key)] = [v / b for v, b in zip(value, total_bp)]
+                d["total_{}".format(key)] = sum(value)
+    
+    _recurse(summary['trim'])
+
+# stats["written_fraction"] = 0
+# stats["too_short_fraction"] = 0
+# stats["too_long_fraction"] = 0
+# stats["too_many_n_fraction"] = 0
+# stats["with_adapters_fraction"] = [0, 0]
+# stats["total_written_bp_fraction"] = 0.0
+# for modifier_class in self.trimmer_classes:
+#     name = modifier_class.__name__
+#     stats["{}_fraction".format(name)] = 0.0
+#
+# N = stats["N"]
+# if N > 0:
+#     stats["written_fraction"] = stats["written"] / N if stats["written"] else 0
+#     stats["too_short_fraction"] = stats["too_short"] / N if stats["too_short"] else 0
+#     stats["too_long_fraction"] = stats["too_long"] / N if stats["too_long"] else 0
+#     stats["too_many_n_fraction"] = stats["too_many_n"] / N if stats["too_many_n"] else 0
+#     stats["with_adapters_fraction"] = [ (v / N) for v in stats["with_adapters"] ]
+#     if "corrected" in stats:
+#         stats["corrected_fraction"] = stats["corrected"] / N
+#
+# if stats["total_bp"] > 0:
+#     N = stats["total_bp"]
+#     stats["total_written_bp_fraction"] = (stats["total_written_bp"] / N) if stats["total_written_bp"] else 0
+#     if "corrected" in stats:
+#         stats["corrected_bp_fraction"] = [ (c / N) for c in stats["corrected_bp"] ]
+#         stats["total_corrected_bp_fraction"] = stats["total_corrected_bp"] / N
+#     for modifier_class in self.trimmer_classes:
+#         name = modifier_class.__name__
+#         if stats[name]:
+#             stats["{}_fraction".format(name)] = (stats[name] / N)
+
 
 # Parallel implementation of run_atropos. Works as follows:
 #
@@ -759,7 +825,7 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
     # Queue for processes to send summary information back to main process
     summary_queue = Queue(threads)
     # Aggregate summary
-    summary = Summary(trimmer_classes=pipeline.modifiers.get_trimmer_classes())
+    summary = MergingDict()
     
     if use_writer_process:
         worker_result_handler = QueueResultHandler(result_queue)
@@ -845,15 +911,14 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
             batch = dequeue(
                 summary_queue,
                 fail_callback=summary_fail_callback)
-            worker_index, worker_batches, process_stats, adapter_stats = batch
-            if process_stats is None or adapter_stats is None:
+            worker_index, worker_batches, stats = batch
+            if stats is None:
                 raise Exception("Worker process {} died unexpectedly".format(worker_index))
             else:
                 logging.getLogger().debug("Processing summary for worker {}".format(worker_index))
             seen_summaries.add(worker_index)
             seen_batches |= worker_batches
-            summary.add_process_stats(process_stats)
-            summary.add_adapter_stats(adapter_stats)
+            summary.merge(stats)
         
         # Check if any batches were missed
         if num_batches > 0:
@@ -881,6 +946,4 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
         if use_writer_process:
             kill(writer_process)
     
-    report = summary.finish() if rc == 0 else None
-    details = dict(mode='parallel', hreads=threads)
-    return (rc, report, details)
+    return (rc, summary)

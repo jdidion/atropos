@@ -12,7 +12,7 @@ from urllib.request import urlopen
 from atropos import align
 from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
-from atropos.util import colorspace
+from atropos.util import MergingDict, colorspace
 
 # Constants for the find_best_alignment function.
 # The function is called with SEQ1 as the adapter, SEQ2 as the read.
@@ -372,6 +372,37 @@ class Adapter(object):
 
     def __len__(self):
         return len(self.sequence)
+    
+    def summarize(self):
+        total_front = sum(self.lengths_front.values())
+        total_back = sum(self.lengths_back.values())
+        
+        stats = MergingDict(
+            total_front=total_front,
+            total_back=total_back,
+            total=total_front + total_back
+        )
+        
+        where = self.where
+        assert (where in (ANYWHERE, LINKED) or
+            (where in (BACK, SUFFIX) and total_front == 0) or
+            (where in (FRONT, PREFIX) and total_back == 0)
+        )
+        stats.set_with_merger("where", where, "check_equal")
+        
+        stats["sequence"] = self.sequence
+        stats.set_with_merger("max_error_rate",
+            self.max_error_rate, "check_equal")
+        if where in (ANYWHERE, FRONT, PREFIX):
+            stats["lengths_front"] = dict(self.lengths_front)
+            stats.handle_nested_dict("errors_front", self.errors_front)
+        if where in (ANYWHERE, BACK, SUFFIX):
+            stats["lengths_back"] = dict(self.lengths_back)
+            stats.handle_nested_dict("errors_back", self.errors_back)
+        if where in (BACK, SUFFIX):
+            stats["adjacent_bases"] = dict(self.adjacent_bases)
+        
+        return stats
 
 class ColorspaceAdapter(Adapter):
     def __init__(self, *args, **kwargs):
@@ -504,29 +535,42 @@ class LinkedAdapter(object):
             return self.back_adapter.trimmed(match.back_match)
         else:
             return front_trimmed
-
-    # Lots of forwarders (needed for the report). I’m sure this can be done
-    # in a better way.
-
-    @property
-    def lengths_front(self):
-        return self.front_adapter.lengths_front
-
-    @property
-    def lengths_back(self):
-        return self.back_adapter.lengths_back
-
-    @property
-    def errors_front(self):
-        return self.front_adapter.errors_front
-
-    @property
-    def errors_back(self):
-        return self.back_adapter.errors_back
-
-    @property
-    def adjacent_bases(self):
-        return self.back_adapter.adjacent_bases
+    
+    def summarize(self):
+        total_front = sum(self.front_adapter.lengths_front.values())
+        total_back = sum(self.back_adapter.lengths_back.values())
+        
+        stats = MergingDict(
+            total_front=total_front,
+            total_back=total_back,
+            total=total_front + total_back
+        )
+        
+        where = self.where
+        assert (where in (ANYWHERE, LINKED) or
+            (where in (BACK, SUFFIX) and total_front == 0) or
+            (where in (FRONT, PREFIX) and total_back == 0)
+        )
+        stats.set_with_merger("where", where, "check_equal")
+        
+        stats["front_sequence"] = self.front_adapter.sequence
+        stats["back_sequence"] = self.back_adapter.sequence
+        stats.set_with_merger("front_max_error_rate",
+            self.front_adapter.max_error_rate, "check_equal")
+        stats.set_with_merger("back_max_error_rate",
+            self.back_adapter.max_error_rate, "check_equal")
+        stats["front_lengths_front"] = dict(self.front_adapter.lengths_front)
+        stats["front_lengths_back"] = dict(self.front_adapter.lengths_back)
+        stats["back_lengths_front"] = dict(self.back_adapter.lengths_front)
+        stats["back_lengths_back"] = dict(self.back_adapter.lengths_back)
+        # have to clone these nested dicts and set them
+        # up with a custom merge function
+        stats.handle_nested_dict("front_errors_front", self.front_adapter.errors_front)
+        stats.handle_nested_dict("front_errors_back", self.front_adapter.errors_back)
+        stats.handle_nested_dict("back_errors_front", self.back_adapter.errors_front)
+        stats.handle_nested_dict("back_errors_back", self.back_adapter.errors_back)
+        
+        return stats
 
 class AdapterCache(object):
     def __init__(self, path=".adapters", auto_reverse_complement=False):

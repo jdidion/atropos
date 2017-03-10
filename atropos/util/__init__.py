@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import logging
 import math
 
@@ -82,6 +83,108 @@ class RandomMatchProbability(object):
             i = next_i
             next_i += 1
         self.max_n = i
+
+def check_equal_merger(dest, src):
+    assert dest == src
+    return dest
+
+def nested_dict_merger(d_dest1, d_src1):
+    assert isinstance(d_src1, dict)
+    for k1, d_src2 in d_src1.items():
+        if k1 in d_dest1:
+            d_dest2 = d_dest1[k1]
+            for k2, v_src in d_src2.items():
+                if k2 in d_dest2:
+                    d_dest2[k2] += v_src
+                else:
+                    d_dest2[k2] = v_src
+        else:
+            d_dest1[k1] = d_src2
+    return d_dest1
+
+MERGERS = dict(
+    check_equal=check_equal_merger,
+    nested_dict=nested_dict_merger
+)
+
+class MergingDict(OrderedDict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mergers = {}
+    
+    def set_with_merger(self, key, value, merger):
+        self[key] = value
+        self.mergers[key] = merger
+    
+    def merge(self, src):
+        for k, v_src in src.items():
+            if k in self and self[k] is not None:
+                if v_src is None:
+                    continue
+                v_self = self[k]
+                if k in self.mergers:
+                    merger = MERGERS[self.mergers[k]]
+                    self[k] = merger(v_self, v_src)
+                # default behavior: lists have two integers, which are summed;
+                # dicts have integer values, which are summed; strings must be
+                # identical; otherwise must be numeric and are summed
+                elif isinstance(v_self, dict):
+                    assert isinstance(v_src, dict)
+                    for kk,vv in v_src.items():
+                        if kk in v_self:
+                            v_self[kk] += vv
+                        else:
+                            v_self[kk] = vv
+                elif isinstance(v_self, list):
+                    assert isinstance(v_src, list)
+                    self[k] = [v_src[0]+v_self[0], v_src[1]+v_self[1]]
+                elif isinstance(v_self, str):
+                    assert v_self == v_src
+                else:
+                    self[k] = v_src + v_self
+            else:
+                self[k] = v_src
+                if isinstance(src, MergingDict) and k in src.mergers:
+                    self.mergers[k] = src.mergers[k]
+    
+    def handle_nested_dict(self, key, value):
+        d = {}
+        for k,v in value.items():
+            d[k] = dict(v)
+        self.set_with_merger(key, d, "nested_dict")
+
+class CountingDict(dict):
+    def __getitem__(self, name):
+        return self.get(name, 0)
+    
+    def sorted_items(self, by='key'):
+        """Sort items"""
+        return tuple(sorted(
+            self.items(), key=lambda item: item[0 if by == 'key' else 1]))
+
+class NestedDict(dict):
+    def __getitem__(self, name):
+        if name not in self:
+            self[name] = CountingDict()
+        return self.get(name)
+    
+    def flatten(self, shape="long"):
+        keys1 = sorted(self.keys())
+        if shape == "long":
+            return [
+                (key1, key2, value)
+                for key1 in keys1
+                for key2, value in self[key1].items()
+            ]
+        else:
+            keys2 = set()
+            for child in self.values():
+                keys2.update(child.keys())
+            keys2 = tuple(sorted(keys2))
+            return (keys2, [
+                (key1,) + tuple(self[key1].get(key2, 0) for key2 in keys2)
+                for key1 in keys1
+            ])
 
 def complement(seq):
     return "".join(base_complements[base] for base in seq)

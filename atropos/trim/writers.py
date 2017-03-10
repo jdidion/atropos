@@ -32,15 +32,6 @@ class Formatters(object):
             set(f for f in self.mux_formatters.values() if f.written > 0)
         )
     
-    def summary(self):
-        seq_formatters = self.get_seq_formatters()
-        written = sum(f.written for f in seq_formatters)
-        read_bp = [
-            sum(f.read1_bp for f in seq_formatters),
-            sum(f.read2_bp for f in seq_formatters)
-        ]
-        return (written, read_bp)
-    
     def format(self, result, dest, read1, read2=None):
         if self.multiplexed and (dest == NoFilter) and read1.match:
             name = read1.match.adapter.name
@@ -55,6 +46,15 @@ class Formatters(object):
             f.format(result, read1)
             if read2:
                 f.format(result, read2)
+    
+    def summarize(self):
+        seq_formatters = self.get_seq_formatters()
+        return dict(
+            records_written=sum(f.written for f in seq_formatters),
+            bp_written=[
+                sum(f.read1_bp for f in seq_formatters),
+                sum(f.read2_bp for f in seq_formatters)
+            ])
 
 class DelimFormatter(object):
     def __init__(self, path, delim=' '):
