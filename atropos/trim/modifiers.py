@@ -8,19 +8,25 @@ need to be stored, and as a class with a __call__ method if there are parameters
 import copy
 import logging
 import re
-from atropos.trim.qualtrim import quality_trim_index, nextseq_trim_index
 from atropos.align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
+from atropos.trim.qualtrim import quality_trim_index, nextseq_trim_index
 from atropos.util import base_complements, reverse_complement, mean, quals2ints
 
 # Base classes
 
-class ReadPairModifier(object):
+class Modifier(object):
+    def summarize(self):
+        """Returns a summary of the modifier's activity as a dict.
+        """
+        pass
+
+class ReadPairModifier(Modifier):
     """Base class of modifiers that edit a pair of reads simultaneously.
     """
     def __call__(self, read1, read2):
-        raise NotImplemented()
+        raise NotImplementedError()
 
-class Trimmer(object):
+class Trimmer(Modifier):
     """Base class of modifiers that trim bases from reads.
     """
     def __init__(self):
@@ -44,14 +50,15 @@ class Trimmer(object):
             return new_read
         else:
             return read
+    
+    def summarize(self):
+        return dict(trimmed_bases=self.trimmed_bases)
 
 # Modifiers
 
-class AdapterCutter(object):
-    """
-    Repeatedly find one of multiple adapters in reads.
-    The number of times the search is repeated is specified by the
-    times parameter.
+class AdapterCutter(Modifier):
+    """Repeatedly find one of multiple adapters in reads. The number of times
+    the search is repeated is specified by the times parameter.
     """
 
     def __init__(self, adapters=[], times=1, action='trim'):
@@ -489,7 +496,7 @@ class MinCutter(Trimmer):
             to_trim(1, False) if trim_back else 0
         )
 
-class LengthTagModifier(object):
+class LengthTagModifier(Modifier):
     """
     Replace "length=..." strings in read names.
     """
@@ -504,7 +511,7 @@ class LengthTagModifier(object):
                 self.length_tag + str(len(read.sequence)), read.name)
         return read
 
-class SuffixRemover(object):
+class SuffixRemover(Modifier):
     """
     Remove a given suffix from read names.
     """
@@ -520,7 +527,7 @@ class SuffixRemover(object):
         read.name = name
         return read
 
-class PrefixSuffixAdder(object):
+class PrefixSuffixAdder(Modifier):
     """
     Add a suffix and a prefix to read names
     """
@@ -535,7 +542,7 @@ class PrefixSuffixAdder(object):
             self.suffix.replace('{name}', adapter_name)
         return read
 
-class DoubleEncoder(object):
+class DoubleEncoder(Modifier):
     """
     Double-encode colorspace reads, using characters ACGTN to represent colors.
     """
@@ -547,7 +554,7 @@ class DoubleEncoder(object):
         read.sequence = read.sequence.translate(self.double_encode_trans)
         return read
 
-class ZeroCapper(object):
+class ZeroCapper(Modifier):
     """
     Change negative quality values of a read to zero
     """
@@ -629,7 +636,7 @@ class RRBSTrimmer(MinCutter):
     def __init__(self, trim_5p=0, trim_3p=2):
         super(RRBSTrimmer, self).__init__((trim_5p, -1 * trim_3p), count_trimmed=False, only_trimmed=True)
 
-class NonDirectionalBisulfiteTrimmer(object):
+class NonDirectionalBisulfiteTrimmer(Modifier):
     """
     For non-directional RRBS/WGBS libraries (which implies that they were digested
     using MspI), sequences that start with either 'CAA' or 'CGA' will have 2 bp
@@ -837,26 +844,21 @@ class Modifiers(object):
             klass for klass in self.modifier_indexes.keys()
             if issubclass(klass, Trimmer)
         ]
-    
-    def modify(self, record):
-        bp = [0, 0]
-        if self.paired:
-            read1, read2 = record
-            bp[0] = len(read1.sequence)
-            bp[1] = len(read2.sequence)
-            for mods in self.modifiers:
-                if isinstance(mods, ReadPairModifier):
-                    read1, read2 = mods(read1, read2)
-                else:
-                    if mods[0] is not None:
-                        read1 = mods[0](read1)
-                    if mods[1] is not None:
-                        read2 = mods[1](read2)
-            reads = (read1, read2)
-        else:
-            read = record
-            bp[0] = len(read.sequence)
-            for mods in self.modifiers:
-                read = mods[0](read)
-            reads = (read,)
-        return (reads, bp)
+
+class PairedEndModifiers(Modifiers):
+    def modify(self, read1, read2=None):
+        for mods in self.modifiers:
+            if isinstance(mods, ReadPairModifier):
+                read1, read2 = mods(read1, read2)
+            else:
+                if mods[0] is not None:
+                    read1 = mods[0](read1)
+                if mods[1] is not None:
+                    read2 = mods[1](read2)
+        return (read1, read2)
+
+class SingleEndModifiers(Modifiers):
+    def modify(self, read1, read2=None):
+        for mods in self.modifiers:
+            read1 = mods[0](read1)
+        return (read1,)
