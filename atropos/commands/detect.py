@@ -28,13 +28,13 @@ from atropos.util import reverse_complement, sequence_complexity, enumerate_rang
 
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last download.
 
-def execute(options, parser):
+def execute(options):
     k = options.kmer_size or 12
     n_reads = options.max_reads
     overrep_cutoff = 100
     include = options.include_contaminants or "all"
     known_contaminants = load_known_adapters(options) if include != 'unknown' else None
-    batch_iterator, names, _, _ = create_reader(options, parser, counter_magnitude="K")
+    batch_iterator, names, _, _ = create_reader(options, counter_magnitude="K")
     
     detector = options.detector
     if not detector:

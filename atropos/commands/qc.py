@@ -29,10 +29,10 @@ class PairedEndQcPipeline(QcPipeline, PairedEndPipelineMixin):
         self.get_stats(src1).collect(read1)
         self.get_stats(src2).collect(read2)
 
-def qc(options, parser):
+def execute(options):
     from atropos.report.text import print_read_stats
     
-    reader, names, qualities, _ = create_reader(options, parser)
+    reader, names, qualities, _ = create_reader(options)
     stats = ReadStatistics(
         'pre', options.paired, qualities=qualities,
         tile_key_regexp=options.tile_key_regexp)

@@ -24,10 +24,12 @@ class TrimPipeline(Pipeline):
     def start(self, worker=None):
         self.result_handler.start(worker)
     
-    def get_context(self, batch_num, batch_source):
-        context = super().get_context(batch_num, batch_source)
+    def get_context(self, batch_source, batch_size):
+        context = super().get_context(batch_source, batch_size)
         context['results'] = defaultdict(lambda: [])
         return context
+    
+    batch_num=batch_num,
     
     def handle_records(self, context, records):
         super().handle_records(context, records)
@@ -181,9 +183,9 @@ class WriterResultHandler(ResultHandler):
     def finish(self, total_batches=None):
         self.writers.close()
 
-def trim(options, parser):
+def execute(options):
     reader, pipeline, formatters, writers = create_trim_params(
-        options, parser, options.default_outfile)
+        options, options.default_outfile)
     num_adapters = sum(len(a) for a in pipeline.modifiers.get_adapters())
     
     logger = logging.getLogger()
@@ -227,8 +229,8 @@ def trim(options, parser):
     
     return (rc, None)
 
-def create_trim_params(options, parser, default_outfile):
-    reader, input_names, qualities, has_qual_file = create_reader(options, parser)
+def create_trim_params(options, default_outfile):
+    reader, input_names, qualities, has_qual_file = create_reader(options)
     
     if options.adapter_max_rmp or options.aligner == 'insert':
         match_probability = RandomMatchProbability()
@@ -255,19 +257,12 @@ def create_trim_params(options, parser, default_outfile):
             parser_args['max_rmp'] = options.adapter_max_rmp
         adapter_parser = AdapterParser(**parser_args)
         
-        try:
-            if has_adapters1:
-                adapters1 = adapter_parser.parse_multi(
-                    options.adapters, options.anywhere, options.front)
-            if has_adapters2:
-                adapters2 = adapter_parser.parse_multi(
-                    options.adapters2, options.anywhere2, options.front2)
-        except IOError as e:
-            if e.errno == errno.ENOENT:
-                parser.error(e)
-            raise
-        except ValueError as e:
-            parser.error(e)
+        if has_adapters1:
+            adapters1 = adapter_parser.parse_multi(
+                options.adapters, options.anywhere, options.front)
+        if has_adapters2:
+            adapters2 = adapter_parser.parse_multi(
+                options.adapters2, options.anywhere2, options.front2)
         
         if options.cache_adapters:
             adapter_cache.save()
@@ -283,12 +278,12 @@ def create_trim_params(options, parser, default_outfile):
             options.maximum_length == sys.maxsize and \
             not has_qual_file and options.max_n is None and not options.trim_n \
             and (not options.paired or options.overwrite_low_quality is None):
-        parser.error("You need to provide at least one adapter sequence.")
+        raise ValueError("You need to provide at least one adapter sequence.")
     
-    if options.aligner == 'insert':
-        if not adapters1 or len(adapters1) != 1 or adapters1[0].where != BACK or \
-                not adapters2 or len(adapters2) != 1 or adapters2[0].where != BACK:
-            parser.error("Insert aligner requires a single 3' adapter for each read")
+    if options.aligner == 'insert' and any(
+            not a or len(a) != 1 or a[0].where != BACK
+            for a in (adapters1, adapters2))
+        raise ValueError("Insert aligner requires a single 3' adapter for each read")
     
     if options.debug:
         for adapter in adapters1 + adapters2:

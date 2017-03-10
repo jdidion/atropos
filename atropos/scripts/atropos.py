@@ -358,13 +358,15 @@ class Command(object):
         pass
     
     def execute(self):
-        """Execute the command
+        """Execute the command.
         
         Returns:
             Tuple (rc, "msg", {details})
         """
-        return atropos.commands.execute_command(
-            self.name, self.options, self.parser)
+        try:
+            return atropos.commands.execute_command(self.name, self.options)
+        except Exception e:
+            self.parser.error(e)
 
 class TrimCommand(Command):
     """Trim sequencing reads."""
@@ -1320,7 +1322,7 @@ COMMANDS['error'] = ErrorCommand
 # Main
 
 def main_from_commandline():
-    rc, message = main(sys.argv[1:])
+    rc, message, _ = main(sys.argv[1:])
     if message:
         print(message)
     sys.exit(rc)

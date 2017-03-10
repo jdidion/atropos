@@ -81,7 +81,7 @@ class ColorspaceSequence(Sequence):
             raise FormatError("In read named {0!r}: length of colorspace quality "
                 "sequence ({1}) and length of read ({2}) do not match (primer "
                 "is: {3!r})".format(rname, len(qualities), len(sequence), self.primer))
-        super(ColorspaceSequence, self).__init__(
+        super().__init__(
             name, sequence, qualities, name2, original_length, match, match_info, clipped,
             insert_overlap, merged, corrected)
         if not self.primer in ('A', 'C', 'G', 'T'):
@@ -155,7 +155,7 @@ class FastaReader(SequenceReader):
 
         keep_linebreaks -- whether to keep newline characters in the sequence
         """
-        super(FastaReader, self).__init__(file)
+        super().__init__(file)
         self.sequence_class = sequence_class
         self.delivers_qualities = False
         self._delimiter = '\n' if keep_linebreaks else ''
@@ -189,16 +189,15 @@ class FastaReader(SequenceReader):
 
 class ColorspaceFastaReader(FastaReader):
     def __init__(self, file, keep_linebreaks=False):
-        super(ColorspaceFastaReader, self).__init__(file, keep_linebreaks,
-            sequence_class=ColorspaceSequence)
+        super().__init__(file, keep_linebreaks, sequence_class=ColorspaceSequence)
 
 class ColorspaceFastqReader(FastqReader):
     def __init__(self, file):
-        super(ColorspaceFastqReader, self).__init__(file, sequence_class=ColorspaceSequence)
+        super().__init__(file, sequence_class=ColorspaceSequence)
 
 class SRAColorspaceFastqReader(FastqReader):
     def __init__(self, file):
-        super(SRAColorspaceFastqReader, self).__init__(file, sequence_class=sra_colorspace_sequence)
+        super().__init__(file, sequence_class=sra_colorspace_sequence)
 
 class FastaQualReader(object):
     """
@@ -250,8 +249,7 @@ class FastaQualReader(object):
 
 class ColorspaceFastaQualReader(FastaQualReader):
     def __init__(self, fastafile, qualfile):
-        super(ColorspaceFastaQualReader, self).__init__(fastafile, qualfile,
-            sequence_class=ColorspaceSequence)
+        super().__init__(fastafile, qualfile, sequence_class=ColorspaceSequence)
 
 def sequence_names_match(r1, r2):
     """
@@ -437,6 +435,7 @@ class BatchIterator(object):
         self.max_reads = max_reads
         self.done = False
         self._empty_batch = [None] * size
+        self._source = None
     
     def __iter__(self):
         return self
@@ -474,9 +473,9 @@ class BatchIterator(object):
             self.close()
         
         if batch_index == self.size:
-            return (batch_index, batch)
+            return (self._source, batch_index, batch)
         else:
-            return (batch_index, batch[0:batch_index])
+            return (self._source, batch_index, batch[0:batch_index])
     
     def close(self):
         self.done = True
@@ -490,7 +489,7 @@ def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=N
     classes also defined in this module.
 
     file1, file2, qualfile -- Paths to regular or compressed files or file-like
-        objects. Use file1 if data is single-end. If also file2 is provided,
+        objects. Use file1 if data is single-end. If file2 is also provided,
         sequences are paired. If qualfile is given, then file1 must be a FASTA
         file and sequences are single-end. One of file2 and qualfile must always
         be None (no paired-end data is supported when reading qualfiles).

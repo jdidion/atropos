@@ -8,12 +8,11 @@ from atropos.io import open_output
 from atropos.io.seqio import FastqReader
 from atropos.util import enumerate_range
 
-def error(options, parser):
-    batch_iterator, names, qualities, _ = create_reader(
-        options, parser, counter_magnitude="K")
+def execute(options):
+    batch_iterator, names, qualities, _ = create_reader(options, counter_magnitude="K")
     try:
         if not qualities:
-            parser.error("Cannot estimate error rate without base qualities")
+            raise Exception("Cannot estimate error rate without base qualities")
         
         if options.algorithm == 'quality':
             estimator_class = BaseQualityErrorEstimator

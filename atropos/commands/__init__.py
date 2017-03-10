@@ -2,9 +2,7 @@ import importlib
 from atropos.io.seqio import UnknownFileType, BatchIterator, open_reader
 
 class Pipeline(object):
-    """
-    Args:
-        paired: Whether each record will contain a pair of reads.
+    """Base class for analysis pipelines.
     """
     def __init__(self):
         self.record_counts = {}
@@ -25,22 +23,22 @@ class Pipeline(object):
         Args:
             batch: A batch of reads. A batch has the format
             (batch_source, batch_size, records).
-        
-        Returns:
-            
         """
         batch_source, batch_size, records = batch
         if not batch_source in record_count:
             self.record_counts[batch_source] = 0
             self.bp_counts[batch_source] = [0, 0]
         self.record_counts[batch_source] += batch_size
-        context = self.get_context(batch_num, batch_source)
+        context = self.get_context(batch_source, batch_size)
         self.handle_records(context, records)
     
-    def get_context(self, batch_num, batch_source):
+    def get_context(self, batch_source, batch_size):
+        """Context is a dict containing information that is needed
+        in the pipeline.
+        """
         return dict(
-            batch_num=batch_num,
             batch_source=batch_source,
+            batch_size=batch_size,
             bp=self.bp_counts[batch_source])
     
     def handle_records(self, context, records):
@@ -71,11 +69,13 @@ class PairedEndPipelineMixin(object):
         bp[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
 
-def execute_command(name, options, parser):
+def execute_command(name, options):
     mod = importlib.import_module("atropos.commands.{}".format(name))
-    return mod.execute(options, parser)
+    return mod.execute(options)
 
-def create_reader(options, parser, counter_magnitude="M"):
+def create_reader(options, counter_magnitude="M"):
+    """
+    """
     interleaved = bool(options.interleaved_input)
     input1 = options.interleaved_input if interleaved else options.input1
     input2 = qualfile = None
@@ -84,12 +84,9 @@ def create_reader(options, parser, counter_magnitude="M"):
     else:
         qualfile = options.input2
     
-    try:
-        reader = open_reader(input1, file2=input2, qualfile=qualfile,
-            colorspace=options.colorspace, fileformat=options.format,
-            interleaved=interleaved, single_input_read=options.single_input_read)
-    except (UnknownFileType, IOError) as e:
-        parser.error(e)
+    reader = open_reader(input1, file2=input2, qualfile=qualfile,
+        colorspace=options.colorspace, fileformat=options.format,
+        interleaved=interleaved, single_input_read=options.single_input_read)
     
     qualities = reader.delivers_qualities
     
@@ -100,6 +97,13 @@ def create_reader(options, parser, counter_magnitude="M"):
     # Wrap reader in batch iterator
     batch_size = options.batch_size or 1000
     reader = BatchIterator(reader, batch_size, options.max_reads)
+    
+    # HACK: This is temporary until multi-file input is supported, at which
+    # point the reader will keep track of the current source files.
+    if input2:
+        reader._source = (input1, input2)
+    else:
+        reader._source = input1
     
     # Wrap iterator in progress bar
     if options.progress:
