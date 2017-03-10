@@ -3,8 +3,8 @@
 Alignment module.
 """
 from collections import namedtuple
-from atropos.align._align import Aligner, compare_prefixes, locate, MultiAligner
-from atropos.util import reverse_complement, RandomMatchProbability
+from atropos.align._align import Aligner, MultiAligner, compare_prefixes, locate
+from atropos.util import RandomMatchProbability, reverse_complement
 
 # flags for global alignment
 

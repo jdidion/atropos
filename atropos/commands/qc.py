@@ -2,7 +2,10 @@
 """Implementation of the 'qc' command.
 """
 import logging
+from atropos.commands import (Pipeline, SingleEndPipelineMixin,
+    PairedEndPipelineMixin, create_reader)
 from atropos.commands.multicore import *
+from atropos.reports.txt import print_read_stats
 from atropos.commands.stats import Summary, ReadStatistics
 
 class QcPipeline(Pipeline):

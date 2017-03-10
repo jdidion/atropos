@@ -25,62 +25,6 @@ MAGNITUDE = dict(
 
 log2 = math.log(2)
 
-def complement(seq):
-    return "".join(base_complements[base] for base in seq)
-
-def reverse_complement(seq):
-    return "".join(base_complements[base] for base in reversed(seq))
-
-def sequence_complexity(seq):
-    """A simple measure of sequence complexity"""
-    seq = seq.upper()
-    seqlen = float(len(seq))
-    term = 0
-    for base in ('A','C','G','T'):
-        c = seq.count(base)
-        if c > 0:
-            d = c / seqlen
-            term += d * math.log(d) / log2
-    return -term
-
-def qual2int(q, base=33):
-    """Convert a quality charater to a phred-scale int.
-    """
-    return ord(q) - base
-
-def quals2ints(quals, base=33):
-    """Convert an iterable of quality characters to phred-scale ints.
-    """
-    return (ord(q) - base for q in quals)
-
-def enumerate_range(collection, start, end):
-    'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
-    i = start
-    it = iter(collection)
-    while i < end:
-        yield (i, next(it))
-        i += 1
-
-def mean(data):
-    return sum(data) / len(data)
-
-def median(data):
-    """
-    Median function borrowed from python statistics module, and sped up by
-    in-place sorting of the array.
-    """
-    n = len(data)
-    if n == 0:
-        raise Exception("no median for empty data")
-    
-    data.sort()
-    
-    i = n // 2
-    if n % 2 == 1:
-        return data[i]
-    else:
-        return (data[i - 1] + data[i]) / 2
-
 class RandomMatchProbability(object):
     """
     Class for computing random match probability for DNA sequences
@@ -138,6 +82,70 @@ class RandomMatchProbability(object):
             i = next_i
             next_i += 1
         self.max_n = i
+
+def complement(seq):
+    return "".join(base_complements[base] for base in seq)
+
+def reverse_complement(seq):
+    return "".join(base_complements[base] for base in reversed(seq))
+
+def sequence_complexity(seq):
+    """A simple measure of sequence complexity"""
+    seq = seq.upper()
+    seqlen = float(len(seq))
+    term = 0
+    for base in ('A','C','G','T'):
+        c = seq.count(base)
+        if c > 0:
+            d = c / seqlen
+            term += d * math.log(d) / log2
+    return -term
+
+def qual2int(q, base=33):
+    """Convert a quality charater to a phred-scale int.
+    """
+    return ord(q) - base
+
+def quals2ints(quals, base=33):
+    """Convert an iterable of quality characters to phred-scale ints.
+    """
+    return (ord(q) - base for q in quals)
+
+def enumerate_range(collection, start, end):
+    'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'
+    i = start
+    it = iter(collection)
+    while i < end:
+        yield (i, next(it))
+        i += 1
+
+def mean(data):
+    return sum(data) / len(data)
+
+def median(data):
+    """
+    Median function borrowed from python statistics module, and sped up by
+    in-place sorting of the array.
+    """
+    n = len(data)
+    if n == 0:
+        raise Exception("no median for empty data")
+    
+    data.sort()
+    
+    i = n // 2
+    if n % 2 == 1:
+        return data[i]
+    else:
+        return (data[i - 1] + data[i]) / 2
+
+def truncate_string(s, n=100):
+    """Shorten string s to at most n characters, appending "..." if necessary."""
+    if s is None:
+        return None
+    if len(s) > n:
+        s = s[:n-3] + '...'
+    return s
 
 def run_interruptible_with_result(func, *args, **kwargs):
     # Return code (0=normal, anything else is an error)

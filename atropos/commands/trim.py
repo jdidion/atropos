@@ -10,8 +10,8 @@ from atropos.commands.stats import *
 from atropos.adapters import AdapterParser, BACK
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
+from atropos.trim.writers import *
 from atropos.io import STDOUT
-from atropos.io.seqio import Formatters, RestFormatter, InfoFormatter, WildcardFormatter, Writers
 from atropos.report.text import print_report
 from atropos.util import RandomMatchProbability, run_interruptible, run_interruptible_with_result
 

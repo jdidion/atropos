@@ -2,8 +2,8 @@
 # cython: profile=False, emit_code_comments=False
 import copy
 from atropos.io import xopen
-from atropos.io.seqio import _shorten, FormatError, SequenceReader
-from atropos.util import reverse_complement
+from atropos.io.seqio import FormatError, SequenceReader
+from atropos.util import reverse_complement, truncate_string
 
 cdef class Sequence(object):
     """
