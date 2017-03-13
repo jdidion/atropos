@@ -7,7 +7,6 @@ TODO
 - Sequence.name should be Sequence.description or so (reserve .name for the part
   before the first space)
 """
-import copy
 import io
 from os.path import splitext
 import re
@@ -426,60 +425,6 @@ def paired_to_read1(reader):
 
 def paired_to_read2(reader):
     for r1, r2 in reader: yield r2
-
-class BatchIterator(object):
-    def __init__(self, reader, size, max_reads=None):
-        self.reader = reader
-        self.iterable = enumerate(reader, 1)
-        self.size = size
-        self.max_reads = max_reads
-        self.done = False
-        self._empty_batch = [None] * size
-        self._source = None
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        if self.done:
-            raise StopIteration()
-        
-        try:
-            read_index, record = next(self.iterable)
-        except:
-            self.close()
-            raise
-        
-        batch = copy.copy(self._empty_batch)
-        batch[0] = record
-        batch_index = 1
-        max_size = self.size
-        if self.max_reads:
-            max_size = min(max_size, self.max_reads - read_index + 1)
-        
-        while batch_index < max_size:
-            try:
-                read_index, record = next(self.iterable)
-                batch[batch_index] = record
-                batch_index += 1
-            except StopIteration:
-                self.close()
-                break
-            except:
-                self.close()
-                raise
-        
-        if self.max_reads and read_index >= self.max_reads:
-            self.close()
-        
-        if batch_index == self.size:
-            return (self._source, batch_index, batch)
-        else:
-            return (self._source, batch_index, batch[0:batch_index])
-    
-    def close(self):
-        self.done = True
-        self.reader.close()
 
 def open_reader(file1, file2=None, qualfile=None, colorspace=False, fileformat=None,
                 interleaved=False, qualities=None, single_input_read=None):

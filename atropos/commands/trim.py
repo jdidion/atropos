@@ -5,13 +5,16 @@ import logging
 import sys
 import time
 import textwrap
+from multiprocessing import Queue
 
+from atropos.commands.multicore import *
 from atropos.commands.stats import *
 from atropos.adapters import AdapterParser, BACK
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
+from atropos.io.compression import get_compressor, can_use_system_compression
 from atropos.report.text import print_report
 from atropos.util import RandomMatchProbability, run_interruptible, run_interruptible_with_result
 
@@ -24,27 +27,23 @@ class TrimPipeline(Pipeline):
     def start(self, worker=None):
         self.result_handler.start(worker)
     
-    def get_context(self, batch_source, batch_size):
-        context = super().get_context(batch_source, batch_size)
+    def add_to_context(self, context):
         context['results'] = defaultdict(lambda: [])
-        return context
-    
-    batch_num=batch_num,
     
     def handle_records(self, context, records):
         super().handle_records(context, records)
-        self.result_handler.write_result(
-            context['batch_num'], context['results'])
+        self.result_handler.write_result(context['index'], context['results'])
     
     def handle_reads(self, context, read1, read2):
-        self.record_handler.handle_record(context, read1, read2)
+        return self.record_handler.handle_record(context, read1, read2)
     
-    def finish(self):
+    def finish(self, worker=None):
         self.result_handler.finish()
     
-    def summarize(self):
+    def summarize(self, error=None):
         summary = super().summarize()
-        summary['trim'] = self.record_handler.summarize()
+        if not error:
+            summary['trim'] = self.record_handler.summarize()
         return summary
 
 class SerialTrimPipeline(TrimPipeline):
@@ -54,13 +53,21 @@ class SerialTrimPipeline(TrimPipeline):
 
 class ParallelTrimPipeline(TrimPipeline):
     def __init__(self, record_handler, result_handler):
-        super().__init__()
+        super().__init__(record_handler, result_handler)
         self.seen_batches = set()
     
     def process_batch(self, batch):
         batch_num, batch_data = batch
         self.seen_batches.add(batch_num)
         super().process_batch(batch_data)
+    
+    def finish(self, worker=None):
+        super().finish(worker)
+        logging.getLogger().debug("{} finished; processed {} batches, {} reads".format(
+            worker.name, len(self.seen_batches), sum(self.record_counts.values())))
+    
+    def summarize(self, error=None):
+        return (self.seen_batches, super().summarize())
 
 class RecordHandler(object):
     def __init__(self, modifiers, filters, formatters):
@@ -93,12 +100,12 @@ class StatsRecordHandlerWrapper(object):
     
     def handle_record(self, context, read1, read2=None):
         if self.pre:
-            self.collect(self.pre, context['batch_source'], read1, read2)
+            self.collect(self.pre, context['source'], read1, read2)
         dest, read1, read2 = self.record_handler.handle_record(context, read1, read2)
         if self.post:
             if dest not in self.post:
                 self.post[dest] = {}
-            self.collect(self.post[dest], context['batch_source'], read1, read2)
+            self.collect(self.post[dest], context['source'], read1, read2)
         return (dest, read1, read2)
     
     def collect(self, stats, source, read1, read2=None):
@@ -184,15 +191,17 @@ class WriterResultHandler(ResultHandler):
         self.writers.close()
 
 def execute(options):
-    reader, pipeline, formatters, writers = create_trim_params(
+    reader, record_handler, writers, mixin_class = create_trim_params(
         options, options.default_outfile)
-    num_adapters = sum(len(a) for a in pipeline.modifiers.get_adapters())
+    num_adapters = sum(len(a) for a in record_handler.modifiers.get_adapters())
     
     logger = logging.getLogger()
     logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
         { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[options.paired])
-    if options.paired == 'first' and (len(pipeline.modifiers.get_modifiers(read=2)) > 0 or options.quality_cutoff):
+    if options.paired == 'first' and (
+            len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
+            options.quality_cutoff):
         logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
             'modifications are applied only to the first '
             'read since backwards compatibility mode is enabled. '
@@ -204,12 +213,15 @@ def execute(options):
     
     if options.threads is None:
         # Run single-threaded version
+        pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
+        pipeline = pipeline_class(record_handler, writers)
         rc, summary = run_interruptible_with_result(pipeline, reader)
     else:
         # Run multiprocessing version
+        pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
         rc, summary = run_parallel(
-            reader, pipeline, options.threads,
-            options.process_timeout, options.preserve_order,
+            reader, record_handler, writers, pipeline_class,
+            options.threads, options.process_timeout, options.preserve_order,
             options.read_queue_size, options.result_queue_size,
             options.writer_process, options.compression)
     
@@ -462,15 +474,16 @@ def create_trim_params(options, default_outfile):
     
     writers = Writers(force_create)
     
-    if options.stats:
-        read_stats = ReadStatistics(
-            options.stats, options.paired, qualities=qualities,
-            tile_key_regexp=options.tile_key_regexp)
-        pipeline = PipelineWithStats(modifiers, filters, read_stats)
-    else:
-        pipeline = Pipeline(modifiers, filters)
+    record_handler = RecordHandler(modifiers, filters, formatters)
     
-    return (reader, pipeline, formatters, writers)
+    if options.stats:
+        record_handler = StatsRecordHandlerWrapper(
+            record_handler, options.paired, mode=options.stats,
+            qualities=qualities, tile_key_regexp=options.tile_key_regexp)
+    
+    mixin_class = PairedEndPipelineMixin if options.paired else SingleEndPipelineMixin
+    
+    return (reader, record_handler, writers, mixin_class)
 
 def add_marginal_stats(summary):
     """For trim stats, any value with a name that starts with 'records_' will
@@ -568,73 +581,6 @@ def add_marginal_stats(summary):
 # particular environment. Additionally, a "soft" timeout is used, after which log messages are
 # escallated from DEBUG to ERROR level. The user can then make the decision of whether or not to kill
 # the program.
-
-import logging
-from multiprocessing import Queue
-from atropos.commands.multicore import *
-from atropos.io.compression import get_compressor, can_use_system_compression
-
-class TrimWorkerProcess(ResultHandlerWorkerProcess):
-    """
-    
-    Args:
-        index: A unique ID for the process
-        pipeline: The trimming pipeline
-        formatters: A Formatters object
-        input_queue: queue with batches of records to process
-        result_handler: A ResultHandler object
-        summary_queue: queue where summary information is written
-        timeout: time to wait upon queue full/empty
-    """
-    def __init__(self, index, input_queue, summary_queue, timeout,
-                 result_handler, pipeline, formatters):
-        super().__init__(index, input_queue, summary_queue, timeout, result_handler)
-        self.pipeline = pipeline
-        self.formatters = formatters
-    
-    def _handle_record(self, record, result):
-        dest, reads = self.pipeline(record)
-        self.formatters.format(result, dest, *reads)
-    
-    def _get_summary(self, error=False):
-        if error:
-            process_stats = adapter_stats = None
-        else:
-            process_stats = collect_process_statistics(
-                self.processed_reads, self.pipeline.total_bp1, self.pipeline.total_bp2,
-                self.pipeline.modifiers, self.pipeline.filters, self.formatters)
-            adapter_stats = self.pipeline.summarize_adapters()
-        return (self.index, self.seen_batches, process_stats, adapter_stats)
-
-class ResultHandlerWorkerProcess(WorkerProcess):
-    """Parent class for worker processes that operate on batches of reads and
-    handles each record.
-    
-    Args:
-        index: A unique ID for the process
-        input_queue: queue with batches of records to process
-        result_handler:
-        summary_queue: queue where summary information is written
-        timeout: time to wait upon queue full/empty
-    """
-    def __init__(self, index, input_queue, summary_queue, timeout, result_handler):
-        super().__init__(index, input_queue, summary_queue, timeout)
-        self.result_handler = result_handler
-    
-    def _on_start(self):
-        self.result_handler.start(self)
-    
-    def _on_finish(self):
-        self.result_handler.finish()
-    
-    def _handle_records(self, batch_num, batch_size, records):
-        result = defaultdict(lambda: [])
-        for record in records:
-            self._handle_record(record, result)
-        self.result_handler.write_result(batch_num, result)
-    
-    def _handle_record(self, record, result):
-        raise NotImplementedError()
 
 class ResultProcess(Process):
     """Thread that accepts results from the worker threads and process them
@@ -772,16 +718,17 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
             self.writers.write_result(pending.pop(), self.compressed)
             self.cur_batch += 1
 
-def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
-                 preserve_order=False, input_queue_size=0, result_queue_size=0,
-                 use_writer_process=True, compression=None):
+def run_parallel(
+        reader, record_handler, writers, pipeline_class, threads=2, timeout=30,
+        preserve_order=False, input_queue_size=0, result_queue_size=0,
+        use_writer_process=True, compression=None):
     """
     Execute atropos in parallel mode.
     
     reader 				:: iterator over batches of reads (most likely a BatchIterator)
-    pipeline 			::
-    formatters          ::
+    record_handler      ::
     writers				::
+    pipeline_class      ::
     threads				:: number of worker threads to use; additional threads are used
                         for the main proccess and the writer process (if requested).
     timeout				:: number of seconds after which waiting processes escalate their
@@ -831,6 +778,7 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
         
         # Shared variable for communicating with writer thread
         writer_control = Control(CONTROL_ACTIVE)
+        
         # result handler
         if preserve_order:
             writer_result_handler = OrderPreservingWriterResultHandler(
@@ -838,6 +786,7 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
         else:
             writer_result_handler = WriterResultHandler(
                 writers, compressed=compression == "worker")
+        
         # writer process
         writer_process = ResultProcess(writer_result_handler, result_queue, writer_control, timeout)
         writer_process.start()
@@ -846,8 +795,9 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
     
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
-    worker_args = (input_queue, summary_queue, timeout, worker_result_handler, pipeline, formatters)
-    worker_processes = launch_workers(threads - 1, TrimWorkerProcess, worker_args)
+    pipeline = pipeline_class(record_handler, worker_result_handler)
+    worker_args = (input_queue, pipeline, summary_queue, timeout)
+    worker_processes = launch_workers(threads - 1, worker_args)
     
     def ensure_alive():
         ensure_processes(worker_processes)
@@ -859,8 +809,7 @@ def run_parallel(reader, pipeline, formatters, writers, threads=2, timeout=30,
     def _run(worker_processes):
         # Add batches of reads to the input queue. Provide a timeout callback
         # to check that subprocesses are alive.
-        num_batches = enqueue_all(
-            enumerate(reader, 1), input_queue, timeout, ensure_alive)
+        num_batches = enqueue_all(reader, input_queue, timeout, ensure_alive)
         logging.getLogger().debug(
             "Main loop complete; saw {} batches".format(num_batches))
         

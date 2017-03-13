@@ -79,26 +79,13 @@ class WorkerProcess(Process):
         summary_queue: queue where summary information is written
         timeout: time to wait upon queue full/empty
     """
-    def __init__(self, index, input_queue, summary_queue, timeout):
+    def __init__(self, index, input_queue, pipeline, summary_queue, timeout):
         super().__init__(name="Worker process {}".format(index))
         self.index = index
         self.input_queue = input_queue
+        self.pipeline = pipeline
         self.summary_queue = summary_queue
         self.timeout = timeout
-        self.processed_reads = 0
-        self.seen_batches = set()
-    
-    def _on_start(self):
-        pass
-    
-    def _on_finish(self):
-        pass
-    
-    def _handle_records(self, batch_num, batch_size, records):
-        raise NotImplementedError()
-    
-    def _get_summary(self, error=False):
-        return (self.index, self.seen_batches)
     
     def run(self):
         logging.getLogger().debug("{} running under pid {}".format(self.name, os.getpid()))
@@ -111,39 +98,36 @@ class WorkerProcess(Process):
                     timeout=self.timeout)
                 yield batch
         
-        def enqueue_summary(error=False):
+        def enqueue_summary(error=None):
+            seen_batches, summary = self.pipeline.summarize(error)
             enqueue(
-                self.summary_queue, self._get_summary(error),
+                self.summary_queue, (self.index, seen_batches, summary),
                 wait_message="{} waiting to queue summary {{}}".format(self.name),
                 timeout=self.timeout
             )
         
         try:
-            self._on_start()
+            self.pipeline.start(worker=self)
             
-            for batch in iter_batches():
-                if batch is None:
-                    break
-                
-                batch_num, (batch_size, records) = batch
-                self.seen_batches.add(batch_num)
-                self.processed_reads += batch_size
-                
-                logging.getLogger().debug("{} processing batch of size {}".format(self.name, batch_size))
-                self._handle_records(batch_num, batch_size, records)
-            
-            logging.getLogger().debug("{} finished; processed {} batches, {} reads".format(
-                self.name, len(self.seen_batches), self.processed_reads))
+            try:
+                for batch in iter_batches():
+                    if batch is None:
+                        break
+                    logging.getLogger().debug(
+                        "{} processing batch of size {}".format(
+                            self.name, batch[0]['size']))
+                    self.pipeline.process_batch(batch)
+            finally:
+                self.pipeline.finish(worker=self)
             
             logging.getLogger().debug("{} sending summary".format(self.name))
             enqueue_summary()
             
             logging.getLogger().debug("{} exiting normally".format(self.name))
-        except:
-            logging.getLogger().error("Unexpected error in {}".format(self.name), exc_info=True)
-            enqueue_summary(error=True)
-        finally:
-            self._on_finish()
+        except Exception e:
+            logging.getLogger().error(
+                "Unexpected error in {}".format(self.name), exc_info=True)
+            enqueue_summary(error=e)
 
 def launch_workers(n, worker_class, args=(), offset=0):
     logging.getLogger().info("Starting {} worker processes".format(n))

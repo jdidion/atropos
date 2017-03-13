@@ -1,5 +1,7 @@
+import copy
 import importlib
-from atropos.io.seqio import UnknownFileType, BatchIterator, open_reader
+import logging
+from atropos.io.seqio import open_reader
 
 class Pipeline(object):
     """Base class for analysis pipelines.
@@ -24,22 +26,20 @@ class Pipeline(object):
             batch: A batch of reads. A batch has the format
             (batch_source, batch_size, records).
         """
-        batch_source, batch_size, records = batch
+        batch_meta, records = batch
+        batch_source = batch_meta['source']
         if not batch_source in record_count:
             self.record_counts[batch_source] = 0
             self.bp_counts[batch_source] = [0, 0]
-        self.record_counts[batch_source] += batch_size
-        context = self.get_context(batch_source, batch_size)
+        self.record_counts[batch_source] += batch_meta['size']
+        context = self.get_context(batch_meta.copy())
         self.handle_records(context, records)
     
-    def get_context(self, batch_source, batch_size):
+    def add_to_context(self, context):
         """Context is a dict containing information that is needed
         in the pipeline.
         """
-        return dict(
-            batch_source=batch_source,
-            batch_size=batch_size,
-            bp=self.bp_counts[batch_source])
+        return context['bp'] = self.bp_counts[context['source']]
     
     def handle_records(self, context, records):
         for record in records:
@@ -48,10 +48,10 @@ class Pipeline(object):
     def handle_reads(self, context, read1, read2=None):
         raise NotImplementedError()
     
-    def finish(self):
+    def finish(self, **kwargs):
         pass
     
-    def summarize(self):
+    def summarize(self, error=None):
         return dict(
             record_counts=self.record_counts,
             bp_counts=self.bp_counts)
@@ -68,6 +68,69 @@ class PairedEndPipelineMixin(object):
         bp[0] += len(read1.sequence)
         bp[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
+
+
+class BatchIterator(object):
+    def __init__(self, reader, size, max_reads=None):
+        self.reader = reader
+        self.iterable = enumerate(reader, 1)
+        self.size = size
+        self.max_reads = max_reads
+        self.batches = 0
+        self.done = False
+        self._empty_batch = [None] * size
+        self._source = None
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.done:
+            raise StopIteration()
+        
+        try:
+            read_index, record = next(self.iterable)
+        except:
+            self.close()
+            raise
+        
+        batch = copy.copy(self._empty_batch)
+        batch[0] = record
+        batch_index = 1
+        max_size = self.size
+        if self.max_reads:
+            max_size = min(max_size, self.max_reads - read_index + 1)
+        
+        while batch_index < max_size:
+            try:
+                read_index, record = next(self.iterable)
+                batch[batch_index] = record
+                batch_index += 1
+            except StopIteration:
+                self.close()
+                break
+            except:
+                self.close()
+                raise
+        
+        if self.max_reads and read_index >= self.max_reads:
+            self.close()
+        
+        self.batches += 1
+        
+        batch_meta = dict(
+            index=self.batches,
+            source=self._source,
+            size=batch_index)
+        
+        if batch_index == self.size:
+            return (batch_meta, batch)
+        else:
+            return (batch_meta, batch[0:batch_index])
+    
+    def close(self):
+        self.done = True
+        self.reader.close()
 
 def execute_command(name, options):
     mod = importlib.import_module("atropos.commands.{}".format(name))

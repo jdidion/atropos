@@ -50,11 +50,7 @@ def execute(options):
     return (rc, None, details)
 
 def run_serial(reader, read_stats):
-    def _run():
-        for batch_size, batch in reader:
-            for record in batch:
-                read_stats.pre_trim(record)
-    rc = run_interruptible(_run)
+    rc = run_interruptible(pipeline, )
     report = read_stats.finish() if rc == 0 else None
     details = dict(mode='serial', threads=1)
     return (rc, report, details)
@@ -64,7 +60,7 @@ class QcWorker(WorkerProcess):
         super().__init__(index, input_queue, summary_queue, timeout)
         self.read_stats = read_stats
         
-    def _handle_records(self, batch_num, batch_size, records):
+    def _handle_records(self, batch_num, batch_batch_size, records):
         for batch_size, batch in reader:
             for record in batch:
                 self.read_stats.pre_trim(record)
