@@ -3,20 +3,16 @@
 from collections import defaultdict
 import logging
 import sys
-import time
 import textwrap
-from multiprocessing import Queue
 
-from atropos.commands.multicore import *
 from atropos.commands.stats import *
 from atropos.adapters import AdapterParser, BACK
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
-from atropos.io.compression import get_compressor, can_use_system_compression
-from atropos.report.text import print_report
-from atropos.util import RandomMatchProbability, run_interruptible, run_interruptible_with_result
+import atropos.report
+from atropos.util import RandomMatchProbability, Timing, run_interruptible_with_result
 
 class TrimPipeline(Pipeline):
     def __init__(self, record_handler, result_handler):
@@ -191,57 +187,6 @@ class WriterResultHandler(ResultHandler):
         self.writers.close()
 
 def execute(options):
-    reader, record_handler, writers, mixin_class = create_trim_params(
-        options, options.default_outfile)
-    num_adapters = sum(len(a) for a in record_handler.modifiers.get_adapters())
-    
-    logger = logging.getLogger()
-    logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
-        num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
-        { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[options.paired])
-    if options.paired == 'first' and (
-            len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
-            options.quality_cutoff):
-        logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
-            'modifications are applied only to the first '
-            'read since backwards compatibility mode is enabled. '
-            'To modify both reads, also use any of the -A/-B/-G/-U options. '
-            'Use a dummy adapter sequence when necessary: -A XXX')))
-    
-    start_wallclock_time = time.time()
-    start_cpu_time = time.clock()
-    
-    if options.threads is None:
-        # Run single-threaded version
-        pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
-        pipeline = pipeline_class(record_handler, writers)
-        rc, summary = run_interruptible_with_result(pipeline, reader)
-    else:
-        # Run multiprocessing version
-        pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
-        rc, summary = run_parallel(
-            reader, record_handler, writers, pipeline_class,
-            options.threads, options.process_timeout, options.preserve_order,
-            options.read_queue_size, options.result_queue_size,
-            options.writer_process, options.compression)
-    
-    reader.close()
-    
-    add_marginal_stats(summary)
-    
-    if rc == 0:
-        stop_wallclock_time = time.time()
-        stop_cpu_time = time.clock()
-        print_report(
-            options,
-            stop_wallclock_time - start_wallclock_time,
-            stop_cpu_time - start_cpu_time,
-            summary,
-            pipeline.modifiers.get_trimmer_classes())
-    
-    return (rc, None)
-
-def create_trim_params(options, default_outfile):
     reader, input_names, qualities, has_qual_file = create_reader(options)
     
     if options.adapter_max_rmp or options.aligner == 'insert':
@@ -294,7 +239,7 @@ def create_trim_params(options, default_outfile):
     
     if options.aligner == 'insert' and any(
             not a or len(a) != 1 or a[0].where != BACK
-            for a in (adapters1, adapters2))
+            for a in (adapters1, adapters2)):
         raise ValueError("Insert aligner requires a single 3' adapter for each read")
     
     if options.debug:
@@ -472,42 +417,75 @@ def create_trim_params(options, default_outfile):
     if options.wildcard_file:
         formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
     
+    mixin_class = PairedEndPipelineMixin if options.paired else SingleEndPipelineMixin
     writers = Writers(force_create)
-    
     record_handler = RecordHandler(modifiers, filters, formatters)
-    
     if options.stats:
         record_handler = StatsRecordHandlerWrapper(
             record_handler, options.paired, mode=options.stats,
             qualities=qualities, tile_key_regexp=options.tile_key_regexp)
     
-    mixin_class = PairedEndPipelineMixin if options.paired else SingleEndPipelineMixin
+    logger = logging.getLogger()
+    num_adapters = sum(len(a) for a in modifiers.get_adapters())
+    logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
+        num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
+        { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[options.paired])
+    if options.paired == 'first' and (
+            len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
+            options.quality_cutoff):
+        logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
+            'modifications are applied only to the first '
+            'read since backwards compatibility mode is enabled. '
+            'To modify both reads, also use any of the -A/-B/-G/-U options. '
+            'Use a dummy adapter sequence when necessary: -A XXX')))
     
-    return (reader, record_handler, writers, mixin_class)
-
-def add_marginal_stats(summary):
-    """For trim stats, any value with a name that starts with 'records_' will
-    have 'fraction_<var>' computed as value / total_reads, and any value with a
-    name that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>'
-    computed.
-    """
-    record_counts = summary['record_counts']
-    total_records = sum(record_counts.values())
+    with Timing() as timing:
+        if options.threads is None:
+            # Run single-threaded version
+            pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
+            pipeline = pipeline_class(record_handler, writers)
+            rc, summary = run_interruptible_with_result(pipeline, reader)
+        else:
+            # Run multiprocessing version
+            pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
+            rc, summary = run_parallel(
+                reader, record_handler, writers, pipeline_class,
+                options.threads, options.process_timeout, options.preserve_order,
+                options.read_queue_size, options.result_queue_size,
+                options.writer_process, options.compression)
     
-    bp_counts = summary['bp_counts']
-    total_bp = [sum(counts) for counts in zip(*bp_counts.values())]
+    reader.close()
     
-    def _recurse(d):
-        for key, value in d.items():
-            if isinstance(value, dict):
-                _recurse(value)
-            elif key.startswith('records_'):
-                d["fraction_{}".format(key)] = value / total_records
-            elif key.startswith('bp_'):
-                d["fraction_{}".format(key)] = [v / b for v, b in zip(value, total_bp)]
-                d["total_{}".format(key)] = sum(value)
+    # For trim stats, any value with a name that starts with 'records_' will
+    # have 'fraction_<var>' computed as value / total_reads, and any value with a
+    # name that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>'
+    # computed.
     
-    _recurse(summary['trim'])
+    if rc == 0:
+        summary['timing'] = timing.summarize()
+        
+        record_counts = summary['record_counts']
+        total_records = sum(record_counts.values())
+        
+        bp_counts = summary['bp_counts']
+        total_bp = [sum(counts) for counts in zip(*bp_counts.values())]
+        
+        def _recurse(d):
+            for key, value in d.items():
+                if isinstance(value, dict):
+                    _recurse(value)
+                elif key.startswith('records_'):
+                    d["fraction_{}".format(key)] = value / total_records
+                elif key.startswith('bp_'):
+                    d["fraction_{}".format(key)] = [v / b for v, b in zip(value, total_bp)]
+                    d["total_{}".format(key)] = sum(value)
+        
+        _recurse(summary['trim'])
+        
+        report = atropos.report.create_report(options)
+        report.generate(summary)
+    
+    return (rc, None, summary)
 
 # stats["written_fraction"] = 0
 # stats["too_short_fraction"] = 0
@@ -540,214 +518,242 @@ def add_marginal_stats(summary):
 #         if stats[name]:
 #             stats["{}_fraction".format(name)] = (stats[name] / N)
 
-
-# Parallel implementation of run_atropos. Works as follows:
-#
-# 1. Main thread creates N worker processes (where N is the number of threads to be allocated) and
-# (optionally) one writer process.
-# 2. Main thread loads batches of reads (or read pairs) from input file(s) and adds them to a queue
-# (the input queue).
-# 3. Worker processes take batches from the input queue, process them as atropos normally does,
-# and either add the results to the result queue (if using a writer process) or write the results
-# to disk. Each result is a dict mapping output file names to strings, where each string is a
-# concatenation of reads (with appropriate line endings) to be written. A parameter also controls
-# whether data compression is done by the workers or the writer.
-# 4. If using a writer process, it takes results from the result queue and writes each string to
-# its corresponding file.
-# 5. When the main process finishes loading reads from the input file(s), it sends a signal to the
-# worker processes that they should complete when the input queue is empty. It also singals the
-# writer process how many total batches to expect, and the writer process exits after it has
-# processed that many batches.
-# 6. When a worker process completes, it adds a summary of its activity to the summary queue.
-# 7. The main process reads summaries from the summary queue and merges them to create the complete
-# summary, which is used to generate the report.
-#
-# There are several possible points of failure:
-#
-# 1. The main process may exit due to an unexpected error, or becuase the user forces it to exit
-# (Ctrl-C). In this case, an attempt is made to cancel all processes before exiting.
-# 2. A worker or writer process may exit due to an unknown error. To handle this, the main process
-# checks that each process is alive whenver it times out writing to the input queue, and again when
-# waiting for worker summaries. If a process has died, the program exits with an error since some data
-# might have gotten lost.
-# 3. More commonly, process will time out blocking on reading from or writing to a queue. Size
-# limits are used (optionally) for the input and result queues to prevent using lots of memory. When
-# few threads are allocated, it is most likely that the main and writer processes will block, whereas
-# with many threads allocated the workers are most likely to block. Also, e.g. in a cluster
-# environment, I/O latency may cause a "backup" resulting in frequent blocking of the main and workers
-# processes. Finally, also e.g. in a cluster environment, processes may suspended for periods of time.
-# Use of a hard timeout period, after which processes are forced to exit, is thus undesirable.
-# Instead, parameters are provided for the user to tune the batch size and max queue sizes to their
-# particular environment. Additionally, a "soft" timeout is used, after which log messages are
-# escallated from DEBUG to ERROR level. The user can then make the decision of whether or not to kill
-# the program.
-
-class ResultProcess(Process):
-    """Thread that accepts results from the worker threads and process them
-    using a ResultHandler. Each batch is expected to be
-    (batch_num, path, records), where path is the destination file and records
-    is a string. Not guaranteed to preserve the original order of sequence records.
-
-    result_handler: A ResultHandler object.
-    queue: input queue.
-    control: a shared value for communcation with the main process.
-    timeout: seconds to wait for next batch before complaining
-    """
-    def __init__(self, result_handler, queue, control, timeout=60):
-        super(WriterProcess, self).__init__(name="Writer process")
-        self.result_handler = result_handler
-        self.queue = queue
-        self.control = control
-        self.timeout = timeout
-        self.seen_batches = set()
-        self.num_batches = None
-    
-    def run(self):
-        logging.getLogger().debug("Writer process running under pid {}".format(self.name, os.getpid()))
-        
-        class Done(Exception): pass
-        class Killed(Exception): pass
-        
-        def fail_callback():
-            if self.num_batches is None and self.control.check_value_positive():
-                self.num_batches = self.control.get_value()
-            if self.num_batches is not None and len(self.seen_batches) >= self.num_batches:
-                raise Done()
-        
-        def timeout_callback():
-            if self.num_batches is not None:
-                missing = set(range(1, self.num_batches+1)) - self.seen_batches
-                logging.getLogger().error("Result thread still missing batches {} of {}".format(
-                    ",".join(str(i) for i in missing), self.num_batches))
-        
-        def iter_batches():
-            while True:
-                batch = dequeue(
-                    self.queue,
-                    wait_message="Result process waiting on result {}",
-                    timeout=self.timeout,
-                    fail_callback=fail_callback,
-                    timeout_callback=timeout_callback)
-                yield batch
-
-        try:
-            self.result_handler.start(self)
-            
-            for batch_num, result in iter_batches():
-                self.seen_batches.add(batch_num)
-                self.result_handler.write_result(batch_num, result)
-        except Done:
-            logging.getLogger().debug("Writer process exiting normally")
-        except Killed:
-            logging.getLogger().debug("Writer process exited early")
-        except:
-            logging.getLogger().error("Unexpected error in writer process", exc_info=True)
-            self.control.set_value(CONTROL_ERROR)
-        finally:
-            num_batches = self.control.get_value(lock=True)
-            self.result_handler.finish(num_batches if num_batches > 0 else None)
-
-class QueueResultHandler(ResultHandler):
-    """
-    ResultHandler that writes results to the output queue.
-    """
-    def __init__(self, queue):
-        self.queue = queue
-    
-    def start(self, worker):
-        self.message = "{} waiting to queue result {{}}".format(worker.name)
-        self.timeout = worker.timeout
-    
-    def write_result(self, batch_num, result):
-        enqueue(
-            self.queue,
-            (batch_num, result),
-            wait_message=self.message,
-            timeout=self.timeout)
-
-class CompressingWorkerResultHandler(WorkerResultHandler):
-    """
-    Wraps a ResultHandler and compresses results prior
-    to writing.
-    """
-    def start(self, worker):
-        super().start(worker)
-        self.file_compressors = {}
-    
-    def prepare_file(self, path, strings):
-        compressor = self.get_compressor(path)
-        if compressor:
-            return ((path, 'wb'), compressor.compress(b''.join(
-                s.encode() for s in strings)))
-        else:
-            return ((path, 'wt'), "".join(strings))
-    
-    def get_compressor(self, filename):
-        if filename not in self.file_compressors:
-            self.file_compressors[filename] = get_compressor(filename)
-        return self.file_compressors[filename]
-
-class OrderPreservingWriterResultHandler(WriterResultHandler):
-    """
-    Writer thread that is less time/memory efficient, but is
-    guaranteed to preserve the original order of records.
-    """
-    def start(self, worker):
-        super().__init__(worker)
-        self.pending = PendingQueue()
-        self.cur_batch = 1
-    
-    def write_result(self, batch_num, result):
-        if batch_num == self.cur_batch:
-            self.writers.write_result(result, self.compressed)
-            self.cur_batch += 1
-            self.consume_pending()
-        else:
-            self.pending.push(batch_num, result)
-    
-    def finish(self, total_batches):
-        if total_batches is not None:
-            self.consume_pending()
-            if self.cur_batch != total_batches:
-                raise Exception("OrderPreservingWriterResultHandler finishing without having seen "
-                                "{} batches".format(total_batches))
-        self.writers.close()
-    
-    def consume_pending(self):
-        while (not self.pending.empty) and (self.cur_batch == pending.min_priority):
-            self.writers.write_result(pending.pop(), self.compressed)
-            self.cur_batch += 1
-
 def run_parallel(
         reader, record_handler, writers, pipeline_class, threads=2, timeout=30,
         preserve_order=False, input_queue_size=0, result_queue_size=0,
         use_writer_process=True, compression=None):
-    """
-    Execute atropos in parallel mode.
+    """Parallel implementation of run_atropos.
     
-    reader 				:: iterator over batches of reads (most likely a BatchIterator)
-    record_handler      ::
-    writers				::
-    pipeline_class      ::
-    threads				:: number of worker threads to use; additional threads are used
-                        for the main proccess and the writer process (if requested).
-    timeout				:: number of seconds after which waiting processes escalate their
-                        messages from DEBUG to ERROR.
-    preserve_order 		:: whether to preserve the input order of reads when writing
-                        (only valid when `use_writer_process=True`)
-    input_queue_size 	:: max number of items that can be in the input queue, or 0 for
-                        no limit (be warned that this could explode memory usage)
-    result_queue_size	:: max number of items that can be in the result queue, or 0 for
-                        no limit (be warned that this could explode memory usage)
-    use_writer_process	:: if True, a separate thread will be used to write results to
-                        disk. Otherwise, each worker thread will write its results to
-                        an output file with a '.N' extension, where N is the thread index.
-                        This is useful in cases where the I/O is the main bottleneck.
-    compression	        If "writer", the writer process perform data compression, otherwise
-                        the worker processes performs compression.
+    Works as follows:
+    
+    1. Main thread creates N worker processes (where N is the number of threads
+    to be allocated) and (optionally) one writer process.
+    2. Main thread loads batches of reads (or read pairs) from input file(s) and
+    adds them to a queue (the input queue).
+    3. Worker processes take batches from the input queue, process them as
+    Atropos normally does, and either add the results to the result queue (if
+    using a writer process) or write the results to disk. Each result is a dict
+    mapping output file names to strings, where each string is a concatenation
+    of reads (with appropriate line endings) to be written. A parameter also
+    controls whether data compression is done by the workers or the writer.
+    4. If using a writer process, it takes results from the result queue and
+    writes each string to its corresponding file.
+    5. When the main process finishes loading reads from the input file(s), it
+    sends a signal to the worker processes that they should complete when the
+    input queue is empty. It also singals the writer process how many total
+    batches to expect, and the writer process exits after it has processed that
+    many batches.
+    6. When a worker process completes, it adds a summary of its activity to the
+    summary queue.
+    7. The main process reads summaries from the summary queue and merges them
+    to create the complete summary, which is used to generate the report.
+    
+    There are several possible points of failure:
+    
+    1. The main process may exit due to an unexpected error, or becuase the user
+    forces it to exit (Ctrl-C). In this case, an attempt is made to cancel all
+    processes before exiting.
+    2. A worker or writer process may exit due to an unknown error. To handle
+    this, the main process checks that each process is alive whenver it times
+    out writing to the input queue, and again when waiting for worker summaries.
+    If a process has died, the program exits with an error since some data might
+    have gotten lost.
+    3. More commonly, process will time out blocking on reading from or writing
+    to a queue. Size limits are used (optionally) for the input and result
+    queues to prevent using lots of memory. When few threads are allocated, it
+    is most likely that the main and writer processes will block, whereas with
+    many threads allocated the workers are most likely to block. Also, e.g. in a
+    cluster environment, I/O latency may cause a "backup" resulting in frequent
+    blocking of the main and workers processes. Finally, also e.g. in a cluster
+    environment, processes may suspended for periods of time. Use of a hard
+    timeout period, after which processes are forced to exit, is thus
+    undesirable. Instead, parameters are provided for the user to tune the batch
+    size and max queue sizes to their particular environment. Additionally, a
+    "soft" timeout is used, after which log messages are escallated from DEBUG
+    to ERROR level. The user can then make the decision of whether or not to
+    kill the program.
+    
+    Args:
+        reader: Iterator over batches of reads (most likely a BatchIterator).
+        record_handler: RecordHandler object.
+        writers: Writers object.
+        pipeline_class: Class of pipeline to instantiate.
+        threads: Number of worker threads to use; additional threads are used
+            for the main proccess and the writer process (if requested).
+        timeout: Number of seconds after which waiting processes escalate their
+            messages from DEBUG to ERROR.
+        preserve_order: Whether to preserve the input order of reads when
+            writing (only valid when `use_writer_process=True`)
+        input_queue_size: Max number of items that can be in the input queue,
+            or 0 for no limit (be warned that this could explode memory usage)
+        result_queue_size: Max number of items that can be in the result queue,
+            or 0 for no limit (be warned that this could explode memory usage)
+        use_writer_process: If True, a separate thread will be used to write
+            results to disk. Otherwise, each worker thread will write its
+            results to an output file with a '.N' extension, where N is the
+            thread index. This is useful in cases where the I/O is the main
+            bottleneck.
+        compression: If "writer", the writer process perform data compression,
+            otherwise the worker processes performs compression.
+    
+    Returns:
+        Tuple of (return_code, {summary}).
     """
+    # We do all the multicore imports and class definitions within the
+    # run_parallel method to avoid extra work if only running in serial mode.
+    from atropos import AtroposError
+    from multiprocessing import (
+        Process, Queue, launch_workers, ensure_processes, wait_on, enqueue,
+        enqueue_all, dequeue)
+    from atropos.commands.multicore import Control, PendingQueue
+    from atropos.io.compression import get_compressor, can_use_system_compression
+    
+    class Done(AtroposError):
+        pass
+    
+    class Killed(AtroposError):
+        pass
+    
+    class QueueResultHandler(ResultHandler):
+        """ResultHandler that writes results to the output queue.
+        """
+        def __init__(self, queue):
+            self.queue = queue
+        
+        def start(self, worker):
+            self.message = "{} waiting to queue result {{}}".format(worker.name)
+            self.timeout = worker.timeout
+        
+        def write_result(self, batch_num, result):
+            enqueue(
+                self.queue,
+                (batch_num, result),
+                wait_message=self.message,
+                timeout=self.timeout)
+
+    class CompressingWorkerResultHandler(WorkerResultHandler):
+        """Wraps a ResultHandler and compresses results prior to writing.
+        """
+        def start(self, worker):
+            super().start(worker)
+            self.file_compressors = {}
+        
+        def prepare_file(self, path, strings):
+            compressor = self.get_compressor(path)
+            if compressor:
+                return ((path, 'wb'), compressor.compress(b''.join(
+                    s.encode() for s in strings)))
+            else:
+                return ((path, 'wt'), "".join(strings))
+        
+        def get_compressor(self, filename):
+            if filename not in self.file_compressors:
+                self.file_compressors[filename] = get_compressor(filename)
+            return self.file_compressors[filename]
+
+    class OrderPreservingWriterResultHandler(WriterResultHandler):
+        """
+        Writer thread that is less time/memory efficient, but is
+        guaranteed to preserve the original order of records.
+        """
+        def start(self, worker):
+            super().__init__(worker)
+            self.pending = PendingQueue()
+            self.cur_batch = 1
+        
+        def write_result(self, batch_num, result):
+            if batch_num == self.cur_batch:
+                self.writers.write_result(result, self.compressed)
+                self.cur_batch += 1
+                self.consume_pending()
+            else:
+                self.pending.push(batch_num, result)
+        
+        def finish(self, total_batches):
+            if total_batches is not None:
+                self.consume_pending()
+                if self.cur_batch != total_batches:
+                    raise AtroposError(
+                        "OrderPreservingWriterResultHandler finishing without "
+                        "having seen {} batches".format(total_batches))
+            self.writers.close()
+        
+        def consume_pending(self):
+            while (not self.pending.empty) and (self.cur_batch == pending.min_priority):
+                self.writers.write_result(pending.pop(), self.compressed)
+                self.cur_batch += 1
+    
+    class ResultProcess(Process):
+        """Thread that accepts results from the worker threads and process them
+        using a ResultHandler. Each batch is expected to be
+        (batch_num, path, records), where path is the destination file and records
+        is a string. Not guaranteed to preserve the original order of sequence records.
+
+        result_handler: A ResultHandler object.
+        queue: Input queue.
+        control: A shared value for communcation with the main process.
+        timeout: Seconds to wait for next batch before complaining.
+        """
+        def __init__(self, result_handler, queue, control, timeout=60):
+            super().__init__(name="Result process")
+            self.result_handler = result_handler
+            self.queue = queue
+            self.control = control
+            self.timeout = timeout
+            self.seen_batches = set()
+            self.num_batches = None
+        
+        def run(self):
+            logging.getLogger().debug(
+                "Writer process running under pid {}".format(
+                    self.name, os.getpid()))
+            
+            def fail_callback():
+                if self.num_batches is None and self.control.check_value_positive():
+                    self.num_batches = self.control.get_value()
+                if self.num_batches is not None and len(self.seen_batches) >= self.num_batches:
+                    raise Done()
+            
+            def timeout_callback():
+                if self.num_batches is not None:
+                    missing = set(range(1, self.num_batches+1)) - self.seen_batches
+                    logging.getLogger().error(
+                        "Result thread still missing batches {} of {}".format(
+                            ",".join(str(i) for i in missing), self.num_batches))
+            
+            def iter_batches():
+                while True:
+                    batch = dequeue(
+                        self.queue,
+                        wait_message="Result process waiting on result {}",
+                        timeout=self.timeout,
+                        fail_callback=fail_callback,
+                        timeout_callback=timeout_callback)
+                    yield batch
+
+            try:
+                self.result_handler.start(self)
+                
+                for batch_num, result in iter_batches():
+                    self.seen_batches.add(batch_num)
+                    self.result_handler.write_result(batch_num, result)
+            except Done:
+                logging.getLogger().debug("Writer process exiting normally")
+            except Killed:
+                logging.getLogger().debug("Writer process exited early")
+            except:
+                logging.getLogger().error(
+                    "Unexpected error in writer process", exc_info=True)
+                self.control.set_value(CONTROL_ERROR)
+            finally:
+                num_batches = self.control.get_value(lock=True)
+                self.result_handler.finish(num_batches if num_batches > 0 else None)
+    
+    # Main process
+    
     logging.getLogger().debug(
-        "Starting atropos in parallel mode with threads={}, timeout={}".format(threads, timeout))
+        "Starting atropos in parallel mode with threads={}, timeout={}".format(
+            threads, timeout))
     
     if threads < 2:
         raise ValueError("'threads' must be >= 2")
@@ -788,10 +794,12 @@ def run_parallel(
                 writers, compressed=compression == "worker")
         
         # writer process
-        writer_process = ResultProcess(writer_result_handler, result_queue, writer_control, timeout)
+        writer_process = ResultProcess(
+            writer_result_handler, result_queue, writer_control, timeout)
         writer_process.start()
     else:
-        worker_result_handler = WorkerResultHandler(WriterResultHandler(writers, use_suffix=True))
+        worker_result_handler = WorkerResultHandler(
+            WriterResultHandler(writers, use_suffix=True))
     
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
@@ -804,7 +812,7 @@ def run_parallel(
         if (use_writer_process and not (
                 writer_process.is_alive() and
                 writer_control.check_value(CONTROL_ACTIVE))):
-            raise Exception("Writer process exited")
+            raise AtroposError("Writer process exited")
     
     def _run(worker_processes):
         # Add batches of reads to the input queue. Provide a timeout callback
@@ -822,8 +830,7 @@ def run_parallel(
         
         # Now that the reader process is done, it essentially
         # frees up another thread to use for a worker
-        worker_processes.extend(
-            launch_workers(1, TrimWorkerProcess, worker_args, offset=threads-1))
+        worker_processes.extend(launch_workers(1, worker_args, offset=threads-1))
         
         # Wait for all summaries to be available on queue
         def summary_timeout_callback():
@@ -842,24 +849,25 @@ def run_parallel(
             timeout_callback=summary_timeout_callback)
         
         # Process summary information from worker processes
-        logging.getLogger().debug("Processing summary information from worker processes")
+        logging.getLogger().debug(
+            "Processing summary information from worker processes")
         seen_summaries = set()
         seen_batches = set()
         
         def summary_fail_callback():
             missing_summaries = set(range(1, threads)) - seen_summaries
-            raise Exception("Missing summaries from processes {}".format(
+            raise AtroposError("Missing summaries from processes {}".format(
                 ",".join(str(s) for s in missing)))
         
         for i in range(1, threads+1):
-            batch = dequeue(
-                summary_queue,
-                fail_callback=summary_fail_callback)
+            batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
             worker_index, worker_batches, stats = batch
             if stats is None:
-                raise Exception("Worker process {} died unexpectedly".format(worker_index))
+                raise AtroposError(
+                    "Worker process {} died unexpectedly".format(worker_index))
             else:
-                logging.getLogger().debug("Processing summary for worker {}".format(worker_index))
+                logging.getLogger().debug(
+                    "Processing summary for worker {}".format(worker_index))
             seen_summaries.add(worker_index)
             seen_batches |= worker_batches
             summary.merge(stats)
@@ -868,7 +876,7 @@ def run_parallel(
         if num_batches > 0:
             missing_batches = set(range(1, num_batches+1)) - seen_batches
             if len(missing_batches) > 0:
-                raise Exception("Workers did not process batches {}".format(
+                raise AtroposError("Workers did not process batches {}".format(
                     ",".join(str(b) for b in missing_batches)))
         
         if use_writer_process:
@@ -876,7 +884,7 @@ def run_parallel(
             wait_on_process(writer_process, timeout)
     
     try:
-        rc = run_interruptible(_run, worker_processes)
+        rc = run_interruptible_with_result(_run, worker_processes)
     finally:
         # notify all threads that they should stop
         logging.getLogger().debug("Exiting all processes")

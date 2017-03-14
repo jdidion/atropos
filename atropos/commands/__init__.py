@@ -24,7 +24,7 @@ class Pipeline(object):
         
         Args:
             batch: A batch of reads. A batch has the format
-            (batch_source, batch_size, records).
+            ({batch_metadata}, [records]).
         """
         batch_meta, records = batch
         batch_source = batch_meta['source']
@@ -39,7 +39,7 @@ class Pipeline(object):
         """Context is a dict containing information that is needed
         in the pipeline.
         """
-        return context['bp'] = self.bp_counts[context['source']]
+        context['bp'] = self.bp_counts[context['source']]
     
     def handle_records(self, context, records):
         for record in records:
@@ -68,7 +68,6 @@ class PairedEndPipelineMixin(object):
         bp[0] += len(read1.sequence)
         bp[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
-
 
 class BatchIterator(object):
     def __init__(self, reader, size, max_reads=None):
@@ -137,7 +136,14 @@ def execute_command(name, options):
     return mod.execute(options)
 
 def create_reader(options, counter_magnitude="M"):
-    """
+    """Create sequence reader based on configured options.
+    
+    Args:
+        options: Namespace-like object with configuration options.
+        counter_magnitude: Magnitutde to use for progress bar.
+    
+    Returns:
+        BatchIterator, possibly wrapped in progress bar.
     """
     interleaved = bool(options.interleaved_input)
     input1 = options.interleaved_input if interleaved else options.input1

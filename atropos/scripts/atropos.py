@@ -178,8 +178,6 @@ probability = between(0, 1, float)
 
 # Commands
 
-COMMANDS = OrderedDict()
-
 class Command(object):
     def __init__(self, args):
         self.orig_args = copy.copy(args)
@@ -365,7 +363,7 @@ class Command(object):
         """
         try:
             return atropos.commands.execute_command(self.name, self.options)
-        except Exception e:
+        except Exception as e:
             self.parser.error(e)
 
 class TrimCommand(Command):
@@ -1140,8 +1138,6 @@ standard input/output. Without the -o option, output is sent to standard output.
         if options.batch_size is None:
             options.batch_size = 1000
 
-COMMANDS['trim'] = TrimCommand
-
 class QcCommand(Command):
     """Compute read-level statistics."""
     name = "qc"
@@ -1204,8 +1200,6 @@ command with '--stats pre'.
             self.options.batch_size = 1000
         if self.options.tile_key_regexp:
             self.options.tile_key_regexp = re.compile(self.options.tile_key_regexp)
-
-COMMANDS['qc'] = QcCommand
 
 def _configure_threads(options, parser):
     if options.debug:
@@ -1281,8 +1275,6 @@ class DetectCommand(Command):
             action="store_false", dest="cache_adapters", default=True,
             help="Don't cache contaminant list as '.contaminants' in the working directory.")
 
-COMMANDS['detect'] = DetectCommand
-
 class ErrorCommand(Command):
     """Estimate the sequencing error rate."""
     name = "error"
@@ -1317,6 +1309,10 @@ error rate."""
             help="File in which to write the summary of the estimated error "
                 "rates. (stdout)")
 
+COMMANDS = OrderedDict()
+COMMANDS['trim'] = TrimCommand
+COMMANDS['qc'] = QcCommand
+COMMANDS['detect'] = DetectCommand
 COMMANDS['error'] = ErrorCommand
 
 # Main
@@ -1347,7 +1343,7 @@ def main(args):
         del args[0]
     
     if command_name not in COMMANDS:
-        return (1, "Invalid command: {}".format(command_name))
+        return (2, "Invalid command: {}".format(command_name))
     
     command_class = COMMANDS[command_name]
     command = command_class(args)

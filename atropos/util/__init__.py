@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import logging
 import math
+import time
 
 base_complements = {
     'A' : 'T',
@@ -185,6 +186,32 @@ class NestedDict(dict):
                 (key1,) + tuple(self[key1].get(key2, 0) for key2 in keys2)
                 for key1 in keys1
             ])
+
+class Timing(object):
+    def __init__(self):
+        self.start_time = None
+        self.elapsed_time = None
+    
+    def __enter__(self):
+        self.start = self._time()
+    
+    def __exit__(self, exception_type, exception_value, traceback):
+        self._update()
+    
+    def _time(self):
+        return (time.time(), time.clock())
+    
+    def _update(self):
+        stop_time = self._time()
+        assert self.start_time
+        self.elapsed = (
+            stop - start
+            for stop, start in zip(stop_time, self.start_time))
+    
+    def summarize(self):
+        if not self.elapsed:
+            self._update()
+        return dict(zip(('wallclock', 'cpu'), self.elapsed_time))
 
 def complement(seq):
     return "".join(base_complements[base] for base in seq)
