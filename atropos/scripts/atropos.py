@@ -20,7 +20,7 @@ check_importability()
 from atropos import __version__
 import atropos.commands
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
-from atropos.util import MAGNITUDE
+from atropos.util import MAGNITUDE, MergingDict
 
 # Extensions to argparse
 
@@ -361,11 +361,17 @@ class Command(object):
         Returns:
             Tuple (rc, "msg", {details})
         """
-        try:
-            return atropos.commands.execute_command(self.name, self.options)
-        except Exception as e:
-            summary = dict(error=e)
-            return (1, summary)
+        rc = 0
+        summary = MergingDict()
+        with Timing() as timing:
+            try:
+                rc = atropos.commands.execute_command(self.name, self.options, summary)
+            except Exception as e:
+                summary['error'] = e
+                rc = 1
+            finally:
+                summary['timing'] = timing.summarize()
+        return (rc, summary)
 
 class TrimCommand(Command):
     """Trim sequencing reads."""

@@ -101,6 +101,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 ### 1.6
 
 * Implement a public plugin API.
+* Add more logging and convert log messages from old-style to new-style format strings.
 
 ### 2.0
 

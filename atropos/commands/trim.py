@@ -188,7 +188,7 @@ class WriterResultHandler(ResultHandler):
     def finish(self, total_batches=None):
         self.writers.close()
 
-def execute(options):
+def execute(options, summary):
     reader, input_names, qualities, has_qual_file = create_reader(options)
     
     if options.adapter_max_rmp or options.aligner == 'insert':
@@ -446,20 +446,19 @@ def execute(options):
             'To modify both reads, also use any of the -A/-B/-G/-U options. '
             'Use a dummy adapter sequence when necessary: -A XXX')))
     
-    with Timing() as timing:
-        if options.threads is None:
-            # Run single-threaded version
-            pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
-            pipeline = pipeline_class(record_handler, writers)
-            rc, summary = run_interruptible_with_result(pipeline, reader, raise_on_error=True)
-        else:
-            # Run multiprocessing version
-            pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
-            rc, summary = run_parallel(
-                reader, record_handler, writers, pipeline_class,
-                options.threads, options.process_timeout, options.preserve_order,
-                options.read_queue_size, options.result_queue_size,
-                options.writer_process, options.compression)
+    if options.threads is None:
+        # Run single-threaded version
+        pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
+        pipeline = pipeline_class(record_handler, writers)
+        rc = run_interruptible(pipeline, reader, summary, raise_on_error=True)
+    else:
+        # Run multiprocessing version
+        pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
+        rc = run_parallel(
+            reader, record_handler, writers, pipeline_class, summary,
+            options.threads, options.process_timeout, options.preserve_order,
+            options.read_queue_size, options.result_queue_size,
+            options.writer_process, options.compression)
     
     reader.close()
     
@@ -469,8 +468,6 @@ def execute(options):
     # computed.
     
     if rc == 0:
-        summary['timing'] = timing.summarize()
-        
         record_counts = summary['record_counts']
         total_records = sum(record_counts.values())
         
@@ -503,7 +500,7 @@ def execute(options):
         
         generate_reports(options, summary)
     
-    return (rc, summary)
+    return rc
 
 # stats["written_fraction"] = 0
 # stats["too_short_fraction"] = 0
@@ -537,9 +534,9 @@ def execute(options):
 #             stats["{}_fraction".format(name)] = (stats[name] / N)
 
 def run_parallel(
-        reader, record_handler, writers, pipeline_class, threads=2, timeout=30,
-        preserve_order=False, input_queue_size=0, result_queue_size=0,
-        use_writer_process=True, compression=None):
+        reader, record_handler, writers, pipeline_class, summary,
+        threads=2, timeout=30, preserve_order=False, input_queue_size=0,
+        result_queue_size=0, use_writer_process=True, compression=None):
     """Parallel implementation of run_atropos.
     
     Works as follows:
@@ -596,6 +593,7 @@ def run_parallel(
         record_handler: RecordHandler object.
         writers: Writers object.
         pipeline_class: Class of pipeline to instantiate.
+        summary: The summary dict to populate.
         threads: Number of worker threads to use; additional threads are used
             for the main proccess and the writer process (if requested).
         timeout: Number of seconds after which waiting processes escalate their
@@ -624,7 +622,6 @@ def run_parallel(
         Control, PendingQueue, MulticoreError, launch_workers, ensure_processes,
         wait_on, wait_on_process, enqueue, enqueue_all, dequeue, RETRY_INTERVAL)
     from atropos.io.compression import get_compressor, can_use_system_compression
-    from atropos.util import MergingDict
     
     class Done(MulticoreError):
         pass
@@ -790,8 +787,6 @@ def run_parallel(
     result_queue = Queue(result_queue_size)
     # Queue for processes to send summary information back to main process
     summary_queue = Queue(threads)
-    # Aggregate summary
-    summary = MergingDict()
     
     if use_writer_process:
         worker_result_handler = QueueResultHandler(result_queue)

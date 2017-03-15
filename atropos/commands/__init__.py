@@ -10,7 +10,7 @@ class Pipeline(object):
         self.record_counts = {}
         self.bp_counts = {}
     
-    def __call__(self, reader, raise_on_error=False, **kwargs):
+    def __call__(self, reader, summary, raise_on_error=False, **kwargs):
         self.start(**kwargs)
         error = None
         try:
@@ -23,7 +23,7 @@ class Pipeline(object):
                 error = e
         finally:
             self.finish(**kwargs)
-        return self.summarize(error=error)
+        return self.summarize(summary, error=error)
     
     def start(self, **kwargs):
         pass
@@ -145,9 +145,9 @@ class BatchIterator(object):
         self.done = True
         self.reader.close()
 
-def execute_command(name, options):
+def execute_command(name, options, summary):
     mod = importlib.import_module("atropos.commands.{}".format(name))
-    return mod.execute(options)
+    return mod.execute(options, summary)
 
 def create_reader(options, counter_magnitude="M"):
     """Create sequence reader based on configured options.
