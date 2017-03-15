@@ -145,7 +145,7 @@ class WorkerProcess(Process):
                 "Unexpected error in {}".format(self.name), exc_info=True)
             enqueue_summary(error=e)
 
-def launch_workers(n, worker_class=WorkerProcess, args=(), offset=0):
+def launch_workers(n, args=(), offset=0, worker_class=WorkerProcess):
     """Launch `n` workers. Each worker is initialized with an incremental
     index starting with `offset`, followed by `args`.
     """

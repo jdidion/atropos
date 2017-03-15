@@ -178,4 +178,4 @@ class Filters(object):
     def summarize(self):
         return dict(
             (f.name, f.summarize())
-            for f in self.filters)
+            for f in self.filters.values())

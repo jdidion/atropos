@@ -364,7 +364,8 @@ class Command(object):
         try:
             return atropos.commands.execute_command(self.name, self.options)
         except Exception as e:
-            self.parser.error(e)
+            summary = dict(error=e)
+            return (1, summary)
 
 class TrimCommand(Command):
     """Trim sequencing reads."""
@@ -1325,9 +1326,9 @@ COMMANDS['error'] = ErrorCommand
 # Main
 
 def main_from_commandline():
-    rc, message, _ = main(sys.argv[1:])
-    if message:
-        print(message)
+    rc, summary = main(sys.argv[1:])
+    if summary['error']:
+        logging.getLogger().error(summary['error'])
     sys.exit(rc)
 
 def main(args):

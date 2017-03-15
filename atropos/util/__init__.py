@@ -1,6 +1,7 @@
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 import logging
 import math
+from numbers import Number
 import time
 from atropos import AtroposError
 
@@ -86,74 +87,32 @@ class RandomMatchProbability(object):
             next_i += 1
         self.max_n = i
 
-def check_equal_merger(dest, src):
-    assert dest == src
-    return dest
-
-def nested_dict_merger(d_dest1, d_src1):
-    assert isinstance(d_src1, dict)
-    for k1, d_src2 in d_src1.items():
-        if k1 in d_dest1:
-            d_dest2 = d_dest1[k1]
-            for k2, v_src in d_src2.items():
-                if k2 in d_dest2:
-                    d_dest2[k2] += v_src
-                else:
-                    d_dest2[k2] = v_src
-        else:
-            d_dest1[k1] = d_src2
-    return d_dest1
-
-MERGERS = dict(
-    check_equal=check_equal_merger,
-    nested_dict=nested_dict_merger
-)
-
-class MergingDict(OrderedDict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.mergers = {}
+class Timing(object):
+    def __init__(self):
+        self.start_time = None
+        self.elapsed_time = None
     
-    def set_with_merger(self, key, value, merger):
-        self[key] = value
-        self.mergers[key] = merger
+    def __enter__(self):
+        self.start_time = self._time()
+        return self
     
-    def merge(self, src):
-        for k, v_src in src.items():
-            if k in self and self[k] is not None:
-                if v_src is None:
-                    continue
-                v_self = self[k]
-                if k in self.mergers:
-                    merger = MERGERS[self.mergers[k]]
-                    self[k] = merger(v_self, v_src)
-                # default behavior: lists have two integers, which are summed;
-                # dicts have integer values, which are summed; strings must be
-                # identical; otherwise must be numeric and are summed
-                elif isinstance(v_self, dict):
-                    assert isinstance(v_src, dict)
-                    for kk,vv in v_src.items():
-                        if kk in v_self:
-                            v_self[kk] += vv
-                        else:
-                            v_self[kk] = vv
-                elif isinstance(v_self, list):
-                    assert isinstance(v_src, list)
-                    self[k] = [v_src[0]+v_self[0], v_src[1]+v_self[1]]
-                elif isinstance(v_self, str):
-                    assert v_self == v_src
-                else:
-                    self[k] = v_src + v_self
-            else:
-                self[k] = v_src
-                if isinstance(src, MergingDict) and k in src.mergers:
-                    self.mergers[k] = src.mergers[k]
+    def __exit__(self, exception_type, exception_value, traceback):
+        self._update()
     
-    def handle_nested_dict(self, key, value):
-        d = {}
-        for k,v in value.items():
-            d[k] = dict(v)
-        self.set_with_merger(key, d, "nested_dict")
+    def _time(self):
+        return (time.time(), time.clock())
+    
+    def _update(self):
+        stop_time = self._time()
+        assert self.start_time
+        self.elapsed_time = (
+            stop - start
+            for stop, start in zip(stop_time, self.start_time))
+    
+    def summarize(self):
+        if not self.elapsed_time:
+            self._update()
+        return dict(zip(('wallclock', 'cpu'), self.elapsed_time))
 
 class CountingDict(dict):
     def __getitem__(self, name):
@@ -188,32 +147,72 @@ class NestedDict(dict):
                 for key1 in keys1
             ])
 
-class Timing(object):
-    def __init__(self):
-        self.start_time = None
-        self.elapsed_time = None
+class Mergeable(object):
+    def merge(self, other):
+        raise NotImplementedError()
+
+class Const(Mergeable):
+    def __init__(self, value):
+        self.value = value
     
-    def __enter__(self):
-        self.start_time = self._time()
-        return self
+    def merge(self, other):
+        if isinstance(other, Const):
+            other = other.value
+        if type(other) != type(self.value):
+            raise ValueError("{} cannot be merged with {}".format(self, other))
+        if self.value != other:
+            raise ValueError("{} != {}".format(self, other))
+        return self.value
     
-    def __exit__(self, exception_type, exception_value, traceback):
-        self._update()
+    def __repr__(self):
+        return self.value
+
+class MergingDict(OrderedDict):
+    def merge(self, src):
+        merge_dicts(self, src)
+
+def merge_dicts(dest, src):
+    """Merge corresponding items in `src` into `dest`. Values in `src` missing
+    in `dest` are simply added to `dest`. Values that appear in both `src` and
+    `dest` are merged using `merge_values`.
     
-    def _time(self):
-        return (time.time(), time.clock())
+    Raises:
+        ValueError if a value is not one of the accepted types.
+    """
+    for k, v_src in src.items():
+        if dest.get(k, None) is None:
+            dest[k] = v_src
+        elif v_src is not None:
+            dest[k] = merge_values(dest[k], v_src)
+
+def merge_values(v_dest, v_src):
+    """Merge two values based on their types, as follows:
     
-    def _update(self):
-        stop_time = self._time()
-        assert self.start_time
-        self.elapsed_time = (
-            stop - start
-            for stop, start in zip(stop_time, self.start_time))
-    
-    def summarize(self):
-        if not self.elapsed_time:
-            self._update()
-        return dict(zip(('wallclock', 'cpu'), self.elapsed_time))
+    - Mergeable: merging is done by the dest object's merge function.
+    - dict: merge_dicts is called recursively.
+    - str: Treated as a Const (i.e. must be identical).
+    - Number: values are summed.
+    - Iterable: First src and dest values are converted to tuples; they must be
+    the same length. Then, corresponding values are handled as above. The value
+    is returned as a list.
+    """
+    if isinstance(v_dest, Mergeable):
+        v_dest = v_dest.merge(v_src)
+    elif isinstance(v_dest, dict):
+        assert isinstance(v_src, dict)
+        merge_dicts(v_dest, v_src)
+    elif isinstance(v_dest, str):
+        assert v_dest == v_src
+    elif isinstance(v_dest, Number):
+        v_dest += v_src
+    elif isinstance(v_dest, Iterable):
+        i_dest = tuple(v_dest)
+        i_src = tuple(v_src)
+        assert len(i_dest) == len(i_src)
+        v_dest = [merge_values(d, s) for d, s in zip(i_dest, i_src)]
+    else:
+        raise ValueError("Unmergable value {}".format(v_dest))
+    return v_dest
 
 def complement(seq):
     return "".join(base_complements[base] for base in seq)

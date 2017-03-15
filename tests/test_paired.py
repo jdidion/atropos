@@ -20,9 +20,10 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                       '-pe2', datapath(in2.format(aligner=aligner))]
                 result = atropos.main(p)
                 assert isinstance(result, tuple)
-                assert len(result) == 3
+                assert len(result) == 2
                 if error_on_rc:
-                    assert result[0] == 0, "Return code {} != 0".format(result[0])
+                    err = result[1]['error'] if result[1] and 'error' in result[1] else None
+                    assert result[0] == 0, "Return code {} != 0; error = {}".format(result[0], err)
                 if assert_files_equal:
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
@@ -38,7 +39,7 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',)):
             p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner)), '-L', tmp]
             result = atropos.main(p)
             assert isinstance(result, tuple)
-            assert len(result) == 3
+            assert len(result) == 2
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
 # def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
@@ -144,7 +145,7 @@ def test_unmatched_read_names():
                     '-a XX -o out1.fastq -p out2.fastq'.split() +
                     ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
                 assert isinstance(result, tuple)
-                assert len(result) == 3
+                assert len(result) == 2
                 assert result[0] != 0
         finally:
             os.remove('out1.fastq')

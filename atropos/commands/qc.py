@@ -14,46 +14,36 @@ class QcPipeline(Pipeline):
         self.stats = {}
         self.stats_kwargs = kwargs
     
-    def get_stats(self, source):
+    def _get_stats(self, source):
         if source not in self.stats:
             self.stats[source] = ReadStatCollector(**self.stats_kwargs)
         return self.stats[source]
 
 class SingleEndQcPipeline(QcPipeline, SingleEndPipelineMixin):
     def handle_reads(self, context, read):
-        self.get_stats(context['batch_source']).collect(read)
+        self._get_stats(context['batch_source']).collect(read)
 
 class PairedEndQcPipeline(QcPipeline, PairedEndPipelineMixin):
     def handle_reads(self, context, read1, read2):
         src1, src2 = context['batch_source']
-        self.get_stats(src1).collect(read1)
-        self.get_stats(src2).collect(read2)
+        self._get_stats(src1).collect(read1)
+        self._get_stats(src2).collect(read2)
 
 def execute(options):
-    from atropos.report.text import print_read_stats
-    
     reader, names, qualities, _ = create_reader(options)
-    stats = ReadStatistics(
-        'pre', options.paired, qualities=qualities,
-        tile_key_regexp=options.tile_key_regexp)
     
     if options.threads is None:
-        from atropos.qc import run_serial
-        rc, report, details = run_serial(reader, stats)
+        rc, summary = run_interruptible_with_result(pipeline, reader)
     else:
-        from atropos.qc import run_parallel
-        rc, report, details = run_parallel(
-            reader, stats, options.threads, options.process_timeout,
+        rc, summary = run_parallel(
+            reader, options.threads, options.process_timeout,
             options.read_queue_size)
     
-    print_read_stats(options, report)
-    return (rc, None, details)
-
-def run_serial(reader, read_stats):
-    rc = run_interruptible(pipeline, )
-    report = read_stats.finish() if rc == 0 else None
-    details = dict(mode='serial', threads=1)
-    return (rc, report, details)
+    if rc == 0:
+        # TODO
+        pass
+    
+    return (rc, details)
 
 class QcWorker(WorkerProcess):
     def __init__(self, index, input_queue, summary_queue, timeout, read_stats):
@@ -102,7 +92,7 @@ def run_parallel(reader, read_stats, threads=2, timeout=30, input_queue_size=0):
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
     worker_args = (input_queue, summary_queue, timeout, read_stats)
-    worker_processes = launch_workers(threads - 1, QcWorker, worker_args)
+    worker_processes = launch_workers(threads - 1, worker_args, worker_class=QcWorker)
     
     def ensure_alive():
         ensure_processes(worker_processes)

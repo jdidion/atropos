@@ -8,11 +8,11 @@ TODO
   before the first space)
 """
 import io
-from os.path import splitext
 import re
 import sys
 from atropos import AtroposError
 from atropos.io import STDOUT, xopen
+from atropos.io.compression import splitext_compressed
 from atropos.util import truncate_string
 
 class FormatError(AtroposError):
@@ -541,7 +541,7 @@ def guess_format_from_name(file, raise_on_failure=False):
         name = file.name
     
     if name:
-        name, ext1, ext2 = _splitext(name)
+        name, ext1, ext2 = splitext_compressed(name)
         ext = ext1.lower()
         if ext in ['.fasta', '.fa', '.fna', '.csfasta', '.csfa']:
             return 'fasta'
@@ -553,24 +553,6 @@ def guess_format_from_name(file, raise_on_failure=False):
     if raise_on_failure:
         raise UnknownFileType("Could not determine whether file {0!r} is FASTA "
             "or FASTQ: file name extension {1!r} not recognized".format(file, ext))
-
-def add_suffix_to_path(path, suffix):
-    """
-    Add the suffix (str or int) after the file name but
-    before the extension.
-    """
-    name, ext1, ext2 = _splitext(path)
-    return "{}{}{}{}".format(name, suffix, ext1, ext2 or "")
-    
-def _splitext(name):
-    ext1 = ext2 = None
-    for ext in ('.gz', '.xz', '.bz2'):
-        if name.endswith(ext):
-            ext2 = ext
-            name = name[:-len(ext)]
-            break
-    name, ext1 = splitext(name)
-    return (name, ext1, ext2)
 
 ## Converting reads to strings ##
 

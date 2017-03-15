@@ -73,7 +73,7 @@ def execute(options):
     finally:
         batch_iterator.close()
     
-    return (0, None, {})
+    return (0, {})
 
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,

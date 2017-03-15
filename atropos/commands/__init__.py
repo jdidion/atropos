@@ -68,7 +68,7 @@ class Pipeline(object):
         return dict(
             record_counts=self.record_counts,
             bp_counts=self.bp_counts,
-            error=str(error) if error else None)
+            error=error)
 
 class SingleEndPipelineMixin(object):
     def handle_record(self, context, record):

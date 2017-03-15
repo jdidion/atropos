@@ -66,7 +66,7 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         print(params)
         result = atropos.main(params)
         assert isinstance(result, tuple)
-        assert len(result) == 3
+        assert len(result) == 2
         # TODO redirect standard output
         assert files_equal(cutpath(expected), tmp_fastaq)
     # TODO diff log files

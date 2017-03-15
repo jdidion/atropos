@@ -1,6 +1,7 @@
 import sys
 from atropos.trim.filters import NoFilter
 from atropos.io import STDOUT, xopen, open_output
+from atropos.io.compression import splitext_compressed
 from atropos.io.seqio import create_seq_formatter
 
 class Formatters(object):
@@ -143,3 +144,11 @@ class Writers(object):
         for writer in self.writers.values():
             if writer != sys.stdout:
                 writer.close()
+
+def add_suffix_to_path(path, suffix):
+    """
+    Add the suffix (str or int) after the file name but
+    before the extension.
+    """
+    name, ext1, ext2 = splitext_compressed(path)
+    return "{}{}{}{}".format(name, suffix, ext1, ext2 or "")

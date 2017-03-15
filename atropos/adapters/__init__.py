@@ -2,7 +2,6 @@
 """
 Adapters
 """
-from collections import defaultdict
 import logging
 import os
 import pickle
@@ -12,7 +11,7 @@ from urllib.request import urlopen
 from atropos import align
 from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
-from atropos.util import MergingDict, colorspace
+from atropos.util import MergingDict, NestedDict, CountingDict, Const, colorspace
 
 # Constants for the find_best_alignment function.
 # The function is called with SEQ1 as the adapter, SEQ2 as the read.
@@ -263,10 +262,10 @@ class Adapter(object):
         else:
             self._front_flag = where not in (BACK, SUFFIX)
         # statistics about length of removed sequences
-        self.lengths_front = defaultdict(int)
-        self.lengths_back = defaultdict(int)
-        self.errors_front = defaultdict(lambda: defaultdict(int))
-        self.errors_back = defaultdict(lambda: defaultdict(int))
+        self.lengths_front = CountingDict()
+        self.lengths_back = CountingDict()
+        self.errors_front = NestedDict()
+        self.errors_back = NestedDict()
         self.adjacent_bases = { 'A': 0, 'C': 0, 'G': 0, 'T': 0, '': 0 }
 
         self.aligner = align.Aligner(self.sequence, self.max_error_rate,
@@ -388,19 +387,18 @@ class Adapter(object):
             (where in (BACK, SUFFIX) and total_front == 0) or
             (where in (FRONT, PREFIX) and total_back == 0)
         )
-        stats.set_with_merger("where", where, "check_equal")
         
-        stats["sequence"] = self.sequence
-        stats.set_with_merger("max_error_rate",
-            self.max_error_rate, "check_equal")
+        stats["where"] = Const(where)
+        stats["sequence"] = Const(self.sequence)
+        stats["max_error_rate"] = Const(self.max_error_rate)
         if where in (ANYWHERE, FRONT, PREFIX):
-            stats["lengths_front"] = dict(self.lengths_front)
-            stats.handle_nested_dict("errors_front", self.errors_front)
+            stats["lengths_front"] = self.lengths_front
+            stats["errors_front"] = self.errors_front
         if where in (ANYWHERE, BACK, SUFFIX):
-            stats["lengths_back"] = dict(self.lengths_back)
-            stats.handle_nested_dict("errors_back", self.errors_back)
+            stats["lengths_back"] = self.lengths_back
+            stats["errors_back"] = self.errors_back
         if where in (BACK, SUFFIX):
-            stats["adjacent_bases"] = dict(self.adjacent_bases)
+            stats["adjacent_bases"] = self.adjacent_bases
         
         return stats
 
@@ -551,24 +549,22 @@ class LinkedAdapter(object):
             (where in (BACK, SUFFIX) and total_front == 0) or
             (where in (FRONT, PREFIX) and total_back == 0)
         )
-        stats.set_with_merger("where", where, "check_equal")
         
-        stats["front_sequence"] = self.front_adapter.sequence
-        stats["back_sequence"] = self.back_adapter.sequence
-        stats.set_with_merger("front_max_error_rate",
-            self.front_adapter.max_error_rate, "check_equal")
-        stats.set_with_merger("back_max_error_rate",
-            self.back_adapter.max_error_rate, "check_equal")
-        stats["front_lengths_front"] = dict(self.front_adapter.lengths_front)
-        stats["front_lengths_back"] = dict(self.front_adapter.lengths_back)
-        stats["back_lengths_front"] = dict(self.back_adapter.lengths_front)
-        stats["back_lengths_back"] = dict(self.back_adapter.lengths_back)
+        stats["where"] = Const(where)
+        stats["front_sequence"] = Const(self.front_adapter.sequence)
+        stats["back_sequence"] = Const(self.back_adapter.sequence)
+        stats.set_with_merger["front_max_error_rate"] = Const(self.front_adapter.max_error_rate)
+        stats.set_with_merger["back_max_error_rate"] = Const(self.back_adapter.max_error_rate)
+        stats["front_lengths_front"] = self.front_adapter.lengths_front
+        stats["front_lengths_back"] = self.front_adapter.lengths_back
+        stats["back_lengths_front"] = self.back_adapter.lengths_front
+        stats["back_lengths_back"] = self.back_adapter.lengths_back
         # have to clone these nested dicts and set them
         # up with a custom merge function
-        stats.handle_nested_dict("front_errors_front", self.front_adapter.errors_front)
-        stats.handle_nested_dict("front_errors_back", self.front_adapter.errors_back)
-        stats.handle_nested_dict("back_errors_front", self.back_adapter.errors_front)
-        stats.handle_nested_dict("back_errors_back", self.back_adapter.errors_back)
+        stats["front_errors_front"] = self.front_adapter.errors_front
+        stats["front_errors_back"] = self.front_adapter.errors_back
+        stats["back_errors_front"] = self.back_adapter.errors_front
+        stats["back_errors_back"] = self.back_adapter.errors_back
         
         return stats
 

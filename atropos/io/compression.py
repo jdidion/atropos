@@ -1,5 +1,6 @@
 import io
 import os
+from os.path import splitext
 import sys
 from subprocess import Popen, PIPE
 
@@ -194,3 +195,13 @@ def open_compressed_file(filename, mode):
     if not opener:
         raise ValueError("{} is not a recognized compression format")
     return opener(filename, mode)
+
+def splitext_compressed(name):
+    ext1 = ext2 = None
+    for ext in (compressors.keys()):
+        if name.endswith(ext):
+            ext2 = ext
+            name = name[:-len(ext)]
+            break
+    name, ext1 = splitext(name)
+    return (name, ext1, ext2)

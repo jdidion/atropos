@@ -1,6 +1,6 @@
 """Implementation of the 'trim' command.
 """
-from collections import defaultdict
+from collections import Iterable, defaultdict
 import logging
 import sys
 import textwrap
@@ -14,7 +14,8 @@ from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
 from atropos.reports import generate_reports
-from atropos.util import RandomMatchProbability, Timing, run_interruptible_with_result
+from atropos.util import (
+    RandomMatchProbability, Timing, run_interruptible, run_interruptible_with_result)
 
 class TrimPipeline(Pipeline):
     def __init__(self, record_handler, result_handler):
@@ -55,9 +56,8 @@ class ParallelTrimPipeline(TrimPipeline):
         self.seen_batches = set()
     
     def process_batch(self, batch):
-        batch_num, batch_data = batch
-        self.seen_batches.add(batch_num)
-        super().process_batch(batch_data)
+        self.seen_batches.add(batch[0]['index'])
+        super().process_batch(batch)
     
     def finish(self, worker=None):
         super().finish(worker)
@@ -483,19 +483,27 @@ def execute(options):
                     _recurse(value)
                 elif isinstance(key, str):
                     if key.startswith('records_'):
-                        d["fraction_{}".format(key)] = (
-                            (value / total_records) if total_records != 0 else 0)
+                        def frac(v):
+                            return (
+                                (v / total_records)
+                                if v and total_records != 0 else 0)
+                        frac_key = "fraction_{}".format(key)
+                        if isinstance(value, Iterable):
+                            d[frac_key] = [frac(v) for v in value]
+                            d["total_{}".format(key)] = sum(v for v in value if v)
+                        else:
+                            d[frac_key] = frac(value)
                     elif key.startswith('bp_'):
                         d["fraction_{}".format(key)] = [
-                            (v / b) if b != 0 else 0
+                            (v / b) if v and b != 0 else 0
                             for v, b in zip(value, total_bp)]
-                        d["total_{}".format(key)] = sum(value)
+                        d["total_{}".format(key)] = sum(v for v in value if v)
         
         _recurse(summary['trim'])
         
         generate_reports(options, summary)
     
-    return (rc, None, summary)
+    return (rc, summary)
 
 # stats["written_fraction"] = 0
 # stats["too_short_fraction"] = 0
@@ -611,11 +619,12 @@ def run_parallel(
     """
     # We do all the multicore imports and class definitions within the
     # run_parallel method to avoid extra work if only running in serial mode.
-    from multiprocessing import (
-        Process, Queue, MulticoreError, launch_workers, ensure_processes,
-        wait_on, enqueue, enqueue_all, dequeue)
-    from atropos.commands.multicore import Control, PendingQueue
+    from multiprocessing import Process, Queue
+    from atropos.commands.multicore import (
+        Control, PendingQueue, MulticoreError, launch_workers, ensure_processes,
+        wait_on, wait_on_process, enqueue, enqueue_all, dequeue, RETRY_INTERVAL)
     from atropos.io.compression import get_compressor, can_use_system_compression
+    from atropos.util import MergingDict
     
     class Done(MulticoreError):
         pass
@@ -880,7 +889,7 @@ def run_parallel(
                     "Processing summary for worker {}".format(worker_index))
             seen_summaries.add(worker_index)
             seen_batches |= worker_batches
-            summary.merge(stats)
+            summary.merge(worker_summary)
         
         # Check if any batches were missed
         if num_batches > 0:
@@ -893,19 +902,18 @@ def run_parallel(
             # Wait for writer to complete
             wait_on_process(writer_process, timeout)
     
-    try:
-        rc = run_interruptible_with_result(_run, worker_processes)
-    finally:
-        # notify all threads that they should stop
-        logging.getLogger().debug("Exiting all processes")
-        def kill(process):
-            if rc <= 1:
-                wait_on_process(process, timeout, terminate=True)
-            elif process.is_alive():
-                process.terminate()
-        for process in worker_processes:
-            kill(process)
-        if use_writer_process:
-            kill(writer_process)
+    rc = run_interruptible(_run, worker_processes)
+
+    # notify all threads that they should stop
+    logging.getLogger().debug("Exiting all processes")
+    def kill(process):
+        if rc <= 1:
+            wait_on_process(process, timeout, terminate=True)
+        elif process.is_alive():
+            process.terminate()
+    for process in worker_processes:
+        kill(process)
+    if use_writer_process:
+        kill(writer_process)
     
     return (rc, summary)

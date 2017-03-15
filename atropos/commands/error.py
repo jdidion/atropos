@@ -35,7 +35,7 @@ def execute(options):
     with open_output(options.output) as o:
         e.summarize(o, names)
     
-    return (0, None, {})
+    return (0, {})
 
 class ErrorEstimator(object):
     def consume_all_batches(self, batch_iterator):

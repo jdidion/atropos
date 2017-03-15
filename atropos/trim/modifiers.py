@@ -907,12 +907,25 @@ class PairedEndModifiers(Modifiers):
         for mods in self.modifiers:
             if isinstance(mods, ReadPairModifier):
                 summary[mods.name] = mods.summarize()
-            else:
-                s1 = mods[0].summarize()
-                s2 = mods[1].summarize()
-                name = s1.name
-                keys = set(s1.keys())
-                assert name != s2.name
-                assert keys == set(s2.keys())
-                summary[name] = dict((key, [s1[key], s2[key]]) for key in keys)
+            elif any(mods):
+                name = keys = None
+                s1 = s2 = {}
+                if mods[0]:
+                    name = mods[0].name
+                    s1 = mods[0].summarize()
+                    if s1:
+                        keys = s1.keys()
+                if mods[1]:
+                    s2 = mods[1].summarize()
+                    if s2:
+                        if name:
+                            assert name == mods[1].name
+                            assert set(keys) == set(s2.keys())
+                        else:
+                            name = mods[1].name
+                            keys = s2.keys()
+                if keys:
+                    summary[name] = dict(
+                        (key, [s1.get(key, None), s2.get(key, None)])
+                        for key in keys)
         return summary
