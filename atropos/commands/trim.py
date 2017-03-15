@@ -451,7 +451,7 @@ def execute(options):
             # Run single-threaded version
             pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
             pipeline = pipeline_class(record_handler, writers)
-            rc, summary = run_interruptible_with_result(pipeline, reader)
+            rc, summary = run_interruptible_with_result(pipeline, reader, raise_on_error=True)
         else:
             # Run multiprocessing version
             pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
@@ -486,7 +486,6 @@ def execute(options):
                         d["fraction_{}".format(key)] = (
                             (value / total_records) if total_records != 0 else 0)
                     elif key.startswith('bp_'):
-                        print("{}=<{}>".format(key,value))
                         d["fraction_{}".format(key)] = [
                             (v / b) if b != 0 else 0
                             for v, b in zip(value, total_bp)]
@@ -871,10 +870,11 @@ def run_parallel(
         
         for i in range(1, threads+1):
             batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
-            worker_index, worker_batches, stats = batch
-            if stats is None:
+            worker_index, worker_batches, worker_summary = batch
+            if worker_summary['error']:
                 raise AtroposError(
-                    "Worker process {} died unexpectedly".format(worker_index))
+                    "Worker process {} died unexpectedly".format(worker_index),
+                    worker_summary['error'])
             else:
                 logging.getLogger().debug(
                     "Processing summary for worker {}".format(worker_index))

@@ -628,7 +628,8 @@ class QualityTrimmer(Trimmer):
     def __call__(self, read):
         if len(read) == 0:
             return read
-        start, stop = quality_trim_index(read.qualities, self.cutoff_front, self.cutoff_back, self.base)
+        start, stop = quality_trim_index(
+            read.qualities, self.cutoff_front, self.cutoff_back, self.base)
         return self.subseq(read, start, stop)
 
 class NEndTrimmer(Trimmer):

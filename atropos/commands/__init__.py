@@ -10,14 +10,17 @@ class Pipeline(object):
         self.record_counts = {}
         self.bp_counts = {}
     
-    def __call__(self, reader, **kwargs):
+    def __call__(self, reader, raise_on_error=False, **kwargs):
         self.start(**kwargs)
         error = None
         try:
             for batch in reader:
                 self.process_batch(batch)
-        except Exception as error:
-            pass
+        except Exception as e:
+            if raise_on_error:
+                raise
+            else:
+                error = e
         finally:
             self.finish(**kwargs)
         return self.summarize(error=error)
@@ -64,7 +67,8 @@ class Pipeline(object):
     def summarize(self, error=None):
         return dict(
             record_counts=self.record_counts,
-            bp_counts=self.bp_counts)
+            bp_counts=self.bp_counts,
+            error=str(error) if error else None)
 
 class SingleEndPipelineMixin(object):
     def handle_record(self, context, record):

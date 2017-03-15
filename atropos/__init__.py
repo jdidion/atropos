@@ -8,7 +8,7 @@ del get_versions
 
 def check_importability():  # pragma: no cover
     try:
-        import atropos._align
+        import atropos.align._align
     except ImportError as e:
         if 'undefined symbol' in str(e):
             print("""

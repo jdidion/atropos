@@ -37,7 +37,7 @@ def quality_trim_index(str qualities, int cutoff_front, int cutoff_back, int bas
     # same for 3' end
     max_qual = 0
     s = 0
-    for i in reversed(xrange(len(qualities))):
+    for i in reversed(range(len(qualities))):
         s += cutoff_back - (ord(qualities[i]) - base)
         if s < 0:
             break
