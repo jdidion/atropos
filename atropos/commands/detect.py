@@ -563,8 +563,9 @@ class KhmerDetector(Detector):
         n_expected = math.ceil(tablesize / float(4**k))
         min_count = n_expected * self.overrep_cutoff
         if min_count >= 2**16:
-            raise Exception("The minimum count for an over-represented k-kmer {} "
-                            "is greater than the max khmer count (2^16)".format(min_count))
+            raise ValueError(
+                "The minimum count for an over-represented k-kmer {} is "
+                "greater than the max khmer count (2^16)".format(min_count))
     
         candidates = {}
         

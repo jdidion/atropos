@@ -7,6 +7,7 @@ from multiprocessing import Process, Queue, Value, cpu_count
 import os
 from queue import Empty, Full
 import time
+from atropos import AtroposError
 from atropos.util import run_interruptible
 
 RETRY_INTERVAL = 5
@@ -17,6 +18,9 @@ CONTROL_ACTIVE = 0
 """Controlled process should run normally."""
 CONTROL_ERROR = -1
 """Controlled process should exit."""
+
+class MulticoreError(AtroposError):
+    pass
 
 class Control(object):
     """Shared (long) value for passing control information between main and
@@ -159,7 +163,7 @@ def ensure_processes(processes, message="One or more process exited: {}", alive=
     """
     is_alive = [process.is_alive() for worker in processes]
     if alive != all(is_alive):
-        raise Exception(message.format(",".join(
+        raise MulticoreError(message.format(",".join(
             str(i) for i in range(len(is_alive)) if not is_alive[i])))
 
 def wait_on(

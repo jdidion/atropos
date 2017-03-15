@@ -1,5 +1,7 @@
+import sys
 from atropos.trim.filters import NoFilter
 from atropos.io import STDOUT, xopen, open_output
+from atropos.io.seqio import create_seq_formatter
 
 class Formatters(object):
     def __init__(self, output, seq_formatter_args):

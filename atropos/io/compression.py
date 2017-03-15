@@ -192,5 +192,5 @@ def open_compressed_file(filename, mode):
     ext = os.path.splitext(filename)
     opener = get_file_opener(ext)
     if not opener:
-        raise Exception("{} is not a recognized compression format")
+        raise ValueError("{} is not a recognized compression format")
     return opener(filename, mode)

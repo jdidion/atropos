@@ -12,7 +12,7 @@ from atropos.io import xopen, open_output
 from atropos.io.seqio import (Sequence, ColorspaceSequence, FormatError,
     FastaReader, FastqReader, FastaQualReader, InterleavedSequenceReader,
     FastaFormat, FastqFormat, InterleavedFormatter, get_format,
-    open_reader as openseq, sequence_names_match, open_output)
+    open_reader as openseq, sequence_names_match)
 from .utils import temporary_path
 
 # files tests/data/simple.fast{q,a}

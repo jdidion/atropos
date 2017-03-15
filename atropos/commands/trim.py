@@ -5,13 +5,15 @@ import logging
 import sys
 import textwrap
 
+from atropos.commands import (
+    Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
 from atropos.commands.stats import *
-from atropos.adapters import AdapterParser, BACK
+from atropos.adapters import AdapterParser, BACK, load_known_adapters
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
-import atropos.report
+from atropos.reports import generate_reports
 from atropos.util import RandomMatchProbability, Timing, run_interruptible_with_result
 
 class TrimPipeline(Pipeline):
@@ -30,7 +32,7 @@ class TrimPipeline(Pipeline):
         super().handle_records(context, records)
         self.result_handler.write_result(context['index'], context['results'])
     
-    def handle_reads(self, context, read1, read2):
+    def handle_reads(self, context, read1, read2=None):
         return self.record_handler.handle_record(context, read1, read2)
     
     def finish(self, worker=None):
@@ -72,10 +74,10 @@ class RecordHandler(object):
         self.formatters = formatters
     
     def handle_record(self, context, read1, read2=None):
-        read1, read2 = self.modifiers.modify(read1, read2)
-        dest = self.filters.filter(read1, read2)
-        self.formatters.format(context['results'], dest, read1, read2)
-        return (dest, read1, read2)
+        reads = self.modifiers.modify(read1, read2)
+        dest = self.filters.filter(*reads)
+        self.formatters.format(context['results'], dest, *reads)
+        return (dest, reads)
     
     def summarize(self):
         return dict(
@@ -97,12 +99,12 @@ class StatsRecordHandlerWrapper(object):
     def handle_record(self, context, read1, read2=None):
         if self.pre:
             self.collect(self.pre, context['source'], read1, read2)
-        dest, read1, read2 = self.record_handler.handle_record(context, read1, read2)
+        dest, reads = self.record_handler.handle_record(context, read1, read2)
         if self.post:
             if dest not in self.post:
                 self.post[dest] = {}
-            self.collect(self.post[dest], context['source'], read1, read2)
-        return (dest, read1, read2)
+            self.collect(self.post[dest], context['source'], *reads)
+        return (dest, reads)
     
     def collect(self, stats, source, read1, read2=None):
         if paired:
@@ -246,7 +248,10 @@ def execute(options):
         for adapter in adapters1 + adapters2:
             adapter.enable_debug()
     
-    modifiers = Modifiers(options.paired)
+    if options.paired:
+        modifiers = PairedEndModifiers(options.paired)
+    else:
+        modifiers = SingleEndModifiers()
             
     for op in options.op_order:
         if op == 'W' and options.overwrite_low_quality:
@@ -269,17 +274,19 @@ def execute(options):
                     match_probability=match_probability,
                     insert_max_rmp=options.insert_max_rmp)
             else:
-                a1_args = a2_args = None
-                if adapters1:
-                    a1_args = dict(adapters=adapters1, times=options.times, action=options.action)
-                if adapters2:
-                    a2_args = dict(adapters=adapters2, times=options.times, action=options.action)
+                a1_args = dict(
+                    adapters=adapters1,
+                    times=options.times,
+                    action=options.action) if adapters1 else None
+                a2_args = dict(
+                    adapters=adapters2,
+                    times=options.times,
+                    action=options.action) if adapters2 else None
                 modifiers.add_modifier_pair(AdapterCutter, a1_args, a2_args)
         elif op == 'C' and (options.cut or options.cut2):
             modifiers.add_modifier_pair(UnconditionalCutter,
                 dict(lengths=options.cut),
-                dict(lengths=options.cut2)
-            )
+                dict(lengths=options.cut2))
         elif op == 'G' and (options.nextseq_trim is not None):
             modifiers.add_modifier(NextseqQualityTrimmer,
                 read=1, cutoff=options.nextseq_trim, base=options.quality_base)
@@ -471,19 +478,23 @@ def execute(options):
         total_bp = [sum(counts) for counts in zip(*bp_counts.values())]
         
         def _recurse(d):
-            for key, value in d.items():
+            for key, value in tuple(d.items()):
                 if isinstance(value, dict):
                     _recurse(value)
-                elif key.startswith('records_'):
-                    d["fraction_{}".format(key)] = value / total_records
-                elif key.startswith('bp_'):
-                    d["fraction_{}".format(key)] = [v / b for v, b in zip(value, total_bp)]
-                    d["total_{}".format(key)] = sum(value)
+                elif isinstance(key, str):
+                    if key.startswith('records_'):
+                        d["fraction_{}".format(key)] = (
+                            (value / total_records) if total_records != 0 else 0)
+                    elif key.startswith('bp_'):
+                        print("{}=<{}>".format(key,value))
+                        d["fraction_{}".format(key)] = [
+                            (v / b) if b != 0 else 0
+                            for v, b in zip(value, total_bp)]
+                        d["total_{}".format(key)] = sum(value)
         
         _recurse(summary['trim'])
         
-        report = atropos.report.create_report(options)
-        report.generate(summary)
+        generate_reports(options, summary)
     
     return (rc, None, summary)
 
@@ -601,17 +612,16 @@ def run_parallel(
     """
     # We do all the multicore imports and class definitions within the
     # run_parallel method to avoid extra work if only running in serial mode.
-    from atropos import AtroposError
     from multiprocessing import (
-        Process, Queue, launch_workers, ensure_processes, wait_on, enqueue,
-        enqueue_all, dequeue)
+        Process, Queue, MulticoreError, launch_workers, ensure_processes,
+        wait_on, enqueue, enqueue_all, dequeue)
     from atropos.commands.multicore import Control, PendingQueue
     from atropos.io.compression import get_compressor, can_use_system_compression
     
-    class Done(AtroposError):
+    class Done(MulticoreError):
         pass
     
-    class Killed(AtroposError):
+    class Killed(MulticoreError):
         pass
     
     class QueueResultHandler(ResultHandler):

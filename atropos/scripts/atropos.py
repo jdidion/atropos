@@ -153,7 +153,7 @@ def int_or_str(x):
         else:
             return int(num)
     else:
-        raise Exception("Unsupported type {}".format(x))
+        raise ValueError("Unsupported type {}".format(x))
 
 def positive(type_=int, inclusive=False):
     """Test that a number is greater than (or equal to, if ``inclusive=True``) zero."""
@@ -611,7 +611,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "FASTQ files. (33)")
         group.add_argument(
             "--trim-n",
-             action='store_true', default=False,
+            action='store_true', default=False,
             help="Trim N's on ends of reads. (no)")
         group.add_argument(
             "-x",
@@ -721,6 +721,13 @@ standard input/output. Without the -o option, output is sent to standard output.
             "--report-file",
             type=writeable_file, default=None, metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)")
+        group.add_argument(
+            "--report-formats",
+            nargs="*", choices=("txt", "json"), default=None, metavar="FORMAT",
+            help="Report type(s) to generate. If multiple, '--report-file' "
+                "is treated as a prefix and the appropriate extensions are "
+                "appended. If unspecified, the format is guessed from the "
+                "file extension.")
         group.add_argument(
             "--stats",
             choices=("pre", "post", "both"), default=None,

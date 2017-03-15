@@ -47,7 +47,7 @@ def test_quality_trimmer():
     assert qt(read) == Sequence('read1', 'GTTTACGTA', '456789###')
 
 def test_Modifiers_single():
-    m = Modifiers(paired=False)
+    m = SingleEndModifiers()
     m.add_modifier(UnconditionalCutter, lengths=[5])
     mod1 = m.get_modifiers(read=1)
     mod2 = m.get_modifiers(read=2)
@@ -56,20 +56,21 @@ def test_Modifiers_single():
     assert len(mod2) == 0
     # test single-end
     read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
-    mod_read, mod_bp = m.modify(read)
+    mod_read = m.modify(read)
+    assert len(mod_read) == 1
     assert mod_read[0].sequence == 'TACGTA'
 
 def test_Modifiers_paired_legacy():
-    m = Modifiers(paired="first")
+    m = PairedEndModifiers(paired="first")
     m.add_modifier(UnconditionalCutter, lengths=[5])
-    read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
+    read1 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
     read2 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
-    (mod_read, mod_read2), mod_bp = m.modify((read, read2))
-    assert mod_read.sequence == 'TACGTA'
+    mod_read1, mod_read2 = m.modify(read1, read2)
+    assert mod_read1.sequence == 'TACGTA'
     assert mod_read2.sequence == 'ACGTTTACGTA'
 
 def test_Modifiers_paired_both():
-    m = Modifiers(paired="both")
+    m = PairedEndModifiers(paired="both")
     m.add_modifier(UnconditionalCutter, read=1|2, lengths=[5])
     mod1 = m.get_modifiers(read=1)
     mod2 = m.get_modifiers(read=2)
@@ -77,10 +78,10 @@ def test_Modifiers_paired_both():
     assert len(mod2) == 1
     assert isinstance(mod1[0], UnconditionalCutter)
     assert isinstance(mod2[0], UnconditionalCutter)
-    read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
+    read1 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
     read2 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
-    (mod_read, mod_read2), mod_bp = m.modify((read, read2))
-    assert mod_read.sequence == 'TACGTA'
+    mod_read1, mod_read2 = m.modify(read1, read2)
+    assert mod_read1.sequence == 'TACGTA'
     assert mod_read2.sequence == 'TACGTA'
 
 def test_min_cutter_T_T():

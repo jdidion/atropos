@@ -138,12 +138,13 @@ def run_parallel(reader, read_stats, threads=2, timeout=30, input_queue_size=0):
             timeout_callback=summary_timeout_callback)
         
         # Process summary information from worker processes
-        logging.getLogger().debug("Processing summary information from worker processes")
+        logging.getLogger().debug(
+            "Processing summary information from worker processes")
         seen_summaries = set()
         seen_batches = set()
         def summary_fail_callback():
             missing_summaries = set(range(1, threads)) - seen_summaries
-            raise Exception("Missing summaries from processes {}".format(
+            raise MulticoreError("Missing summaries from processes {}".format(
                 ",".join(str(s) for s in missing)))
         
         for i in range(1, threads+1):
@@ -152,9 +153,11 @@ def run_parallel(reader, read_stats, threads=2, timeout=30, input_queue_size=0):
                 fail_callback=summary_fail_callback)
             worker_index, worker_batches, worker_stats = batch
             if worker_stats is None:
-                raise Exception("Worker process {} died unexpectedly".format(worker_index))
+                raise MulticoreError(
+                    "Worker process {} died unexpectedly".format(worker_index))
             else:
-                logging.getLogger().debug("Processing summary for worker {}".format(worker_index))
+                logging.getLogger().debug(
+                    "Processing summary for worker {}".format(worker_index))
             seen_summaries.add(worker_index)
             seen_batches |= worker_batches
             summary.add_read_stats(read_stats)
@@ -163,7 +166,7 @@ def run_parallel(reader, read_stats, threads=2, timeout=30, input_queue_size=0):
         if num_batches > 0:
             missing_batches = set(range(1, num_batches+1)) - seen_batches
             if len(missing_batches) > 0:
-                raise Exception("Workers did not process batches {}".format(
+                raise MulticoreError("Workers did not process batches {}".format(
                     ",".join(str(b) for b in missing_batches)))
     
     try:

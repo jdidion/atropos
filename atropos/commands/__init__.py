@@ -12,9 +12,15 @@ class Pipeline(object):
     
     def __call__(self, reader, **kwargs):
         self.start(**kwargs)
-        for batch in reader:
-            self.process_batch(batch)
-        return self.finish()
+        error = None
+        try:
+            for batch in reader:
+                self.process_batch(batch)
+        except Exception as error:
+            pass
+        finally:
+            self.finish(**kwargs)
+        return self.summarize(error=error)
     
     def start(self, **kwargs):
         pass
@@ -27,19 +33,23 @@ class Pipeline(object):
             ({batch_metadata}, [records]).
         """
         batch_meta, records = batch
-        batch_source = batch_meta['source']
-        if not batch_source in record_count:
-            self.record_counts[batch_source] = 0
-            self.bp_counts[batch_source] = [0, 0]
-        self.record_counts[batch_source] += batch_meta['size']
-        context = self.get_context(batch_meta.copy())
+        context = batch_meta.copy()
+        
+        if not context['source'] in self.record_counts:
+            self.record_counts[context['source']] = 0
+        self.record_counts[context['source']] += context['size']
+        
+        if not context['source'] in self.bp_counts:
+            self.bp_counts[context['source']] = [0, 0]
+        context['bp'] = self.bp_counts[context['source']]
+        
+        self.add_to_context(context)
         self.handle_records(context, records)
     
     def add_to_context(self, context):
-        """Context is a dict containing information that is needed
-        in the pipeline.
+        """Add items to the batch context.
         """
-        context['bp'] = self.bp_counts[context['source']]
+        pass
     
     def handle_records(self, context, records):
         for record in records:

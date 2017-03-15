@@ -1,9 +1,10 @@
-# Estimate the empircal error rate
-
+"""Estimate the empircal error rate.
+"""
 from collections import defaultdict
 import csv
 import logging
 import re
+from atropos import AtroposError
 from atropos.io import open_output
 from atropos.io.seqio import FastqReader
 from atropos.util import enumerate_range
@@ -12,7 +13,7 @@ def execute(options):
     batch_iterator, names, qualities, _ = create_reader(options, counter_magnitude="K")
     try:
         if not qualities:
-            raise Exception("Cannot estimate error rate without base qualities")
+            raise ValueError("Cannot estimate error rate without base qualities")
         
         if options.algorithm == 'quality':
             estimator_class = BaseQualityErrorEstimator
@@ -157,7 +158,7 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
                 stdout, stderr = p.communicate()
                 if p.returncode != 0:
-                    raise Exception(
+                    raise AtroposError(
                         "R script failed: rc={}; stdout={}; stderr={}".format(
                         p.returncode, stdout, stderr))
             
@@ -166,12 +167,12 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
                 reader = csv.reader(i, delimiter="\t")
                 per_read_error = dict(reader)
                 if len(per_read_error) != 4:
-                    raise Exception("Invalid output from R script")
+                    raise AtroposError("Invalid output from R script")
             with open(per_cycle, 'rt') as i:
                 reader = csv.reader(i, delimiter="\t")
                 per_cycle_error = list(row[0:3] for row in reader)
                 if not per_cycle_error:
-                    raise Exception("Invalid output from R script")
+                    raise AtroposError("Invalid output from R script")
             
             return (per_read_error["error rate"], dict(
                 per_read=per_read_error,

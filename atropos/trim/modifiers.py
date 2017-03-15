@@ -9,6 +9,7 @@ from collections import OrderedDict
 import copy
 import logging
 import re
+from atropos import AtroposError
 from atropos.align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
 from atropos.trim.qualtrim import quality_trim_index, nextseq_trim_index
 from atropos.util import base_complements, reverse_complement, mean, quals2ints
@@ -203,8 +204,9 @@ class ErrorCorrectorMixin(object):
             r1_qual = list(read1.qualities)
             r2_qual = list(read2.qualities)
         elif self.mismatch_action in ('liberal', 'conservative'):
-            raise Exception("Cannot perform quality-based error correction on "
-                            "reads lacking quality information")
+            raise ValueError(
+                "Cannot perform quality-based error correction on reads "
+                "lacking quality information")
         
         r1_start = insert_match[2]
         r1_end = insert_match[3]
@@ -423,8 +425,9 @@ class OverwriteRead(ReadPairModifier):
         if len(read1) < self.window_size or len(read2) < self.window_size:
             return (read1, read2)
         if not (read1.qualities and read2.qualities):
-            raise Exception("OverwriteRead modifier does not work with reads "
-                            "lacking base qualities.")
+            raise ValueError(
+                "OverwriteRead modifier does not work with reads "
+                "lacking base qualities.")
         q1 = list(quals2ints(read1.qualities[:self.window_size], self.base))
         s1 = self.summary_fn(q1)
         
@@ -775,7 +778,7 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
                     if read1.qualities and read2.qualities:
                         read1.qualities = "".join(reversed(read2.qualities)) + read1.qualities[r1_stop:]
                 else:
-                    raise Exception(
+                    raise AtroposError(
                         "Invalid alignment while trying to merge read {}: {}".format(
                             read1.name, ",".join(str(i) for i in alignment)))
                 
@@ -785,37 +788,9 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
         return (read1, read2)
 
 class Modifiers(object):
-    def __init__(self, paired):
+    def __init__(self):
         self.modifiers = []
         self.modifier_indexes = {}
-        self.paired = paired
-    
-    def add_modifier(self, mod_class, read=1|2, **kwargs):
-        if issubclass(mod_class, ReadPairModifier):
-            if self.paired != "both" and read == 1|2:
-                raise ValueError(
-                    "Must have paired-end reads to use modifer {}".format(
-                    mod_class))
-            mods = mod_class(**kwargs)
-        else:
-            mods = [None, None]
-            if read & 1 > 0:
-                mods[0] = mod_class(**kwargs)
-            if read & 2 > 0 and self.paired == "both":
-                mods[1] = mod_class(**kwargs)
-            if all(m is None for m in mods):
-                return None
-        return self._add_modifiers(mod_class, mods)
-    
-    def add_modifier_pair(self, mod_class, read1_args=None, read2_args=None):
-        mods = [None, None]
-        if read1_args is not None:
-            mods[0] = mod_class(**read1_args)
-        if read2_args is not None and self.paired == "both":
-            mods[1] = mod_class(**read2_args)
-        if all(m is None for m in mods):
-            return None
-        return self._add_modifiers(mod_class, mods)
     
     def _add_modifiers(self, mod_class, mods):
         i = len(self.modifiers)
@@ -825,6 +800,9 @@ class Modifiers(object):
         else:
             self.modifier_indexes[mod_class] = [i]
         return i
+    
+    def has_modifier(self, mod_class):
+        return mod_class in self.modifier_indexes
     
     def get_modifiers(self, mod_class=None, read=None):
         if mod_class is None:
@@ -845,9 +823,6 @@ class Modifiers(object):
                 read_mods.append(m[read-1])
         return read_mods
     
-    def has_modifier(self, mod_class):
-        return mod_class in self.modifier_indexes
-    
     def get_adapters(self):
         adapters = [[], []]
         if self.has_modifier(AdapterCutter):
@@ -862,7 +837,59 @@ class Modifiers(object):
             adapters[1] = [m.adapter2]
         return adapters
 
+class SingleEndModifiers(Modifiers):
+    def add_modifier(self, mod_class, read=1, **kwargs):
+        if read != 1:
+            raise ValueError("'read' must be 1 for single-end data")
+        return self._add_modifiers(mod_class, [mod_class(**kwargs), None])
+    
+    def add_modifier_pair(self, mod_class, read1_args=None, read2_args=None):
+        if read1_args is not None:
+            return self.add_modifier(mod_class, **read1_args)
+    
+    def modify(self, read1, read2=None):
+        for mods in self.modifiers:
+            read1 = mods[0](read1)
+        return (read1,)
+    
+    def summarize(self):
+        summary = {}
+        for mods in self.modifiers:
+            mod = mods[0]
+            summary[mod.name] = (mod.summarize(),)
+        return summary
+
 class PairedEndModifiers(Modifiers):
+    def __init__(self, paired):
+        super().__init__()
+        self.paired = paired
+    
+    def add_modifier(self, mod_class, read=1|2, **kwargs):
+        if issubclass(mod_class, ReadPairModifier):
+            if self.paired != "both" and read == 1|2:
+                raise ValueError(
+                    "Must have paired-end reads to use modifer {}".format(
+                    mod_class))
+            mods = mod_class(**kwargs)
+        else:
+            mods = [None, None]
+            if read & 1 > 0:
+                mods[0] = mod_class(**kwargs)
+            if read & 2 > 0 and self.paired == "both":
+                mods[1] = mod_class(**kwargs)
+            if not any(mods):
+                return None
+        return self._add_modifiers(mod_class, mods)
+    
+    def add_modifier_pair(self, mod_class, read1_args=None, read2_args=None):
+        mods = [None, None]
+        if read1_args is not None:
+            mods[0] = mod_class(**read1_args)
+        if read2_args is not None and self.paired == "both":
+            mods[1] = mod_class(**read2_args)
+        if any(mods):
+            return self._add_modifiers(mod_class, mods)
+    
     def modify(self, read1, read2=None):
         for mods in self.modifiers:
             if isinstance(mods, ReadPairModifier):
@@ -887,17 +914,4 @@ class PairedEndModifiers(Modifiers):
                 assert name != s2.name
                 assert keys == set(s2.keys())
                 summary[name] = dict((key, [s1[key], s2[key]]) for key in keys)
-        return summary
-
-class SingleEndModifiers(Modifiers):
-    def modify(self, read1, read2=None):
-        for mods in self.modifiers:
-            read1 = mods[0](read1)
-        return (read1,)
-    
-    def summarize(self):
-        summary = {}
-        for mods in self.modifiers:
-            mod = mods[0]
-            summary[mod.name] = mod.summarize()
         return summary

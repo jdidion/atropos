@@ -406,7 +406,7 @@ class PairedEndSAMReader(SAMReader):
     def _iter(self, sam):
         for reads in zip(sam, sam):
             if reads[0].query_name != reads[1].query_name:
-                raise Exception(
+                raise AtroposError(
                     "Consecutive reads {}, {} in paired-end SAM/BAM file do not "
                     "have the same name; make sure your file is name-sorted and "
                     "does not contain any secondary/supplementary alignments.",

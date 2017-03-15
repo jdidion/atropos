@@ -368,6 +368,7 @@ def test_quiet_is_quiet():
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
+    print(captured_standard_output.getvalue())
     assert captured_standard_output.getvalue() == ''
     assert captured_standard_error.getvalue() == ''
 

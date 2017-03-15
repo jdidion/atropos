@@ -2,6 +2,7 @@ from collections import OrderedDict
 import logging
 import math
 import time
+from atropos import AtroposError
 
 base_complements = {
     'A' : 'T',
@@ -193,7 +194,8 @@ class Timing(object):
         self.elapsed_time = None
     
     def __enter__(self):
-        self.start = self._time()
+        self.start_time = self._time()
+        return self
     
     def __exit__(self, exception_type, exception_value, traceback):
         self._update()
@@ -204,12 +206,12 @@ class Timing(object):
     def _update(self):
         stop_time = self._time()
         assert self.start_time
-        self.elapsed = (
+        self.elapsed_time = (
             stop - start
             for stop, start in zip(stop_time, self.start_time))
     
     def summarize(self):
-        if not self.elapsed:
+        if not self.elapsed_time:
             self._update()
         return dict(zip(('wallclock', 'cpu'), self.elapsed_time))
 
@@ -259,7 +261,7 @@ def median(data):
     """
     n = len(data)
     if n == 0:
-        raise Exception("no median for empty data")
+        raise ValueError("no median for empty data")
     
     data.sort()
     
