@@ -2,6 +2,7 @@
 """
 from collections import Iterable, defaultdict
 import logging
+import os
 import sys
 import textwrap
 
@@ -596,7 +597,7 @@ def run_parallel(
     from atropos.commands.multicore import (
         Control, PendingQueue, ParallelPipelineMixin, MulticoreError,
         launch_workers, ensure_processes, wait_on, wait_on_process, enqueue,
-        enqueue_all, dequeue, RETRY_INTERVAL)
+        enqueue_all, dequeue, RETRY_INTERVAL, CONTROL_ACTIVE, CONTROL_ERROR)
     from atropos.io.compression import get_compressor, can_use_system_compression
     
     class Done(MulticoreError):

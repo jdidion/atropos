@@ -369,6 +369,7 @@ class Command(object):
                 rc = atropos.commands.execute_command(
                     self.name, self.options, summary)
             except Exception as e:
+                raise
                 summary['error'] = e
                 rc = 1
             finally:
