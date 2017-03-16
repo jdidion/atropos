@@ -68,7 +68,6 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
     * Integrate with MultiQC
     * https://github.com/marcelm/cutadapt/issues/112
     * Also look at the QCML used in ngs-bits
-* Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
 * Add developer/contributor documentation and guidelines.
 
 ### 1.2
@@ -77,6 +76,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
 * Expand the list of contaminants that are detected by default.
+* Automate creation and sending of user statistics and crash reports (similar to error_report in  https://github.com/biologyguy/BuddySuite/blob/master/buddysuite/buddy_resources.py).
 
 ### 1.3
 

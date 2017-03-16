@@ -1,4 +1,5 @@
 from collections import OrderedDict, Iterable
+from datetime import datetime
 import logging
 import math
 from numbers import Number
@@ -87,32 +88,44 @@ class RandomMatchProbability(object):
             next_i += 1
         self.max_n = i
 
+class Timestamp(object):
+    def __init__(self):
+        self.dt = datetime.now()
+        self.clock = time.clock()
+    
+    def timestamp(self):
+        return self.dt.timestamp()
+    
+    def isoformat(self):
+        return self.dt.isoformat()
+    
+    def __sub__(self, other):
+        return dict(
+            wallclock=self.timestamp() - other.timestamp(),
+            cpu=self.clock - other.clock)
+
 class Timing(object):
     def __init__(self):
         self.start_time = None
-        self.elapsed_time = None
+        self.cur_time = None
     
     def __enter__(self):
-        self.start_time = self._time()
+        self.start_time = Timestamp()
         return self
     
     def __exit__(self, exception_type, exception_value, traceback):
-        self._update()
+        self.update()
     
-    def _time(self):
-        return (time.time(), time.clock())
-    
-    def _update(self):
-        stop_time = self._time()
-        assert self.start_time
-        self.elapsed_time = (
-            stop - start
-            for stop, start in zip(stop_time, self.start_time))
+    def update(self):
+        self.cur_time = Timestamp()
     
     def summarize(self):
-        if not self.elapsed_time:
-            self._update()
-        return dict(zip(('wallclock', 'cpu'), self.elapsed_time))
+        if not self.cur_time:
+            self.update()
+        assert self.start_time is not None
+        summary = dict(start=self.start_time.isoformat())
+        summary.update(self.cur_time - self.start_time)
+        return summary
 
 class CountingDict(dict):
     def __getitem__(self, name):
