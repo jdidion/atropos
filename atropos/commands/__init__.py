@@ -12,7 +12,6 @@ class Pipeline(object):
     
     def __call__(self, reader, summary, raise_on_error=False, **kwargs):
         self.start(**kwargs)
-        error = None
         try:
             for batch in reader:
                 self.process_batch(batch)
@@ -20,10 +19,9 @@ class Pipeline(object):
             if raise_on_error:
                 raise
             else:
-                error = e
+                summary['error'] = e
         finally:
-            self.finish(**kwargs)
-        return self.summarize(summary, error=error)
+            self.finish(summary, **kwargs)
     
     def start(self, **kwargs):
         pass
@@ -61,14 +59,10 @@ class Pipeline(object):
     def handle_reads(self, context, read1, read2=None):
         raise NotImplementedError()
     
-    def finish(self, **kwargs):
-        pass
-    
-    def summarize(self, error=None):
-        return dict(
+    def finish(self, summary, **kwargs):
+        summary.update(
             record_counts=self.record_counts,
-            bp_counts=self.bp_counts,
-            error=error)
+            bp_counts=self.bp_counts)
 
 class SingleEndPipelineMixin(object):
     def handle_record(self, context, record):

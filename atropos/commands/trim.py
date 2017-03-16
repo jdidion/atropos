@@ -14,8 +14,7 @@ from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
 from atropos.reports import generate_reports
-from atropos.util import (
-    RandomMatchProbability, Timing, run_interruptible, run_interruptible_with_result)
+from atropos.util import RandomMatchProbability, run_interruptible
 
 class TrimPipeline(Pipeline):
     def __init__(self, record_handler, result_handler):
@@ -36,36 +35,10 @@ class TrimPipeline(Pipeline):
     def handle_reads(self, context, read1, read2=None):
         return self.record_handler.handle_record(context, read1, read2)
     
-    def finish(self, worker=None):
+    def finish(self, summary, worker=None):
         self.result_handler.finish()
-    
-    def summarize(self, error=None):
-        summary = super().summarize()
-        if not error:
-            summary['trim'] = self.record_handler.summarize()
-        return summary
-
-class SerialTrimPipeline(TrimPipeline):
-    def __init__(self, record_handler, writers):
-        result_handler = WorkerResultHandler(WriterResultHandler(writers))
-        super().__init__(record_handler, result_handler)
-
-class ParallelTrimPipeline(TrimPipeline):
-    def __init__(self, record_handler, result_handler):
-        super().__init__(record_handler, result_handler)
-        self.seen_batches = set()
-    
-    def process_batch(self, batch):
-        self.seen_batches.add(batch[0]['index'])
-        super().process_batch(batch)
-    
-    def finish(self, worker=None):
-        super().finish(worker)
-        logging.getLogger().debug("{} finished; processed {} batches, {} reads".format(
-            worker.name, len(self.seen_batches), sum(self.record_counts.values())))
-    
-    def summarize(self, error=None):
-        return (self.seen_batches, super().summarize())
+        super().finish(summary)
+        summary['trim'] = self.record_handler.summarize()
 
 class RecordHandler(object):
     def __init__(self, modifiers, filters, formatters):
@@ -448,14 +421,16 @@ def execute(options, summary):
     
     if options.threads is None:
         # Run single-threaded version
-        pipeline_class = type('TrimPipelineImpl', (SerialTrimPipeline, mixin_class), {})
-        pipeline = pipeline_class(record_handler, writers)
+        result_handler = WorkerResultHandler(WriterResultHandler(writers))
+        pipeline_class = type('TrimPipelineImpl', (mixin_class, TrimPipeline), {})
+        pipeline = pipeline_class(record_handler, result_handler)
+        summary.update(mode='serial', threads=1)
         rc = run_interruptible(pipeline, reader, summary, raise_on_error=True)
     else:
         # Run multiprocessing version
-        pipeline_class = type('TrimPipelineImpl', (ParallelTrimPipeline, mixin_class), {})
+        summary.update(mode='parallel', threads=options.threads)
         rc = run_parallel(
-            reader, record_handler, writers, pipeline_class, summary,
+            reader, record_handler, writers, mixin_class, summary,
             options.threads, options.process_timeout, options.preserve_order,
             options.read_queue_size, options.result_queue_size,
             options.writer_process, options.compression)
@@ -534,7 +509,7 @@ def execute(options, summary):
 #             stats["{}_fraction".format(name)] = (stats[name] / N)
 
 def run_parallel(
-        reader, record_handler, writers, pipeline_class, summary,
+        reader, record_handler, writers, mixin_class, summary,
         threads=2, timeout=30, preserve_order=False, input_queue_size=0,
         result_queue_size=0, use_writer_process=True, compression=None):
     """Parallel implementation of run_atropos.
@@ -619,8 +594,9 @@ def run_parallel(
     # run_parallel method to avoid extra work if only running in serial mode.
     from multiprocessing import Process, Queue
     from atropos.commands.multicore import (
-        Control, PendingQueue, MulticoreError, launch_workers, ensure_processes,
-        wait_on, wait_on_process, enqueue, enqueue_all, dequeue, RETRY_INTERVAL)
+        Control, PendingQueue, ParallelPipelineMixin, MulticoreError,
+        launch_workers, ensure_processes, wait_on, wait_on_process, enqueue,
+        enqueue_all, dequeue, RETRY_INTERVAL)
     from atropos.io.compression import get_compressor, can_use_system_compression
     
     class Done(MulticoreError):
@@ -816,6 +792,10 @@ def run_parallel(
     
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
+    pipeline_class = type(
+        'TrimPipelineImpl',
+        (ParallelPipelineMixin, mixin_class, TrimPipeline),
+        {})
     pipeline = pipeline_class(record_handler, worker_result_handler)
     worker_args = (input_queue, pipeline, summary_queue, timeout)
     worker_processes = launch_workers(threads - 1, worker_args)
@@ -875,7 +855,7 @@ def run_parallel(
         for i in range(1, threads+1):
             batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
             worker_index, worker_batches, worker_summary = batch
-            if worker_summary['error']:
+            if 'error' in worker_summary and worker_summary['error'] is not None:
                 raise AtroposError(
                     "Worker process {} died unexpectedly".format(worker_index),
                     worker_summary['error'])
@@ -911,4 +891,4 @@ def run_parallel(
     if use_writer_process:
         kill(writer_process)
     
-    return (rc, summary)
+    return rc

@@ -9,7 +9,7 @@ from atropos.io import open_output
 from atropos.io.seqio import FastqReader
 from atropos.util import enumerate_range
 
-def execute(options):
+def execute(options, summary):
     batch_iterator, names, qualities, _ = create_reader(options, counter_magnitude="K")
     try:
         if not qualities:
@@ -35,7 +35,7 @@ def execute(options):
     with open_output(options.output) as o:
         e.summarize(o, names)
     
-    return (0, {})
+    return 0
 
 class ErrorEstimator(object):
     def consume_all_batches(self, batch_iterator):

@@ -28,7 +28,7 @@ from atropos.util import reverse_complement, sequence_complexity, enumerate_rang
 
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last download.
 
-def execute(options):
+def execute(options, summary):
     k = options.kmer_size or 12
     n_reads = options.max_reads
     overrep_cutoff = 100
@@ -73,7 +73,7 @@ def execute(options):
     finally:
         batch_iterator.close()
     
-    return (0, {})
+    return 0
 
 class Match(object):
     def __init__(self, seq_or_contam, count=0, names=None, match_frac=None,

@@ -84,6 +84,20 @@ class PendingQueue(object):
     def empty(self):
         return len(self.queue) == 0
 
+class ParallelPipelineMixin(object):
+    def start(self, **kwargs):
+        super().start(**kwargs)
+        self.seen_batches = set()
+    
+    def process_batch(self, batch):
+        self.seen_batches.add(batch[0]['index'])
+        super().process_batch(batch)
+    
+    def finish(self, summary, worker=None):
+        super().finish(summary, worker=worker)
+        logging.getLogger().debug("{} finished; processed {} batches, {} reads".format(
+            worker.name, len(self.seen_batches), sum(self.record_counts.values())))
+
 class WorkerProcess(Process):
     """Parent class for worker processes that execute Pipelines.
     
@@ -106,6 +120,8 @@ class WorkerProcess(Process):
         logging.getLogger().debug(
             "{} running under pid {}".format(self.name, os.getpid()))
         
+        summary = {}
+        
         def iter_batches():
             while True:
                 batch = dequeue(
@@ -114,10 +130,9 @@ class WorkerProcess(Process):
                     timeout=self.timeout)
                 yield batch
         
-        def enqueue_summary(error=None):
-            seen_batches, summary = self.pipeline.summarize(error)
+        def enqueue_summary():
             enqueue(
-                self.summary_queue, (self.index, seen_batches, summary),
+                self.summary_queue, (self.index, self.pipeline.seen_batches, summary),
                 wait_message="{} waiting to queue summary {{}}".format(self.name),
                 timeout=self.timeout
             )
@@ -134,16 +149,16 @@ class WorkerProcess(Process):
                             self.name, batch[0]['size']))
                     self.pipeline.process_batch(batch)
             finally:
-                self.pipeline.finish(worker=self)
+                self.pipeline.finish(summary, worker=self)
             
-            logging.getLogger().debug("{} sending summary".format(self.name))
-            enqueue_summary()
-            
-            logging.getLogger().debug("{} exiting normally".format(self.name))
+            logging.getLogger().debug("{} finished normally".format(self.name))
         except Exception as e:
             logging.getLogger().error(
                 "Unexpected error in {}".format(self.name), exc_info=True)
-            enqueue_summary(error=e)
+            summary['error'] = e
+        
+        logging.getLogger().debug("{} sending summary".format(self.name))
+        enqueue_summary()
 
 def launch_workers(n, args=(), offset=0, worker_class=WorkerProcess):
     """Launch `n` workers. Each worker is initialized with an incremental

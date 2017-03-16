@@ -278,12 +278,11 @@ def truncate_string(s, n=100):
         s = s[:n-3] + '...'
     return s
 
-def run_interruptible_with_result(func, *args, **kwargs):
+def run_interruptible(func, *args, **kwargs):
     # Return code (0=normal, anything else is an error)
     rc = 0
-    result = None
     try:
-        result = func(*args, **kwargs)
+        func(*args, **kwargs)
     except KeyboardInterrupt as e:
         logging.getLogger().error("Interrupted")
         rc = 130
@@ -298,8 +297,4 @@ def run_interruptible_with_result(func, *args, **kwargs):
     except Exception as e:
         logging.getLogger().error("Unknown error", exc_info=True)
         rc = 1
-    return (rc, result)
-
-def run_interruptible(func, *args, **kwargs):
-    rc, result = run_interruptible_with_result(func, *args, **kwargs)
     return rc

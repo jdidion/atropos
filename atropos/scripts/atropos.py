@@ -20,7 +20,7 @@ check_importability()
 from atropos import __version__
 import atropos.commands
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
-from atropos.util import MAGNITUDE, MergingDict
+from atropos.util import MAGNITUDE, MergingDict, Timing
 
 # Extensions to argparse
 
@@ -363,9 +363,11 @@ class Command(object):
         """
         rc = 0
         summary = MergingDict()
+        summary['command_line'] = self.orig_args
         with Timing() as timing:
             try:
-                rc = atropos.commands.execute_command(self.name, self.options, summary)
+                rc = atropos.commands.execute_command(
+                    self.name, self.options, summary)
             except Exception as e:
                 summary['error'] = e
                 rc = 1
