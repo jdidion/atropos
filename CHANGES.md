@@ -9,6 +9,7 @@ v1.1.0 (dev)
     * Added optional dependency on jinja2, which enables generating reports using templates.
     * Integration with MultiQC.
     * Major internal code reorganization.
+    * Fix for Cutadapt #128
 * Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
 * Switched to pytest for testing
 * Fixed adapter masking in InsertAligner (issue #7, thanks @lllaaa).

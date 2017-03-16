@@ -363,7 +363,11 @@ class Command(object):
         """
         rc = 0
         summary = MergingDict()
-        summary['command_line'] = self.orig_args
+        summary['version'] = __version__
+        summary['python'] = platform.python_version()
+        summary['command_line'] = self.orig_args.copy()
+        summary['options'] = self.options.__dict__.copy()
+        
         with Timing() as timing:
             try:
                 rc = atropos.commands.execute_command(
@@ -374,6 +378,7 @@ class Command(object):
                 rc = 1
             finally:
                 summary['timing'] = timing.summarize()
+        
         return (rc, summary)
 
 class TrimCommand(Command):

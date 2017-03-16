@@ -13,86 +13,52 @@ from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
 from atropos.util import MergingDict, NestedDict, CountingDict, Const, colorspace
 
-# Constants for the find_best_alignment function.
-# The function is called with SEQ1 as the adapter, SEQ2 as the read.
-# TODO get rid of those constants, use strings instead
-BACK = align.START_WITHIN_SEQ2 | align.STOP_WITHIN_SEQ2 | align.STOP_WITHIN_SEQ1
-FRONT = align.START_WITHIN_SEQ2 | align.STOP_WITHIN_SEQ2 | align.START_WITHIN_SEQ1
-PREFIX = align.STOP_WITHIN_SEQ2
-SUFFIX = align.START_WITHIN_SEQ2
-ANYWHERE = align.SEMIGLOBAL
-LINKED = 'linked'
+class AdapterType(object):
+    def __init__(self, name, desc, *flags):
+        self.name = name
+        self.desc = desc
+        self.flags = flags[0]
+        for i in range(1, len(flags)):
+            self.flags |= flags[i]
+    
+    def asdict(self):
+        return dict(name=self.name, desc=self.desc, flags=self.flags)
+
+ADAPTER_TYPES = dict(
+    back=AdapterType(
+        'back', "regular 3'",
+        align.START_WITHIN_SEQ2,
+        align.STOP_WITHIN_SEQ2,
+        align.STOP_WITHIN_SEQ1),
+    front=AdapterType(
+        'front', "regular 5'",
+        align.START_WITHIN_SEQ2,
+        align.STOP_WITHIN_SEQ2,
+        align.START_WITHIN_SEQ1
+    ),
+    prefix=AdapterType('prefix', "anchored 5'", align.STOP_WITHIN_SEQ2),
+    suffix=AdapterType('suffix', "anchored 3'", align.START_WITHIN_SEQ2),
+    anywhere=AdapterType('anywhere', "variable 5'/3'", align.SEMIGLOBAL),
+    linked=AdapterType('linked', 'linked', 'linked')
+)
+
+def where_int_to_dict(where):
+    for adapter_type in ADAPTER_TYPES.values():
+        if where == adapter_type.flags:
+            return adapter_type.asdict()
+    else:
+        raise ValueError("Invalid WHERE value: {}".format(where))
+
+# TODO get rid of these constants
+BACK = ADAPTER_TYPES['back'].flags
+FRONT = ADAPTER_TYPES['front'].flags
+PREFIX = ADAPTER_TYPES['prefix'].flags
+SUFFIX = ADAPTER_TYPES['suffix'].flags
+ANYWHERE = ADAPTER_TYPES['anywhere'].flags
+LINKED = ADAPTER_TYPES['linked'].flags
 
 # TODO: specify this externally rather than hard-coding
 DEFAULT_ADAPTERS_URL = "https://github.com/jdidion/atropos/blob/master/atropos/adapters/sequencing_adapters.fa"
-
-def load_known_adapters(options):
-    cache_file = options.adapter_cache_file if options.cache_adapters else None
-    adapter_cache = AdapterCache(cache_file)
-    if adapter_cache.empty and options.default_adapters:
-        try:
-            adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
-        except:
-            logging.getLogger().warn(
-                "Error loading adapters from URL %s; loading from file", DEFAULT_ADAPTERS_URL)
-            from atropos import get_package_data
-            adapter_cache.load_from_file(
-                get_package_data('adapters', 'sequencing_adapters.fa'))
-    if options.known_adapter:
-        for s in options.known_adapter:
-            name, seq = s.split('=')
-            adapter_cache.add(name, seq)
-    if options.known_adapters_file:
-        for f in options.known_adapters_file:
-            try:
-                adapter_cache.load_from_url(f)
-            except:
-                logging.getLogger().error(
-                    "Error loading adapters from url/file %s", f)
-    if options.cache_adapters:
-        adapter_cache.save()
-    return adapter_cache
-
-def parse_braces(sequence):
-    """
-    Replace all occurrences of ``x{n}`` (where x is any character) with n
-    occurrences of x. Raise ValueError if the expression cannot be parsed.
-
-    >>> parse_braces('TGA{5}CT')
-    TGAAAAACT
-    """
-    # Simple DFA with four states, encoded in prev
-    result = ''
-    prev = None
-    for s in re.split('(\{|\})', sequence):
-        if s == '':
-            continue
-        if prev is None:
-            if s == '{':
-                raise ValueError('"{" must be used after a character')
-            if s == '}':
-                raise ValueError('"}" cannot be used here')
-            prev = s
-            result += s
-        elif prev == '{':
-            prev = int(s)
-            if not 0 <= prev <= 10000:
-                raise ValueError('Value {} invalid'.format(prev))
-        elif isinstance(prev, int):
-            if s != '}':
-                raise ValueError('"}" expected')
-            result = result[:-1] + result[-1] * prev
-            prev = None
-        else:
-            if s != '{':
-                raise ValueError('Expected "{"')
-            prev = '{'
-    # Check if we are in a non-terminating state
-    if isinstance(prev, int) or prev == '{':
-        raise ValueError("Unterminated expression")
-    return result
-
-ADAPTER_TYPES = dict(back=BACK, front=FRONT, anywhere=ANYWHERE)
 
 class AdapterParser(object):
     """
@@ -118,7 +84,7 @@ class AdapterParser(object):
         """
         if cmdline_type not in ADAPTER_TYPES:
             raise ValueError('cmdline_type cannot be {0!r}'.format(cmdline_type))
-        where = ADAPTER_TYPES[cmdline_type]
+        where = ADAPTER_TYPES[cmdline_type].flags
         
         if name is None and spec is None:
             raise ValueError("Either name or spec must be given")
@@ -197,11 +163,6 @@ class AdapterParser(object):
             name = None
         spec = spec.strip()
         return name, spec
-
-def _generate_adapter_name(_start=[1]):
-    name = str(_start[0])
-    _start[0] += 1
-    return name
 
 class Adapter(object):
     """
@@ -377,6 +338,7 @@ class Adapter(object):
         total_back = sum(self.lengths_back.values())
         
         stats = MergingDict(
+            adapter_class=self.__class__.__name__,
             total_front=total_front,
             total_back=total_back,
             total=total_front + total_back
@@ -388,7 +350,7 @@ class Adapter(object):
             (where in (FRONT, PREFIX) and total_back == 0)
         )
         
-        stats["where"] = Const(where)
+        stats["where"] = where_int_to_dict(where)
         stats["sequence"] = Const(self.sequence)
         stats["max_error_rate"] = Const(self.max_error_rate)
         if where in (ANYWHERE, FRONT, PREFIX):
@@ -550,7 +512,7 @@ class LinkedAdapter(object):
             (where in (FRONT, PREFIX) and total_back == 0)
         )
         
-        stats["where"] = Const(where)
+        stats["where"] = where_int_to_dict(where)
         stats["front_sequence"] = Const(self.front_adapter.sequence)
         stats["back_sequence"] = Const(self.back_adapter.sequence)
         stats.set_with_merger["front_max_error_rate"] = Const(self.front_adapter.max_error_rate)
@@ -655,3 +617,74 @@ class AdapterCache(object):
     
     def get_for_seq(self, seq):
         return list(self.seq_to_name[seq])
+
+def parse_braces(sequence):
+    """
+    Replace all occurrences of ``x{n}`` (where x is any character) with n
+    occurrences of x. Raise ValueError if the expression cannot be parsed.
+
+    >>> parse_braces('TGA{5}CT')
+    TGAAAAACT
+    """
+    # Simple DFA with four states, encoded in prev
+    result = ''
+    prev = None
+    for s in re.split('(\{|\})', sequence):
+        if s == '':
+            continue
+        if prev is None:
+            if s == '{':
+                raise ValueError('"{" must be used after a character')
+            if s == '}':
+                raise ValueError('"}" cannot be used here')
+            prev = s
+            result += s
+        elif prev == '{':
+            prev = int(s)
+            if not 0 <= prev <= 10000:
+                raise ValueError('Value {} invalid'.format(prev))
+        elif isinstance(prev, int):
+            if s != '}':
+                raise ValueError('"}" expected')
+            result = result[:-1] + result[-1] * prev
+            prev = None
+        else:
+            if s != '{':
+                raise ValueError('Expected "{"')
+            prev = '{'
+    # Check if we are in a non-terminating state
+    if isinstance(prev, int) or prev == '{':
+        raise ValueError("Unterminated expression")
+    return result
+
+def load_known_adapters(options):
+    cache_file = options.adapter_cache_file if options.cache_adapters else None
+    adapter_cache = AdapterCache(cache_file)
+    if adapter_cache.empty and options.default_adapters:
+        try:
+            adapter_cache.load_from_url(DEFAULT_ADAPTERS_URL)
+        except:
+            logging.getLogger().warn(
+                "Error loading adapters from URL %s; loading from file", DEFAULT_ADAPTERS_URL)
+            from atropos import get_package_data
+            adapter_cache.load_from_file(
+                get_package_data('adapters', 'sequencing_adapters.fa'))
+    if options.known_adapter:
+        for s in options.known_adapter:
+            name, seq = s.split('=')
+            adapter_cache.add(name, seq)
+    if options.known_adapters_file:
+        for f in options.known_adapters_file:
+            try:
+                adapter_cache.load_from_url(f)
+            except:
+                logging.getLogger().error(
+                    "Error loading adapters from url/file %s", f)
+    if options.cache_adapters:
+        adapter_cache.save()
+    return adapter_cache
+
+def _generate_adapter_name(_start=[1]):
+    name = str(_start[0])
+    _start[0] += 1
+    return name

@@ -99,10 +99,10 @@ class Timestamp(object):
     def isoformat(self):
         return self.dt.isoformat()
     
-    def __sub__(self, other):
+    def __sub__(self, other, minval=0.01):
         return dict(
-            wallclock=self.timestamp() - other.timestamp(),
-            cpu=self.clock - other.clock)
+            wallclock=max(minval, self.timestamp() - other.timestamp()),
+            cpu=max(minval, self.clock - other.clock))
 
 class Timing(object):
     def __init__(self):
@@ -203,11 +203,11 @@ def merge_values(v_dest, v_src):
     
     - Mergeable: merging is done by the dest object's merge function.
     - dict: merge_dicts is called recursively.
-    - str: Treated as a Const (i.e. must be identical).
     - Number: values are summed.
-    - Iterable: First src and dest values are converted to tuples; they must be
-    the same length. Then, corresponding values are handled as above. The value
-    is returned as a list.
+    - Iterable (non-string): First src and dest values are converted to tuples;
+    they must be the same length. Then, corresponding values are handled as
+    above. The value is returned as a list.
+    - Otherwise: Treated as a Const (i.e. must be identical).
     """
     if isinstance(v_dest, Mergeable):
         v_dest = v_dest.merge(v_src)
@@ -224,7 +224,7 @@ def merge_values(v_dest, v_src):
         assert len(i_dest) == len(i_src)
         v_dest = [merge_values(d, s) for d, s in zip(i_dest, i_src)]
     else:
-        raise ValueError("Unmergable value {}".format(v_dest))
+        assert v_dest == v_src
     return v_dest
 
 def complement(seq):

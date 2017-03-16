@@ -62,7 +62,10 @@ class Pipeline(object):
     def finish(self, summary, **kwargs):
         summary.update(
             record_counts=self.record_counts,
-            bp_counts=self.bp_counts)
+            total_record_counts=sum(self.record_counts.values()),
+            bp_counts=self.bp_counts,
+            total_bp_counts=tuple(
+                sum(b) for b in zip(*self.bp_counts.values())))
 
 class SingleEndPipelineMixin(object):
     def handle_record(self, context, record):
