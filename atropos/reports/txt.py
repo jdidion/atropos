@@ -1,4 +1,4 @@
-# coding: utf-8
+N# coding: utf-8
 """Routines for printing a report. This is the legacy code for generating
 text-based reports. This will eventually be deprecated in favor of the jinja
 and multiqc reports.
@@ -7,16 +7,19 @@ import math
 import sys
 import textwrap
 
-# TODO:
-# * Reliably line things up in columns.
-# * Fix https://github.com/marcelm/cutadapt/issues/128
+# TODO: Fix https://github.com/marcelm/cutadapt/issues/128,
+# https://github.com/marcelm/cutadapt/issues/112
+
+INDENT = '    '
+paragraph = textwrap.TextWrapper()
+indented = textwrap.TextWrapper(initial_indent=INDENT, subsequent_indent=INDENT)
 
 class HeaderPrinter(object):
     def __init__(self, outfile, levels=(('=', '='), ('-', None))):
         self.outfile = outfile
         self.levels = levels
     
-    def __call__(self, title, level=1):
+    def __call__(self, *title, level=1, **kwargs):
         if level > len(self.levels):
             raise ValueError("Invalid level: {}".format(level))
         underline, overline = self.levels[level-1]
@@ -24,13 +27,15 @@ class HeaderPrinter(object):
             overline = underline
         width = len(title)
         if overline:
-            print(overline * width, file=self.outfile)
-        print(title, file=self.outfile)
+            print(overline * width, file=self.outfile, **kwargs)
+        print(*title, file=self.outfile, **kwargs)
         if underline:
-            print(underline * width, file=self.outfile)
+            print(underline * width, file=self.outfile, **kwargs)
 
 class RowPrinter(object):
-    def __init__(self, outfile, colwidths=10, justification='<', indent='', **kwargs):
+    def __init__(
+            self, outfile, colwidths=10, justification=('<', '>'), indent='',
+            **kwargs):
         self.outfile = outfile
         self.colwidths = (colwidths,) if isinstance(colwidths, int) else colwidths
         self.justification = (justification,) if isinstance(justification, str) else justification
@@ -87,10 +92,6 @@ class RowPrinter(object):
                 ' '.join(underline * width for width in colwidths),
                 file=self.outfile, **self.print_args)
 
-INDENT = '    '
-paragraph = textwrap.TextWrapper()
-indented = textwrap.TextWrapper(initial_indent=INDENT, subsequent_indent=INDENT)
-
 def generate_report(summary, outfile):
     close = False
     if outfile == 'stdout':
@@ -120,7 +121,108 @@ def print_report(summary, outfile):
     max_width = len(str(total_bp))
     
     _print_header = HeaderPrinter(outfile)
-    _print = RowPrinter(outfile, (25, max_width), ('<', '>'))
+    _print = RowPrinter(outfile, (25, max_width))
+    
+    N = summary["total_record_count"]
+    if N == 0:
+        _print(
+            "No reads processed! Either your input file is empty or you "
+            "used the wrong -f/--format parameter.")
+        return
+    
+    timing = summary['timing']
+    modifiers, filters, formatters = (
+        summary['trim'][key]
+        for key in ('modifiers', 'filters', 'formatters'))
+    adapter_cutter = None
+    if 'AdapterCutter' in modifiers:
+        adapter_cutter = modifiers['AdapterCutter']
+    elif 'InsertAdaptercutter' in modifiers:
+        adapter_cutter = modifiers['InsertAdapterCutter']
+    corrected = None
+    trimmers = []
+    for name, mod in modifers.items():
+        if 'records_corrected' in mod:
+            corrected = mod
+        elif 'bp_trimmed' in mod:
+            trimmers.append((name, mod))
+    
+    _print("Wallclock time: {0:.2F} s ({1:.0F} us/read; {2:.2F} M reads/minute).".format(
+        timing["wallclock"],
+        1E6 * summary["wallclock_time"] / N,
+        N / timing["wallclock"] * 60 / 1E6))
+    _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
+    
+    _print_header("Summary", level=1)
+    _print('', 'records', 'fraction', underline='-')
+    _print("Total {} processed".format('read pairs' if paired else 'reads'), N)
+    if adapter_cutter:
+        for read in range(2 if paired else 1):
+            _print(
+                "Read{} with adapter".format(' {}'.format(read+1) if paired else 's'),
+                adapter_cutter['records_with_adapters'][read],
+                adapter_cutter['fraction_records_with_adapters'][read],
+                indent='  ', pct=True)
+    
+    def _print_filter(name, sep):
+        if name in filters:
+            _print(
+                "{} {} {}:".format(pairs_or_reads, sep, name.replace('_', ' ')),
+                filters[name]['records_filtered'],
+                filters[name]['fraction_records_filtered'], pct=True)
+    
+    _print_filter('too_short', 'that were')
+    _print_filter('too_long', 'that were')
+    _print_filter('too_many_n', 'with')
+    
+    _print(
+        '{} written (passing filters)'.format(pairs_or_reads),
+        formatters['records_written'], formatters['fraction_records_written'],
+        pct=True)
+    
+    if corrected:
+        _print(
+            'Pairs corrected', corrected['records_corrected'],
+            corrected['fraction_records_corrected'], pct=True)
+    
+    _print("Total bp processed", total_bp)
+    if paired:
+        for read in range(2):
+            _print("Read {}".format(read+1), summary['total_bp_counts'][read],
+            indent='  ')
+    
+    def _print_bp(title, d, key):
+        _print(
+            title, d['total_'.format(key)],
+            d['fraction_total_{}'.format(key)], pct=True)
+        if paired:
+            for read in range(2):
+                _print(
+                    "Read {}".format(read+1), d[key][read],
+                    d['fraction_{}'.format(key)][read], pct=True)
+    
+    for name, mod in trimmers:
+        _print_bp(name, mod, 'bp_trimmed')
+    
+    _print_bp("Total bp written (filtered)", formatters, 'bp_written')
+    
+    if corrected:
+        _print_bp("Total bp corrected", formatters, 'bp_corrected')
+    
+    if adapter_cutter:
+        adapters = adapter_cutter['adapters']
+        print_adapter_report(adapters, outfile, paired, N, max_width)
+
+def print_adapter_report(adapters, outfile, paired, N, max_width):
+    max_seq_len = max(
+        (len(a['front_sequence'] + a['back_sequence'] + 3)
+            if a['where']['name'] == 'linked' else len(a['sequence']))
+        for pair in adapters
+        for a in pair.values())
+    
+    _print_header = HeaderPrinter(outfile)
+    _print = RowPrinter(outfile, (25, max_width))
+    _print_seq = RowPrinter(outfile, (max_seq_len, 8, 3, max_width))
     
     def print_error_ranges(adapter_length, error_rate):
         _print("No. of allowed errors:")
@@ -198,160 +300,92 @@ def print_report(summary, outfile):
             _print('WARNING:')
             _print(indented.wrap(
                 'The adapter is preceded by "{0}" extremely often. The provided '
-                'adapter sequence may be incomplete. To fix the problem, add
+                'adapter sequence may be incomplete. To fix the problem, add '
                 '"{0}" to the beginning of the adapter sequence.'.format(warnbase)))
             _print()
             return True
         _print()
         return False
-    
-    N = summary["total_record_count"]
-    if N == 0:
-        _print("No reads processed! Either your input file is empty or you used the wrong -f/--format parameter.")
-        return
-    
-    timing = summary['timing']
-    modifiers, filters, formatters = (
-        summary['trim'][key]
-        for key in ('modifiers', 'filters', 'formatters'))
-    adapter_cutter = None
-    if 'AdapterCutter' in modifiers:
-        adapter_cutter = modifiers['AdapterCutter']
-    elif 'InsertAdaptercutter' in modifiers:
-        adapter_cutter = modifiers['InsertAdapterCutter']
-    corrected = None
-    trimmers = []
-    for name, mod in modifers.items():
-        if 'records_corrected' in mod:
-            corrected = mod
-        elif 'bp_trimmed' in mod:
-            trimmers.append((name, mod))
-    
-    _print("Wallclock time: {0:.2F} s ({1:.0F} us/read; {2:.2F} M reads/minute).".format(
-        timing["wallclock"],
-        1E6 * summary["wallclock_time"] / N,
-        N / timing["wallclock"] * 60 / 1E6))
-    _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
-    
-    _print_header("Summary", level=1)
-    _print('', 'records', 'fraction', underline='-')
-    _print("Total {} processed".format('read pairs' if paired else 'reads'), N)
-    if adapter_cutter:
-        for read in range(2 if paired else 1):
-            _print(
-                "Read{} with adapter".format(' {}'.format(read+1) if paired else 's'),
-                adapter_cutter['records_with_adapters'][read],
-                adapter_cutter['fraction_records_with_adapters'][read],
-                indent='  ', pct=True)
-    
-    def _print_filter(name, sep):
-        if name in filters:
-            _print(
-                "{} {} {}:".format(pairs_or_reads, sep, name.replace('_', ' ')),
-                filters[name]['records_filtered'],
-                filters[name]['fraction_records_filtered'], pct=True)
-    
-    _print_filter('too_short', 'that were')
-    _print_filter('too_long', 'that were')
-    _print_filter('too_many_n', 'with')
-    
-    _print(
-        '{} written (passing filters)'.format(pairs_or_reads),
-        formatters['records_written'], formatters['fraction_records_written'],
-        pct=True)
-    
-    if corrected:
-        _print(
-            'Pairs corrected', corrected['records_corrected'],
-            corrected['fraction_records_corrected'], pct=True)
-    
-    _print("Total bp processed", total_bp)
-    if paired:
-        for read in range(2):
-            _print("Read {}".format(read+1), summary['total_bp_counts'][read], indent='  ')
-    
-    def _print_bp(title, d, key):
-        _print(
-            title, d['total_'.format(key)],
-            d['fraction_total_{}'.format(key)], pct=True)
-        if paired:
-            for read in range(2):
-                _print(
-                    "Read {}".format(read+1), d[key][read],
-                    d['fraction_{}'.format(key)][read], pct=True)
-    
-    for name, mod in trimmers:
-        _print_bp(name, mod, 'bp_trimmed')
-    
-    _print_bp("Total bp written (filtered)", formatters, 'bp_written')
-    
-    if corrected:
-        _print_bp("Total bp corrected", formatters, 'bp_corrected')
-    
+        
     warning = False
-    for which_in_pair in (0, 1):
-        for adapter in summary["adapters"][which_in_pair]:
-            if summary["paired"]:
-                extra = 'First read: ' if which_in_pair == 0 else 'Second read: '
-            else:
-                extra = ''
-
-            _print("=" * 3, extra + "Adapter", adapter["name"], "=" * 3)
-            _print()
-            if adapter["where"]["name"] == "linked":
-                _print("Sequence: {0}...{1}; Type: linked; Length: {2}+{3}; Trimmed: {4} times; Half matches: {5}".
-                    format(
+    for pair in range(2 if paired else 1):
+        header = "Adapter {}"
+        if paired:
+            header = ('First read: ' if pair == 0 else 'Second read: ') + header
+        
+        for name, adapter in adapters[pair]:
+            _print_header(header.format(adapter["name"]), level=1)
+            
+            where_name = adapter["where"]["name"]
+            if where_name == "linked":
+                front_len, back_len = [
+                    len(adapter[s])
+                    for s in ('front_sequence', 'back_sequence')]
+                _print_seq(
+                    "Sequence", "Type", "Length", "Trimmed (x)", "Half matches (x)",
+                    underline='-')
+                _print_seq(
+                    "{0}...{1}".format(
                         adapter["front_sequence"],
-                        adapter["back_sequence"],
-                        len(adapter["front_sequence"]),
-                        len(adapter["back_sequence"]),
-                        adapter["total_front"], adapter["total_back"]
-                    ))
+                        adapter["back_sequence"]),
+                    "linked",
+                    "{2}+{3}".format(front_len, back_len),
+                    adapter["total_front"],
+                    adapter["total_back"]
+                )
             else:
-                _print("Sequence: {0}; Type: {1}; Length: {2}; Trimmed: {3} times.".
-                    format(adapter["sequence"], adapter["where"]["desc"],
-                        len(adapter["sequence"]), adapter["total"]))
-    
+                seq_len = len(adapter["sequence"])
+                _print_seq(
+                    "Sequence", "Type", "Length", "Trimmed (x)", underline='-')
+                _print_seq(
+                    adapter["sequence"], adapter["where"]["desc"], seq_len,
+                    adapter["total"])
+            
+            _print()
+            
             if adapter["total"] == 0:
-                _print()
-                continue
-            if adapter["where"]["name"] == "anywhere":
+                return
+            
+            if where_name == "anywhere":
                 _print(adapter["total_front"], "times, it overlapped the 5' end of a read")
                 _print(adapter["total_back"], "times, it overlapped the 3' end or was within the read")
                 _print()
-                print_error_ranges(len(adapter["sequence"]), adapter["max_error_rate"])
+                print_error_ranges(seq_len, adapter["max_error_rate"])
                 _print("Overview of removed sequences (5')")
-                print_histogram(adapter["lengths_front"], len(adapter["sequence"]), summary["N"],
-                    adapter["max_error_rate"], adapter["errors_front"])
+                hist_args = (seq_len, N, adapter["max_error_rate"], adapter["errors_front"])
+                print_histogram(adapter["lengths_front"], *hist_args)
                 _print()
                 _print("Overview of removed sequences (3' or within)")
-                print_histogram(adapter["lengths_back"], len(adapter["sequence"]), summary["N"],
-                    adapter["max_error_rate"], adapter["errors_back"])
-            elif adapter["where"]["name"] == "linked":
-                _print()
-                print_error_ranges(len(adapter["front_sequence"]), adapter["front_max_error_rate"])
-                print_error_ranges(len(adapter["back_sequence"]), adapter["back_max_error_rate"])
+                print_histogram(adapter["lengths_back"], *hist_args)
+            
+            elif where_name == "linked":
+                print_error_ranges(front_len, adapter["front_max_error_rate"])
+                print_error_ranges(back_len, adapter["back_max_error_rate"])
                 _print("Overview of removed sequences at 5' end")
-                print_histogram(adapter["front_lengths_front"], len(adapter["front_sequence"]),
-                    summary["N"], adapter["front_max_error_rate"], adapter["front_errors_front"])
+                print_histogram(
+                    adapter["front_lengths_front"], front_len, N,
+                    adapter["front_max_error_rate"], adapter["front_errors_front"])
                 _print()
                 _print("Overview of removed sequences at 3' end")
-                print_histogram(adapter["back_lengths_back"], len(adapter["back_sequence"]),
-                    summary["N"], adapter["back_max_error_rate"], adapter["back_errors_back"])
-            elif adapter["where"]["name"] in ("front", "prefix"):
-                _print()
-                print_error_ranges(len(adapter["sequence"]), adapter["max_error_rate"])
+                print_histogram(
+                    adapter["back_lengths_back"], back_len, N,
+                    adapter["back_max_error_rate"], adapter["back_errors_back"])
+            
+            elif where_name in ("front", "prefix"):
+                print_error_ranges(seq_len, adapter["max_error_rate"])
                 _print("Overview of removed sequences")
-                print_histogram(adapter["lengths_front"], len(adapter["sequence"]),
-                    summary["N"], adapter["max_error_rate"], adapter["errors_front"])
-            else:
-                assert adapter["where"]["name"] in ("back", "suffix")
-                _print()
-                print_error_ranges(len(adapter["sequence"]), adapter["max_error_rate"])
-                warning = warning or print_adjacent_bases(adapter["adjacent_bases"], adapter["sequence"])
+                print_histogram(
+                    adapter["lengths_front"], seq_len, N,
+                    adapter["max_error_rate"], adapter["errors_front"])
+            
+            elif where_name in ("back", "suffix"):
+                print_error_ranges(seq_len, adapter["max_error_rate"])
+                warning = warning or print_adjacent_bases(
+                    adapter["adjacent_bases"], adapter["sequence"])
                 _print("Overview of removed sequences")
-                print_histogram(adapter["lengths_back"], len(adapter["sequence"]),
-                    summary["N"], adapter["max_error_rate"], adapter["errors_back"])
+                print_histogram(
+                    adapter["lengths_back"], seq_len, N,
+                    adapter["max_error_rate"], adapter["errors_back"])
     
     if warning:
         _print('WARNING:')
@@ -390,7 +424,7 @@ def generate_read_stats(stats, outfile):
         max_width += (max_width // 3) + 1
         
         _print_header = HeaderPrinter(outfile)
-        _print = RowPrinter(outfile, (25, max_width), ('<', '>'))
+        _print = RowPrinter(outfile, (25, max_width))
         
         def _print_histogram(title, hist1, hist2=None):
             _print_header(title, 2)
