@@ -62,7 +62,7 @@ class Pipeline(object):
     def finish(self, summary, **kwargs):
         summary.update(
             record_counts=self.record_counts,
-            total_record_counts=sum(self.record_counts.values()),
+            total_record_count=sum(self.record_counts.values()),
             bp_counts=self.bp_counts,
             total_bp_counts=tuple(
                 sum(b) for b in zip(*self.bp_counts.values())))

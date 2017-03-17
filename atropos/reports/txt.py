@@ -30,13 +30,17 @@ class HeaderPrinter(object):
             print(underline * width, file=self.outfile)
 
 class RowPrinter(object):
-    def __init__(self, outfile, colwidths, justification, **kwargs):
+    def __init__(self, outfile, colwidths=10, justification='<', indent='', **kwargs):
         self.outfile = outfile
-        self.colwidths = colwidths
-        self.justification = justification
+        self.colwidths = (colwidths,) if isinstance(colwidths, int) else colwidths
+        self.justification = (justification,) if isinstance(justification, str) else justification
+        self.indent = (indent,) if isinstance(indent, str) else indent
         self.print_args = kwargs
     
-    def __call__(*args, extra_width=None, extra_justification=None):
+    def __call__(
+            *args, colwidths=None, extra_width=None, justification=None,
+            extra_justification=None, indent=None, extra_indent=None,
+            underline=None, pct=False):
         ncols = len(args)
         if ncols == 0:
             print(file=self.outfile)
@@ -51,28 +55,41 @@ class RowPrinter(object):
             else:
                 return a + ([extra or a[-1]] * (l - ncols))
         
-        colwidths, justification = (
+        colwidths, justification, indent = (
             adjust(a, extra)
-            for a, extra in zip(
-                (self.colwidths, self.justification),
-                (extra_width, extra_justification)))
+            for a, extra in zip((
+                    colwidths or self.colwidths,
+                    justification or self.justification,
+                    indent or self.indent
+                ),
+                (extra_width, extra_justification, extra_indent)))
         
         fmt_str = []
         fmt_args = []
-        for i, (value, width, just) in enumerate(zip(args, colwidths, justification)):
+        for i, (value, width, just, ind) in enumerate(
+                zip(args, colwidths, justification, indent)):
             if isinstance(value, str):
                 typ = 's'
                 if len(value) > width:
                     value = textwrap.wrap(value, width)
             elif isinstance(value, float):
-                typ = '.1f'
+                typ = '.1' + '%' if pct else 'f'
             else:
                 typ = ',d'
-            fmt_str.append('{' + str(i) + ':' + just + str(width) + typ + '}')
+            fmt_str.append(ind + '{' + str(i) + ':' + just + str(width) + typ + '}')
             fmt_args.append(value)
         
         fmt_str = ' '.join(fmt_str)
         print(fmt_str.format(*fmt_args), file=self.outfile, **self.print_args)
+        
+        if underline:
+            print(
+                ' '.join(underline * width for width in colwidths),
+                file=self.outfile, **self.print_args)
+
+INDENT = '    '
+paragraph = textwrap.TextWrapper()
+indented = textwrap.TextWrapper(initial_indent=INDENT, subsequent_indent=INDENT)
 
 def generate_report(summary, outfile):
     close = False
@@ -90,14 +107,17 @@ def generate_report(summary, outfile):
         if close:
             outfile.close()
 
-def print_report(stats, outfile):
+def print_report(summary, outfile):
     """
     Args:
-        stats: Summary dict.
+        summary: Summary dict.
         outfile: Open output stream.
     """
-    pairs_or_reads = "Pairs" if stats['paired'] else "Reads"
-    max_width = len(str(max(stats['total_bp_counts'])))
+    
+    paired = summary["paired"]
+    pairs_or_reads = "Pairs" if paired else "Reads"
+    total_bp = sum(summary['total_bp_counts'])
+    max_width = len(str(total_bp))
     
     _print_header = HeaderPrinter(outfile)
     _print = RowPrinter(outfile, (25, max_width), ('<', '>'))
@@ -110,46 +130,58 @@ def print_report(stats, outfile):
             _print("{0}-{1} bp: {2};".format(prev, r - 1, errors - 1), end=' ')
             prev = r
         if prev == adapter_length:
-            _print("{0} bp: {1}".format(adapter_length, int(error_rate * adapter_length)))
+            _print("{0} bp: {1}".format(
+                adapter_length, int(error_rate * adapter_length)))
         else:
-            _print("{0}-{1} bp: {2}".format(prev, adapter_length, int(error_rate * adapter_length)))
+            _print("{0}-{1} bp: {2}".format(
+                prev, adapter_length, int(error_rate * adapter_length)))
         _print()
-
+    
     def print_histogram(d, adapter_length, n, error_rate, errors):
-        """
-        Print a histogram. Also, print the no. of reads expected to be
-        trimmed by chance (assuming a uniform distribution of nucleotides in the reads).
-        d -- a dictionary mapping lengths of trimmed sequences to their respective frequency
-        adapter_length -- adapter length
-        n -- total no. of reads.
-        """
-        h = []
-        for length in sorted(d):
-            # when length surpasses adapter_length, the
-            # probability does not increase anymore
-            estimated = n * 0.25 ** min(length, adapter_length)
-            h.append( (length, d[length], estimated) )
+        """Print a histogram. Also, print the no. of reads expected to be
+        trimmed by chance (assuming a uniform distribution of nucleotides in
+        the reads).
         
+        Args:
+            d: A dictionary mapping lengths of trimmed sequences to their
+                respective frequency
+            adapter_length: adapter length
+            n: total no. of reads.
+            error_rate: Max error rate.
+            errors: Histogram of actual numbers of errors.
+        """
         def errs_to_str(l, e):
             if e in errors[l]:
                 return str(errors[l][e])
             return "0"
         
-        _print("length", "count", "expect", "max.err", "error counts", sep="\t")
-        for length, count, estimate in h:
+        hist = []
+        for length in sorted(d):
+            # when length surpasses adapter_length, the
+            # probability does not increase anymore
+            estimate = n * 0.25 ** min(length, adapter_length)
+            count = d[length]
             max_errors = max(errors[length].keys())
             errs = ' '.join(errs_to_str(length, e) for e in range(max_errors+1))
-            _print(length, count, "{0:.1F}".format(estimate),
-                   int(error_rate*min(length, adapter_length)), errs, sep="\t")
+            hist.append((length, count, estimated, errors, errs))
+        
+        colwidths = [sizeof(*x) for x in zip(*h)]
+        
+        _print(
+            "length", "count", "expect", "max.err", "error counts",
+            colwidths=colwidths, underline='-')
+        
+        for h in hist:
+            _print(*h, colwidths=colwidths)
         _print()
-
+    
     def print_adjacent_bases(bases, sequence):
-        """
-        Print a summary of the bases preceding removed adapter sequences.
+        """Print a summary of the bases preceding removed adapter sequences.
         Print a warning if one of the bases is overrepresented and there are
         at least 20 preceding bases available.
-
-        Return whether a warning was printed.
+        
+        Return:
+            True if a warning was printed.
         """
         total = sum(bases.values())
         if total == 0:
@@ -159,86 +191,107 @@ def print_report(stats, outfile):
         for base in ['A', 'C', 'G', 'T', '']:
             b = base if base != '' else 'none/other'
             fraction = 1.0 * bases[base] / total
-            _print('  {0}: {1:.1%}'.format(b, fraction))
+            _print(b, fraction)
             if fraction > 0.8 and base != '':
                 warnbase = b
         if total >= 20 and warnbase is not None:
             _print('WARNING:')
-            _print('	The adapter is preceded by "{0}" extremely often.'.format(warnbase))
-            _print('	The provided adapter sequence may be incomplete.')
-            _print('	To fix the problem, add "{0}" to the beginning of the adapter sequence.'.format(warnbase))
+            _print(indented.wrap(
+                'The adapter is preceded by "{0}" extremely often. The provided '
+                'adapter sequence may be incomplete. To fix the problem, add
+                '"{0}" to the beginning of the adapter sequence.'.format(warnbase)))
             _print()
             return True
         _print()
         return False
     
-    #----------------
-    
-    """Print report to standard output."""
-    if stats["N"] == 0:
+    N = summary["total_record_count"]
+    if N == 0:
         _print("No reads processed! Either your input file is empty or you used the wrong -f/--format parameter.")
         return
+    
+    timing = summary['timing']
+    modifiers, filters, formatters = (
+        summary['trim'][key]
+        for key in ('modifiers', 'filters', 'formatters'))
+    adapter_cutter = None
+    if 'AdapterCutter' in modifiers:
+        adapter_cutter = modifiers['AdapterCutter']
+    elif 'InsertAdaptercutter' in modifiers:
+        adapter_cutter = modifiers['InsertAdapterCutter']
+    corrected = None
+    trimmers = []
+    for name, mod in modifers.items():
+        if 'records_corrected' in mod:
+            corrected = mod
+        elif 'bp_trimmed' in mod:
+            trimmers.append((name, mod))
+    
     _print("Wallclock time: {0:.2F} s ({1:.0F} us/read; {2:.2F} M reads/minute).".format(
-        stats["wallclock_time"], 1E6 * stats["wallclock_time"] / stats["N"], stats["N"] / stats["wallclock_time"] * 60 / 1E6))
-    _print("CPU time (main process): {0:.2F} s".format(stats["cpu_time"]))
+        timing["wallclock"],
+        1E6 * summary["wallclock_time"] / N,
+        N / timing["wallclock"] * 60 / 1E6))
+    _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
     
-    report = "\n=== Summary ===\n\n"
-    if stats["paired"]:
-        report += textwrap.dedent("""\
-        Total read pairs processed:		 {N:13,d}
-          Read 1 with adapter:			 {with_adapters[0]:13,d} ({with_adapters_fraction[0]:.1%})
-          Read 2 with adapter:			 {with_adapters[1]:13,d} ({with_adapters_fraction[1]:.1%})
-        """)
-    else:
-        report += textwrap.dedent("""\
-        Total reads processed:			 {N:13,d}
-        Reads with adapters:			 {with_adapters[0]:13,d} ({with_adapters_fraction[0]:.1%})
-        """)
-    if stats["too_short"] is not None:
-        report += "{pairs_or_reads} that were too short:		   {too_short:13,d} ({too_short_fraction:.1%})\n"
-    if stats["too_long"] is not None:
-        report += "{pairs_or_reads} that were too long:			   {too_long:13,d} ({too_long_fraction:.1%})\n"
-    if stats["too_many_n"] is not None:
-        report += "{pairs_or_reads} with too many N:			   {too_many_n:13,d} ({too_many_n_fraction:.1%})\n"
+    _print_header("Summary", level=1)
+    _print('', 'records', 'fraction', underline='-')
+    _print("Total {} processed".format('read pairs' if paired else 'reads'), N)
+    if adapter_cutter:
+        for read in range(2 if paired else 1):
+            _print(
+                "Read{} with adapter".format(' {}'.format(read+1) if paired else 's'),
+                adapter_cutter['records_with_adapters'][read],
+                adapter_cutter['fraction_records_with_adapters'][read],
+                indent='  ', pct=True)
     
-    report += textwrap.dedent("""\
-    {pairs_or_reads} written (passing filters):			{written:13,d} ({written_fraction:.1%})
-    """)
+    def _print_filter(name, sep):
+        if name in filters:
+            _print(
+                "{} {} {}:".format(pairs_or_reads, sep, name.replace('_', ' ')),
+                filters[name]['records_filtered'],
+                filters[name]['fraction_records_filtered'], pct=True)
     
-    if "corrected" in stats:
-        report += "Pairs corrected:			{corrected:13,d} ({corrected_fraction:.1%})\n"
+    _print_filter('too_short', 'that were')
+    _print_filter('too_long', 'that were')
+    _print_filter('too_many_n', 'with')
     
-    report += "\nTotal basepairs processed:			{total_bp:13,d} bp\n"
+    _print(
+        '{} written (passing filters)'.format(pairs_or_reads),
+        formatters['records_written'], formatters['fraction_records_written'],
+        pct=True)
     
-    if stats["paired"]:
-        report += "	 Read 1: {total_bp1:13,d} bp\n"
-        report += "	 Read 2: {total_bp2:13,d} bp\n"
+    if corrected:
+        _print(
+            'Pairs corrected', corrected['records_corrected'],
+            corrected['fraction_records_corrected'], pct=True)
     
-    for modifier_class in trimmer_classes:
-        name = modifier_class.__name__
-        if stats[name] > 0:
-            spacing = ' ' * (40 - len(modifier_class.display_str))
-            report += "{0}:{1}{{{2}:13,d}} bp ({{{2}_fraction:.1%}})\n".format(modifier_class.display_str, spacing, name)
-            if stats["paired"]:
-                report += "	 Read 1: {{{}_bp[0]:13,d}} bp\n".format(name)
-                report += "	 Read 2: {{{}_bp[1]:13,d}} bp\n".format(name)
+    _print("Total bp processed", total_bp)
+    if paired:
+        for read in range(2):
+            _print("Read {}".format(read+1), summary['total_bp_counts'][read], indent='  ')
     
-    report += "Total written (filtered):                {total_written_bp:13,d} bp ({total_written_bp_fraction:.1%})\n"
-    if stats["paired"]:
-        report += "	 Read 1: {written_bp[0]:13,d} bp\n"
-        report += "	 Read 2: {written_bp[1]:13,d} bp\n"
+    def _print_bp(title, d, key):
+        _print(
+            title, d['total_'.format(key)],
+            d['fraction_total_{}'.format(key)], pct=True)
+        if paired:
+            for read in range(2):
+                _print(
+                    "Read {}".format(read+1), d[key][read],
+                    d['fraction_{}'.format(key)][read], pct=True)
     
-    if "corrected" in stats:
-        report += "Total corrected bp:                        {total_corrected_bp:13,d} ({total_corrected_bp_fraction:.1%})\n"
-        report += "	 Read 1:                {corrected_bp[0]:13,d} ({corrected_bp_fraction[0]:.1%})\n"
-        report += "	 Read 2:                {corrected_bp[1]:13,d} ({corrected_bp_fraction[1]:.1%})\n"
+    for name, mod in trimmers:
+        _print_bp(name, mod, 'bp_trimmed')
     
-    _print(report.format(**stats))
+    _print_bp("Total bp written (filtered)", formatters, 'bp_written')
+    
+    if corrected:
+        _print_bp("Total bp corrected", formatters, 'bp_corrected')
     
     warning = False
     for which_in_pair in (0, 1):
-        for adapter in stats["adapters"][which_in_pair]:
-            if stats["paired"]:
+        for adapter in summary["adapters"][which_in_pair]:
+            if summary["paired"]:
                 extra = 'First read: ' if which_in_pair == 0 else 'Second read: '
             else:
                 extra = ''
@@ -268,11 +321,11 @@ def print_report(stats, outfile):
                 _print()
                 print_error_ranges(len(adapter["sequence"]), adapter["max_error_rate"])
                 _print("Overview of removed sequences (5')")
-                print_histogram(adapter["lengths_front"], len(adapter["sequence"]), stats["N"],
+                print_histogram(adapter["lengths_front"], len(adapter["sequence"]), summary["N"],
                     adapter["max_error_rate"], adapter["errors_front"])
                 _print()
                 _print("Overview of removed sequences (3' or within)")
-                print_histogram(adapter["lengths_back"], len(adapter["sequence"]), stats["N"],
+                print_histogram(adapter["lengths_back"], len(adapter["sequence"]), summary["N"],
                     adapter["max_error_rate"], adapter["errors_back"])
             elif adapter["where"]["name"] == "linked":
                 _print()
@@ -280,17 +333,17 @@ def print_report(stats, outfile):
                 print_error_ranges(len(adapter["back_sequence"]), adapter["back_max_error_rate"])
                 _print("Overview of removed sequences at 5' end")
                 print_histogram(adapter["front_lengths_front"], len(adapter["front_sequence"]),
-                    stats["N"], adapter["front_max_error_rate"], adapter["front_errors_front"])
+                    summary["N"], adapter["front_max_error_rate"], adapter["front_errors_front"])
                 _print()
                 _print("Overview of removed sequences at 3' end")
                 print_histogram(adapter["back_lengths_back"], len(adapter["back_sequence"]),
-                    stats["N"], adapter["back_max_error_rate"], adapter["back_errors_back"])
+                    summary["N"], adapter["back_max_error_rate"], adapter["back_errors_back"])
             elif adapter["where"]["name"] in ("front", "prefix"):
                 _print()
                 print_error_ranges(len(adapter["sequence"]), adapter["max_error_rate"])
                 _print("Overview of removed sequences")
                 print_histogram(adapter["lengths_front"], len(adapter["sequence"]),
-                    stats["N"], adapter["max_error_rate"], adapter["errors_front"])
+                    summary["N"], adapter["max_error_rate"], adapter["errors_front"])
             else:
                 assert adapter["where"]["name"] in ("back", "suffix")
                 _print()
@@ -298,12 +351,13 @@ def print_report(stats, outfile):
                 warning = warning or print_adjacent_bases(adapter["adjacent_bases"], adapter["sequence"])
                 _print("Overview of removed sequences")
                 print_histogram(adapter["lengths_back"], len(adapter["sequence"]),
-                    stats["N"], adapter["max_error_rate"], adapter["errors_back"])
+                    summary["N"], adapter["max_error_rate"], adapter["errors_back"])
     
     if warning:
         _print('WARNING:')
-        _print('	One or more of your adapter sequences may be incomplete.')
-        _print('	Please see the detailed output above.')
+        _print(indented.wrap(
+            'One or more of your adapter sequences may be incomplete. '
+            'Please see the detailed output above.'))
 
 def print_read_stats(options, stats):
     outfile = options.output
@@ -441,3 +495,11 @@ def generate_read_stats(stats, outfile):
         _print_stats('Pre-trimming stats', stats['pre'])
     if 'post' in stats:
         _print_stats('Post-trimming stats', stats['post'])
+
+def sizeof(*x):
+    if isinstance(x[0], str):
+        return max(len(s) for s in x)
+    elif isinstance(x[0], int):
+        return len(str(max(x)))
+    else:
+        return len(str(round(max(x), 1)))

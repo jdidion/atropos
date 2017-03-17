@@ -284,7 +284,8 @@ def median(data):
         return (data[i - 1] + data[i]) / 2
 
 def truncate_string(s, n=100):
-    """Shorten string s to at most n characters, appending "..." if necessary."""
+    """Shorten string s to at most n characters, appending "..." if necessary.
+    """
     if s is None:
         return None
     if len(s) > n:

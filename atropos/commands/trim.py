@@ -444,16 +444,14 @@ def execute(options, summary):
     # computed.
     
     if rc == 0:
-        record_counts = summary['record_counts']
-        total_records = sum(record_counts.values())
+        total_records = summary['total_record_count']
+        total_bp = summary['total_bp_counts']
+        sum_total_bp = sum(total_bp)
         
-        bp_counts = summary['bp_counts']
-        total_bp = [sum(counts) for counts in zip(*bp_counts.values())]
-        
-        def _recurse(d):
+        def _add_margins(d):
             for key, value in tuple(d.items()):
                 if isinstance(value, dict):
-                    _recurse(value)
+                    _add_margins(value)
                 elif isinstance(key, str):
                     if key.startswith('records_'):
                         def frac(v):
@@ -463,16 +461,21 @@ def execute(options, summary):
                         frac_key = "fraction_{}".format(key)
                         if isinstance(value, Iterable):
                             d[frac_key] = [frac(v) for v in value]
-                            d["total_{}".format(key)] = sum(v for v in value if v)
+                            total = sum(v for v in value if v)
+                            d["total_{}".format(key)] = total
+                            d["fraction_total_{}".format(key)] = frac(total)
                         else:
                             d[frac_key] = frac(value)
                     elif key.startswith('bp_'):
                         d["fraction_{}".format(key)] = [
                             (v / b) if v and b != 0 else 0
                             for v, b in zip(value, total_bp)]
-                        d["total_{}".format(key)] = sum(v for v in value if v)
+                        total = sum(v for v in value if v)
+                        d["total_{}".format(key)] = total
+                        d["fraction_total_{}".format(key)] = (
+                            (total / sum_total_bp) if sum_total_bp else 0)
         
-        _recurse(summary['trim'])
+        _add_margins(summary['trim'])
         
         report_file = options.report_file
         if report_file == '-':
