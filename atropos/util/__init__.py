@@ -176,9 +176,6 @@ class Const(Mergeable):
         if self.value != other:
             raise ValueError("{} != {}".format(self, other))
         return self.value
-    
-    def __repr__(self):
-        return self.value
 
 class MergingDict(OrderedDict):
     def merge(self, src):

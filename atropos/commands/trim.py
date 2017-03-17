@@ -14,7 +14,7 @@ from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
-from atropos.util import RandomMatchProbability, run_interruptible
+from atropos.util import RandomMatchProbability, Const, run_interruptible
 
 class TrimPipeline(Pipeline):
     def __init__(self, record_handler, result_handler):
@@ -70,26 +70,26 @@ class StatsRecordHandlerWrapper(object):
         self.stats_kwargs = kwargs
     
     def handle_record(self, context, read1, read2=None):
-        if self.pre:
+        if self.pre is not None:
             self.collect(self.pre, context['source'], read1, read2)
         dest, reads = self.record_handler.handle_record(context, read1, read2)
-        if self.post:
+        if self.post is not None:
             if dest not in self.post:
                 self.post[dest] = {}
             self.collect(self.post[dest], context['source'], *reads)
         return (dest, reads)
     
     def collect(self, stats, source, read1, read2=None):
-        if paired:
+        if self.paired:
             self._collect(stats, source[0], read1)
             self._collect(stats, source[1], read2)
         else:
             self._collect(stats, source, read1)
     
     def _collect(self, stats, source, read):
-        if source not in self.stats:
+        if source not in stats:
             stats[source] = ReadStatCollector(**self.stats_kwargs)
-        self.stats[source].collect(read)
+        stats[source].collect(read)
     
     def summarize(self):
         summary = self.record_handler.summarize()
@@ -437,44 +437,52 @@ def execute(options, summary):
     
     reader.close()
     
-    # For trim stats, any value with a name that starts with 'records_' will
-    # have 'fraction_<var>' computed as value / total_reads, and any value with a
-    # name that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>'
-    # computed.
-    
     if rc == 0:
+        # For trim stats, any value with a name that starts with 'records_' will
+        # have 'fraction_<var>' computed as value / total_reads, and any value with a
+        # name that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>'
+        # computed. We also replace any `Const`s with their values.
         total_records = summary['total_record_count']
         total_bp = summary['total_bp_counts']
         sum_total_bp = sum(total_bp)
         
-        def _add_margins(d):
+        def frac(v, total):
+            return (v / total) if v and total != 0 else 0
+        
+        def _post_process(d):
             for key, value in tuple(d.items()):
                 if isinstance(value, dict):
-                    _add_margins(value)
-                elif isinstance(key, str):
-                    if key.startswith('records_'):
-                        def frac(v):
-                            return (
-                                (v / total_records)
-                                if v and total_records != 0 else 0)
-                        frac_key = "fraction_{}".format(key)
-                        if isinstance(value, Iterable):
-                            d[frac_key] = [frac(v) for v in value]
-                            total = sum(v for v in value if v)
-                            d["total_{}".format(key)] = total
-                            d["fraction_total_{}".format(key)] = frac(total)
-                        else:
-                            d[frac_key] = frac(value)
-                    elif key.startswith('bp_'):
-                        d["fraction_{}".format(key)] = [
-                            (v / b) if v and b != 0 else 0
-                            for v, b in zip(value, total_bp)]
-                        total = sum(v for v in value if v)
-                        d["total_{}".format(key)] = total
-                        d["fraction_total_{}".format(key)] = (
-                            (total / sum_total_bp) if sum_total_bp else 0)
+                    _post_process(value)
+                elif isinstance(value, tuple) and len(value) > 0 and isinstance(value[0], dict):
+                    for v in value:
+                        _post_process(v)
+                else:
+                    if isinstance(value, Const):
+                        value = value.value
+                        d[key] = value
+                    if isinstance(key, str):
+                        if key.startswith('records_'):
+                            frac_key = "fraction_{}".format(key)
+                            if isinstance(value, Iterable):
+                                d[frac_key] = [frac(v, total_records) for v in value]
+                                total = sum(v for v in value if v)
+                                d["total_{}".format(key)] = total
+                                d["fraction_total_{}".format(key)] = frac(total, total_records)
+                            else:
+                                d[frac_key] = frac(value, total_records)
+                        elif key.startswith('bp_'):
+                            frac_key = "fraction_{}".format(key)
+                            if isinstance(value, Iterable):
+                                d[frac_key] = [
+                                    frac(v, b)
+                                    for v, b in zip(value, total_bp)]
+                                total = sum(v for v in value if v)
+                                d["total_{}".format(key)] = total
+                                d["fraction_total_{}".format(key)] = frac(total, sum_total_bp)
+                            else:
+                                d[frac_key] = frac(value, sum_total_bp)
         
-        _add_margins(summary['trim'])
+        _post_process(summary['trim'])
     
     return rc
 

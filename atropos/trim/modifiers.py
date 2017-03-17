@@ -21,6 +21,10 @@ class Modifier(object):
     def name(self):
         return self.__class__.__name__
     
+    @property
+    def description(self):
+        return getattr(self, 'display_str', self.name)
+    
     def summarize(self):
         """Returns a summary of the modifier's activity as a dict.
         """
@@ -391,8 +395,14 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         return trimmed_read
     
     def summarize(self):
-        d = dict(records_with_adapters=self.with_adapters)
-        d.update(ErrorCorrectorMixin.summarize(self))
+        adapters_summary = tuple(
+            { adapter.name : adapter.summarize() }
+            for adapter in (self.adapter1, self.adapter2))
+        d = dict(
+            records_with_adapters=self.with_adapters,
+            adapters=adapters_summary)
+        if self.mismatch_action:
+            d.update(ErrorCorrectorMixin.summarize(self))
         return d
 
 class OverwriteRead(ReadPairModifier):
@@ -857,7 +867,9 @@ class SingleEndModifiers(Modifiers):
         summary = {}
         for mods in self.modifiers:
             mod = mods[0]
-            summary[mod.name] = (mod.summarize(),)
+            mod_summary = mod.summarize()
+            mod_summary['desc'] = mod.description
+            summary[mod.name] = (mod_summary,)
         return summary
 
 class PairedEndModifiers(Modifiers):
@@ -907,11 +919,13 @@ class PairedEndModifiers(Modifiers):
         for mods in self.modifiers:
             if isinstance(mods, ReadPairModifier):
                 summary[mods.name] = mods.summarize()
+                summary[mods.name]['desc'] = mods.description
             elif any(mods):
-                name = keys = None
+                name = desc = keys = None
                 s1 = s2 = {}
                 if mods[0]:
                     name = mods[0].name
+                    desc = mods[0].description
                     s1 = mods[0].summarize()
                     if s1:
                         keys = s1.keys()
@@ -920,12 +934,15 @@ class PairedEndModifiers(Modifiers):
                     if s2:
                         if name:
                             assert name == mods[1].name
+                            assert desc == mods[1].description
                             assert set(keys) == set(s2.keys())
                         else:
                             name = mods[1].name
+                            desc = mods[1].description
                             keys = s2.keys()
                 if keys:
                     summary[name] = dict(
                         (key, [s1.get(key, None), s2.get(key, None)])
                         for key in keys)
+                    summary[name]['desc'] = desc
         return summary

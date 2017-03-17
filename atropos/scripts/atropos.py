@@ -391,11 +391,11 @@ class Command(object):
                 if self.options.quiet:
                     report_file = None
                 else:
-                    report_file = 'stderr' if options.output is None else 'stdout'
+                    report_file = 'stderr' if self.options.output is None else 'stdout'
             
             if report_file:
                 logging.getLogger().debug("Generating report file")
-                generate_reports(summary, report_file, options.report_formats)
+                generate_reports(summary, report_file, self.options.report_formats)
             else:
                 logging.getLogger().debug("Not generating report file")
         
@@ -771,8 +771,13 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "post-trimming stats; both=compute both pre- and post-trimming "
                  "stats. (both)")
         group.add_argument(
+            "--tile-stats",
+            action="store_true", default=False,
+            help="Enable collection of tile statistics using the default regular "
+                 "expression for Illumina reads.")
+        group.add_argument(
             "--tile-key-regexp",
-            default="@(((?:[^\:]+)\:){5})",
+            default=None,
             help="Regular expression to extract key portions of read names to "
                  "collect tile-specific statistics.")
         
@@ -1135,9 +1140,6 @@ standard input/output. Without the -o option, output is sent to standard output.
             if len(options.cut_min2) == 2 and options.cut_min2[0] * options.cut_min2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
         
-        if options.tile_key_regexp:
-            options.tile_key_regexp = re.compile(options.tile_key_regexp)
-        
         if options.threads is not None:
             threads = _configure_threads(options, parser)
             
@@ -1214,6 +1216,11 @@ command with '--stats pre'.
                 "appended. If unspecified, the format is guessed from the "
                 "output file extension.")
         group.add_argument(
+            "--tile-stats",
+            action="store_true", default=False,
+            help="Enable collection of tile statistics using the default regular "
+                 "expression for Illumina reads.")
+        group.add_argument(
             "--tile-key-regexp",
             nargs="?", const="^(?:[^\:]+\:){4}([^\:]+)", default=None,
             help="Regular expression to extract key portions of read names to "
@@ -1247,8 +1254,6 @@ command with '--stats pre'.
                 self.parser.error("Read queue size must be >= than 'threads'")
         if self.options.batch_size is None:
             self.options.batch_size = 1000
-        if self.options.tile_key_regexp:
-            self.options.tile_key_regexp = re.compile(self.options.tile_key_regexp)
 
 class DetectCommand(Command):
     """Detect adapter and other contaminant sequences."""
@@ -1368,8 +1373,10 @@ def _configure_threads(options, parser):
 
 def main_from_commandline():
     rc, summary = main(sys.argv[1:])
-    if summary['error']:
-        logging.getLogger().error(summary['error'])
+    if 'error' in summary:
+        err = summary['error']
+        if err:
+            logging.getLogger().error(err)
     sys.exit(rc)
 
 def main(args):
