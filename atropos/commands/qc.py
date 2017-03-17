@@ -49,10 +49,6 @@ def execute(options, summary):
             reader, pipeline_args, summary, options.threads,
             options.process_timeout, options.read_queue_size)
     
-    if rc == 0:
-        # TODO
-        pass
-    
     return rc
 
 def run_parallel(reader, pipeline_args, summary, threads=2, timeout=30, input_queue_size=0):

@@ -14,7 +14,6 @@ from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
 from atropos.io import STDOUT
-from atropos.reports import generate_reports
 from atropos.util import RandomMatchProbability, run_interruptible
 
 class TrimPipeline(Pipeline):

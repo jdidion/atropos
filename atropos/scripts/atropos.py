@@ -20,6 +20,7 @@ check_importability()
 from atropos import __version__
 import atropos.commands
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
+from atropos.reports import generate_reports
 from atropos.util import MAGNITUDE, MergingDict, Timing
 
 # Extensions to argparse
@@ -65,8 +66,11 @@ class char_list(object):
         return l
 
 class delimited(TypeWithArgs):
-    """Splits a string argument using a delimiter."""
-    def _do_call(self, string, delim=",", data_type=None, choices=None, min_len=None, max_len=None):
+    """Splits a string argument using a delimiter.
+    """
+    def _do_call(
+            self, string, delim=",", data_type=None, choices=None,
+            min_len=None, max_len=None):
         if isinstance(string, str):
             vals = string.split(delim) if delim else (string,)
         else:
@@ -219,6 +223,8 @@ class Command(object):
         self.parser.set_defaults(
             paired=False,
             default_outfile=STDOUT,
+            report_file=None,
+            report_formats=None,
             batch_size=1000)
         self.parser.add_argument(
             "--debug",
@@ -359,7 +365,7 @@ class Command(object):
         """Execute the command.
         
         Returns:
-            Tuple (rc, "msg", {details})
+            Tuple (rc, {summary})
         """
         rc = 0
         summary = MergingDict()
@@ -379,10 +385,10 @@ class Command(object):
             finally:
                 summary['timing'] = timing.summarize()
         
-        if rc == 0:
-            report_file = options.report_file
+        if rc == 0 and self.options.report_file:
+            report_file = self.options.report_file
             if report_file == '-':
-                if options.quiet:
+                if self.options.quiet:
                     report_file = None
                 else:
                     report_file = 'stderr' if options.output is None else 'stdout'
@@ -1195,11 +1201,18 @@ command with '--stats pre'.
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file, metavar="FILE",
+            type=writeable_file, dest='report_file', metavar="FILE",
             help="Write stats to file rather than stdout.")
         
         group = self.add_group(
             "Report", title="Report content and formatting options")
+        group.add_argument(
+            "--report-formats",
+            nargs="*", choices=("txt", "json"), default=None, metavar="FORMAT",
+            help="Report type(s) to generate. If multiple, '--output' "
+                "is treated as a prefix and the appropriate extensions are "
+                "appended. If unspecified, the format is guessed from the "
+                "output file extension.")
         group.add_argument(
             "--tile-key-regexp",
             nargs="?", const="^(?:[^\:]+\:){4}([^\:]+)", default=None,
@@ -1236,17 +1249,6 @@ command with '--stats pre'.
             self.options.batch_size = 1000
         if self.options.tile_key_regexp:
             self.options.tile_key_regexp = re.compile(self.options.tile_key_regexp)
-
-def _configure_threads(options, parser):
-    if options.debug:
-        parser.error("Cannot use debug mode with multiple threads")
-    threads = options.threads
-    if threads <= 0:
-        threads = cpu_count()
-    elif threads == 1:
-        parser.error("--threads must be >= 2")
-    options.threads = threads
-    return threads
 
 class DetectCommand(Command):
     """Detect adapter and other contaminant sequences."""
@@ -1350,6 +1352,17 @@ COMMANDS['trim'] = TrimCommand
 COMMANDS['qc'] = QcCommand
 COMMANDS['detect'] = DetectCommand
 COMMANDS['error'] = ErrorCommand
+
+def _configure_threads(options, parser):
+    if options.debug:
+        parser.error("Cannot use debug mode with multiple threads")
+    threads = options.threads
+    if threads <= 0:
+        threads = cpu_count()
+    elif threads == 1:
+        parser.error("--threads must be >= 2")
+    options.threads = threads
+    return threads
 
 # Main
 

@@ -93,22 +93,20 @@ class RowPrinter(object):
                 file=self.outfile, **self.print_args)
 
 def generate_report(summary, outfile):
-    close = False
-    if outfile == 'stdout':
-        outfile = sys.stdout
-    elif outfile == 'stderr':
-        outfile = sys.stderr
-    else:
-        outfile = open(outfile, "w")
-        close = True
-    
+    is_path = isinstance(outfile, str)
+    if is_path:
+        outfile = open(outfile, 'wt')
     try:
-        print_report(summary, outfile)
+        if 'trim' in summary:
+            print_trim_report(summary, outfile)
+        for phase in ('pre', 'post'):
+            if phase in summary:
+                print_stats_report(summary, phase, outfile)
     finally:
-        if close:
+        if is_path:
             outfile.close()
 
-def print_report(summary, outfile):
+def print_trim_report(summary, outfile):
     """
     Args:
         summary: Summary dict.
@@ -397,142 +395,115 @@ def print_adapter_report(adapters, outfile, paired, N, max_width):
             'One or more of your adapter sequences may be incomplete. '
             'Please see the detailed output above.'))
 
-def print_read_stats(options, stats):
-    outfile = options.output
-    close = False
+def print_stats_report(summary, phase, outfile):
+    data = summary[phase]
+    title = ("Pre" if phase == 'pre' else "Post") + "-trimming stats"
+    paired = 'read2' in data
+    max_width = len(str(max(data['read1']['count'], data['read2']['count'])))
+    # add space for commas and column separation
+    max_width += (max_width // 3) + 1
     
-    if outfile is not None:
-        outfile = open(outfile, "w")
-        close = True
-    elif not options.quiet:
-        outfile = sys.stderr if options.output is None else sys.stdout
-    else:
-        return None
+    _print_header = HeaderPrinter(outfile)
+    _print = RowPrinter(outfile, (25, max_width))
     
-    try:
-        #try:
-        #    generate_mako(stats, outfile, "stats.txt")
-        #except:
-        generate_read_stats(stats, outfile)
-        return stats
-    finally:
-        if close:
-            outfile.close()
-
-def generate_read_stats(stats, outfile):
-    def _print_stats(title, data):
-        
-        paired = 'read2' in data
-        max_width = len(str(max(data['read1']['count'], data['read2']['count'])))
-        # add space for commas and column separation
-        max_width += (max_width // 3) + 1
-        
-        _print_header = HeaderPrinter(outfile)
-        _print = RowPrinter(outfile, (25, max_width))
-        
-        def _print_histogram(title, hist1, hist2=None):
-            _print_header(title, 2)
-            if hist2:
-                hist = ((h1[0], h1[1], h2[1]) for h1, h2 in zip(hist1, hist2))
-            else:
-                hist = h1
-            for h in hist:
-                _print(*h)
-        
-        def _print_base_histogram(title, col_names, hist):
-            _print_header(title, 2)
-            _print('Position', *col_names, extra_width=4)
-            for row in hist:
-                total_count = sum(row[1:])
-                base_pcts = (
-                    round(count * 100 / total_count, 1)
-                    for count in row[1:])
-                _print(row[0], *base_pcts, extra_width=4)
-        
-        def _print_tile_histogram(
-                title, value_cols, hist, index_cols=('Tile',), index_widths=(5,)):
-            _print_header(title, 2)
-            ncol = len(value_cols)
-            # As far as I know, tiles are max 4 digits
-            max_width = max(
-                4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
-            widths = index_widths + ((max_width,) * ncol)
-            _print(*(index_cols + value_cols), extra_width=max_width)
-            for row in hist:
-                _print(*row, extra_width=max_width)
-        
-        _print_header(title, 1)
-        _print('', 'Read1', 'Read2')
-        
-        # Sequence-level stats
-        _print(
-            "Read pairs:" if paired else "Reads:",
-            data['read1']['count'],
-            data['read2']['count'])
-        _print()
+    def _print_histogram(title, hist1, hist2=None):
+        _print_header(title, 2)
+        if hist2:
+            hist = ((h1[0], h1[1], h2[1]) for h1, h2 in zip(hist1, hist2))
+        else:
+            hist = h1
+        for h in hist:
+            _print(*h)
+    
+    def _print_base_histogram(title, col_names, hist):
+        _print_header(title, 2)
+        _print('Position', *col_names, extra_width=4)
+        for row in hist:
+            total_count = sum(row[1:])
+            base_pcts = (
+                round(count * 100 / total_count, 1)
+                for count in row[1:])
+            _print(row[0], *base_pcts, extra_width=4)
+    
+    def _print_tile_histogram(
+            title, value_cols, hist, index_cols=('Tile',), index_widths=(5,)):
+        _print_header(title, 2)
+        ncol = len(value_cols)
+        # As far as I know, tiles are max 4 digits
+        max_width = max(
+            4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
+        widths = index_widths + ((max_width,) * ncol)
+        _print(*(index_cols + value_cols), extra_width=max_width)
+        for row in hist:
+            _print(*row, extra_width=max_width)
+    
+    _print_header(title, 1)
+    _print('', 'Read1', 'Read2')
+    
+    # Sequence-level stats
+    _print(
+        "Read pairs:" if paired else "Reads:",
+        data['read1']['count'],
+        data['read2']['count'])
+    _print()
+    _print_histogram(
+        "Sequence lengths:",
+        data['read1']['length'],
+        data['read2']['length'])
+    _print()
+    if 'qualities' in data['read1']:
         _print_histogram(
-            "Sequence lengths:",
-            data['read1']['length'],
-            data['read2']['length'])
+            "Sequence qualities:",
+            data['read1']['qualities'],
+            data['read2']['qualities'])
         _print()
-        if 'qualities' in data['read1']:
-            _print_histogram(
-                "Sequence qualities:",
-                data['read1']['qualities'],
-                data['read2']['qualities'])
-            _print()
-        _print_histogram(
-            "Sequence GC content (%):",
-            data['read1']['gc'],
-            data['read2']['gc'])
+    _print_histogram(
+        "Sequence GC content (%):",
+        data['read1']['gc'],
+        data['read2']['gc'])
+    _print()
+    
+    if 'tile_sequence_qualities' in data['read1']:
+        _print_tile_histogram(
+            "Per-tile sequence qualities (Read 1):",
+            *data['read1']['tile_sequence_qualities'])
         _print()
-        
-        if 'tile_sequence_qualities' in data['read1']:
-            _print_tile_histogram(
-                "Per-tile sequence qualities (Read 1):",
-                *data['read1']['tile_sequence_qualities'])
-            _print()
-            _print_tile_histogram(
-                "Per-tile sequence qualities (Read 2):",
-                *data['read2']['tile_sequence_qualities'])
-            _print()
-        
-        # Base-level stats
-        if 'base_qualities' in data['read1']:
-            _print_base_histogram(
-                "Base qualities (Read 1):",
-                *data['read1']['base_qualities'])
-            _print()
-            _print_base_histogram(
-                "Base qualities (Read 2):",
-                *data['read2']['base_qualities'])
-            _print()
+        _print_tile_histogram(
+            "Per-tile sequence qualities (Read 2):",
+            *data['read2']['tile_sequence_qualities'])
+        _print()
+    
+    # Base-level stats
+    if 'base_qualities' in data['read1']:
         _print_base_histogram(
-            "Base composition (Read 1):",
-            *data['read1']['bases'])
+            "Base qualities (Read 1):",
+            *data['read1']['base_qualities'])
         _print()
         _print_base_histogram(
-            "Base composition (Read 2):",
-            *data['read2']['bases'])
+            "Base qualities (Read 2):",
+            *data['read2']['base_qualities'])
         _print()
-        if 'tile_base_qualities' in data['read1']:
-            _print_tile_histogram(
-                "Per-tile base qualities (Read 1):",
-                *data['read1']['tile_base_qualities'],
-                index_cols=('Position', 'Tile'),
-                index_widths=(25, 5))
-            _print()
-            _print_tile_histogram(
-                "Per-tile base qualities (Read 2):",
-                *data['read2']['tile_base_qualities'],
-                index_cols=('Position', 'Tile'),
-                index_widths=(25, 5))
-            _print()
-    
-    if 'pre' in stats:
-        _print_stats('Pre-trimming stats', stats['pre'])
-    if 'post' in stats:
-        _print_stats('Post-trimming stats', stats['post'])
+    _print_base_histogram(
+        "Base composition (Read 1):",
+        *data['read1']['bases'])
+    _print()
+    _print_base_histogram(
+        "Base composition (Read 2):",
+        *data['read2']['bases'])
+    _print()
+    if 'tile_base_qualities' in data['read1']:
+        _print_tile_histogram(
+            "Per-tile base qualities (Read 1):",
+            *data['read1']['tile_base_qualities'],
+            index_cols=('Position', 'Tile'),
+            index_widths=(25, 5))
+        _print()
+        _print_tile_histogram(
+            "Per-tile base qualities (Read 2):",
+            *data['read2']['tile_base_qualities'],
+            index_cols=('Position', 'Tile'),
+            index_widths=(25, 5))
+        _print()
 
 def sizeof(*x):
     if isinstance(x[0], str):
