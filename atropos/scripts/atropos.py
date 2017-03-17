@@ -379,6 +379,20 @@ class Command(object):
             finally:
                 summary['timing'] = timing.summarize()
         
+        if rc == 0:
+            report_file = options.report_file
+            if report_file == '-':
+                if options.quiet:
+                    report_file = None
+                else:
+                    report_file = 'stderr' if options.output is None else 'stdout'
+            
+            if report_file:
+                logging.getLogger().debug("Generating report file")
+                generate_reports(summary, report_file, options.report_formats)
+            else:
+                logging.getLogger().debug("Not generating report file")
+        
         return (rc, summary)
 
 class TrimCommand(Command):

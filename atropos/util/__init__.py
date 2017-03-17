@@ -196,7 +196,6 @@ def merge_dicts(dest, src):
         if dest.get(k, None) is None:
             dest[k] = v_src
         elif v_src is not None:
-            print(k)
             dest[k] = merge_values(dest[k], v_src)
 
 def merge_values(v_dest, v_src):

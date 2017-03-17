@@ -1,7 +1,7 @@
 import importlib
 import os
 
-def generate_reports(summary, report_file, report_formats=None, quiet=False):
+def generate_reports(summary, report_file, report_formats=None):
     """Generate report(s) from a summary.
     """
     if not report_file:
@@ -21,7 +21,7 @@ def generate_reports(summary, report_file, report_formats=None, quiet=False):
     for fmt, outfile in zip(report_formats, report_files):
         #try:
         mod = importlib.import_module("atropos.reports.{}".format(fmt))
-        mod.generate_report(summary, outfile, quiet)
+        mod.generate_report(summary, outfile)
         #except:
         #    from atropos.reports.jinja import generate_report
         #    generate_report(fmt, summary, outfile)

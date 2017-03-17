@@ -1,4 +1,4 @@
-N# coding: utf-8
+# coding: utf-8
 """Routines for printing a report. This is the legacy code for generating
 text-based reports. This will eventually be deprecated in favor of the jinja
 and multiqc reports.
@@ -114,8 +114,11 @@ def print_report(summary, outfile):
         summary: Summary dict.
         outfile: Open output stream.
     """
+    #from pprint import pprint
+    #with open('summary.dump.txt', 'w') as o:
+    #    pprint(summary, o)
     
-    paired = summary["paired"]
+    paired = summary["options"]["paired"]
     pairs_or_reads = "Pairs" if paired else "Reads"
     total_bp = sum(summary['total_bp_counts'])
     max_width = len(str(total_bp))
@@ -139,13 +142,14 @@ def print_report(summary, outfile):
         adapter_cutter = modifiers['AdapterCutter']
     elif 'InsertAdaptercutter' in modifiers:
         adapter_cutter = modifiers['InsertAdapterCutter']
+    correction_enabled = summary["options"]["correct_mismatches"]
     corrected = None
     trimmers = []
     for name, mod in modifers.items():
-        if 'records_corrected' in mod:
-            corrected = mod
-        elif 'bp_trimmed' in mod:
+        if 'bp_trimmed' in mod:
             trimmers.append((name, mod))
+        if correction_enabled and 'records_corrected' in mod:
+            corrected = mod
     
     _print("Wallclock time: {0:.2F} s ({1:.0F} us/read; {2:.2F} M reads/minute).".format(
         timing["wallclock"],
