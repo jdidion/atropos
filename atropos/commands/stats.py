@@ -63,63 +63,6 @@ class BaseNestedDicts(BaseDicts):
         ])
 
 class ReadStatistics(object):
-    """Manages :class:`ReadStatCollector`s for pre- and post-trimming stats.
-    
-    Args:
-        tile_key_regexp: Regular expression to parse read names and capture the
-            read's 'tile' ID.
-    """
-    def __init__(self, mode, paired, **kwargs):
-        self.mode = mode
-        self.paired = paired
-        self.pre = None
-        self.post = None
-        self.collector_args = kwargs
-        
-        if mode in ('pre', 'both'):
-            self.pre = self._make_collectors()
-        if mode in ('post', 'both'):
-            self.post = {}
-    
-    def _make_collectors(self):
-        return [
-            ReadStatCollector(**self.collector_args)
-            for i in range(2 if self.paired else 1)]
-    
-    def pre_trim(self, record):
-        if self.pre is None:
-            return
-        if self.paired:
-            self.pre[0].collect(record[0])
-            self.pre[1].collect(record[1])
-        else:
-            self.pre[0].collect(record)
-    
-    def post_trim(self, dest, record):
-        if self.post is None:
-            return
-        if dest not in self.post:
-            self.post[dest] = self._make_collectors()
-        post = self.post[dest]
-        post[0].collect(record[0])
-        if self.paired:
-            post[1].collect(record[1])
-    
-    def finish(self):
-        result = {}
-        if self.pre is not None:
-            result['pre'] = dict(
-                ('read{}'.format(read), stats.finish())
-                for read, stats in enumerate(self.pre, 1))
-        if self.post is not None:
-            result['post'] = {}
-            for dest, collectors in self.post.items():
-                result[post][dest] = dict(
-                    ('read{}'.format(read), stats.finish())
-                    for read, stats in enumerate(collectors, 1))
-        return result
-
-class ReadStatCollector(object):
     def __init__(self, qualities=None, tile_key_regexp=None):
         # max read length
         self.max_read_len = 0
@@ -183,7 +126,7 @@ class ReadStatCollector(object):
     def track_tiles(self):
         return self.qualities and self.tile_key_regexp is not None
     
-    def collect(self, record):
+    def collect_record(self, record):
         if self.qualities is None and record.qualities:
             self.qualities = True
             self._init_qualities()
@@ -236,17 +179,38 @@ class ReadStatCollector(object):
             if self.track_tiles:
                 self.tile_base_qualities.extend(new_size)
     
-    def finish(self):
-        result = dict(
+    def summarize(self):
+        summary = dict(
             count=self.count,
             length=self.sequence_lengths.sorted_items(),
             gc=self.sequence_gc.sorted_items(),
             bases=self.bases.flatten(datatype="n"))
         if self.sequence_qualities:
-            result['qualities'] = self.sequence_qualities.sorted_items()
+            summary['qualities'] = self.sequence_qualities.sorted_items()
         if self.base_qualities:
-            result['base_qualities'] = self.base_qualities.flatten(datatype="q")
+            summary['base_qualities'] = self.base_qualities.flatten(datatype="q")
         if self.track_tiles:
-            result['tile_base_qualities'] = self.tile_base_qualities.flatten(datatype="q")
-            result['tile_sequence_qualities'] = self.tile_sequence_qualities.flatten(shape="wide")
-        return result
+            summary['tile_base_qualities'] = self.tile_base_qualities.flatten(datatype="q")
+            summary['tile_sequence_qualities'] = self.tile_sequence_qualities.flatten(shape="wide")
+        return summary
+
+class SingleEndReadStatistics(ReadStatistics):
+    def collect(self, read1, read2=None):
+        self.collect_record(read1)
+    
+    def summarize(self):
+        return dict(read1=super().summarize())
+
+class PairedEndReadStatistics(object):
+    def __init__(self, **kwargs):
+        self.read1 = ReadStatistics(**kwargs)
+        self.read2 = ReadStatistics(**kwargs)
+    
+    def collect(self, read1, read2):
+        self.read1.collect_record(read1)
+        self.read2.collect_record(read2)
+    
+    def summarize(self):
+        return dict(
+            read1=self.read1.summarize(),
+            read2=self.read2.summarize())

@@ -8,7 +8,7 @@ import textwrap
 
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
-from atropos.commands.stats import *
+from atropos.commands.stats import SingleEndReadStatistics, PairedEndReadStatistics
 from atropos.adapters import AdapterParser, BACK, load_known_adapters
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
@@ -38,7 +38,7 @@ class TrimPipeline(Pipeline):
     def finish(self, summary, worker=None):
         self.result_handler.finish()
         super().finish(summary)
-        summary['trim'] = self.record_handler.summarize()
+        summary.update(self.record_handler.summarize())
 
 class RecordHandler(object):
     def __init__(self, modifiers, filters, formatters):
@@ -53,15 +53,16 @@ class RecordHandler(object):
         return (dest, reads)
     
     def summarize(self):
-        return dict(
+        return dict(trim=dict(
             modifiers=self.modifiers.summarize(),
             filters=self.filters.summarize(),
-            formatters=self.formatters.summarize())
+            formatters=self.formatters.summarize()))
 
 class StatsRecordHandlerWrapper(object):
     def __init__(self, record_handler, paired, mode='both', **kwargs):
         self.record_handler = record_handler
-        self.paired = paired
+        self.read_statistics_class = (
+            PairedEndReadStatistics if paired else SingleEndReadStatistics)
         self.pre = self.post = None
         if mode in ('pre', 'both'):
             self.pre = {}
@@ -80,23 +81,22 @@ class StatsRecordHandlerWrapper(object):
         return (dest, reads)
     
     def collect(self, stats, source, read1, read2=None):
-        if self.paired:
-            self._collect(stats, source[0], read1)
-            self._collect(stats, source[1], read2)
-        else:
-            self._collect(stats, source, read1)
-    
-    def _collect(self, stats, source, read):
         if source not in stats:
-            stats[source] = ReadStatCollector(**self.stats_kwargs)
-        stats[source].collect(read)
+            stats[source] = self.read_statistics_class(**self.stats_kwargs)
+        stats[source].collect(read1, read2)
     
     def summarize(self):
         summary = self.record_handler.summarize()
-        if self.pre:
-            summary['pre'] = self.pre
-        if self.post:
-            summary['post'] = self.post
+        if self.pre is not None:
+            summary['pre'] = dict(
+                (source, stats.summarize())
+                for source, stats in self.pre.items())
+        if self.post is not None:
+            summary['post'] = {}
+            for dest, stats_dict in self.post.items():
+                summary['post'][dest.name] = dict(
+                    (source, stats.summarize())
+                    for source, stats in stats_dict.items())
         return summary
 
 class ResultHandler(object):
@@ -865,7 +865,7 @@ def run_parallel(
         def summary_fail_callback():
             missing_summaries = set(range(1, threads)) - seen_summaries
             raise AtroposError("Missing summaries from processes {}".format(
-                ",".join(str(s) for s in missing)))
+                ",".join(str(s) for s in missing_summaries)))
         
         for i in range(1, threads+1):
             batch = dequeue(summary_queue, fail_callback=summary_fail_callback)

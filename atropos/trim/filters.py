@@ -149,6 +149,8 @@ class TrimmedFilter(object):
         return read.match is not None
 
 class NoFilter(object):
+    name = "NoFilter"
+    
     def __call__(self, read):
         return False
 

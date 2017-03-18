@@ -35,11 +35,11 @@ class Printer(object):
         print(file=self.outfile)
 
 class TitlePrinter(Printer):
-    def __init__(self, outfile, levels=(('=', '='), ('-', None)), **kwargs):
+    def __init__(self, outfile, levels=(('=', '='), ('-', None), ('~', None)), **kwargs):
         super().__init__(outfile, **kwargs)
         self.levels = levels
     
-    def __call__(self, *title, level=None, **kwargs):
+    def __call__(self, *title, level=None, newline=True, **kwargs):
         title = ' '.join(title)
         
         if level:
@@ -57,7 +57,8 @@ class TitlePrinter(Printer):
         if level and underline:
             self._print(underline * width, **kwargs)
         
-        self.newline()
+        if newline:
+            self.newline()
 
 class RowPrinter(Printer):
     def __init__(
@@ -116,9 +117,6 @@ class RowPrinter(Printer):
                 max(w, len(a))
                 for w, a in zip(colwidths, args))
         
-        #print(args)
-        #print(colwidths, justification, indent)
-        
         fmt_str = []
         fmt_args = []
         for i, (value, width, just, ind) in enumerate(
@@ -145,6 +143,10 @@ class RowPrinter(Printer):
             self._print(ul, **kwargs)
 
 def generate_report(summary, outfile):
+    # from pprint import pprint
+    # with open('summary.dump.txt', 'w') as o:
+    #     pprint(summary, o)
+    
     is_path = isinstance(outfile, str)
     if is_path:
         outfile = open(outfile, 'wt')
@@ -152,9 +154,10 @@ def generate_report(summary, outfile):
         print_summary_report(summary, outfile)
         if 'trim' in summary:
             print_trim_report(summary, outfile)
-        for phase in ('pre', 'post'):
-            if phase in summary:
-                print_stats_report(summary, phase, outfile)
+        if 'pre' in summary:
+            print_pre_trim_report(summary, outfile)
+        if 'post' in summary:
+            print_post_trim_report(summary, outfile)
     finally:
         if is_path:
             outfile.close()
@@ -179,10 +182,6 @@ def print_trim_report(summary, outfile):
         summary: Summary dict.
         outfile: Open output stream.
     """
-    # from pprint import pprint
-    # with open('summary.dump.txt', 'w') as o:
-    #     pprint(summary, o)
-    
     paired = summary["options"]["paired"]
     pairs_or_reads = "Pairs" if paired else "Reads"
     total_bp = sum(summary['total_bp_counts'])
@@ -483,11 +482,38 @@ def print_adapter_report(adapters, outfile, paired, N, max_width):
             'One or more of your adapter sequences may be incomplete. '
             'Please see the detailed output above.'))
 
-def print_stats_report(summary, phase, outfile):
-    data = summary[phase]
-    title = ("Pre" if phase == 'pre' else "Post") + "-trimming stats"
+def print_pre_trim_report(summary, outfile):
+    pre = summary['pre']
+    _print_title = TitlePrinter(outfile)
+    _print = Printer(outfile)
+    _print_title("Pre-trimming stats", level=1)
+    for source, data in pre.items():
+        _print_title("Source", level=3, newline=False)
+        for read, src in enumerate(source, 1):
+            _print("Read {}: {}".format(read, src))
+        _print()
+        print_stats_report(data, outfile)
+    
+def print_post_trim_report(summary, outfile):
+    post = summary['post']
+    _print_title = TitlePrinter(outfile)
+    _print = Printer(outfile)
+    _print_title("Post-trimming stats", level=1)
+    for dest, stats in post.items():
+        _print_title("Destination: {}".format(dest), level=2)
+        for source, data in stats.items():
+            _print_title("Source", level=3, newline=False)
+            for read, src in enumerate(source, 1):
+                _print("Read {}: {}".format(read, src))
+            _print()
+            print_stats_report(data, outfile)
+
+def print_stats_report(data, outfile):
     paired = 'read2' in data
-    max_width = len(str(max(data['read1']['count'], data['read2']['count'])))
+    max_count = data['read1']['count']
+    if paired:
+        max_count = max(max_count, data['read2']['count'])
+    max_width = len(str(max_count))
     # add space for commas and column separation
     max_width += (max_width // 3) + 1
     
@@ -495,7 +521,7 @@ def print_stats_report(summary, phase, outfile):
     _print = RowPrinter(outfile, (35, max_width))
     
     def _print_histogram(title, hist1, hist2=None):
-        _print_title(title, 2)
+        _print_title(title, level=2)
         if hist2:
             hist = ((h1[0], h1[1], h2[1]) for h1, h2 in zip(hist1, hist2))
         else:
@@ -504,7 +530,7 @@ def print_stats_report(summary, phase, outfile):
             _print(*h)
     
     def _print_base_histogram(title, col_names, hist):
-        _print_title(title, 2)
+        _print_title(title, level=2)
         _print('Position', *col_names, extra_width=4)
         for row in hist:
             total_count = sum(row[1:])
@@ -515,7 +541,7 @@ def print_stats_report(summary, phase, outfile):
     
     def _print_tile_histogram(
             title, value_cols, hist, index_cols=('Tile',), index_widths=(5,)):
-        _print_title(title, 2)
+        _print_title(title, level=2)
         ncol = len(value_cols)
         # As far as I know, tiles are max 4 digits
         max_width = max(
@@ -525,8 +551,7 @@ def print_stats_report(summary, phase, outfile):
         for row in hist:
             _print(*row, extra_width=max_width)
     
-    _print_title(title, 1)
-    _print('', 'Read1', 'Read2')
+    _print('', 'Read1', 'Read2', level=1)
     
     # Sequence-level stats
     _print(
@@ -546,48 +571,48 @@ def print_stats_report(summary, phase, outfile):
             data['read2']['qualities'])
         _print()
     _print_histogram(
-        "Sequence GC content (%):",
+        "Sequence GC content (%)",
         data['read1']['gc'],
         data['read2']['gc'])
     _print()
     
     if 'tile_sequence_qualities' in data['read1']:
         _print_tile_histogram(
-            "Per-tile sequence qualities (Read 1):",
+            "Read 1 per-tile sequence qualities (%)",
             *data['read1']['tile_sequence_qualities'])
         _print()
         _print_tile_histogram(
-            "Per-tile sequence qualities (Read 2):",
+            "Read 2 per-tile sequence qualities (%)",
             *data['read2']['tile_sequence_qualities'])
         _print()
     
     # Base-level stats
     if 'base_qualities' in data['read1']:
         _print_base_histogram(
-            "Base qualities (Read 1):",
+            "Read 1 base qualities (%)",
             *data['read1']['base_qualities'])
         _print()
         _print_base_histogram(
-            "Base qualities (Read 2):",
+            "Read 2 base qualities (%)",
             *data['read2']['base_qualities'])
         _print()
     _print_base_histogram(
-        "Base composition (Read 1):",
+        "Read 1 base composition (%)",
         *data['read1']['bases'])
     _print()
     _print_base_histogram(
-        "Base composition (Read 2):",
+        "Read 2 base composition (%)",
         *data['read2']['bases'])
     _print()
     if 'tile_base_qualities' in data['read1']:
         _print_tile_histogram(
-            "Per-tile base qualities (Read 1):",
+            "Read 1 per-tile base qualities (%)",
             *data['read1']['tile_base_qualities'],
             index_cols=('Position', 'Tile'),
             index_widths=(35, 5))
         _print()
         _print_tile_histogram(
-            "Per-tile base qualities (Read 2):",
+            "Read 2 per-tile base qualities (%)",
             *data['read2']['tile_base_qualities'],
             index_cols=('Position', 'Tile'),
             index_widths=(35, 5))
