@@ -62,12 +62,13 @@ class TitlePrinter(Printer):
 class RowPrinter(Printer):
     def __init__(
             self, outfile, colwidths=10, justification=('<', '>'), indent='',
-            pct=False, **kwargs):
+            pct=False, default=0, **kwargs):
         super().__init__(outfile, **kwargs)
         self.colwidths = (colwidths,) if isinstance(colwidths, int) else tuple(colwidths)
         self.justification = (justification,) if isinstance(justification, str) else tuple(justification)
         self.indent = (indent,) if isinstance(indent, str) else tuple(indent)
         self.pct = pct
+        self.default = default
     
     def print_rows(self, *rows, header=None, **kwargs):
         colwidths = tuple(sizeof(*x) for x in zip(*rows))
@@ -81,7 +82,7 @@ class RowPrinter(Printer):
     def __call__(
             self, *args, colwidths=None, extra_width=None, justification=None,
             extra_justification=None, indent=None, extra_indent=None,
-            header=False, underline='-', pct=None, **kwargs):
+            header=False, underline='-', pct=None, default=None, **kwargs):
         
         ncols = len(args)
         if ncols == 0:
@@ -122,6 +123,8 @@ class RowPrinter(Printer):
         fmt_args = []
         for i, (value, width, just, ind) in enumerate(
                 zip(args, colwidths, justification, indent)):
+            if value is None:
+                value = default or self.default
             if isinstance(value, str):
                 typ = 's'
                 if len(value) > width:
@@ -160,12 +163,13 @@ def print_summary_report(summary, outfile):
     _print = Printer(outfile)
     N = summary["total_record_count"]
     timing = summary['timing']
-    
     _print("Start time: {}".format(timing['start']))
-    _print("Wallclock time: {0:.2F} s ({1:.0F} us/read; {2:.2F} M reads/minute)".format(
-        timing["wallclock"],
-        1E6 * timing["wallclock"] / N,
-        N / timing["wallclock"] * 60 / 1E6))
+    wc = ["Wallclock time: {:.2F} s".format(timing["wallclock"])]
+    if N > 0:
+        wc.append("({0:.0F} us/read; {1:.2F} M reads/minute)".format(
+            1E6 * timing["wallclock"] / N,
+            N / timing["wallclock"] * 60 / 1E6))
+    _print(*wc)
     _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
     _print()
 
@@ -175,9 +179,9 @@ def print_trim_report(summary, outfile):
         summary: Summary dict.
         outfile: Open output stream.
     """
-    #from pprint import pprint
-    #with open('summary.dump.txt', 'w') as o:
-    #    pprint(summary, o)
+    from pprint import pprint
+    with open('summary.dump.txt', 'w') as o:
+        pprint(summary, o)
     
     paired = summary["options"]["paired"]
     pairs_or_reads = "Pairs" if paired else "Reads"
@@ -217,12 +221,19 @@ def print_trim_report(summary, outfile):
     _print(pairs_or_reads, 'records', 'fraction', header=True)
     _print("Total {} processed".format('read pairs' if paired else 'reads'), N)
     if adapter_cutter:
-        for read in range(2 if paired else 1):
+        if paired:
+            for read in range(2):
+                _print(
+                    "Read {} with adapter".format(read+1),
+                    adapter_cutter['records_with_adapters'][read],
+                    adapter_cutter['fraction_records_with_adapters'][read],
+                    indent=('  ', ''), pct=True)
+        else:
             _print(
-                "Read{} with adapter".format(' {}'.format(read+1) if paired else 's'),
-                adapter_cutter['records_with_adapters'][read],
-                adapter_cutter['fraction_records_with_adapters'][read],
-                indent=('  ', ''), pct=True)
+                "Reads with adapter",
+                adapter_cutter['records_with_adapters'][0],
+                adapter_cutter['fraction_records_with_adapters'][0],
+                pct=True)
     
     def _print_filter(name, sep):
         if name in filters:
@@ -255,18 +266,19 @@ def print_trim_report(summary, outfile):
                 "Read {}".format(read+1), summary['total_bp_counts'][read],
                 indent=('  ', ''))
     
-    def _print_bp(title, d, key):
+    def _print_bp(title, d, key, default=0):
         if paired:
             _print(
                 title, d['total_{}'.format(key)],
                 d['fraction_total_{}'.format(key)], pct=True)
             for read in range(2):
                 _print(
-                    "Read {}".format(read+1), d[key][read],
-                    d['fraction_{}'.format(key)][read], indent=('  ', ''),
-                    pct=True)
+                    "Read {}".format(read+1),
+                    d[key][read],
+                    d['fraction_{}'.format(key)][read],
+                    indent=('  ', ''), pct=True)
         else:
-            _print(title, d[key], d['fraction_{}'.format(key)], pct=True)
+            _print(title, d[key][0], d['fraction_{}'.format(key)][0], pct=True)
     
     for name, mod in trimmers:
         _print_bp(mod['desc'], mod, 'bp_trimmed')
@@ -282,11 +294,16 @@ def print_trim_report(summary, outfile):
         print_adapter_report(adapters, outfile, paired, N, max_width)
 
 def print_adapter_report(adapters, outfile, paired, N, max_width):
-    max_seq_len = max(
-        (len(a['front_sequence'] + a['back_sequence'] + 3)
-            if a['where']['name'] == 'linked' else len(a['sequence']))
-        for pair in adapters
-        for a in pair.values())
+    adapter_lenghts = []
+    for pair in adapters:
+        if pair:
+            for a in pair.values():
+                if a['where']['name'] == 'linked':
+                    adapter_lenghts.append(
+                        len(a['front_sequence'] + a['back_sequence'] + 3))
+                else:
+                    adapter_lenghts.append(len(a['sequence']))
+    max_seq_len = max(adapter_lenghts)
     
     _print = Printer(outfile)
     _print_title = TitlePrinter(outfile)
@@ -375,6 +392,9 @@ def print_adapter_report(adapters, outfile, paired, N, max_width):
         
     warning = False
     for pair in range(2 if paired else 1):
+        if adapters[pair] is None:
+            continue
+        
         header = "Adapter {}"
         if paired:
             header = ('First read: ' if pair == 0 else 'Second read: ') + header
@@ -419,11 +439,14 @@ def print_adapter_report(adapters, outfile, paired, N, max_width):
                 _print()
                 print_error_ranges(seq_len, adapter["max_error_rate"])
                 _print("Overview of removed sequences (5'):")
-                hist_args = (seq_len, N, adapter["max_error_rate"], adapter["errors_front"])
-                print_histogram(adapter["lengths_front"], *hist_args)
+                print_histogram(
+                    adapter["lengths_front"], seq_len, N,
+                    adapter["max_error_rate"], adapter["errors_front"])
                 _print()
                 _print("Overview of removed sequences (3' or within):")
-                print_histogram(adapter["lengths_back"], *hist_args)
+                print_histogram(
+                    adapter["lengths_back"], seq_len, N,
+                    adapter["max_error_rate"], adapter["errors_back"])
             
             elif where_name == "linked":
                 print_error_ranges(front_len, adapter["front_max_error_rate"])

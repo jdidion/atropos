@@ -5,6 +5,7 @@ import re
 from atropos.util import CountingDict, NestedDict, qual2int
 
 DEFAULT_TILE_KEY_REGEXP = "@(((?:[^\:]+)\:){5})"
+"""Regexp for the default Illumina read name format."""
 
 class BaseDicts(object):
     def __init__(self):
@@ -132,14 +133,18 @@ class ReadStatCollector(object):
         self.bases = BaseCountingDicts()
         
         # whether to collect base quality stats
-        if tile_key_regexp is True:
-            tile_key_regexp = DEFAULT_TILE_KEY_REGEXP
-        if isinstance(tile_key_regexp, str):
-            tile_key_regexp = re.compile(regexp)
-        self.tile_key_regexp = tile_key_regexp
         self.qualities = qualities
-        self.sequence_qualities = self.base_qualities = self.tile_base_qualities = None
+        self.tile_key_regexp = None
+        self.sequence_qualities = None
+        self.base_qualities = None
+        self.tile_base_qualities = None
+        
         if qualities:
+            if tile_key_regexp is True:
+                tile_key_regexp = DEFAULT_TILE_KEY_REGEXP
+            if isinstance(tile_key_regexp, str):
+                tile_key_regexp = re.compile(regexp)
+            self.tile_key_regexp = tile_key_regexp
             self._init_qualities()
         
         # cache of computed values

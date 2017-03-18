@@ -1,6 +1,7 @@
 import importlib
 import os
 import sys
+from atropos.io import STDOUT, STDERR
 
 def generate_reports(summary, report_file, report_formats=None):
     """Generate report(s) from a summary.
@@ -8,12 +9,12 @@ def generate_reports(summary, report_file, report_formats=None):
     Args:
         report_file: File name (if generating a single )
     """
-    if report_file in ('-', 'stdout', 'stderr'):
-        report_file = (sys.stderr if report_file == 'stderr' else sys.stdout,)
+    if report_file in (STDOUT, STDERR):
+        report_files = (sys.stderr if report_file == STDERR else sys.stdout,)
         if not report_formats:
             report_formats = ('txt',)
         elif len(report_formats) > 1:
-            report_file = report_file * len(report_formats)
+            report_files = report_file * len(report_formats)
     else:
         file_parts = os.path.splitext(report_file)
         if not report_formats:

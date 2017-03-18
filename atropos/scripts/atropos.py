@@ -387,11 +387,11 @@ class Command(object):
         
         if rc == 0 and self.options.report_file:
             report_file = self.options.report_file
-            if report_file == '-':
+            if report_file in (STDOUT, STDERR):
                 if self.options.quiet:
                     report_file = None
-                else:
-                    report_file = 'stderr' if self.options.output is None else 'stdout'
+                elif report_file == '-':
+                    report_file = STDERR if self.options.output is None else STDOUT
             
             if report_file:
                 logging.getLogger().debug("Generating report file")
@@ -754,7 +754,7 @@ standard input/output. Without the -o option, output is sent to standard output.
                 "are discarded)")
         group.add_argument(
             "--report-file",
-            type=writeable_file, default=None, metavar="FILE",
+            type=writeable_file, default="-", metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)")
         group.add_argument(
             "--report-formats",
@@ -770,12 +770,14 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "pre=only compute pre-trimming stats; post=only compute "
                  "post-trimming stats; both=compute both pre- and post-trimming "
                  "stats. (both)")
-        group.add_argument(
+        tile_group = group.add_mutually_exclusive_group()
+        tile_group.add_argument(
             "--tile-stats",
-            action="store_true", default=False,
+            action="store_true", dest="tile_key_regexp",
             help="Enable collection of tile statistics using the default regular "
-                 "expression for Illumina reads.")
-        group.add_argument(
+                 "expression for Illumina reads; use --tile-key-regexp in "
+                 "addition/instead to specifiy a custom regexp.")
+        tile_group.add_argument(
             "--tile-key-regexp",
             default=None,
             help="Regular expression to extract key portions of read names to "
@@ -1203,7 +1205,7 @@ command with '--stats pre'.
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file, dest='report_file', metavar="FILE",
+            type=writeable_file, dest='report_file', default="-", metavar="FILE",
             help="Write stats to file rather than stdout.")
         
         group = self.add_group(
@@ -1215,12 +1217,14 @@ command with '--stats pre'.
                 "is treated as a prefix and the appropriate extensions are "
                 "appended. If unspecified, the format is guessed from the "
                 "output file extension.")
-        group.add_argument(
+        tile_group = group.add_mutually_exclusive_group()
+        tile_group.add_argument(
             "--tile-stats",
-            action="store_true", default=False,
+            action="store_true", dest="tile_key_regexp",
             help="Enable collection of tile statistics using the default regular "
-                 "expression for Illumina reads.")
-        group.add_argument(
+                 "expression for Illumina reads; use --tile-key-regexp in "
+                 "addition/instead to specifiy a custom regexp.")
+        tile_group.add_argument(
             "--tile-key-regexp",
             nargs="?", const="^(?:[^\:]+\:){4}([^\:]+)", default=None,
             help="Regular expression to extract key portions of read names to "

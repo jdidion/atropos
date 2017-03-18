@@ -867,9 +867,10 @@ class SingleEndModifiers(Modifiers):
         summary = {}
         for mods in self.modifiers:
             mod = mods[0]
-            mod_summary = mod.summarize()
-            mod_summary['desc'] = mod.description
-            summary[mod.name] = (mod_summary,)
+            summary[mod.name] = dict(
+                (key, (value,))
+                for key, value in mod.summarize().items())
+            summary[mod.name]['desc'] = mod.description
         return summary
 
 class PairedEndModifiers(Modifiers):
@@ -942,7 +943,7 @@ class PairedEndModifiers(Modifiers):
                             keys = s2.keys()
                 if keys:
                     summary[name] = dict(
-                        (key, [s1.get(key, None), s2.get(key, None)])
+                        (key, (s1.get(key, None), s2.get(key, None)))
                         for key in keys)
                     summary[name]['desc'] = desc
         return summary

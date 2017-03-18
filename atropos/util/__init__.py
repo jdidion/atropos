@@ -193,6 +193,7 @@ def merge_dicts(dest, src):
         if dest.get(k, None) is None:
             dest[k] = v_src
         elif v_src is not None:
+            print(k)
             dest[k] = merge_values(dest[k], v_src)
 
 def merge_values(v_dest, v_src):
@@ -219,7 +220,7 @@ def merge_values(v_dest, v_src):
         i_dest = tuple(v_dest)
         i_src = tuple(v_src)
         if len(i_dest) == 0:
-            v_dest = i_dest
+            v_dest = i_src
         elif len(i_src) > 0:
             v_dest = [merge_values(d, s) for d, s in zip(i_dest, i_src)]
     else:

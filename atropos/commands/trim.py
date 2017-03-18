@@ -1,6 +1,6 @@
 """Implementation of the 'trim' command.
 """
-from collections import Iterable, defaultdict
+from collections import Sequence, defaultdict
 import logging
 import os
 import sys
@@ -450,10 +450,16 @@ def execute(options, summary):
             return (v / total) if v and total != 0 else 0
         
         def _post_process(d):
+            if d is None:
+                return
             for key, value in tuple(d.items()):
+                if value is None:
+                    continue
                 if isinstance(value, dict):
                     _post_process(value)
-                elif isinstance(value, tuple) and len(value) > 0 and isinstance(value[0], dict):
+                elif (isinstance(value, Sequence) and
+                        len(value) > 0 and
+                        all(v is None or isinstance(v, dict) for v in value)):
                     for v in value:
                         _post_process(v)
                 else:
@@ -463,7 +469,7 @@ def execute(options, summary):
                     if isinstance(key, str):
                         if key.startswith('records_'):
                             frac_key = "fraction_{}".format(key)
-                            if isinstance(value, Iterable):
+                            if isinstance(value, Sequence):
                                 d[frac_key] = [frac(v, total_records) for v in value]
                                 total = sum(v for v in value if v)
                                 d["total_{}".format(key)] = total
@@ -472,7 +478,7 @@ def execute(options, summary):
                                 d[frac_key] = frac(value, total_records)
                         elif key.startswith('bp_'):
                             frac_key = "fraction_{}".format(key)
-                            if isinstance(value, Iterable):
+                            if isinstance(value, Sequence):
                                 d[frac_key] = [
                                     frac(v, b)
                                     for v, b in zip(value, total_bp)]
