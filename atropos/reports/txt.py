@@ -179,9 +179,9 @@ def print_trim_report(summary, outfile):
         summary: Summary dict.
         outfile: Open output stream.
     """
-    from pprint import pprint
-    with open('summary.dump.txt', 'w') as o:
-        pprint(summary, o)
+    # from pprint import pprint
+    # with open('summary.dump.txt', 'w') as o:
+    #     pprint(summary, o)
     
     paired = summary["options"]["paired"]
     pairs_or_reads = "Pairs" if paired else "Reads"

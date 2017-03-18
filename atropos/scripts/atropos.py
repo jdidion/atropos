@@ -770,14 +770,13 @@ standard input/output. Without the -o option, output is sent to standard output.
                  "pre=only compute pre-trimming stats; post=only compute "
                  "post-trimming stats; both=compute both pre- and post-trimming "
                  "stats. (both)")
-        tile_group = group.add_mutually_exclusive_group()
-        tile_group.add_argument(
+        group.add_argument(
             "--tile-stats",
-            action="store_true", dest="tile_key_regexp",
+            action="store_true",
             help="Enable collection of tile statistics using the default regular "
                  "expression for Illumina reads; use --tile-key-regexp in "
                  "addition/instead to specifiy a custom regexp.")
-        tile_group.add_argument(
+        group.add_argument(
             "--tile-key-regexp",
             default=None,
             help="Regular expression to extract key portions of read names to "
@@ -1142,6 +1141,9 @@ standard input/output. Without the -o option, output is sent to standard output.
             if len(options.cut_min2) == 2 and options.cut_min2[0] * options.cut_min2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
         
+        if options.tile_stats and not options.tile_key_regexp:
+            options.tile_key_regexp = True
+        
         if options.threads is not None:
             threads = _configure_threads(options, parser)
             
@@ -1217,14 +1219,13 @@ command with '--stats pre'.
                 "is treated as a prefix and the appropriate extensions are "
                 "appended. If unspecified, the format is guessed from the "
                 "output file extension.")
-        tile_group = group.add_mutually_exclusive_group()
-        tile_group.add_argument(
+        group.add_argument(
             "--tile-stats",
-            action="store_true", dest="tile_key_regexp",
+            action="store_true",
             help="Enable collection of tile statistics using the default regular "
                  "expression for Illumina reads; use --tile-key-regexp in "
                  "addition/instead to specifiy a custom regexp.")
-        tile_group.add_argument(
+        group.add_argument(
             "--tile-key-regexp",
             nargs="?", const="^(?:[^\:]+\:){4}([^\:]+)", default=None,
             help="Regular expression to extract key portions of read names to "
@@ -1258,6 +1259,8 @@ command with '--stats pre'.
                 self.parser.error("Read queue size must be >= than 'threads'")
         if self.options.batch_size is None:
             self.options.batch_size = 1000
+        if self.options.tile_stats and not self.options.tile_key_regexp:
+            self.options.tile_key_regexp = True
 
 class DetectCommand(Command):
     """Detect adapter and other contaminant sequences."""
