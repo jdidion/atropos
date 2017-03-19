@@ -379,8 +379,9 @@ class Command(object):
                 rc = atropos.commands.execute_command(
                     self.name, self.options, summary)
             except Exception as e:
-                raise
-                summary['error'] = e
+                summary['error'] = dict(
+                    message=str(e),
+                    details=sys.exc_info())
                 rc = 1
             finally:
                 summary['timing'] = timing.summarize()
@@ -1207,7 +1208,7 @@ command with '--stats pre'.
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file, dest='report_file', default="-", metavar="FILE",
+            type=writeable_file, default="-", metavar="FILE",
             help="Write stats to file rather than stdout.")
         
         group = self.add_group(
@@ -1251,6 +1252,7 @@ command with '--stats pre'.
             help="Size of queue for batches of reads to be processed. (THREADS * 100)")
     
     def validate_command_options(self):
+        self.options.report_file = self.options.output
         if self.options.threads is not None:
             _configure_threads(self.options, self.parser)
             if self.options.read_queue_size is None:
@@ -1383,7 +1385,8 @@ def main_from_commandline():
     if 'error' in summary:
         err = summary['error']
         if err:
-            logging.getLogger().error(err)
+            logging.getLogger().error(
+                "Unexpected error: %s", err['message'], exc_info=err['details'])
     sys.exit(rc)
 
 def main(args):

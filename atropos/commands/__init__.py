@@ -1,6 +1,7 @@
 import copy
 import importlib
 import logging
+import sys
 from atropos.io.seqio import open_reader
 
 class Pipeline(object):
@@ -19,7 +20,9 @@ class Pipeline(object):
             if raise_on_error:
                 raise
             else:
-                summary['error'] = e
+                summary['error'] = dict(
+                    message=str(e),
+                    details=sys.exc_info())
         finally:
             self.finish(summary, **kwargs)
     

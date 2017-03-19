@@ -8,9 +8,6 @@ import sys
 import textwrap
 from atropos.util import truncate_string
 
-# TODO: Fix https://github.com/marcelm/cutadapt/issues/128,
-# https://github.com/marcelm/cutadapt/issues/112
-
 INDENT = '    '
 paragraph = textwrap.TextWrapper()
 indented = textwrap.TextWrapper(initial_indent=INDENT, subsequent_indent=INDENT)
@@ -143,9 +140,9 @@ class RowPrinter(Printer):
             self._print(ul, **kwargs)
 
 def generate_report(summary, outfile):
-    # from pprint import pprint
-    # with open('summary.dump.txt', 'w') as o:
-    #     pprint(summary, o)
+    from pprint import pprint
+    with open('summary.dump.txt', 'w') as o:
+        pprint(summary, o)
     
     is_path = isinstance(outfile, str)
     if is_path:
@@ -551,7 +548,7 @@ def print_stats_report(data, outfile):
         for row in hist:
             _print(*row, extra_width=max_width)
     
-    _print('', 'Read1', 'Read2', level=1)
+    _print('', 'Read1', 'Read2', underline=True)
     
     # Sequence-level stats
     _print(

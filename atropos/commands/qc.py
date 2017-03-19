@@ -4,54 +4,62 @@
 import logging
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
-from atropos.reports.txt import print_read_stats
-from atropos.commands.stats import Summary, ReadStatistics
+from atropos.commands.stats import SingleEndReadStatistics, PairedEndReadStatistics
+from atropos.util import run_interruptible
 
 class QcPipeline(Pipeline):
-    def __init__(self, **kwargs):
+    def __init__(self, read_statistics_class, **kwargs):
         super().__init__()
+        self.read_statistics_class = read_statistics_class
         self.stats = {}
         self.stats_kwargs = kwargs
     
     def _get_stats(self, source):
         if source not in self.stats:
-            self.stats[source] = ReadStatCollector(**self.stats_kwargs)
+            self.stats[source] = self.read_statistics_class(**self.stats_kwargs)
         return self.stats[source]
+    
+    def handle_reads(self, context, read1, read2=None):
+        self._get_stats(context['source']).collect(read1, read2)
+    
+    def finish(self, summary, worker=None):
+        super().finish(summary)
+        summary['pre'] = dict(
+            (source, stats.summarize())
+            for source, stats in self.stats.items())
 
 class SingleEndQcPipeline(SingleEndPipelineMixin, QcPipeline):
-    def handle_reads(self, context, read):
-        self._get_stats(context['batch_source']).collect(read)
+    def __init__(self, **kwargs):
+        super().__init__(SingleEndReadStatistics, **kwargs)
 
 class PairedEndQcPipeline(PairedEndPipelineMixin, QcPipeline):
-    def handle_reads(self, context, read1, read2):
-        src1, src2 = context['batch_source']
-        self._get_stats(src1).collect(read1)
-        self._get_stats(src2).collect(read2)
+    def __init__(self, **kwargs):
+        super().__init__(PairedEndReadStatistics, **kwargs)
 
 def execute(options, summary):
     reader, names, qualities, _ = create_reader(options)
-    
-    if options.paired:
-        pipeline_class = PairedEndQcPipeline
-    else:
-        pipeline_class = SingleEndQcPipeline
-    
+    pipeline_class = PairedEndQcPipeline if options.paired else SingleEndQcPipeline
     pipeline_args = dict(
         qualities=qualities,
         tile_key_regexp=options.tile_key_regexp)
     
     if options.threads is None:
         summary.update(mode='serial', threads=1)
-        rc = run_interruptible(pipeline_class(**pipeline_args), reader, summary)
+        pipeline = pipeline_class(**pipeline_args)
+        rc = run_interruptible(pipeline, reader, summary)
     else:
         summary.update(mode='parallel', threads=options.threads)
         rc = run_parallel(
-            reader, pipeline_args, summary, options.threads,
+            reader, pipeline_class, pipeline_args, summary, options.threads,
             options.process_timeout, options.read_queue_size)
+    
+    reader.close()
     
     return rc
 
-def run_parallel(reader, pipeline_args, summary, threads=2, timeout=30, input_queue_size=0):
+def run_parallel(
+        reader, pipeline_class, pipeline_args, summary, threads=2,
+        timeout=30, input_queue_size=0):
     """Execute qc in parallel mode.
     
     Args:
@@ -69,8 +77,6 @@ def run_parallel(reader, pipeline_args, summary, threads=2, timeout=30, input_qu
         ParallelPipelineMixin, MulticoreError, launch_workers, ensure_processes,
         enqueue_all, dequeue)
     
-    pipeline_class = type('QcPipelineImpl', (ParallelPipelineMixin, pipeline_class))
-    
     logging.getLogger().debug(
         "Starting atropos qc in parallel mode with threads={}, timeout={}".format(
         threads, timeout))
@@ -87,14 +93,15 @@ def run_parallel(reader, pipeline_args, summary, threads=2, timeout=30, input_qu
     
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
-    worker_args = (input_queue, summary_queue, timeout, read_stats)
-    worker_processes = launch_workers(
-        threads - 1, worker_args, worker_class=QcWorker)
+    pipeline_class = type('QcPipelineImpl', (ParallelPipelineMixin, pipeline_class))
+    pipeline = pipeline_class(**pipeline_args)
+    worker_args = (input_queue, pipeline, summary_queue, timeout, read_stats)
+    worker_processes = launch_workers(threads - 1, worker_args)
     
     def ensure_alive():
         ensure_processes(worker_processes)
     
-    def _run():
+    def _run(worker_processes):
         # Add batches of reads to the input queue. Provide a timeout callback
         # to check that subprocesses are alive.
         num_batches = enqueue_all(reader, input_queue, timeout, ensure_alive)
@@ -106,8 +113,7 @@ def run_parallel(reader, pipeline_args, summary, threads=2, timeout=30, input_qu
         
         # Now that the reader process is done, it essentially
         # frees up another thread to use for a worker
-        worker_processes += launch_workers(
-            1, worker_args, offset=threads-1, worker_class=QcWorker)
+        worker_processes.extend(launch_workers(1, worker_args, offset=threads-1))
         
         # Wait for all summaries to be available on queue
         def summary_timeout_callback():

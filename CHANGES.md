@@ -3,13 +3,12 @@
 v1.1.0 (dev)
 -------------
 * In progress:
-    * New 'qc' command computes read-level statistics.
-    * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
-    * Major refactoring and improvement of reporting.
     * Added optional dependency on jinja2, which enables generating reports using templates.
     * Integration with MultiQC.
-    * Major internal code reorganization.
-    * Fix for Cutadapt #128
+* New 'qc' command computes read-level statistics.
+* The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
+* Major refactoring and improvement of reporting.
+* Major internal code reorganization.
 * Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
 * Switched to pytest for testing
 * Fixed adapter masking in InsertAligner (issue #7, thanks @lllaaa).

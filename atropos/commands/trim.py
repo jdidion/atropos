@@ -492,44 +492,11 @@ def execute(options, summary):
     
     return rc
 
-# stats["written_fraction"] = 0
-# stats["too_short_fraction"] = 0
-# stats["too_long_fraction"] = 0
-# stats["too_many_n_fraction"] = 0
-# stats["with_adapters_fraction"] = [0, 0]
-# stats["total_written_bp_fraction"] = 0.0
-# for modifier_class in self.trimmer_classes:
-#     name = modifier_class.__name__
-#     stats["{}_fraction".format(name)] = 0.0
-#
-# N = stats["N"]
-# if N > 0:
-#     stats["written_fraction"] = stats["written"] / N if stats["written"] else 0
-#     stats["too_short_fraction"] = stats["too_short"] / N if stats["too_short"] else 0
-#     stats["too_long_fraction"] = stats["too_long"] / N if stats["too_long"] else 0
-#     stats["too_many_n_fraction"] = stats["too_many_n"] / N if stats["too_many_n"] else 0
-#     stats["with_adapters_fraction"] = [ (v / N) for v in stats["with_adapters"] ]
-#     if "corrected" in stats:
-#         stats["corrected_fraction"] = stats["corrected"] / N
-#
-# if stats["total_bp"] > 0:
-#     N = stats["total_bp"]
-#     stats["total_written_bp_fraction"] = (stats["total_written_bp"] / N) if stats["total_written_bp"] else 0
-#     if "corrected" in stats:
-#         stats["corrected_bp_fraction"] = [ (c / N) for c in stats["corrected_bp"] ]
-#         stats["total_corrected_bp_fraction"] = stats["total_corrected_bp"] / N
-#     for modifier_class in self.trimmer_classes:
-#         name = modifier_class.__name__
-#         if stats[name]:
-#             stats["{}_fraction".format(name)] = (stats[name] / N)
-
 def run_parallel(
         reader, record_handler, writers, mixin_class, summary,
         threads=2, timeout=30, preserve_order=False, input_queue_size=0,
         result_queue_size=0, use_writer_process=True, compression=None):
-    """Parallel implementation of run_atropos.
-    
-    Works as follows:
+    """Parallel implementation of run_atropos. Works as follows:
     
     1. Main thread creates N worker processes (where N is the number of threads
     to be allocated) and (optionally) one writer process.

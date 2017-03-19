@@ -66,8 +66,6 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 * Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
     * Integrate with MultiQC
-    * https://github.com/marcelm/cutadapt/issues/112
-    * https://github.com/marcelm/cutadapt/issues/128
     * Also look at the QCML used in ngs-bits
 * Add developer/contributor documentation and guidelines.
 * Static code analysis (pylint).
@@ -108,7 +106,9 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 ### 2.0
 
 * Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
-* Performance enhancments using
+* Consider adding additional report formats
+    * https://github.com/marcelm/cutadapt/issues/112
+* Performance enhancements using
     * http://numba.pydata.org/
     * https://github.com/undefx/vecpy
     * https://github.com/serge-sans-paille/pythran
