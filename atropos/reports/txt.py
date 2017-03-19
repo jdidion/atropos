@@ -140,9 +140,9 @@ class RowPrinter(Printer):
             self._print(ul, **kwargs)
 
 def generate_report(summary, outfile):
-    from pprint import pprint
-    with open('summary.dump.txt', 'w') as o:
-        pprint(summary, o)
+    # from pprint import pprint
+    # with open('summary.dump.txt', 'w') as o:
+    #     pprint(summary, o)
     
     is_path = isinstance(outfile, str)
     if is_path:

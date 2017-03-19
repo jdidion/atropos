@@ -24,9 +24,8 @@ The original error message follows.
 """.format(sys.executable))
         raise
 
-def get_package_data(subdir, path):
-    return os.path.join(
-        os.path.abspath(os.path.dirname(__file__)), subdir, path)
+def get_package_path(*relpath):
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), *relpath)
 
 class AtroposError(Exception):
     """Base class for Atropos-specific errors.
