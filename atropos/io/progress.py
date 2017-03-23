@@ -149,6 +149,8 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
                 raise
         
         def close(self):
+            """Finish the progress bar and close the underlying iterator.
+            """
             if not self.done:
                 self.finish()
                 self.done = True
@@ -161,6 +163,7 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
         """Custom widget that formats the value using a specified magnitude.
         """
         def __init__(self, mag_format):
+            super().__init__()
             self._format = mag_format
     
         def __call__(self, progress, data):

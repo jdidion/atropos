@@ -39,9 +39,13 @@ class SequenceReader(object):
     
     @property
     def name(self):
+        """The underlying file name.
+        """
         return self._file.name
     
     def close(self):
+        """Close the underlying file.
+        """
         if self._close_on_exit and self._file is not None:
             self._file.close()
             self._file = None
@@ -144,6 +148,8 @@ class FileWithPrependedLine(object):
             yield line
     
     def close(self):
+        """Close the underlying file.
+        """
         self._file.close()
 
 class FastaReader(SequenceReader):
@@ -252,6 +258,8 @@ class FastaQualReader(object):
                 fastaread.name, fastaread.sequence, qualities)
     
     def close(self):
+        """Close the underlying files.
+        """
         self.fastareader.close()
         self.qualreader.close()
     
@@ -341,6 +349,8 @@ class PairedSequenceReader(object):
             yield (read1, read2)
     
     def close(self):
+        """Close the underlying files.
+        """
         self.reader1.close()
         self.reader2.close()
     
@@ -380,6 +390,8 @@ class InterleavedSequenceReader(object):
             yield (read1, read2)
     
     def close(self):
+        """Close the underlying reader.
+        """
         self.reader.close()
 
     def __enter__(self):
@@ -412,6 +424,11 @@ class SAMReader(object):
         import pysam
         return self._iter(pysam.AlignmentFile(self._file))
     
+    def _iter(self, sam):
+        """Create an iterator over records in the SAM/BAM file.
+        """
+        raise NotImplementedError()
+    
     def __enter__(self):
         return self
     
@@ -419,6 +436,8 @@ class SAMReader(object):
         self.close()
     
     def close(self):
+        """Close the underling AlignmentFile.
+        """
         if self._close_on_exit and self._file is not None:
             self._file.close()
             self._file = None
@@ -654,6 +673,8 @@ class FastaFormat(SequenceFileFormat):
         return self.format_entry(read.name, read.sequence)
     
     def format_entry(self, name, sequence):
+        """Convert a sequence record to a string.
+        """
         if self.text_wrapper:
             sequence = self.text_wrapper.fill(sequence)
         return "".join((">", name, "\n", sequence, "\n"))
@@ -672,6 +693,8 @@ class FastqFormat(SequenceFileFormat):
             read.name, read.sequence, read.qualities, read.name2)
     
     def format_entry(self, name, sequence, qualities, name2=""):
+        """Convert a sequence record to a string.
+        """
         return "".join((
             '@', name, '\n',
             sequence, '\n+',
@@ -722,8 +745,7 @@ class InterleavedFormatter(SingleEndFormatter):
     def format(self, result, read1, read2=None):
         result[self.file1].extend((
             self.seq_format.format(read1),
-            self.seq_format.format(read2)
-        ))
+            self.seq_format.format(read2)))
         self.written += 1
         self.read1_bp += len(read1)
         self.read2_bp += len(read2)

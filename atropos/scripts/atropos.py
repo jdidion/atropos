@@ -46,6 +46,11 @@ class TypeWithArgs(object): # pylint: disable=no-member
     
     def __call__(self, string):
         return self._do_call(string, *self.args, **self.kwargs) or string
+    
+    def _do_call(string, *args, **kwargs):
+        """Convert and/or validate `string`.
+        """
+        raise NotImplementedError()
 
 class CompositeType(object):
     """A composite of multiple data types.
@@ -211,6 +216,8 @@ probability = between(0, 1, float)
 
 class Command(object):
     """Base class for Atropos sub-commands.
+    
+    Subclasses must define name, description, and usage members.
     """
     def __init__(self, args):
         self.orig_args = copy.copy(args)

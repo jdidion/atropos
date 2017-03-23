@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import textwrap
+from atropos import AtroposError
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
 from atropos.commands import load_known_adapters
@@ -12,9 +13,18 @@ from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
 # TODO: Only import used members
-from atropos.trim.modifiers import *
-from atropos.trim.filters import *
-from atropos.trim.writers import *
+from atropos.trim.modifiers import (
+    AdapterCutter, DoubleEncoder, InsertAdapterCutter, LengthTagModifier,
+    MergeOverlapping, MinCutter, NEndTrimmer, NextseqQualityTrimmer,
+    NonDirectionalBisulfiteTrimmer, OverwriteRead, PairedEndModifiers,
+    PrefixSuffixAdder, PrimerTrimmer, QualityTrimmer, RRBSTrimmer,
+    SingleEndModifiers, SuffixRemover, SwiftBisulfiteTrimmer,
+    UnconditionalCutter, ZeroCapper)
+from atropos.trim.filters import (
+    FilterFactory, Filters, MergedReadFilter, NContentFilter, NoFilter,
+    TooLongReadFilter, TooShortReadFilter, TrimmedFilter, UntrimmedFilter)
+from atropos.trim.writers import (
+    Formatters, InfoFormatter, RestFormatter, WildcardFormatter, Writers)
 from atropos.io import STDOUT
 from atropos.util import RandomMatchProbability, Const, run_interruptible
 
