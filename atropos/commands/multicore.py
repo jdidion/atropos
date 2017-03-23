@@ -1,4 +1,4 @@
-"""Classes and methods to support parallel operations.
+"""Classes and methods to support parallelization of operations.
 """
 from collections import defaultdict
 import inspect
@@ -20,22 +20,46 @@ CONTROL_ERROR = -1
 """Controlled process should exit."""
 
 class MulticoreError(AtroposError):
+    """Base error for parallel processes.
+    """
     pass
 
 class Control(object):
     """Shared (long) value for passing control information between main and
     worker threads.
+    
+    Args:
+        initial_value: Initial value of the shared control variable.
     """
     def __init__(self, initial_value=CONTROL_ACTIVE):
         self.control = Value('l', initial_value)
     
     def check_value(self, value, lock=False):
+        """Check that the current control value == `value`.
+        
+        Args:
+            value: The value to check.
+            lock: Whether to lock the shared variable before checking.
+        
+        Returns:
+            True if the values are equal.
+        """
         return self.get_value(lock=lock) == value
     
     def check_value_positive(self, lock=False):
+        """Check that the current control value is positive.
+        
+        Args:
+            lock: Whether to lock the shared variable before checking.
+        """
         return self.get_value(lock=lock) > 0
     
     def get_value(self, lock=True):
+        """Returns the current control value.
+        
+        Args:
+            lock: Whether to lock the shared variable before checking.
+        """
         if lock:
             with self.control.get_lock():
                 return self.control.value
@@ -43,6 +67,11 @@ class Control(object):
             return self.control.value
     
     def set_value(self, value):
+        """Set the control value. The shared variable is always locked.
+        
+        Args:
+            value: The value to set.
+        """
         with self.control.get_lock():
             self.control.value = value
 
