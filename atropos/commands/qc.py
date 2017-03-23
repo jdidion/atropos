@@ -4,10 +4,13 @@
 import logging
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
-from atropos.commands.stats import SingleEndReadStatistics, PairedEndReadStatistics
+from atropos.commands.stats import (
+    SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.util import run_interruptible
 
 class QcPipeline(Pipeline):
+    """Base Pipeline for the qc command.
+    """
     def __init__(self, read_statistics_class, **kwargs):
         super().__init__()
         self.read_statistics_class = read_statistics_class
@@ -29,16 +32,29 @@ class QcPipeline(Pipeline):
             for source, stats in self.stats.items())
 
 class SingleEndQcPipeline(SingleEndPipelineMixin, QcPipeline):
+    """QcPipeline for single-end data.
+    """
     def __init__(self, **kwargs):
         super().__init__(SingleEndReadStatistics, **kwargs)
 
 class PairedEndQcPipeline(PairedEndPipelineMixin, QcPipeline):
+    """QcPipeline for paired-end data.
+    """
     def __init__(self, **kwargs):
         super().__init__(PairedEndReadStatistics, **kwargs)
 
 def execute(options, summary):
-    reader, names, qualities, _ = create_reader(options)
-    pipeline_class = PairedEndQcPipeline if options.paired else SingleEndQcPipeline
+    """Execute the qc command.
+    
+    Args:
+        options: Command-line options.
+        summary: The summary dict.
+    """
+    reader, _, qualities, _ = create_reader(options)
+    if options.paired:
+        pipeline_class = PairedEndQcPipeline
+    else:
+        pipeline_class = SingleEndQcPipeline
     pipeline_args = dict(
         qualities=qualities,
         tile_key_regexp=options.tile_key_regexp)
@@ -46,16 +62,16 @@ def execute(options, summary):
     if options.threads is None:
         summary.update(mode='serial', threads=1)
         pipeline = pipeline_class(**pipeline_args)
-        rc = run_interruptible(pipeline, reader, summary)
+        retcode = run_interruptible(pipeline, reader, summary)
     else:
         summary.update(mode='parallel', threads=options.threads)
-        rc = run_parallel(
+        retcode = run_parallel(
             reader, pipeline_class, pipeline_args, summary, options.threads,
             options.process_timeout, options.read_queue_size)
     
     reader.close()
     
-    return rc
+    return retcode
 
 def run_parallel(
         reader, pipeline_class, pipeline_args, summary, threads=2,
@@ -75,11 +91,11 @@ def run_parallel(
     from multiprocessing import Queue
     from atropos.commands.multicore import (
         ParallelPipelineMixin, MulticoreError, launch_workers, ensure_processes,
-        enqueue_all, dequeue)
+        enqueue_all, dequeue, wait_on, wait_on_process, RETRY_INTERVAL)
     
     logging.getLogger().debug(
-        "Starting atropos qc in parallel mode with threads={}, timeout={}".format(
-        threads, timeout))
+        "Starting atropos qc in parallel mode with threads=%d, timeout=%d",
+        threads, timeout)
     
     if threads < 2:
         raise ValueError("'threads' must be >= 2")
@@ -93,12 +109,15 @@ def run_parallel(
     
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
-    pipeline_class = type('QcPipelineImpl', (ParallelPipelineMixin, pipeline_class))
+    pipeline_class = type(
+        'QcPipelineImpl', (ParallelPipelineMixin, pipeline_class))
     pipeline = pipeline_class(**pipeline_args)
-    worker_args = (input_queue, pipeline, summary_queue, timeout, read_stats)
+    worker_args = (input_queue, pipeline, summary_queue, timeout)
     worker_processes = launch_workers(threads - 1, worker_args)
     
     def ensure_alive():
+        """Ensure that all worker processes have not terminated.
+        """
         ensure_processes(worker_processes)
     
     def _run(worker_processes):
@@ -106,23 +125,28 @@ def run_parallel(
         # to check that subprocesses are alive.
         num_batches = enqueue_all(reader, input_queue, timeout, ensure_alive)
         logging.getLogger().debug(
-            "Main loop complete; saw {} batches".format(num_batches))
+            "Main loop complete; saw %d batches", num_batches)
         
         # Tell the worker processes no more input is coming
         enqueue_all((None,) * threads, input_queue, timeout, ensure_alive)
         
         # Now that the reader process is done, it essentially
         # frees up another thread to use for a worker
-        worker_processes.extend(launch_workers(1, worker_args, offset=threads-1))
+        worker_processes.extend(
+            launch_workers(1, worker_args, offset=threads-1))
         
         # Wait for all summaries to be available on queue
         def summary_timeout_callback():
+            """Ensure that worker processes are still alive while waiting for
+            summaries.
+            """
             try:
-                ensure_processes(worker_processes,
+                ensure_processes(
+                    worker_processes,
                     "Workers are still alive and haven't returned summaries: {}",
                     alive=False)
-            except Exception as e:
-                logging.getLogger().error(e)
+            except Exception as err:
+                logging.getLogger().error(err)
         
         wait_on(
             lambda: summary_queue.full(),
@@ -137,11 +161,14 @@ def run_parallel(
         seen_summaries = set()
         seen_batches = set()
         def summary_fail_callback():
+            """Raise exception if any summaries are missing.
+            """
             missing_summaries = set(range(1, threads)) - seen_summaries
-            raise MulticoreError("Missing summaries from processes {}".format(
-                ",".join(str(s) for s in missing)))
+            raise MulticoreError(
+                "Missing summaries from processes {}".format(
+                    ",".join(str(s) for s in missing_summaries)))
         
-        for i in range(1, threads+1):
+        for _ in range(1, threads+1):
             batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
             worker_index, worker_batches, worker_summary = batch
             if worker_summary is None:
@@ -149,7 +176,7 @@ def run_parallel(
                     "Worker process {} died unexpectedly".format(worker_index))
             else:
                 logging.getLogger().debug(
-                    "Processing summary for worker {}".format(worker_index))
+                    "Processing summary for worker %d", worker_index)
             seen_summaries.add(worker_index)
             seen_batches |= worker_batches
             summary.merge(worker_summary)
@@ -158,19 +185,22 @@ def run_parallel(
         if num_batches > 0:
             missing_batches = set(range(1, num_batches+1)) - seen_batches
             if len(missing_batches) > 0:
-                raise MulticoreError("Workers did not process batches {}".format(
-                    ",".join(str(b) for b in missing_batches)))
+                raise MulticoreError(
+                    "Workers did not process batches {}".format(
+                        ",".join(str(b) for b in missing_batches)))
     
-    rc = run_interruptible(_run, worker_processes)
+    retcode = run_interruptible(_run, worker_processes)
     
     # notify all threads that they should stop
     logging.getLogger().debug("Exiting all processes")
     def kill(process):
-        if rc <= 1:
-            wait_on_process(process, terminate=True)
+        """Kill a process if it fails to terminate on its own.
+        """
+        if retcode <= 1:
+            wait_on_process(process, timeout, terminate=True)
         elif process.is_alive():
             process.terminate()
     for process in worker_processes:
         kill(process)
     
-    return rc
+    return retcode

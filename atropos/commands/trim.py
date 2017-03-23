@@ -5,13 +5,13 @@ import logging
 import os
 import sys
 import textwrap
-
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
 from atropos.commands import load_known_adapters
 from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
+# TODO: Only import used members
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
@@ -19,6 +19,12 @@ from atropos.io import STDOUT
 from atropos.util import RandomMatchProbability, Const, run_interruptible
 
 class TrimPipeline(Pipeline):
+    """Base trimming pipeline.
+    
+    Args:
+        record_handler:
+        result_handler:
+    """
     def __init__(self, record_handler, result_handler):
         super().__init__()
         self.record_handler = record_handler
@@ -43,24 +49,39 @@ class TrimPipeline(Pipeline):
         summary.update(self.record_handler.summarize())
 
 class RecordHandler(object):
+    """Base class for record handlers.
+    """
     def __init__(self, modifiers, filters, formatters):
         self.modifiers = modifiers
         self.filters = filters
         self.formatters = formatters
     
     def handle_record(self, context, read1, read2=None):
+        """Handle a pair of reads.
+        """
         reads = self.modifiers.modify(read1, read2)
         dest = self.filters.filter(*reads)
         self.formatters.format(context['results'], dest, *reads)
         return (dest, reads)
     
     def summarize(self):
+        """Returns a summary dict.
+        """
         return dict(trim=dict(
             modifiers=self.modifiers.summarize(),
             filters=self.filters.summarize(),
             formatters=self.formatters.summarize()))
 
 class StatsRecordHandlerWrapper(object):
+    """Wrapper around a record handler that collects read statistics
+    before and/or after trimming.
+    
+    Args:
+        record_handler:
+        paired: Whether reads are paired-end.
+        mode: Collection mode; pre=only collect pre-trim stats; post=only
+            collect post-trim stats; both=collect both pre- and post-trim stats.
+    """
     def __init__(self, record_handler, paired, mode='both', **kwargs):
         self.record_handler = record_handler
         self.read_statistics_class = (
@@ -73,6 +94,8 @@ class StatsRecordHandlerWrapper(object):
         self.stats_kwargs = kwargs
     
     def handle_record(self, context, read1, read2=None):
+        """Handle a pair of reads.
+        """
         if self.pre is not None:
             self.collect(self.pre, context['source'], read1, read2)
         dest, reads = self.record_handler.handle_record(context, read1, read2)
@@ -83,11 +106,20 @@ class StatsRecordHandlerWrapper(object):
         return (dest, reads)
     
     def collect(self, stats, source, read1, read2=None):
+        """Collect stats on a pair of reads.
+        
+        Args:
+            stats: The :class:`ReadStatistics` object.
+            source: The source file(s).
+            read1, read2: The reads.
+        """
         if source not in stats:
             stats[source] = self.read_statistics_class(**self.stats_kwargs)
         stats[source].collect(read1, read2)
     
     def summarize(self):
+        """Returns a summary dict.
+        """
         summary = self.record_handler.summarize()
         if self.pre is not None:
             summary['pre'] = dict(
@@ -102,13 +134,28 @@ class StatsRecordHandlerWrapper(object):
         return summary
 
 class ResultHandler(object):
+    """Base class for result handlers.
+    """
     def start(self, worker):
+        """Start the result handler.
+        """
         pass
     
     def finish(self, total_batches=None):
+        """Finish the result handler.
+        
+        Args:
+            total_batches: Total number of batches processed.
+        """
         pass
     
     def write_result(self, batch_num, result):
+        """Write a batch of results to output.
+        
+        Args:
+            batch_num: The batch number.
+            result: The result to write.
+        """
         raise NotImplementedError()
 
 class ResultHandlerWrapper(ResultHandler):
@@ -130,11 +177,9 @@ class WorkerResultHandler(ResultHandlerWrapper):
     """Wraps a ResultHandler and compresses results prior to writing.
     """
     def write_result(self, batch_num, result):
-        """
-        Given a dict mapping files to lists of strings,
-        join the strings and compress them (if necessary)
-        and then return the property formatted result
-        dict.
+        """Given a dict mapping files to lists of strings, join the strings and
+        compress them (if necessary) and then return the property formatted
+        result dict.
         """
         self.handler.write_result(
             batch_num, dict(
@@ -142,11 +187,21 @@ class WorkerResultHandler(ResultHandlerWrapper):
                 for item in result.items()))
     
     def prepare_file(self, path, strings):
+        """Prepare data for writing.
+        
+        Returns:
+            Tuple (path, data).
+        """
         return (path, "".join(strings))
 
 class WriterResultHandler(ResultHandler):
-    """
-    ResultHandler that writes results to disk.
+    """ResultHandler that writes results to disk.
+    
+    Args:
+        writers: :class:`Writers` object.
+        compressed: Whether the data is compressed.
+        use_suffix: Whether to add the worker index as a file suffix. Used for
+            parallel-write mode.
     """
     def __init__(self, writers, compressed=False, use_suffix=False):
         self.writers = writers
@@ -164,7 +219,13 @@ class WriterResultHandler(ResultHandler):
         self.writers.close()
 
 def execute(options, summary):
-    reader, input_names, qualities, has_qual_file = create_reader(options)
+    """Execute the trim command.
+    
+    Args:
+        options: Command-line options.
+        summary: The summary dict.
+    """
+    reader, _, qualities, has_qual_file = create_reader(options)
     
     if options.adapter_max_rmp or options.aligner == 'insert':
         match_probability = RandomMatchProbability()
@@ -204,20 +265,23 @@ def execute(options, summary):
     # Create Modifiers
     
     # TODO: can this be replaced with an argparse required group?
-    if not adapters1 and not adapters2 and not options.quality_cutoff and \
-            options.nextseq_trim is None and \
-            options.cut == [] and options.cut2 == [] and \
-            options.cut_min == [] and options.cut_min2 == [] and \
-            (options.minimum_length is None or options.minimum_length <= 0) and \
-            options.maximum_length == sys.maxsize and \
-            not has_qual_file and options.max_n is None and not options.trim_n \
-            and (not options.paired or options.overwrite_low_quality is None):
+    if (
+            not adapters1 and not adapters2 and not options.quality_cutoff and
+            options.nextseq_trim is None and
+            options.cut == [] and options.cut2 == [] and
+            options.cut_min == [] and options.cut_min2 == [] and
+            (options.minimum_length is None or options.minimum_length <= 0) and
+            options.maximum_length == sys.maxsize and
+            not has_qual_file and options.max_n is None and not options.trim_n
+            and (not options.paired or options.overwrite_low_quality is None)):
         raise ValueError("You need to provide at least one adapter sequence.")
     
-    if options.aligner == 'insert' and any(
-            not a or len(a) != 1 or a[0].where != BACK
-            for a in (adapters1, adapters2)):
-        raise ValueError("Insert aligner requires a single 3' adapter for each read")
+    if (
+            options.aligner == 'insert' and any(
+                not a or len(a) != 1 or a[0].where != BACK
+                for a in (adapters1, adapters2))):
+        raise ValueError(
+            "Insert aligner requires a single 3' adapter for each read")
     
     if options.debug:
         for adapter in adapters1 + adapters2:
@@ -227,15 +291,16 @@ def execute(options, summary):
         modifiers = PairedEndModifiers(options.paired)
     else:
         modifiers = SingleEndModifiers()
-            
-    for op in options.op_order:
-        if op == 'W' and options.overwrite_low_quality:
+    
+    for oper in options.op_order:
+        if oper== 'W' and options.overwrite_low_quality:
             lowq, highq, window = options.overwrite_low_quality
-            modifiers.add_modifier(OverwriteRead,
+            modifiers.add_modifier(
+                OverwriteRead,
                 worse_read_min_quality=lowq, better_read_min_quality=highq,
                 window_size=window, base=options.quality_base)
             
-        elif op == 'A' and (adapters1 or adapters2):
+        elif oper == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
                 # Use different base probabilities if we're trimming bisulfite
@@ -246,11 +311,14 @@ def execute(options, summary):
                 #   base_probs = dict(match_prob=0.33, mismatch_prob=0.67)
                 # else:
                 #   base_probs = dict(match_prob=0.25, mismatch_prob=0.75)
-                modifiers.add_modifier(InsertAdapterCutter,
-                    adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
+                modifiers.add_modifier(
+                    InsertAdapterCutter,
+                    adapter1=adapters1[0], adapter2=adapters2[0],
+                    action=options.action,
                     mismatch_action=options.correct_mismatches,
                     max_insert_mismatch_frac=options.insert_match_error_rate,
-                    max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
+                    max_adapter_mismatch_frac=\
+                        options.insert_match_adapter_error_rate,
                     match_probability=match_probability,
                     insert_max_rmp=options.insert_max_rmp)
             else:
@@ -263,15 +331,18 @@ def execute(options, summary):
                     times=options.times,
                     action=options.action) if adapters2 else None
                 modifiers.add_modifier_pair(AdapterCutter, a1_args, a2_args)
-        elif op == 'C' and (options.cut or options.cut2):
-            modifiers.add_modifier_pair(UnconditionalCutter,
+        elif oper == 'C' and (options.cut or options.cut2):
+            modifiers.add_modifier_pair(
+                UnconditionalCutter,
                 dict(lengths=options.cut),
                 dict(lengths=options.cut2))
-        elif op == 'G' and (options.nextseq_trim is not None):
-            modifiers.add_modifier(NextseqQualityTrimmer,
+        elif oper == 'G' and (options.nextseq_trim is not None):
+            modifiers.add_modifier(
+                NextseqQualityTrimmer,
                 read=1, cutoff=options.nextseq_trim, base=options.quality_base)
-        elif op == 'Q' and options.quality_cutoff:
-            modifiers.add_modifier(QualityTrimmer,
+        elif oper == 'Q' and options.quality_cutoff:
+            modifiers.add_modifier(
+                QualityTrimmer,
                 cutoff_front=options.quality_cutoff[0],
                 cutoff_back=options.quality_cutoff[1],
                 base=options.quality_base)
@@ -279,7 +350,8 @@ def execute(options, summary):
     if options.bisulfite:
         if isinstance(options.bisulfite, str):
             if "non-directional" in options.bisulfite:
-                modifiers.add_modifier(NonDirectionalBisulfiteTrimmer,
+                modifiers.add_modifier(
+                    NonDirectionalBisulfiteTrimmer,
                     rrbs=options.bisulfite=="non-directional-rrbs")
             elif options.bisulfite == "rrbs":
                 modifiers.add_modifier(RRBSTrimmer)
@@ -291,18 +363,20 @@ def execute(options, summary):
                 modifiers.add_modifier(SwiftBisulfiteTrimmer)
         else:
             if options.bisulfite[0]:
-                modifiers.add_modifier(MinCutter, read=1, **(options.bisulfite[0]))
+                modifiers.add_modifier(
+                    MinCutter, read=1, **(options.bisulfite[0]))
             if len(options.bisulfite) > 1 and options.bisulfite[1]:
-                modifiers.add_modifier(MinCutter, read=2, **(options.bisulfite[1]))
+                modifiers.add_modifier(
+                    MinCutter, read=2, **(options.bisulfite[1]))
     
     if options.trim_n:
         modifiers.add_modifier(NEndTrimmer)
     
     if options.cut_min or options.cut_min2:
-        modifiers.add_modifier_pair(MinCutter,
+        modifiers.add_modifier_pair(
+            MinCutter,
             dict(lengths=options.cut_min),
-            dict(lengths=options.cut_min2)
-        )
+            dict(lengths=options.cut_min2))
     
     if options.length_tag:
         modifiers.add_modifier(LengthTagModifier, length_tag=options.length_tag)
@@ -311,7 +385,8 @@ def execute(options, summary):
         modifiers.add_modifier(SuffixRemover, suffixes=options.strip_suffix)
     
     if options.prefix or options.suffix:
-        modifiers.add_modifier(PrefixSuffixAdder, prefix=options.prefix, suffix=options.suffix)
+        modifiers.add_modifier(
+            PrefixSuffixAdder, prefix=options.prefix, suffix=options.suffix)
     
     if options.double_encode:
         modifiers.add_modifier(DoubleEncoder)
@@ -323,7 +398,8 @@ def execute(options, summary):
         modifiers.add_modifier(PrimerTrimmer)
     
     if options.merge_overlapping:
-        modifiers.add_modifier(MergeOverlapping,
+        modifiers.add_modifier(
+            MergeOverlapping,
             min_overlap=options.merge_min_overlap,
             error_rate=options.merge_error_rate,
             mismatch_action=options.correct_mismatches)
@@ -353,18 +429,21 @@ def execute(options, summary):
     if options.merge_overlapping:
         filters.add_filter(MergedReadFilter)
         if options.merged_output:
-            formatters.add_seq_formatter(MergedReadFilter, options.merged_output)
+            formatters.add_seq_formatter(
+                MergedReadFilter, options.merged_output)
         
     if options.minimum_length is not None and options.minimum_length > 0:
         filters.add_filter(TooShortReadFilter, options.minimum_length)
         if options.too_short_output:
-            formatters.add_seq_formatter(TooShortReadFilter,
+            formatters.add_seq_formatter(
+                TooShortReadFilter,
                 options.too_short_output, options.too_short_paired_output)
 
     if options.maximum_length < sys.maxsize:
         filters.add_filter(TooLongReadFilter, options.maximum_length)
         if options.too_long_output is not None:
-            formatters.add_seq_formatter(TooLongReadFilter,
+            formatters.add_seq_formatter(
+                TooLongReadFilter,
                 options.too_long_output, options.too_long_paired_output)
 
     if options.max_n is not None:
@@ -381,22 +460,24 @@ def execute(options, summary):
                 if output2 is not None:
                     force_create.append(output2)
         elif not (options.discard_trimmed and options.untrimmed_output):
-            formatters.add_seq_formatter(NoFilter, default_outfile)
-            if default_outfile != STDOUT and options.writer_process:
-                force_create.append(default_outfile)
+            formatters.add_seq_formatter(NoFilter, options.default_outfile)
+            if options.default_outfile != STDOUT and options.writer_process:
+                force_create.append(options.default_outfile)
     
     if options.discard_untrimmed or options.untrimmed_output:
         filters.add_filter(UntrimmedFilter)
 
     if not options.discard_untrimmed:
         if formatters.multiplexed:
-            untrimmed = options.untrimmed_output or output1.format(name='unknown')
+            untrimmed = options.untrimmed_output or output1.format(
+                name='unknown')
             formatters.add_seq_formatter(UntrimmedFilter, untrimmed)
             formatters.add_seq_formatter(NoFilter, untrimmed)
         elif options.untrimmed_output:
-            formatters.add_seq_formatter(UntrimmedFilter,
+            formatters.add_seq_formatter(
+                UntrimmedFilter,
                 options.untrimmed_output, options.untrimmed_paired_output)
-
+    
     if options.rest_file:
         formatters.add_info_formatter(RestFormatter(options.rest_file))
     if options.info_file:
@@ -404,7 +485,10 @@ def execute(options, summary):
     if options.wildcard_file:
         formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
     
-    mixin_class = PairedEndPipelineMixin if options.paired else SingleEndPipelineMixin
+    if options.paired:
+        mixin_class = PairedEndPipelineMixin
+    else:
+        mixin_class = SingleEndPipelineMixin
     writers = Writers(force_create)
     record_handler = RecordHandler(modifiers, filters, formatters)
     if options.stats:
@@ -414,29 +498,37 @@ def execute(options, summary):
     
     logger = logging.getLogger()
     num_adapters = sum(len(a) for a in modifiers.get_adapters())
-    logger.info("Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
+    logger.info(
+        "Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
         num_adapters, 's' if num_adapters > 1 else '', options.error_rate * 100,
-        { False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end' }[options.paired])
-    if options.paired == 'first' and (
-            len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
-            options.quality_cutoff):
-        logger.warning('\n'.join(textwrap.wrap('WARNING: Requested read '
-            'modifications are applied only to the first '
-            'read since backwards compatibility mode is enabled. '
+        {
+            False: 'single-end',
+            'first': 'paired-end legacy',
+            'both': 'paired-end'
+        }[options.paired])
+    if (
+            options.paired == 'first' and (
+                len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
+                options.quality_cutoff)):
+        logger.warning('\n'.join(textwrap.wrap(
+            'WARNING: Requested read modifications are applied only to the '
+            'first read since backwards compatibility mode is enabled. '
             'To modify both reads, also use any of the -A/-B/-G/-U options. '
             'Use a dummy adapter sequence when necessary: -A XXX')))
     
     if options.threads is None:
         # Run single-threaded version
         result_handler = WorkerResultHandler(WriterResultHandler(writers))
-        pipeline_class = type('TrimPipelineImpl', (mixin_class, TrimPipeline), {})
+        pipeline_class = type(
+            'TrimPipelineImpl', (mixin_class, TrimPipeline), {})
         pipeline = pipeline_class(record_handler, result_handler)
         summary.update(mode='serial', threads=1)
-        rc = run_interruptible(pipeline, reader, summary, raise_on_error=True)
+        retcode = run_interruptible(
+            pipeline, reader, summary, raise_on_error=True)
     else:
         # Run multiprocessing version
         summary.update(mode='parallel', threads=options.threads)
-        rc = run_parallel(
+        retcode = run_parallel(
             reader, record_handler, writers, mixin_class, summary,
             options.threads, options.process_timeout, options.preserve_order,
             options.read_queue_size, options.result_queue_size,
@@ -444,60 +536,71 @@ def execute(options, summary):
     
     reader.close()
     
-    if rc == 0:
+    if retcode == 0:
         # For trim stats, any value with a name that starts with 'records_' will
-        # have 'fraction_<var>' computed as value / total_reads, and any value with a
-        # name that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>'
-        # computed. We also replace any `Const`s with their values.
+        # have 'fraction_<var>' computed as value / total_reads, and any value
+        # with a name that starts with 'bp_' will have 'fraction_<var>' and
+        # 'total_<var>' computed. We also replace any `Const`s with their
+        # values.
         total_records = summary['total_record_count']
         total_bp = summary['total_bp_counts']
         sum_total_bp = sum(total_bp)
         
-        def frac(v, total):
-            return (v / total) if v and total != 0 else 0
+        def frac(val, total):
+            """Compute fraction of total.
+            """
+            return (val / total) if val and total != 0 else 0
         
-        def _post_process(d):
-            if d is None:
+        def _post_process(dict_val):
+            """Compute totals and fractions on elements of the summary dict.
+            """
+            if dict_val is None:
                 return
-            for key, value in tuple(d.items()):
+            for key, value in tuple(dict_val.items()):
                 if value is None:
                     continue
                 if isinstance(value, dict):
                     _post_process(value)
-                elif (isinstance(value, Sequence) and
+                elif (
+                        isinstance(value, Sequence) and
                         len(value) > 0 and
-                        all(v is None or isinstance(v, dict) for v in value)):
-                    for v in value:
-                        _post_process(v)
+                        all(
+                            val is None or isinstance(val, dict)
+                            for val in value)):
+                    for val in value:
+                        _post_process(val)
                 else:
                     if isinstance(value, Const):
                         value = value.value
-                        d[key] = value
+                        dict_val[key] = value
                     if isinstance(key, str):
                         if key.startswith('records_'):
                             frac_key = "fraction_{}".format(key)
                             if isinstance(value, Sequence):
-                                d[frac_key] = [frac(v, total_records) for v in value]
-                                total = sum(v for v in value if v)
-                                d["total_{}".format(key)] = total
-                                d["fraction_total_{}".format(key)] = frac(total, total_records)
+                                dict_val[frac_key] = [
+                                    frac(val, total_records) for val in value]
+                                total = sum(val for val in value if val)
+                                dict_val["total_{}".format(key)] = total
+                                dict_val["fraction_total_{}".format(key)] = \
+                                    frac(total, total_records)
                             else:
-                                d[frac_key] = frac(value, total_records)
+                                dict_val[frac_key] = frac(value, total_records)
                         elif key.startswith('bp_'):
                             frac_key = "fraction_{}".format(key)
                             if isinstance(value, Sequence):
-                                d[frac_key] = [
-                                    frac(v, b)
-                                    for v, b in zip(value, total_bp)]
-                                total = sum(v for v in value if v)
-                                d["total_{}".format(key)] = total
-                                d["fraction_total_{}".format(key)] = frac(total, sum_total_bp)
+                                dict_val[frac_key] = [
+                                    frac(val, bps)
+                                    for val, bps in zip(value, total_bp)]
+                                total = sum(val for val in value if val)
+                                dict_val["total_{}".format(key)] = total
+                                dict_val["fraction_total_{}".format(key)] = \
+                                    frac(total, sum_total_bp)
                             else:
-                                d[frac_key] = frac(value, sum_total_bp)
+                                dict_val[frac_key] = frac(value, sum_total_bp)
         
         _post_process(summary['trim'])
     
-    return rc
+    return retcode
 
 def run_parallel(
         reader, record_handler, writers, mixin_class, summary,
@@ -586,12 +689,17 @@ def run_parallel(
         Control, PendingQueue, ParallelPipelineMixin, MulticoreError,
         launch_workers, ensure_processes, wait_on, wait_on_process, enqueue,
         enqueue_all, dequeue, RETRY_INTERVAL, CONTROL_ACTIVE, CONTROL_ERROR)
-    from atropos.io.compression import get_compressor, can_use_system_compression
+    from atropos.io.compression import (
+        get_compressor, can_use_system_compression)
     
     class Done(MulticoreError):
+        """Raised when process exits normally.
+        """
         pass
     
     class Killed(MulticoreError):
+        """Raised when process exits is killed.
+        """
         pass
     
     class QueueResultHandler(ResultHandler):
@@ -599,6 +707,8 @@ def run_parallel(
         """
         def __init__(self, queue):
             self.queue = queue
+            self.message = None
+            self.timeout = None
         
         def start(self, worker):
             self.message = "{} waiting to queue result {{}}".format(worker.name)
@@ -614,6 +724,10 @@ def run_parallel(
     class CompressingWorkerResultHandler(WorkerResultHandler):
         """Wraps a ResultHandler and compresses results prior to writing.
         """
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.file_compressors = None
+        
         def start(self, worker):
             super().start(worker)
             self.file_compressors = {}
@@ -627,15 +741,21 @@ def run_parallel(
                 return ((path, 'wt'), "".join(strings))
         
         def get_compressor(self, filename):
+            """Returns the file compressor based on the file extension.
+            """
             if filename not in self.file_compressors:
                 self.file_compressors[filename] = get_compressor(filename)
             return self.file_compressors[filename]
 
     class OrderPreservingWriterResultHandler(WriterResultHandler):
+        """Writer thread that is less time/memory efficient, but is guaranteed
+        to preserve the original order of records.
         """
-        Writer thread that is less time/memory efficient, but is
-        guaranteed to preserve the original order of records.
-        """
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.pending = None
+            self.cur_batch = None
+        
         def start(self, worker):
             super().__init__(worker)
             self.pending = PendingQueue()
@@ -649,7 +769,7 @@ def run_parallel(
             else:
                 self.pending.push(batch_num, result)
         
-        def finish(self, total_batches):
+        def finish(self, total_batches=None):
             if total_batches is not None:
                 self.consume_pending()
                 if self.cur_batch != total_batches:
@@ -659,20 +779,26 @@ def run_parallel(
             self.writers.close()
         
         def consume_pending(self):
-            while (not self.pending.empty) and (self.cur_batch == pending.min_priority):
-                self.writers.write_result(pending.pop(), self.compressed)
+            """Consume any remaining items in the queue.
+            """
+            while (
+                    (not self.pending.empty) and
+                    (self.cur_batch == self.pending.min_priority)):
+                self.writers.write_result(self.pending.pop(), self.compressed)
                 self.cur_batch += 1
     
     class ResultProcess(Process):
         """Thread that accepts results from the worker threads and process them
         using a ResultHandler. Each batch is expected to be
-        (batch_num, path, records), where path is the destination file and records
-        is a string. Not guaranteed to preserve the original order of sequence records.
-
-        result_handler: A ResultHandler object.
-        queue: Input queue.
-        control: A shared value for communcation with the main process.
-        timeout: Seconds to wait for next batch before complaining.
+        (batch_num, path, records), where path is the destination file and
+        records is a string. Not guaranteed to preserve the original order of
+        sequence records.
+        
+        Args:
+            result_handler: A ResultHandler object.
+            queue: Input queue.
+            control: A shared value for communcation with the main process.
+            timeout: Seconds to wait for next batch before complaining.
         """
         def __init__(self, result_handler, queue, control, timeout=60):
             super().__init__(name="Result process")
@@ -685,23 +811,35 @@ def run_parallel(
         
         def run(self):
             logging.getLogger().debug(
-                "Writer process running under pid {}".format(
-                    self.name, os.getpid()))
+                "Writer process %s running under pid %d",
+                self.name, os.getpid())
             
             def fail_callback():
-                if self.num_batches is None and self.control.check_value_positive():
+                """Raises Done if the expected number of batches has been seen.
+                """
+                if (
+                        self.num_batches is None and
+                        self.control.check_value_positive()):
                     self.num_batches = self.control.get_value()
-                if self.num_batches is not None and len(self.seen_batches) >= self.num_batches:
+                if (
+                        self.num_batches is not None and
+                        len(self.seen_batches) >= self.num_batches):
                     raise Done()
             
             def timeout_callback():
+                """Logs an error with the missing batches.
+                """
                 if self.num_batches is not None:
-                    missing = set(range(1, self.num_batches+1)) - self.seen_batches
+                    missing = (
+                        set(range(1, self.num_batches+1)) - self.seen_batches)
                     logging.getLogger().error(
-                        "Result thread still missing batches {} of {}".format(
-                            ",".join(str(i) for i in missing), self.num_batches))
+                        "Result thread still missing batches %s of %d",
+                        ",".join(str(i) for i in missing),
+                        self.num_batches)
             
             def iter_batches():
+                """Dequeue and yield batches.
+                """
                 while True:
                     batch = dequeue(
                         self.queue,
@@ -727,20 +865,24 @@ def run_parallel(
                 self.control.set_value(CONTROL_ERROR)
             finally:
                 num_batches = self.control.get_value(lock=True)
-                self.result_handler.finish(num_batches if num_batches > 0 else None)
+                self.result_handler.finish(
+                    num_batches if num_batches > 0 else None)
     
     # Main process
     
     logging.getLogger().debug(
-        "Starting atropos in parallel mode with threads={}, timeout={}".format(
-            threads, timeout))
+        "Starting atropos in parallel mode with threads=%d, timeout=%d",
+        threads, timeout)
     
     if threads < 2:
         raise ValueError("'threads' must be >= 2")
     
-    # Reserve a thread for the writer process if it will be doing the compression and if one is available.
+    # Reserve a thread for the writer process if it will be doing the
+    # compression and if one is available.
     if compression is None:
-        compression = "writer" if use_writer_process and can_use_system_compression() else "worker"
+        compression = "worker"
+        if use_writer_process and can_use_system_compression():
+            compression = "writer"
     if compression == "writer" and threads > 2:
         threads -= 1
     
@@ -748,7 +890,8 @@ def run_parallel(
     
     # Queue by which batches of reads are sent to worker processes
     input_queue = Queue(input_queue_size)
-    # Queue by which results are sent from the worker processes to the writer process
+    # Queue by which results are sent from the worker processes to the writer
+    # process
     result_queue = Queue(result_queue_size)
     # Queue for processes to send summary information back to main process
     summary_queue = Queue(threads)
@@ -758,7 +901,8 @@ def run_parallel(
         if compression == "writer":
             worker_result_handler = WorkerResultHandler(worker_result_handler)
         else:
-            worker_result_handler = CompressingWorkerResultHandler(worker_result_handler)
+            worker_result_handler = CompressingWorkerResultHandler(
+                worker_result_handler)
         
         # Shared variable for communicating with writer thread
         writer_control = Control(CONTROL_ACTIVE)
@@ -783,13 +927,14 @@ def run_parallel(
     # which we will get back after it completes
     pipeline_class = type(
         'TrimPipelineImpl',
-        (ParallelPipelineMixin, mixin_class, TrimPipeline),
-        {})
+        (ParallelPipelineMixin, mixin_class, TrimPipeline), {})
     pipeline = pipeline_class(record_handler, worker_result_handler)
     worker_args = (input_queue, pipeline, summary_queue, timeout)
     worker_processes = launch_workers(threads - 1, worker_args)
     
     def ensure_alive():
+        """Raises AtroposError if the WriterProcess is not alive.
+        """
         ensure_processes(worker_processes)
         if (use_writer_process and not (
                 writer_process.is_alive() and
@@ -801,7 +946,7 @@ def run_parallel(
         # to check that subprocesses are alive.
         num_batches = enqueue_all(reader, input_queue, timeout, ensure_alive)
         logging.getLogger().debug(
-            "Main loop complete; saw {} batches".format(num_batches))
+            "Main loop complete; saw %d batches", num_batches)
         
         # Tell the worker processes no more input is coming
         enqueue_all((None,) * threads, input_queue, timeout, ensure_alive)
@@ -817,13 +962,15 @@ def run_parallel(
         
         # Wait for all summaries to be available on queue
         def summary_timeout_callback():
+            """Ensure that workers are still alive.
+            """
             try:
                 ensure_processes(
                     worker_processes,
                     "Workers are still alive and haven't returned summaries: {}",
                     alive=False)
-            except Exception as e:
-                logging.getLogger().error(e)
+            except Exception as err:
+                logging.getLogger().error(err)
             
         wait_on(
             lambda: summary_queue.full(),
@@ -839,11 +986,14 @@ def run_parallel(
         seen_batches = set()
         
         def summary_fail_callback():
+            """Raises AtroposError with workers that did not report summaries.
+            """
             missing_summaries = set(range(1, threads)) - seen_summaries
-            raise AtroposError("Missing summaries from processes {}".format(
-                ",".join(str(s) for s in missing_summaries)))
+            raise AtroposError(
+                "Missing summaries from processes %s",
+                ",".join(str(s) for s in missing_summaries))
         
-        for i in range(1, threads+1):
+        for _ in range(1, threads+1):
             batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
             worker_index, worker_batches, worker_summary = batch
             if 'error' in worker_summary and worker_summary['error'] is not None:
@@ -852,7 +1002,7 @@ def run_parallel(
                     worker_summary['error'])
             else:
                 logging.getLogger().debug(
-                    "Processing summary for worker {}".format(worker_index))
+                    "Processing summary for worker %d", worker_index)
             seen_summaries.add(worker_index)
             seen_batches |= worker_batches
             summary.merge(worker_summary)
@@ -861,19 +1011,22 @@ def run_parallel(
         if num_batches > 0:
             missing_batches = set(range(1, num_batches+1)) - seen_batches
             if len(missing_batches) > 0:
-                raise AtroposError("Workers did not process batches {}".format(
-                    ",".join(str(b) for b in missing_batches)))
+                raise AtroposError(
+                    "Workers did not process batches {}".format(
+                        ",".join(str(b) for b in missing_batches)))
         
         if use_writer_process:
             # Wait for writer to complete
             wait_on_process(writer_process, timeout)
     
-    rc = run_interruptible(_run, worker_processes)
+    retcode = run_interruptible(_run, worker_processes)
 
     # notify all threads that they should stop
     logging.getLogger().debug("Exiting all processes")
     def kill(process):
-        if rc <= 1:
+        """Kill a process if it fails to terminate on its own.
+        """
+        if retcode <= 1:
             wait_on_process(process, timeout, terminate=True)
         elif process.is_alive():
             process.terminate()
@@ -882,4 +1035,4 @@ def run_parallel(
     if use_writer_process:
         kill(writer_process)
     
-    return rc
+    return retcode
