@@ -18,58 +18,58 @@ def _initialize_dicts():
     Create the colorspace encoding and decoding dictionaries.
     """
     enc = {}
-    for i, c1 in enumerate("ACGT"):
-        enc['N' + c1] = '4'
-        enc[c1 + 'N'] = '4'
-        enc['.' + c1] = '4'
-        enc[c1 + '.'] = '4'
-        for j, c2 in enumerate("ACGT"):
+    for i, char1 in enumerate("ACGT"):
+        enc['N' + char1] = '4'
+        enc[char1 + 'N'] = '4'
+        enc['.' + char1] = '4'
+        enc[char1 + '.'] = '4'
+        for j, char2 in enumerate("ACGT"):
             # XOR of nucleotides gives color
-            enc[c1 + c2] = chr(ord('0') + (i ^ j))
+            enc[char1 + char2] = chr(ord('0') + (i ^ j))
     enc.update({ 'NN': '4', 'N.': '4', '.N': '4', '..': '4'})
 
     dec = {}
-    for i, c1 in enumerate("ACGT"):
+    for i, char1 in enumerate("ACGT"):
         dec['.' + str(i)] = 'N'
         dec['N' + str(i)] = 'N'
-        dec[c1 + '4'] = 'N'
-        dec[c1 + '.'] = 'N'
-        for j, c2 in enumerate("ACGT"):
+        dec[char1 + '4'] = 'N'
+        dec[char1 + '.'] = 'N'
+        for j, char2 in enumerate("ACGT"):
             # XOR of nucleotides gives color
-            dec[c1 + chr(ord('0') + (i ^ j))] = c2
+            dec[char1 + chr(ord('0') + (i ^ j))] = char2
     dec['N4'] = 'N'
 
     return (enc, dec)
 
-def encode(s):
-    """
-    Given a sequence of nucleotides, convert them to
-    colorspace. Only uppercase characters are allowed.
-    >>> encode("ACGGTC")
-    "A13012"
-    """
-    if not s:
-        return s
-    r = s[0:1]
-    for i in range(len(s) - 1):
-        r += ENCODE[s[i:i+2]]
-    return r
+ENCODE, DECODE = _initialize_dicts()
 
-def decode(s):
+def encode(nucs):
+    """Given a sequence of nucleotides, convert them to colorspace. Only
+    uppercase characters are allowed.
+    
+    Examples:
+        >>> encode("ACGGTC")
+        "A13012"
     """
-    Decode a sequence of colors to nucleotide space.
-    The first character in s must be a nucleotide.
-    Only uppercase characters are allowed.
-    >>> decode("A13012")
-    "ACGGTC"
+    if not nucs:
+        return nucs
+    encoded = nucs[0:1]
+    for idx in range(len(nucs) - 1):
+        encoded += ENCODE[nucs[idx:idx+2]]
+    return encoded
+
+def decode(colors):
+    """Decode a sequence of colors to nucleotide space. The first character in
+    `colors` must be a nucleotide. Only uppercase characters are allowed.
+    
+    Examples:
+        >>> decode("A13012")
+        "ACGGTC"
     """
-    if len(s) < 2:
-        return s
-    x = s[0]
-    result = x
-    for c in s[1:]:
-        x = DECODE[x + c]
-        result += x
+    if len(colors) < 2:
+        return colors
+    result = base = colors[0]
+    for col in colors[1:]:
+        base = DECODE[base + col]
+        result += base
     return result
-
-(ENCODE, DECODE) = _initialize_dicts()

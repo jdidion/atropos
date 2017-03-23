@@ -1,3 +1,5 @@
+"""Interface to report generation.
+"""
 import importlib
 import os
 import sys
@@ -7,15 +9,28 @@ TEXT_SERIALIZERS = ['json', 'yaml']
 BINARY_SERIALIZERS = ['pickle']
 
 def serialize(obj, fmt, mode, outfile, **kwargs):
+    """Serialize a summary dict to a file.
+    
+    Args:
+        obj: The summary dict.
+        fmt: The serialization format (e.g. json, yaml).
+        mode: The file mode (b=binary, t=text).
+        outfile: The output file.
+        kwargs: Additional arguments to pass to the `dump` method.
+    """
     mod = importlib.import_module(fmt)
-    with open(outfile, 'w' + mode) as o:
-        mod.dump(obj, o, **kwargs)
+    with open(outfile, 'w' + mode) as stream:
+        mod.dump(obj, stream, **kwargs)
 
 def generate_reports(summary, report_file, report_formats=None, **kwargs):
     """Generate report(s) from a summary.
     
     Args:
-        report_file: File name (if generating a single )
+        summary: The summary dict.
+        report_file: File name (if generating a single report) or file name
+            prefix.
+        report_formats: Sequence of formats to generate.
+        kwargs: Additional arguments to pass to report generator function(s).
     """
     if report_file in (STDOUT, STDERR):
         report_files = (sys.stderr if report_file == STDERR else sys.stdout,)
@@ -30,7 +45,9 @@ def generate_reports(summary, report_file, report_formats=None, **kwargs):
         if len(report_formats) == 1:
             report_files = (report_file,)
         else:
-            report_files = ('{}.{}'.format(report_file, fmt) for fmt in report_formats)
+            report_files = (
+                '{}.{}'.format(report_file, fmt)
+                for fmt in report_formats)
     
     for fmt, outfile in zip(report_formats, report_files):
         if fmt in BINARY_SERIALIZERS:
@@ -40,15 +57,18 @@ def generate_reports(summary, report_file, report_formats=None, **kwargs):
             # compatible with JSON serialization
             serialize(simplify(summary), fmt, 't', outfile, **kwargs)
         else:
-            try:
-                mod = importlib.import_module("atropos.reports.{}".format(fmt))
-                mod.generate_report(summary, outfile, **kwargs)
-            except:
-                import atropos.reports.jinja
-                atropos.reports.jinja.generate_report(fmt, summary, outfile, **kwargs)
+            #try:
+            mod = importlib.import_module("atropos.reports.{}".format(fmt))
+            mod.generate_report(summary, outfile, **kwargs)
+            #except:
+            #    import atropos.reports.jinja
+            #    atropos.reports.jinja.generate_report(
+            #        fmt, summary, outfile, **kwargs)
 
 def simplify(summary):
-    """
+    """Simplify a summary dict for serialization to an external format (e.g.
+    JSON, YAML).
+    
     1. JSON does not allow non-string map keys.
     """
     from collections import OrderedDict

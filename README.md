@@ -11,20 +11,24 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 3. Options for trimming specific types of data (miRNA, bisulfite-seq).
 4. A new command ('detect') that will detect adapter sequences and other potential contaminants (this is experimental).
 5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
-5. The ability to merge overlapping reads (this is experimental and the functionality is limited).
-6. Summary report includes read statistics and can be viewed in [MultiQC](http://multiqc.info).
-7. The ability to write the summary report and log messages to separate files.
-8. The ability to read and write interleaved FASTQ files.
-9. A progress bar, and other minor usability enhancements.
+6. A new command ('qc') that generates read statistics similar to FastQC. The trim command can also compute read statistics both before and after trimming (using the '--stats' option).
+7. Improved summary reports, including support for serialization formats (JSON, YAML, pickle), support for user-defined templates (via the optional Jinja2 dependency), and integration with [MultiQC](http://multiqc.info).
+8. The ability to merge overlapping reads (this is experimental and the functionality is limited).
+9. The ability to write the summary report and log messages to separate files.
+10. The ability to read SAM/BAM files and read/write interleaved FASTQ files.
+11. A progress bar, and other minor usability enhancements.
 
 ## Dependencies
 
-* Python 3.3+ (python 2.x is NOT supported)
-* Cython 0.25.2+ (`pip install Cython`)
-* pytest (for running unit tests)
-* progressbar2 or tqdm (optional, if you want progressbar support)
-* pysam (optional, if you want support for SAM/BAM input)
-* khmer 2.0+ (`pip install khmer`) (optional, for detecting low-frequency adapter contamination)
+* Required
+    * Python 3.3+ (python 2.x is NOT supported)
+    * Cython 0.25.2+ (`pip install Cython`)
+* Optional
+    * pytest (for running unit tests)
+    * progressbar2 or tqdm (progressbar support)
+    * pysam (SAM/BAM input)
+    * khmer 2.0+ (`pip install khmer`) (for detecting low-frequency adapter contamination)
+    * jinja2 (for user-defined report formats)
 
 ## Installation
 
@@ -54,6 +58,10 @@ atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCC
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
+## Developers
+
+We welcome any contributions via GitHub issues and pull requests. See the  [documentation](https://atropos.readthedocs.org/) for style guidelines and best practices. We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.
+
 ## Links
 
 * [Documentation](https://atropos.readthedocs.org/)
@@ -64,11 +72,13 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ### 1.1
 
-* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
-    * Integrate with MultiQC
+* Improvements to the summary report
+    * Support for report output in JSON, YAML, and pickle
+    * Support for report templates using jinja2
+    * Implementation of a separate Atropos MultiQC module that will be submitted for inclusion in that project
     * Also look at the QCML used in ngs-bits
-* Add developer/contributor documentation and guidelines.
 * Static code analysis (pylint).
+* Add developer/contributor documentation and guidelines.
 
 ### 1.2
 

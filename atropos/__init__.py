@@ -1,4 +1,6 @@
 # coding: utf-8
+"""Top-level Atropos package.
+"""
 import os
 import sys
 
@@ -6,11 +8,18 @@ from atropos._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
+class AtroposError(Exception):
+    """Base class for Atropos-specific errors.
+    """
+    pass
+
 def check_importability():  # pragma: no cover
+    """Check that cython modules haev been compile.
+    """
     try:
-        import atropos.align._align
-    except ImportError as e:
-        if 'undefined symbol' in str(e):
+        import atropos.align._align # pylint: disable=unused-variable
+    except ImportError as err:
+        if 'undefined symbol' in str(err):
             print("""
 ERROR: A required extension module could not be imported because it is
 incompatible with your system. A quick fix is to recompile the extension
@@ -25,9 +34,13 @@ The original error message follows.
         raise
 
 def get_package_path(*relpath):
-    return os.path.join(os.path.abspath(os.path.dirname(__file__)), *relpath)
-
-class AtroposError(Exception):
-    """Base class for Atropos-specific errors.
+    """Resolves a relative path with the Atropos package.
+    
+    Args:
+        relpath: Path components relative to the top-level Atropos package
+            directory.
+    
+    Returns:
+        The absolute path.
     """
-    pass
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), *relpath)

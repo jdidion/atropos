@@ -1,9 +1,23 @@
+"""Generate a report from a Jinja2 template.
+"""
 import jinja2
 from atropos import get_package_path
 
 def generate_report(
         fmt, summary, outfile, template_name=None, template_paths=None,
         template_globals=None):
+    """Generate a report.
+    
+    Args:
+        fmt: Report format. Must match the file extension on a discoverable
+            template.
+        summary: The summary dict.
+        outfile: The output file name/prefix.
+        template_name: A template name to use, rather than auto-discover.
+        template_paths: Sequence of paths to search for templates.
+        template_globals: Dict of additional globals to add to the template
+            environment.
+    """
     if not template_name:
         template_name = 'template.{}'.format(fmt)
     if not template_paths:
@@ -31,8 +45,9 @@ def generate_report(
     
     try:
         print(report_output, file=outfile)
-    except IOError as e:
-        raise IOError("Could not print report to '{}' - {}".format(outfile, e))
+    except IOError as err:
+        raise IOError(
+            "Could not print report to '{}' - {}".format(outfile, err))
     finally:
         if is_path:
             outfile.close()

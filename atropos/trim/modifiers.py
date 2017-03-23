@@ -12,7 +12,7 @@ import re
 from atropos import AtroposError
 from atropos.align import Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
 from atropos.trim.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.util import base_complements, reverse_complement, mean, quals2ints
+from atropos.util import BASE_COMPLEMENTS, reverse_complement, mean, quals2ints
 
 # Base classes
 
@@ -222,7 +222,7 @@ class ErrorCorrectorMixin(object):
         
         for i, j in zip(range(r1_start, r1_end), range(r2_end - 1, r2_start, -1)):
             b1 = r1_seq[i]
-            b2 = base_complements[r2_seq[j]]
+            b2 = BASE_COMPLEMENTS[r2_seq[j]]
             if b1 == b2:
                 continue
             if self.mismatch_action == 'N':
@@ -236,14 +236,14 @@ class ErrorCorrectorMixin(object):
                     r1_qual[i] = r2_qual[j]
                 r1_changed += 1
             elif b2 == 'N':
-                r2_seq[j] = base_complements[b1]
+                r2_seq[j] = BASE_COMPLEMENTS[b1]
                 if has_quals:
                     r2_qual[j] = r1_qual[i]
                 r2_changed += 1
             elif has_quals:
                 diff = ord(r1_qual[i]) - ord(r2_qual[j])
                 if diff >= self.r1r2_min_qual_difference:
-                    r2_seq[j] = base_complements[b1]
+                    r2_seq[j] = BASE_COMPLEMENTS[b1]
                     r2_qual[j] = r1_qual[i]
                     r2_changed += 1
                 elif diff <= self.r2r1_min_qual_difference:
@@ -264,7 +264,7 @@ class ErrorCorrectorMixin(object):
             if diff > 1:
                 # read1 is better than read2
                 for i, j, b1, b2 in quals_equal:
-                    r2_seq[j] = base_complements[b1]
+                    r2_seq[j] = BASE_COMPLEMENTS[b1]
                     r2_qual[j] = r1_qual[i]
                     r2_changed += 1
             elif diff < -1:

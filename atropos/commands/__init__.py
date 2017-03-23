@@ -1,7 +1,12 @@
+"""Common classes/functions used in commands.
+"""
 import copy
 import importlib
 import logging
+import random
 import sys
+from atropos import get_package_path
+from atropos.adapters import AdapterCache
 from atropos.io.seqio import open_reader
 
 class Pipeline(object):
@@ -16,17 +21,19 @@ class Pipeline(object):
         try:
             for batch in reader:
                 self.process_batch(batch)
-        except Exception as e:
+        except Exception as err:
             if raise_on_error:
                 raise
             else:
                 summary['error'] = dict(
-                    message=str(e),
+                    message=str(err),
                     details=sys.exc_info())
         finally:
             self.finish(summary, **kwargs)
     
     def start(self, **kwargs):
+        """Start the pipeline.
+        """
         pass
     
     def process_batch(self, batch):
@@ -56,13 +63,39 @@ class Pipeline(object):
         pass
     
     def handle_records(self, context, records):
+        """Handle a sequence of records.
+        
+        Args:
+            context: The pipeline context (dict).
+            records: The sequence of records.
+        """
         for record in records:
             self.handle_record(context, record)
     
+    def handle_record(self, context, record):
+        """Handle a single record.
+        
+        Args:
+            context: The pipeline context (dict).
+            record: The record.
+        """
+        raise NotImplementedError()
+    
     def handle_reads(self, context, read1, read2=None):
+        """Handle a read or read-pair.
+        
+        Args:
+            context: The pipeline context (dict).
+            read1, read2: The read pair; read2 will be None for single-end data.
+        """
         raise NotImplementedError()
     
     def finish(self, summary, **kwargs):
+        """Finish the pipeline, including adding information to the summary.
+        
+        Args:
+            summary: Summary dict to update.
+        """
         summary.update(
             record_counts=self.record_counts,
             total_record_count=sum(self.record_counts.values()),
@@ -71,19 +104,30 @@ class Pipeline(object):
                 sum(b) for b in zip(*self.bp_counts.values())))
 
 class SingleEndPipelineMixin(object):
+    """Mixin for pipelines that implements `handle_record` for single-end data.
+    """
     def handle_record(self, context, record):
         context['bp'][0] += len(record)
         return self.handle_reads(context, record)
 
 class PairedEndPipelineMixin(object):
+    """Mixin for pipelines that implements `handle_record` for paired-end data.
+    """
     def handle_record(self, context, record):
         read1, read2 = record
-        bp = context['bp']
-        bp[0] += len(read1.sequence)
-        bp[1] += len(read2.sequence)
+        bps = context['bp']
+        bps[0] += len(read1.sequence)
+        bps[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
 
 class BatchIterator(object):
+    """Iterator that yields batches of sequence records.
+    
+    Args:
+        reader: The iterator over records.
+        size: Batch size.
+        max_reads: Maxiumum number of records to read.
+    """
     def __init__(self, reader, size, max_reads=None):
         self.reader = reader
         self.iterable = enumerate(reader, 1)
@@ -142,10 +186,19 @@ class BatchIterator(object):
             return (batch_meta, batch[0:batch_index])
     
     def close(self):
+        """Close the underlying reader.
+        """
         self.done = True
         self.reader.close()
 
 def execute_command(name, options, summary):
+    """Execute a subcommand. Loads module `name` within the atropos.commands
+    package and calls that module's `execute` method.
+    
+    Args:
+        options: Command-line options.
+        summary: The summary dict.
+    """
     mod = importlib.import_module("atropos.commands.{}".format(name))
     return mod.execute(options, summary)
 
@@ -167,9 +220,10 @@ def create_reader(options, counter_magnitude="M"):
     else:
         qualfile = options.input2
     
-    reader = open_reader(input1, file2=input2, qualfile=qualfile,
-        colorspace=options.colorspace, fileformat=options.format,
-        interleaved=interleaved, single_input_read=options.single_input_read)
+    reader = open_reader(
+        input1, file2=input2, qualfile=qualfile, colorspace=options.colorspace,
+        fileformat=options.format, interleaved=interleaved,
+        single_input_read=options.single_input_read)
     
     qualities = reader.delivers_qualities
     
@@ -198,7 +252,33 @@ def create_reader(options, counter_magnitude="M"):
     return (reader, (input1, input2), qualities, qualfile is not None)
 
 def subsample(reader, frac):
-    from random import random
+    """Generator that yields a random subsample of records.
+    
+    Args:
+        reader: The reader from which to sample.
+        frac: The fraction of records to yield.
+    """
     for reads in reader:
-        if random() < frac:
+        if random.random() < frac:
             yield reads
+
+def load_known_adapters(options):
+    """Load known adapters based on setting in command-line options.
+    
+    Args:
+        options: Command-line options.
+    """
+    cache_file = options.adapter_cache_file if options.cache_adapters else None
+    adapter_cache = AdapterCache(cache_file)
+    if adapter_cache.empty and options.default_adapters:
+        adapter_cache.load_default()
+    if options.known_adapter:
+        for known in options.known_adapter:
+            name, seq = known.split('=')
+            adapter_cache.add(name, seq)
+    if options.known_adapters_file:
+        for known_file in options.known_adapters_file:
+            adapter_cache.load_from_url(known_file)
+    if options.cache_adapters:
+        adapter_cache.save()
+    return adapter_cache

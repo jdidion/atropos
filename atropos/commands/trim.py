@@ -8,8 +8,10 @@ import textwrap
 
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
-from atropos.commands.stats import SingleEndReadStatistics, PairedEndReadStatistics
-from atropos.adapters import AdapterParser, BACK, load_known_adapters
+from atropos.commands import load_known_adapters
+from atropos.commands.stats import (
+    SingleEndReadStatistics, PairedEndReadStatistics)
+from atropos.adapters import AdapterParser, BACK
 from atropos.trim.modifiers import *
 from atropos.trim.filters import *
 from atropos.trim.writers import *
@@ -236,9 +238,14 @@ def execute(options, summary):
         elif op == 'A' and (adapters1 or adapters2):
             # TODO: generalize this using some kind of factory class
             if options.aligner == 'insert':
-                # Use different base probabilities if we're trimming bisulfite data.
-                # TODO: this doesn't seem to help things, so commenting it out for now
-                #base_probs = dict(p1=0.33, p2=0.67) if options.bisulfite else dict(p1=0.25, p2=0.75)
+                # Use different base probabilities if we're trimming bisulfite
+                # data.
+                # TODO: this doesn't seem to help things, so commenting it out
+                # for now
+                #if options.bisulfite:
+                #   base_probs = dict(match_prob=0.33, mismatch_prob=0.67)
+                # else:
+                #   base_probs = dict(match_prob=0.25, mismatch_prob=0.75)
                 modifiers.add_modifier(InsertAdapterCutter,
                     adapter1=adapters1[0], adapter2=adapters2[0], action=options.action,
                     mismatch_action=options.correct_mismatches,
@@ -805,12 +812,14 @@ def run_parallel(
         
         # Now that the reader process is done, it essentially
         # frees up another thread to use for a worker
-        worker_processes.extend(launch_workers(1, worker_args, offset=threads-1))
+        worker_processes.extend(
+            launch_workers(1, worker_args, offset=threads-1))
         
         # Wait for all summaries to be available on queue
         def summary_timeout_callback():
             try:
-                ensure_processes(worker_processes,
+                ensure_processes(
+                    worker_processes,
                     "Workers are still alive and haven't returned summaries: {}",
                     alive=False)
             except Exception as e:

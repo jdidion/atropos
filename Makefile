@@ -1,7 +1,8 @@
-tests  = tests
+tests = tests
+module = atropos
 
 BUILD = python setup.py build_ext -i && python setup.py install
-TEST  = py.test $(tests)
+TEST = py.test $(tests)
 
 all:
 	$(BUILD)
@@ -21,8 +22,8 @@ release:
 	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
-	twine register dist/atropos-$(version).tar.gz
-	twine upload dist/atropos-$(version).tar.gz
+	twine register dist/$(module)-$(version).tar.gz
+	twine upload dist/$(module)-$(version).tar.gz
 	git push origin --tags
 
 docs:
@@ -31,3 +32,6 @@ docs:
 
 readme:
 	pandoc --from=markdown --to=rst --output=README.rst README.md
+
+lint:
+	pylint $(module)

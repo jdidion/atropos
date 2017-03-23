@@ -44,8 +44,9 @@ cdef class Sequence(object):
         self.corrected = corrected
         if qualities is not None and len(qualities) != len(sequence):
             rname = truncate_string(name)
-            raise FormatError("In read named {0!r}: length of quality sequence ({1}) and length "
-                "of read ({2}) do not match".format(
+            raise FormatError(
+                "In read named {0!r}: length of quality sequence ({1}) and "
+                "length  of read ({2}) do not match".format(
                     rname, len(qualities), len(sequence)))
     
     def subseq(self, begin=0, end=None):
