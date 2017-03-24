@@ -64,12 +64,16 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         else:
             params += ['-o', tmp_fastaq] # TODO not parallelizable
         print(params)
-        result = atropos.main(params)
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-        assert result[0] == 0
-        assert isinstance(result[1], dict)
-        assert 'error' not in result[1] or result[1]['error'] is None, result[1]['error']
+        retcode, summary = atropos.main(params)
+        assert summary is not None
+        assert isinstance(summary, dict)
+        if 'error' in summary and summary['error'] is not None:
+            assert retcode != 0
+            err = summary['error']
+            raise Exception(
+                "Unexpected error: %s", err['message'], exc_info=err['details'])
+        else:
+            assert retcode == 0
         # TODO redirect standard output
         assert os.path.exists(tmp_fastaq)
         assert files_equal(cutpath(expected), tmp_fastaq)
