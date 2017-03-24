@@ -71,7 +71,7 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
             assert retcode != 0
             err = summary['error']
             raise Exception(
-                "Unexpected error: %s", err['message'], exc_info=err['details'])
+                "Unexpected error: {}".format(err['message']), err['details'])
         else:
             assert retcode == 0
         # TODO redirect standard output
