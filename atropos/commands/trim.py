@@ -696,9 +696,9 @@ def run_parallel(
     # run_parallel method to avoid extra work if only running in serial mode.
     from multiprocessing import Process, Queue
     from atropos.commands.multicore import (
-        Control, PendingQueue, ParallelPipelineMixin, MulticoreError,
-        launch_workers, ensure_processes, wait_on, wait_on_process, enqueue,
-        enqueue_all, dequeue, RETRY_INTERVAL, CONTROL_ACTIVE, CONTROL_ERROR)
+        Control, PendingQueue, ParallelPipelineMixin, ParallelPipelineRunner,
+        MulticoreError, wait_on_process, enqueue, dequeue, kill, RETRY_INTERVAL,
+        CONTROL_ACTIVE, CONTROL_ERROR)
     from atropos.io.compression import (
         get_compressor, can_use_system_compression)
     
@@ -711,6 +711,36 @@ def run_parallel(
         """Raised when process exits is killed.
         """
         pass
+    
+    class ParallelTrimPipelineRunner(ParallelPipelineRunner):
+        """ParallelPipelineRunner for a TrimPipeline.
+        """
+        def __init__(
+                self, reader, pipeline, threads, input_queue_size, timeout,
+                writer_manager=None):
+            super().__init__(
+                reader, pipeline, threads, input_queue_size, timeout)
+            self.writer_manager = writer_manager
+        
+        def ensure_alive(self):
+            super().ensure_alive()
+            if self.writer_manager and not self.writer_manager.is_active():
+                raise AtroposError("Writer process exited")
+        
+        def after_enqueue(self):
+            # Tell the writer thread the max number of batches to expect
+            if self.writer_manager:
+                self.writer_manager.set_num_batches(self.num_batches)
+        
+        def finish(self):
+            if self.writer_manager:
+                # Wait for writer to complete
+                self.writer_manager.wait()
+        
+        def terminate(self, retcode):
+            super().terminate(retcode)
+            if self.writer_manager:
+                self.writer_manager.terminate(retcode)
     
     class QueueResultHandler(ResultHandler):
         """ResultHandler that writes results to the output queue.
@@ -730,7 +760,7 @@ def run_parallel(
                 (batch_num, result),
                 wait_message=self.message,
                 timeout=self.timeout)
-
+    
     class CompressingWorkerResultHandler(WorkerResultHandler):
         """Wraps a ResultHandler and compresses results prior to writing.
         """
@@ -858,7 +888,7 @@ def run_parallel(
                         fail_callback=fail_callback,
                         timeout_callback=timeout_callback)
                     yield batch
-
+            
             try:
                 self.result_handler.start(self)
                 
@@ -877,6 +907,52 @@ def run_parallel(
                 num_batches = self.control.get_value(lock=True)
                 self.result_handler.finish(
                     num_batches if num_batches > 0 else None)
+    
+    class WriterManager(object):
+        """Manager for a writer process and control variable.
+        """
+        def __init__(
+                self, writers, compression, preserve_order, result_queue,
+                timeout):
+            # result handler
+            if preserve_order:
+                writer_result_handler = OrderPreservingWriterResultHandler(
+                    writers, compressed=compression == "worker")
+            else:
+                writer_result_handler = WriterResultHandler(
+                    writers, compressed=compression == "worker")
+            
+            self.timeout = timeout
+            # Shared variable for communicating with writer thread
+            self.writer_control = Control(CONTROL_ACTIVE)
+            # writer process
+            self.writer_process = ResultProcess(
+                writer_result_handler, result_queue, self.writer_control,
+                timeout)
+            self.writer_process.start()
+        
+        def is_active(self):
+            """Returns True if the writer process is alive and the control
+            value is CONTROL_ACTIVE.
+            """
+            return (
+                self.writer_process.is_alive() and
+                self.writer_control.check_value(CONTROL_ACTIVE))
+        
+        def set_num_batches(self, num_batches):
+            """Set the number of batches to the control variable.
+            """
+            self.writer_control.set_value(num_batches)
+        
+        def wait(self):
+            """Wait for the writer process to terminate.
+            """
+            wait_on_process(self.writer_process, self.timeout)
+        
+        def terminate(self, retcode):
+            """Force the writer process to terminate.
+            """
+            kill(self.writer_process, retcode, self.timeout)
     
     # Main process
     
@@ -898,13 +974,10 @@ def run_parallel(
     
     timeout = max(timeout, RETRY_INTERVAL)
     
-    # Queue by which batches of reads are sent to worker processes
-    input_queue = Queue(input_queue_size)
     # Queue by which results are sent from the worker processes to the writer
     # process
     result_queue = Queue(result_queue_size)
-    # Queue for processes to send summary information back to main process
-    summary_queue = Queue(threads)
+    writer_manager = None
     
     if use_writer_process:
         worker_result_handler = QueueResultHandler(result_queue)
@@ -913,22 +986,8 @@ def run_parallel(
         else:
             worker_result_handler = CompressingWorkerResultHandler(
                 worker_result_handler)
-        
-        # Shared variable for communicating with writer thread
-        writer_control = Control(CONTROL_ACTIVE)
-        
-        # result handler
-        if preserve_order:
-            writer_result_handler = OrderPreservingWriterResultHandler(
-                writers, compressed=compression == "worker")
-        else:
-            writer_result_handler = WriterResultHandler(
-                writers, compressed=compression == "worker")
-        
-        # writer process
-        writer_process = ResultProcess(
-            writer_result_handler, result_queue, writer_control, timeout)
-        writer_process.start()
+        writer_manager = WriterManager(
+            writers, compression, preserve_order, result_queue, timeout)
     else:
         worker_result_handler = WorkerResultHandler(
             WriterResultHandler(writers, use_suffix=True))
@@ -939,110 +998,6 @@ def run_parallel(
         'TrimPipelineImpl',
         (ParallelPipelineMixin, mixin_class, TrimPipeline), {})
     pipeline = pipeline_class(record_handler, worker_result_handler)
-    worker_args = (input_queue, pipeline, summary_queue, timeout)
-    worker_processes = launch_workers(threads - 1, worker_args)
-    
-    def ensure_alive():
-        """Raises AtroposError if the WriterProcess is not alive.
-        """
-        ensure_processes(worker_processes)
-        if (use_writer_process and not (
-                writer_process.is_alive() and
-                writer_control.check_value(CONTROL_ACTIVE))):
-            raise AtroposError("Writer process exited")
-    
-    def _run(worker_processes):
-        # Add batches of reads to the input queue. Provide a timeout callback
-        # to check that subprocesses are alive.
-        num_batches = enqueue_all(reader, input_queue, timeout, ensure_alive)
-        logging.getLogger().debug(
-            "Main loop complete; saw %d batches", num_batches)
-        
-        # Tell the worker processes no more input is coming
-        enqueue_all((None,) * threads, input_queue, timeout, ensure_alive)
-        
-        # Tell the writer thread the max number of batches to expect
-        if use_writer_process:
-            writer_control.set_value(num_batches)
-        
-        # Now that the reader process is done, it essentially
-        # frees up another thread to use for a worker
-        worker_processes.extend(
-            launch_workers(1, worker_args, offset=threads-1))
-        
-        # Wait for all summaries to be available on queue
-        def summary_timeout_callback():
-            """Ensure that workers are still alive.
-            """
-            try:
-                ensure_processes(
-                    worker_processes,
-                    "Workers are still alive and haven't returned summaries: {}",
-                    alive=False)
-            except Exception as err:
-                logging.getLogger().error(err)
-            
-        wait_on(
-            lambda: summary_queue.full(),
-            wait_message="Waiting on worker summaries {}",
-            timeout=timeout,
-            wait=True,
-            timeout_callback=summary_timeout_callback)
-        
-        # Process summary information from worker processes
-        logging.getLogger().debug(
-            "Processing summary information from worker processes")
-        seen_summaries = set()
-        seen_batches = set()
-        
-        def summary_fail_callback():
-            """Raises AtroposError with workers that did not report summaries.
-            """
-            missing_summaries = set(range(1, threads)) - seen_summaries
-            raise AtroposError(
-                "Missing summaries from processes %s",
-                ",".join(str(s) for s in missing_summaries))
-        
-        for _ in range(1, threads+1):
-            batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
-            worker_index, worker_batches, worker_summary = batch
-            if 'error' in worker_summary and worker_summary['error'] is not None:
-                raise AtroposError(
-                    "Worker process {} died unexpectedly".format(worker_index),
-                    worker_summary['error'])
-            else:
-                logging.getLogger().debug(
-                    "Processing summary for worker %d", worker_index)
-            seen_summaries.add(worker_index)
-            seen_batches |= worker_batches
-            summary.merge(worker_summary)
-        
-        # Check if any batches were missed
-        if num_batches > 0:
-            missing_batches = set(range(1, num_batches+1)) - seen_batches
-            if len(missing_batches) > 0:
-                raise AtroposError(
-                    "Workers did not process batches {}".format(
-                        ",".join(str(b) for b in missing_batches)))
-        
-        if use_writer_process:
-            # Wait for writer to complete
-            wait_on_process(writer_process, timeout)
-    
-    retcode = run_interruptible(_run, worker_processes)
-
-    # notify all threads that they should stop
-    logging.getLogger().debug("Exiting all processes")
-    def kill(process):
-        """Kill a process if it fails to terminate on its own.
-        """
-        if retcode <= 1:
-            wait_on_process(process, timeout, terminate=True)
-        elif process.is_alive():
-            process.terminate()
-    for process in worker_processes:
-        kill(process)
-    if use_writer_process:
-        kill(writer_process)
-    
-    return retcode
+    runner = ParallelTrimPipelineRunner(
+        reader, pipeline, threads, input_queue_size, timeout, writer_manager)
+    return runner.run(summary)

@@ -2,11 +2,12 @@
 """
 import inspect
 import logging
-from multiprocessing import Process, Value
+from multiprocessing import Process, Value, Queue
 import os
 from queue import Empty, Full
 import time
 from atropos import AtroposError
+from atropos.util import run_interruptible
 
 RETRY_INTERVAL = 5
 """Max time to wait between retrying operations."""
@@ -219,6 +220,159 @@ class WorkerProcess(Process):
         logging.getLogger().debug("%s sending summary", self.name)
         enqueue_summary()
 
+class ParallelPipelineRunner(object):
+    """Run a pipeline in parallel.
+    
+    Args:
+        reader: A :class:`BatchIterator`.
+        pipeline: A :class:`Pipeline`.
+        threads: Number of threads to use.
+        input_queue_size:
+        timeout:
+    """
+    def __init__(
+            self, reader, pipeline, threads, input_queue_size, timeout):
+        self.reader = reader
+        self.pipeline = pipeline
+        self.threads = threads
+        self.timeout = max(timeout, RETRY_INTERVAL)
+        # Queue by which batches of reads are sent to worker processes
+        self.input_queue = Queue(input_queue_size)
+        # Queue for processes to send summary information back to main process
+        self.summary_queue = Queue(threads)
+        self.worker_processes = None
+        self.num_batches = None
+        self.seen_summaries = None
+        self.seen_batches = None
+    
+    def ensure_alive(self):
+        """Callback when enqueue times out.
+        """
+        ensure_processes(self.worker_processes)
+    
+    def after_enqueue(self):
+        """Called after all batches are queued.
+        """
+        pass
+    
+    def finish(self):
+        """Called at the end of the run.
+        """
+        pass
+    
+    def run(self, summary):
+        """Run the pipeline.
+        
+        Args:
+            summary: The summary dict.
+        
+        Returns:
+            The return code.
+        """
+        retcode = run_interruptible(self, summary)
+        self.terminate(retcode)
+        return retcode
+    
+    def terminate(self, retcode):
+        """Terminates all processes.
+        
+        Args:
+            retcode: The return code.
+        """
+        # notify all threads that they should stop
+        logging.getLogger().debug("Exiting all processes")
+        for process in self.worker_processes:
+            kill(process, retcode, self.timeout)
+    
+    def __call__(self, summary):
+        worker_args = (
+            self.input_queue, self.pipeline, self.summary_queue, self.timeout)
+        self.worker_processes = launch_workers(self.threads - 1, worker_args)
+        
+        self.num_batches = enqueue_all(
+            self.reader, self.input_queue, self.timeout, self.ensure_alive)
+        
+        logging.getLogger().debug(
+            "Main loop complete; saw %d batches", self.num_batches)
+        
+        # Tell the worker processes no more input is coming
+        enqueue_all(
+            (None,) * self.threads, self.input_queue, self.timeout,
+            self.ensure_alive)
+        
+        self.after_enqueue()
+        
+        # Now that the reader process is done, it essentially
+        # frees up another thread to use for a worker
+        self.worker_processes.extend(
+            launch_workers(1, worker_args, offset=self.threads-1))
+        
+        # Wait for all summaries to be available on queue
+        def summary_timeout_callback():
+            """Ensure that workers are still alive.
+            """
+            try:
+                ensure_processes(
+                    self.worker_processes,
+                    "Workers are still alive and haven't returned summaries: {}",
+                    alive=False)
+            except Exception as err:
+                logging.getLogger().error(err)
+            
+        wait_on(
+            self.summary_queue.full,
+            wait_message="Waiting on worker summaries {}",
+            timeout=self.timeout,
+            wait=True,
+            timeout_callback=summary_timeout_callback)
+        
+        # Process summary information from worker processes
+        logging.getLogger().debug(
+            "Processing summary information from worker processes")
+        
+        self.seen_summaries = set()
+        self.seen_batches = set()
+        
+        def summary_fail_callback():
+            """Raises AtroposError with workers that did not report summaries.
+            """
+            missing_summaries = (
+                set(range(1, self.threads)) - self.seen_summaries)
+            raise AtroposError(
+                "Missing summaries from processes %s",
+                ",".join(str(summ) for summ in missing_summaries))
+        
+        for _ in range(1, self.threads+1):
+            batch = dequeue(
+                self.summary_queue, fail_callback=summary_fail_callback)
+            worker_index, worker_batches, worker_summary = batch
+            if worker_summary is None:
+                raise MulticoreError(
+                    "Worker process {} died unexpectedly".format(worker_index))
+            elif (
+                    'error' in worker_summary and
+                    worker_summary['error'] is not None):
+                raise AtroposError(
+                    "Worker process {} died unexpectedly".format(worker_index),
+                    worker_summary['error'])
+            else:
+                logging.getLogger().debug(
+                    "Processing summary for worker %d", worker_index)
+            self.seen_summaries.add(worker_index)
+            self.seen_batches |= worker_batches
+            summary.merge(worker_summary)
+        
+        # Check if any batches were missed
+        if self.num_batches > 0:
+            missing_batches = (
+                set(range(1, self.num_batches+1)) - self.seen_batches)
+            if len(missing_batches) > 0:
+                raise AtroposError(
+                    "Workers did not process batches {}".format(
+                        ",".join(str(batch) for batch in missing_batches)))
+        
+        self.finish()
+
 def launch_workers(num_workers, args=(), offset=0, worker_class=WorkerProcess):
     """Launch `n` workers. Each worker is initialized with an incremental
     index starting with `offset`, followed by `args`.
@@ -374,3 +528,11 @@ def dequeue(
         except Empty:
             return False
     return wait_on(condition, wait_message=wait_message, **kwargs)
+
+def kill(process, retcode, timeout):
+    """Kill a process if it fails to terminate on its own.
+    """
+    if retcode <= 1:
+        wait_on_process(process, timeout, terminate=True)
+    elif process.is_alive():
+        process.terminate()

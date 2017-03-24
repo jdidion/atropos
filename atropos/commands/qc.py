@@ -88,10 +88,8 @@ def run_parallel(
         input_queue_size: max number of items that can be in the input queue,
             or 0 for no limit (be warned that this could explode memory usage)
     """
-    from multiprocessing import Queue
     from atropos.commands.multicore import (
-        ParallelPipelineMixin, MulticoreError, launch_workers, ensure_processes,
-        enqueue_all, dequeue, wait_on, wait_on_process, RETRY_INTERVAL)
+        ParallelPipelineMixin, ParallelPipelineRunner)
     
     logging.getLogger().debug(
         "Starting atropos qc in parallel mode with threads=%d, timeout=%d",
@@ -100,107 +98,11 @@ def run_parallel(
     if threads < 2:
         raise ValueError("'threads' must be >= 2")
     
-    timeout = max(timeout, RETRY_INTERVAL)
-    
-    # Queue by which batches of reads are sent to worker processes
-    input_queue = Queue(input_queue_size)
-    # Queue for processes to send summary information back to main process
-    summary_queue = Queue(threads)
-    
     # Start worker processes, reserve a thread for the reader process,
     # which we will get back after it completes
     pipeline_class = type(
         'QcPipelineImpl', (ParallelPipelineMixin, pipeline_class))
     pipeline = pipeline_class(**pipeline_args)
-    worker_args = (input_queue, pipeline, summary_queue, timeout)
-    worker_processes = launch_workers(threads - 1, worker_args)
-    
-    def ensure_alive():
-        """Ensure that all worker processes have not terminated.
-        """
-        ensure_processes(worker_processes)
-    
-    def _run(worker_processes):
-        # Add batches of reads to the input queue. Provide a timeout callback
-        # to check that subprocesses are alive.
-        num_batches = enqueue_all(reader, input_queue, timeout, ensure_alive)
-        logging.getLogger().debug(
-            "Main loop complete; saw %d batches", num_batches)
-        
-        # Tell the worker processes no more input is coming
-        enqueue_all((None,) * threads, input_queue, timeout, ensure_alive)
-        
-        # Now that the reader process is done, it essentially
-        # frees up another thread to use for a worker
-        worker_processes.extend(
-            launch_workers(1, worker_args, offset=threads-1))
-        
-        # Wait for all summaries to be available on queue
-        def summary_timeout_callback():
-            """Ensure that worker processes are still alive while waiting for
-            summaries.
-            """
-            try:
-                ensure_processes(
-                    worker_processes,
-                    "Workers are still alive and haven't returned summaries: {}",
-                    alive=False)
-            except Exception as err:
-                logging.getLogger().error(err)
-        
-        wait_on(
-            lambda: summary_queue.full(),
-            wait_message="Waiting on worker summaries {}",
-            timeout=timeout,
-            wait=True,
-            timeout_callback=summary_timeout_callback)
-        
-        # Process summary information from worker processes
-        logging.getLogger().debug(
-            "Processing summary information from worker processes")
-        seen_summaries = set()
-        seen_batches = set()
-        def summary_fail_callback():
-            """Raise exception if any summaries are missing.
-            """
-            missing_summaries = set(range(1, threads)) - seen_summaries
-            raise MulticoreError(
-                "Missing summaries from processes {}".format(
-                    ",".join(str(s) for s in missing_summaries)))
-        
-        for _ in range(1, threads+1):
-            batch = dequeue(summary_queue, fail_callback=summary_fail_callback)
-            worker_index, worker_batches, worker_summary = batch
-            if worker_summary is None:
-                raise MulticoreError(
-                    "Worker process {} died unexpectedly".format(worker_index))
-            else:
-                logging.getLogger().debug(
-                    "Processing summary for worker %d", worker_index)
-            seen_summaries.add(worker_index)
-            seen_batches |= worker_batches
-            summary.merge(worker_summary)
-        
-        # Check if any batches were missed
-        if num_batches > 0:
-            missing_batches = set(range(1, num_batches+1)) - seen_batches
-            if len(missing_batches) > 0:
-                raise MulticoreError(
-                    "Workers did not process batches {}".format(
-                        ",".join(str(b) for b in missing_batches)))
-    
-    retcode = run_interruptible(_run, worker_processes)
-    
-    # notify all threads that they should stop
-    logging.getLogger().debug("Exiting all processes")
-    def kill(process):
-        """Kill a process if it fails to terminate on its own.
-        """
-        if retcode <= 1:
-            wait_on_process(process, timeout, terminate=True)
-        elif process.is_alive():
-            process.terminate()
-    for process in worker_processes:
-        kill(process)
-    
-    return retcode
+    runner = ParallelPipelineRunner(
+        reader, pipeline, threads, input_queue_size, timeout)
+    return runner.run(summary)
