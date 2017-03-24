@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import os
 import sys
+import traceback
 from atropos.scripts import atropos
 
 @contextmanager
@@ -70,8 +71,8 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         if 'error' in summary and summary['error'] is not None:
             assert retcode != 0
             err = summary['error']
-            raise Exception(
-                "Unexpected error: {}".format(err['message']), err['details'])
+            traceback.print_exception(*err['details'])
+            raise Exception("Unexpected error: {}".format(err['message']))
         else:
             assert retcode == 0
         # TODO redirect standard output
