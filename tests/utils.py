@@ -67,7 +67,11 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         result = atropos.main(params)
         assert isinstance(result, tuple)
         assert len(result) == 2
+        assert result[0] == 0
+        assert isinstance(result[1], dict)
+        assert 'error' not in result[1] or result[1]['error'] is None, result[1]['error']
         # TODO redirect standard output
+        assert os.path.exists(tmp_fastaq)
         assert files_equal(cutpath(expected), tmp_fastaq)
     # TODO diff log files
 
