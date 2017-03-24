@@ -72,7 +72,7 @@ ANYWHERE = ADAPTER_TYPES['anywhere'].flags
 LINKED = ADAPTER_TYPES['linked'].flags
 
 # TODO: specify this externally rather than hard-coding
-DEFAULT_ADAPTERS_URL = "https://github.com/jdidion/atropos/blob/master/atropos/adapters/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/master/atropos/adapters/sequencing_adapters.fa"
 DEFAULT_ADAPTERS_PATH = get_package_path('adapters', 'sequencing_adapters.fa')
 
 class AdapterParser(object):
