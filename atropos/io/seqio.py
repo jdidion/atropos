@@ -118,12 +118,6 @@ class ColorspaceSequence(Sequence):
             self.merged,
             self.corrected)
 
-def sra_colorspace_sequence(name, sequence, qualities, name2):
-    """Factory for an SRA colorspace sequence (which has one quality value
-    too many).
-    """
-    return ColorspaceSequence(name, sequence, qualities[1:], name2=name2)
-
 class FileWithPrependedLine(object):
     """A file-like object that allows to "prepend" a single line to an already
     opened file. That is, further reads on the file will return the provided
@@ -279,26 +273,6 @@ class ColorspaceFastaQualReader(FastaQualReader):
     """
     def __init__(self, fastafile, qualfile):
         super().__init__(fastafile, qualfile, sequence_class=ColorspaceSequence)
-
-def sequence_names_match(read1, read2):
-    """Check whether the sequences read1 and read2 have identical names,
-    ignoring a suffix of '1' or '2'. Some old paired-end reads have names that
-    end in '/1' and '/2'. Also, the fastq-dump tool (used for converting SRA
-    files to FASTQ) appends a .1 and .2 to paired-end reads if option -I is
-    used.
-    
-    Args:
-        read1, read2: The sequences to compare.
-    
-    Returns:
-        Whether the sequences are equal.
-    """
-    name1 = read1.name.split(None, 1)[0]
-    name2 = read2.name.split(None, 1)[0]
-    if name1[-1:] in '12' and name2[-1:] in '12':
-        name1 = name1[:-1]
-        name2 = name2[:-1]
-    return name1 == name2
 
 class PairedSequenceReader(object):
     """Read paired-end reads from two files. Wraps two SequenceReader instances,
@@ -494,6 +468,156 @@ class PairedEndSAMReader(SAMReader):
             
             yield tuple(self._as_sequence(r) for r in reads)
 
+class SequenceFileFormat(object):
+    """Base class for sequence formatters.
+    """
+    def format(self, read):
+        """Format a Sequence as a string.
+        
+        Args:
+            read: The Sequence object.
+        
+        Returns:
+            A string representation of the sequence object in the sequence
+            file format.
+        """
+        raise NotImplementedError()
+
+class FastaFormat(SequenceFileFormat):
+    """FASTA SequenceFileFormat.
+    
+    Args:
+        line_length: Max line length (in characters), or None. Determines
+            whether and how lines are wrapped.
+    """
+    def __init__(self, line_length=None):
+        self.text_wrapper = None
+        if line_length:
+            from textwrap import TextWrapper
+            self.text_wrapper = TextWrapper(width=line_length)
+    
+    def format(self, read):
+        return self.format_entry(read.name, read.sequence)
+    
+    def format_entry(self, name, sequence):
+        """Convert a sequence record to a string.
+        """
+        if self.text_wrapper:
+            sequence = self.text_wrapper.fill(sequence)
+        return "".join((">", name, "\n", sequence, "\n"))
+
+class ColorspaceFastaFormat(FastaFormat):
+    """FastaFormat in which sequences are in colorspace.
+    """
+    def format(self, read):
+        return self.format_entry(read.name, read.primer + read.sequence)
+
+class FastqFormat(SequenceFileFormat):
+    """FASTQ SequenceFileFormat.
+    """
+    def format(self, read):
+        return self.format_entry(
+            read.name, read.sequence, read.qualities, read.name2)
+    
+    def format_entry(self, name, sequence, qualities, name2=""):
+        """Convert a sequence record to a string.
+        """
+        return "".join((
+            '@', name, '\n',
+            sequence, '\n+',
+            name2, '\n',
+            qualities, '\n'))
+
+class ColorspaceFastqFormat(FastqFormat):
+    """FastqFormat in which sequences are in colorspace.
+    """
+    def format(self, read):
+        return self.format_entry(
+            read.name, read.primer + read.sequence, read.qualities)
+
+class SingleEndFormatter(object):
+    """Wrapper for a SequenceFileFormat for single-end data.
+    
+    Args:
+        seq_format: The SequenceFileFormat object.
+        file1: The single-end file.
+    """
+    def __init__(self, seq_format, file1):
+        self.seq_format = seq_format
+        self.file1 = file1
+        self.written = 0
+        self.read1_bp = 0
+        self.read2_bp = 0
+    
+    def format(self, result, read1, read2=None):
+        """Format read(s) and add them to `result`.
+        
+        Args:
+            result: A dict mapping file names to lists of formatted reads.
+            read1, read2: The reads to format.
+        """
+        result[self.file1].append(self.seq_format.format(read1))
+        self.written += 1
+        self.read1_bp += len(read1)
+    
+    @property
+    def written_bp(self):
+        """Tuple of base-pairs written (read1_bp, read2_bp).
+        """
+        return (self.read1_bp, self.read2_bp)
+
+class InterleavedFormatter(SingleEndFormatter):
+    """Format read pairs as successive reads in an interleaved file.
+    """
+    def format(self, result, read1, read2=None):
+        result[self.file1].extend((
+            self.seq_format.format(read1),
+            self.seq_format.format(read2)))
+        self.written += 1
+        self.read1_bp += len(read1)
+        self.read2_bp += len(read2)
+
+class PairedEndFormatter(SingleEndFormatter):
+    """Wrapper for a SequenceFileFormat. Both reads in a pair are formatted
+    using the specified format.
+    """
+    def __init__(self, seq_format, file1, file2):
+        super(PairedEndFormatter, self).__init__(seq_format, file1)
+        self.file2 = file2
+    
+    def format(self, result, read1, read2):
+        result[self.file1].append(self.seq_format.format(read1))
+        result[self.file2].append(self.seq_format.format(read2))
+        self.written += 1
+        self.read1_bp += len(read1)
+        self.read2_bp += len(read2)
+
+def sra_colorspace_sequence(name, sequence, qualities, name2):
+    """Factory for an SRA colorspace sequence (which has one quality value
+    too many).
+    """
+    return ColorspaceSequence(name, sequence, qualities[1:], name2=name2)
+
+def sequence_names_match(read1, read2):
+    """Check whether the sequences read1 and read2 have identical names,
+    ignoring a suffix of '1' or '2'. Some old paired-end reads have names that
+    end in '/1' and '/2'. Also, the fastq-dump tool (used for converting SRA
+    files to FASTQ) appends a .1 and .2 to paired-end reads if option -I is
+    used.
+    
+    Args:
+        read1, read2: The sequences to compare.
+    
+    Returns:
+        Whether the sequences are equal.
+    """
+    name1 = read1.name.split(None, 1)[0]
+    name2 = read2.name.split(None, 1)[0]
+    if name1[-1:] in '12' and name2[-1:] in '12':
+        name1 = name1[:-1]
+        name2 = name2[:-1]
+    return name1 == name2
+
 def paired_to_read1(reader):
     """Generator that yields the first read from an iterator over read pairs.
     """
@@ -638,132 +762,6 @@ def guess_format_from_name(path, raise_on_failure=False):
         raise UnknownFileType(
             "Could not determine whether file {0!r} is FASTA or FASTQ: file "
             "name extension {1!r} not recognized".format(path, ext))
-
-## Converting reads to strings ##
-
-class SequenceFileFormat(object):
-    """Base class for sequence formatters.
-    """
-    def format(self, read):
-        """Format a Sequence as a string.
-        
-        Args:
-            read: The Sequence object.
-        
-        Returns:
-            A string representation of the sequence object in the sequence
-            file format.
-        """
-        raise NotImplementedError()
-
-class FastaFormat(SequenceFileFormat):
-    """FASTA SequenceFileFormat.
-    
-    Args:
-        line_length: Max line length (in characters), or None. Determines
-            whether and how lines are wrapped.
-    """
-    def __init__(self, line_length=None):
-        self.text_wrapper = None
-        if line_length:
-            from textwrap import TextWrapper
-            self.text_wrapper = TextWrapper(width=line_length)
-    
-    def format(self, read):
-        return self.format_entry(read.name, read.sequence)
-    
-    def format_entry(self, name, sequence):
-        """Convert a sequence record to a string.
-        """
-        if self.text_wrapper:
-            sequence = self.text_wrapper.fill(sequence)
-        return "".join((">", name, "\n", sequence, "\n"))
-
-class ColorspaceFastaFormat(FastaFormat):
-    """FastaFormat in which sequences are in colorspace.
-    """
-    def format(self, read):
-        return self.format_entry(read.name, read.primer + read.sequence)
-
-class FastqFormat(SequenceFileFormat):
-    """FASTQ SequenceFileFormat.
-    """
-    def format(self, read):
-        return self.format_entry(
-            read.name, read.sequence, read.qualities, read.name2)
-    
-    def format_entry(self, name, sequence, qualities, name2=""):
-        """Convert a sequence record to a string.
-        """
-        return "".join((
-            '@', name, '\n',
-            sequence, '\n+',
-            name2, '\n',
-            qualities, '\n'))
-
-class ColorspaceFastqFormat(FastqFormat):
-    """FastqFormat in which sequences are in colorspace.
-    """
-    def format(self, read):
-        return self.format_entry(
-            read.name, read.primer + read.sequence, read.qualities)
-
-class SingleEndFormatter(object):
-    """Wrapper for a SequenceFileFormat for single-end data.
-    
-    Args:
-        seq_format: The SequenceFileFormat object.
-        file1: The single-end file.
-    """
-    def __init__(self, seq_format, file1):
-        self.seq_format = seq_format
-        self.file1 = file1
-        self.written = 0
-        self.read1_bp = 0
-        self.read2_bp = 0
-    
-    def format(self, result, read1, read2=None):
-        """Format read(s) and add them to `result`.
-        
-        Args:
-            result: A dict mapping file names to lists of formatted reads.
-            read1, read2: The reads to format.
-        """
-        result[self.file1].append(self.seq_format.format(read1))
-        self.written += 1
-        self.read1_bp += len(read1)
-    
-    @property
-    def written_bp(self):
-        """Tuple of base-pairs written (read1_bp, read2_bp).
-        """
-        return (self.read1_bp, self.read2_bp)
-
-class InterleavedFormatter(SingleEndFormatter):
-    """Format read pairs as successive reads in an interleaved file.
-    """
-    def format(self, result, read1, read2=None):
-        result[self.file1].extend((
-            self.seq_format.format(read1),
-            self.seq_format.format(read2)))
-        self.written += 1
-        self.read1_bp += len(read1)
-        self.read2_bp += len(read2)
-
-class PairedEndFormatter(SingleEndFormatter):
-    """Wrapper for a SequenceFileFormat. Both reads in a pair are formatted
-    using the specified format.
-    """
-    def __init__(self, seq_format, file1, file2):
-        super(PairedEndFormatter, self).__init__(seq_format, file1)
-        self.file2 = file2
-    
-    def format(self, result, read1, read2):
-        result[self.file1].append(self.seq_format.format(read1))
-        result[self.file2].append(self.seq_format.format(read2))
-        self.written += 1
-        self.read1_bp += len(read1)
-        self.read2_bp += len(read2)
 
 def create_seq_formatter(file1, file2=None, interleaved=False, **kwargs):
     """Create a formatter, deriving the format name from the file extension.

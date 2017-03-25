@@ -13,7 +13,7 @@ v1.1.0 (dev)
 * Major internal code reorganization.
 * Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
 * Switched to pytest for testing
-* Fixed adapter masking in InsertAligner (issue #7, thanks @lllaaa).
+* Fixed adapter masking in InsertAligner (issue #7; thanks @lllaaa).
 * Added developer/contributor documentation and guidelines.
 
 v1.0.23 (2016.12.07)

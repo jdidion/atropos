@@ -18,6 +18,7 @@ import urllib
 from atropos import check_importability, __version__
 import atropos.commands
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
+from atropos.io.compression import splitext_compressed
 from atropos.reports import generate_reports
 from atropos.util import MAGNITUDE, MergingDict, Timing
 
@@ -349,6 +350,11 @@ class Command(object):
             "--batch-size",
             type=int_or_str, metavar="SIZE",
             help="Number of records to process in each batch. (1000)")
+        group.add_argument(
+            "-D",
+            "--sample-id",
+            default=None, metavar="ID",
+            help="Optional sample ID. Added to the summary output.")
     
     def add_command_options(self):
         """Add command-specific options. At the very least,
@@ -416,6 +422,21 @@ class Command(object):
                     "instead.")
             options.paired = True
         
+        # Set sample ID from the input file name(s)
+        if options.sample_id is None:
+            name1 = splitext_compressed(
+                options.input1 or options.interleaved_input)[0]
+            name2 = None
+            if options.input2:
+                name2 = splitext_compressed(options.input2)[0]
+            if name2 is None or name1 == name2:
+                options.sample_id = name1
+            else:
+                for i in range(min(len(name1), len(name2))):
+                    if name1[i] != name2[i]:
+                        options.sample_id = name1[:i]
+                        break
+        
         if options.quiet:
             options.progress = None
         elif options.progress and options.output == STDERR:
@@ -439,6 +460,7 @@ class Command(object):
         summary['python'] = platform.python_version()
         summary['command_line'] = self.orig_args.copy()
         summary['options'] = self.options.__dict__.copy()
+        summary['sample_id'] = self.options.sample_id
         
         with Timing() as timing:
             try:
