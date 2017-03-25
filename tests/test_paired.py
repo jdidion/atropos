@@ -348,12 +348,13 @@ def test_summary():
         assert summary is not None
         assert isinstance(summary, dict)
         assert summary['command_line'] == [
-            '--threads', '2',
+            'trim', '--threads', '2',
             '-a', 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG',
             '-A', 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
             '--aligner', aligner,
             '-o', outfiles[0], '-p', outfiles[1],
             '-pe1', infiles[0], '-pe2', infiles[1]]
+        assert summary['sample_id'] == 'big'
         assert summary['mode'] == 'parallel'
         assert summary['threads'] == 2
         # infiles are 100 125 bp PE reads

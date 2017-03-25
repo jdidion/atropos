@@ -393,9 +393,6 @@ class Command(object):
         logger.info(
             "This is Atropos %s with Python %s", __version__,
             platform.python_version())
-        logger.info(
-            "Command line parameters: %s %s", self.name,
-            " ".join(self.orig_args))
     
     def validate_common_options(self):
         """Validate arguments to common options.
@@ -424,18 +421,19 @@ class Command(object):
         
         # Set sample ID from the input file name(s)
         if options.sample_id is None:
-            name1 = splitext_compressed(
-                options.input1 or options.interleaved_input)[0]
-            name2 = None
+            fname = os.path.basename(
+                options.input1 or options.interleaved_input)
+            name = splitext_compressed(fname)[0]
             if options.input2:
-                name2 = splitext_compressed(options.input2)[0]
-            if name2 is None or name1 == name2:
-                options.sample_id = name1
-            else:
-                for i in range(min(len(name1), len(name2))):
-                    if name1[i] != name2[i]:
-                        options.sample_id = name1[:i]
-                        break
+                name2 = splitext_compressed(os.path.basename(options.input2))[0]
+                if name != name2:
+                    for i in range(min(len(name), len(name2))):
+                        if name[i] != name2[i]:
+                            name = name[:i]
+                            break
+            if name.endswith('.'):
+                name = name[:-1]
+            options.sample_id = name
         
         if options.quiet:
             options.progress = None
@@ -458,7 +456,7 @@ class Command(object):
         summary = MergingDict()
         summary['version'] = __version__
         summary['python'] = platform.python_version()
-        summary['command_line'] = self.orig_args.copy()
+        summary['command_line'] = [self.name] + self.orig_args.copy()
         summary['options'] = self.options.__dict__.copy()
         summary['sample_id'] = self.options.sample_id
         

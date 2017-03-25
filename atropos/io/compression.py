@@ -5,7 +5,6 @@ import gzip
 import io
 import lzma
 import os
-from os.path import splitext
 from subprocess import Popen, PIPE
 
 COMPRESSORS = {
@@ -276,5 +275,5 @@ def splitext_compressed(name):
             ext2 = ext
             name = name[:-len(ext)]
             break
-    name, ext1 = splitext(name)
+    name, ext1 = os.path.splitext(name)
     return (name, ext1, ext2)

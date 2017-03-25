@@ -47,7 +47,7 @@ class TitlePrinter(Printer):
         kwargs: Additional keyword arguments passed to the print function.
     """
     def __init__(
-            self, outfile, levels=(('=', '='), ('-', None), ('~', None)),
+            self, outfile, levels=(('=', '='), ('-', '-'), ('-', None), ('~', None)),
             **kwargs):
         super().__init__(outfile, **kwargs)
         self.levels = levels
@@ -58,7 +58,7 @@ class TitlePrinter(Printer):
         if level:
             if level > len(self.levels):
                 raise ValueError("Invalid level: {}".format(level))
-            underline, overline = self.levels[level-1]
+            underline, overline = self.levels[level]
             if overline is True:
                 overline = underline
             width = len(title)
@@ -234,17 +234,25 @@ def print_summary_report(summary, outfile):
         summary: The summary dict.
         outfile: The output file object.
     """
+    _print_title = TitlePrinter(outfile)
     _print = Printer(outfile)
-    total = summary["total_record_count"]
+    
     timing = summary['timing']
-    _print("Start time: {}".format(timing['start']))
+    total = summary["total_record_count"]
     wctime = ["Wallclock time: {:.2F} s".format(timing["wallclock"])]
     if total > 0:
         wctime.append("({0:.0F} us/read; {1:.2F} M reads/minute)".format(
             1E6 * timing["wallclock"] / total,
             total / timing["wallclock"] * 60 / 1E6))
+    
+    _print_title("Atropos", level=0)
+    _print("Atropos version: ".format(summary['version']))
+    _print("Python version: ".format(summary['python']))
+    _print("Command line parameters: {}".format(" ".join(summary['command_line'])))
+    _print("Start time: {}".format(timing['start']))
     _print(*wctime)
-    _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
+    _print("CPU time (main process): {0:.2F} s".format(timing['cpu']))
+    _print("Sample ID: {}".format(summary['sample_id']))
     _print()
 
 def print_trim_report(summary, outfile):
