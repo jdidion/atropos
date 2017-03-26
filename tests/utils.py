@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import os
 import sys
+import traceback
 from atropos.scripts import atropos
 
 @contextmanager
@@ -64,10 +65,18 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         else:
             params += ['-o', tmp_fastaq] # TODO not parallelizable
         print(params)
-        result = atropos.main(params)
-        assert isinstance(result, tuple)
-        assert len(result) == 3
+        retcode, summary = atropos.main(params)
+        assert summary is not None
+        assert isinstance(summary, dict)
+        if 'error' in summary and summary['error'] is not None:
+            assert retcode != 0
+            err = summary['error']
+            traceback.print_exception(*err['details'])
+            raise Exception("Unexpected error: {}".format(err['message']))
+        else:
+            assert retcode == 0
         # TODO redirect standard output
+        assert os.path.exists(tmp_fastaq)
         assert files_equal(cutpath(expected), tmp_fastaq)
     # TODO diff log files
 

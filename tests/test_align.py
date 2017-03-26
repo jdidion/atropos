@@ -1,8 +1,9 @@
 # coding: utf-8
+import math
+from .utils import approx_equal
+from atropos.adapters import BACK
 from atropos.align import locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
 from atropos.util import RandomMatchProbability
-from atropos.adapters import BACK
-
 
 class TestAligner():
     def test(self):
@@ -120,9 +121,6 @@ def test_no_match():
     a = locate('CTGATCTGGCCG', 'AAAAGGG', 0.1, BACK)
     assert a is None, a
 
-import math
-from .utils import approx_equal
-
 def test_factorial():
     f = RandomMatchProbability()
     # simple test
@@ -167,7 +165,7 @@ def test_short_adapter_overlap():
     assert match2.length == 2
 
 def test_multi_aligner_no_mismatches():
-    from atropos._align import MultiAligner
+    from atropos.align._align import MultiAligner
     a = MultiAligner(max_error_rate=0, min_overlap=3)
     matches = a.locate('AGAGATCAGATGACAGATC', 'GATCA')
     assert len(matches) == 2
@@ -189,7 +187,7 @@ def test_multi_aligner_no_mismatches():
     assert matches[1][5] == 0
 
 def test_multi_aligner_with_mismatches():
-    from atropos._align import MultiAligner
+    from atropos.align._align import MultiAligner
     a = MultiAligner(max_error_rate=0.1, min_overlap=10)
     matches = a.locate('GATATCAGATGACAGATCAGAGATCAGAT', 'GAGATCAGATGA')
     

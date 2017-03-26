@@ -338,7 +338,7 @@ def test_demultiplex():
     params = ['-a', 'first=AATTTCAGGAATT', '-a', 'second=GTTCTCTAGTTCT', '-o', multiout, '-se', datapath('twoadapters.fasta')]
     result = atropos.main(params)
     assert isinstance(result, tuple)
-    assert len(result) == 3
+    assert len(result) == 2
     assert result[0] == 0
     assert files_equal(cutpath('twoadapters.first.fasta'), multiout.format(name='first'))
     assert files_equal(cutpath('twoadapters.second.fasta'), multiout.format(name='second'))
@@ -368,6 +368,7 @@ def test_quiet_is_quiet():
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
+    print(captured_standard_output.getvalue())
     assert captured_standard_output.getvalue() == ''
     assert captured_standard_error.getvalue() == ''
 

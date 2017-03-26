@@ -1,0 +1,8 @@
+[MESSAGES CONTROL]
+# C0303: Trailing whitespace; will add a custom checker that only flags
+#        trailing whitespace at the end of non-empty lines
+# C0326: Disabled because it incorrectly flags whitespace around default values
+#        when function annotations are used; will add a custom checker that
+#        flags all other cases
+disable=fixme,C0303,C0326,too-few-public-methods,too-many-instance-attributes,too-many-arguments,too-many-locals,too-many-branches,too-many-statements,too-many-function-args,too-many-lines,too-many-boolean-expressions,too-many-return-statements,too-many-ancestors
+ignore=__pycache__,*.pyx,_version.py

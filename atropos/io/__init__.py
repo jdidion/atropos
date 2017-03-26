@@ -1,17 +1,18 @@
-"""
-Open compressed files transparently.
+"""Open compressed files transparently.
 """
 import errno
 import io
 import os
 import sys
 
-from .compression import get_file_opener
+from atropos.io.compression import get_file_opener
 
 STDOUT = '-'
 STDERR = '_'
 
 def abspath(path):
+    """Returns the user home-resolved absolute path.
+    """
     return os.path.abspath(os.path.expanduser(path))
     
 def resolve_path(path, parent=None):
@@ -35,17 +36,20 @@ def resolve_path(path, parent=None):
     return apath
 
 def check_path(path, ptype=None, access=None):
-    """Checks that a path exists, is of the specified type, and allows the specified access.
+    """Checks that a path exists, is of the specified type, and allows the
+    specified access.
     
     Args:
         ptype: 'f' for file or 'd' for directory.
         access (int): One of the access values from :module:`os`
     
     Raises:
-        IOError if the path does not exist, is not of the specified type, or doesn't allow the
-        specified access.
+        IOError if the path does not exist, is not of the specified type, or
+        doesn't allow the specified access.
     """
-    if ptype == 'f' and not path.startswith("/dev/") and not os.path.isfile(path):
+    if (
+            ptype == 'f' and not path.startswith("/dev/") and
+            not os.path.isfile(path)):
         raise IOError(errno.EISDIR, "{} is not a file".format(path), path)
     elif ptype == 'd' and not os.path.isdir(path):
         raise IOError(errno.ENOTDIR, "{} is not a directory".format(path), path)
@@ -55,29 +59,41 @@ def check_path(path, ptype=None, access=None):
         raise IOError(errno.EACCES, "{} is not accessable".format(path), path)
     return path
 
-def check_writeable(p, ptype=None):
-    if p in (STDOUT, STDERR):
-        return p
-    p = abspath(p)
+def check_writeable(rawpath, ptype=None):
+    """Resolves the absolute path. Raises an IOError if the path is not
+    writable.
+    
+    Args:
+        rawpath: The path to resolve/check.
+        ptype: The path type (f=file, d=directory).
+    """
+    if rawpath in (STDOUT, STDERR):
+        return rawpath
+    rawpath = abspath(rawpath)
     try:
-        path = resolve_path(p)
+        path = resolve_path(rawpath)
         check_path(path, ptype, os.W_OK)
     except IOError:
-        dirpath = os.path.dirname(p)
+        dirpath = os.path.dirname(rawpath)
         if os.path.exists(dirpath):
-            check_path(dirpath, "d", os.W_OK)
+            check_path(dirpath, 'd', os.W_OK)
         else:
             os.makedirs(dirpath)
-        path = os.path.join(dirpath, os.path.basename(p))
+        path = os.path.join(dirpath, os.path.basename(rawpath))
     return path
 
 def open_output(filename, mode='w', context_wrapper=False):
-    """
-    Replacement for the "open" function that is only for writing text files.
+    """Replacement for the "open" function that is only for writing text files.
     If the filename is '-', standard output (mode 'w').
     
-    mode can be: 'a', 'ab', 'wt', or 'wb'
-    Instead of 'wt', 'w' can be used as an abbreviation.
+    Args:
+        filename: The file to open.
+        mode: The file open mode; can be: 'a', 'ab', 'wt', or 'wb'.
+            Instead of 'wt', 'w' can be used as an abbreviation.
+        context_wrapper: Whether to wrap the file in a context manager.
+    
+    Returns:
+        The opened file.
     """
     if mode == 'w':
         mode = 'wt'
@@ -90,38 +106,45 @@ def open_output(filename, mode='w', context_wrapper=False):
 
     # standard input and standard output handling
     if filename in (STDOUT, STDERR):
-        fh = sys.stdout if filename == STDOUT else sys.stderr
+        fileobj = sys.stdout if filename == STDOUT else sys.stderr
         if mode == 'wb':
-            fh = fh.buffer
+            fileobj = fileobj.buffer
         if context_wrapper:
             class StdWrapper(object):
-                def __init__(self, fh):
-                    self.fh = fh
+                """Context manager for stdout/stderr that is no-op on exit.
+                """
+                def __init__(self, fileobj):
+                    self.fileobj = fileobj
                 def __enter__(self):
-                    return self.fh
-                def __exit__(exception_type, exception_value, traceback):
+                    return self.fileobj
+                def __exit__(self, exception_type, exception_value, traceback):
                     pass
-            fh = StdWrapper(fh)
+            fileobj = StdWrapper(fileobj)
     else:
         filename = check_writeable(filename, 'f')
-        fh = open(filename, mode)
+        fileobj = open(filename, mode)
     
-    return fh
+    return fileobj
 
 def xopen(filename, mode='r', use_system=True):
-    """
-    Replacement for the "open" function that can also open files that have
+    """Replacement for the "open" function that can also open files that have
     been compressed with gzip, bzip2 or xz. If the filename is '-', standard
     output (mode 'w') or input (mode 'r') is returned. If the filename ends
     with .gz, the file is opened with a pipe to the gzip program. If that
     does not work, then gzip.open() is used (the gzip module is slower than
     the pipe to the gzip program). If the filename ends with .bz2, it's
     opened as a bz2.BZ2File. Otherwise, the regular open() is used.
-
-    mode can be: 'rt', 'rb', 'a', 'wt', or 'wb'
-    Instead of 'rt' and 'wt', 'r' and 'w' can be used as abbreviations.
-
-    Append mode ('a') is unavailable with BZ2 compression and will raise an error.
+    
+    Args:
+        filename: The file to open.
+        mode: The file open mode. Can be: 'rt', 'rb', 'a', 'wt', or 'wb'.
+            Instead of 'rt' and 'wt', 'r' and 'w' can be used as abbreviations.
+            Append mode ('a') is unavailable with BZ2 compression and will raise
+            an error.
+        use_system: Whether to use the system compression/decompression program.
+    
+    Returns:
+        The opened file.
     """
     if mode == 'r':
         mode = 'rt'
@@ -137,15 +160,15 @@ def xopen(filename, mode='r', use_system=True):
     # standard input and standard output handling
     if filename in (STDOUT, STDERR):
         if 'r' in mode:
-            fh = sys.stdin
+            fileobj = sys.stdin
         else:
-            fh = sys.stdout if filename == STDOUT else sys.stderr
+            fileobj = sys.stdout if filename == STDOUT else sys.stderr
         if 'b' in mode:
-            fh = fh.buffer
-        return fh
+            fileobj = fileobj.buffer
+        return fileobj
     
     file_opener = get_file_opener(filename)
     if file_opener:
-        return file_opener(filename, mode, use_system)
+        return file_opener(filename, mode, use_system=use_system)
     else:
-         return open(filename, mode)
+        return open(filename, mode)

@@ -1,10 +1,9 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
-from __future__ import print_function, division, absolute_import
 import copy
-from atropos.xopen import xopen
-from atropos.seqio import _shorten, FormatError, SequenceReader
-from atropos.util import reverse_complement
+from atropos.io import xopen
+from atropos.io.seqio import FormatError, SequenceReader
+from atropos.util import reverse_complement, truncate_string
 
 cdef class Sequence(object):
     """
@@ -44,9 +43,10 @@ cdef class Sequence(object):
         self.merged = merged
         self.corrected = corrected
         if qualities is not None and len(qualities) != len(sequence):
-            rname = _shorten(name)
-            raise FormatError("In read named {0!r}: length of quality sequence ({1}) and length "
-                "of read ({2}) do not match".format(
+            rname = truncate_string(name)
+            raise FormatError(
+                "In read named {0!r}: length of quality sequence ({1}) and "
+                "length  of read ({2}) do not match".format(
                     rname, len(qualities), len(sequence)))
     
     def subseq(self, begin=0, end=None):
@@ -128,9 +128,9 @@ cdef class Sequence(object):
     def __repr__(self):
         qstr = ''
         if self.qualities is not None:
-            qstr = ', qualities={0!r}'.format(_shorten(self.qualities))
+            qstr = ', qualities={0!r}'.format(truncate_string(self.qualities))
         return '<Sequence(name={0!r}, sequence={1!r}{2})>'.format(
-            _shorten(self.name), _shorten(self.sequence), qstr)
+            truncate_string(self.name), truncate_string(self.sequence), qstr)
 
     def __len__(self):
         return len(self.sequence)

@@ -11,20 +11,24 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 3. Options for trimming specific types of data (miRNA, bisulfite-seq).
 4. A new command ('detect') that will detect adapter sequences and other potential contaminants (this is experimental).
 5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
-5. The ability to merge overlapping reads (this is experimental and the functionality is limited).
-6. Summary report includes read statistics and can be viewed in [MultiQC](multiqc.info).
-7. The ability to write the summary report and log messages to separate files.
-8. The ability to read and write interleaved FASTQ files.
-9. A progress bar, and other minor usability enhancements.
+6. A new command ('qc') that generates read statistics similar to FastQC. The trim command can also compute read statistics both before and after trimming (using the '--stats' option).
+7. Improved summary reports, including support for serialization formats (JSON, YAML, pickle), support for user-defined templates (via the optional Jinja2 dependency), and integration with [MultiQC](http://multiqc.info).
+8. The ability to merge overlapping reads (this is experimental and the functionality is limited).
+9. The ability to write the summary report and log messages to separate files.
+10. The ability to read SAM/BAM files and read/write interleaved FASTQ files.
+11. A progress bar, and other minor usability enhancements.
 
 ## Dependencies
 
-* Python 3.3+ (python 2.x is NOT supported)
-* Cython 0.25.2+ (`pip install Cython`)
-* pytest (for running unit tests)
-* progressbar2 or tqdm (optional, if you want progressbar support)
-* pysam (optional, if you want support for SAM/BAM input)
-* khmer 2.0+ (`pip install khmer`) (optional, for detecting low-frequency adapter contamination)
+* Required
+    * Python 3.3+ (python 2.x is NOT supported)
+    * Cython 0.25.2+ (`pip install Cython`)
+* Optional
+    * pytest (for running unit tests)
+    * progressbar2 or tqdm (progressbar support)
+    * pysam (SAM/BAM input)
+    * khmer 2.0+ (`pip install khmer`) (for detecting low-frequency adapter contamination)
+    * jinja2 (for user-defined report formats)
 
 ## Installation
 
@@ -54,6 +58,10 @@ atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCC
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
+## Developers
+
+We welcome any contributions via GitHub issues and pull requests. See the  [documentation](https://atropos.readthedocs.org/) for style guidelines and best practices. We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.
+
 ## Links
 
 * [Documentation](https://atropos.readthedocs.org/)
@@ -64,11 +72,11 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 ### 1.1
 
-* Improvements to the summary report, and addition of a computer-parsable report for use in QC pipelines
-    * Integrate with MultiQC
-    * https://github.com/marcelm/cutadapt/issues/112
-    * Also look at the QCML used in ngs-bits
-* Integrate userstats (opt-in, of course) to gather user statistics and crash reports.
+* Improvements to the summary report
+    * Support for report output in JSON, YAML, and pickle
+    * Support for report templates using jinja2
+    * Implementation of a separate Atropos MultiQC module that will be submitted for inclusion in that project
+* Static code analysis (pylint).
 * Add developer/contributor documentation and guidelines.
 
 ### 1.2
@@ -77,10 +85,11 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
 * Expand the list of contaminants that are detected by default.
+* Automate creation and sending of user statistics and crash reports (similar to error_report in  https://github.com/biologyguy/BuddySuite/blob/master/buddysuite/buddy_resources.py).
 
 ### 1.3
 
-* Provide PacBio-specific options (https://github.com/marcelm/cutadapt/issues/120).
+* Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 
 ### 1.4
@@ -101,10 +110,21 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 ### 1.6
 
 * Implement a public plugin API.
+* Add more logging and convert log messages from old-style to new-style format strings.
 
 ### 2.0
 
-* Simplification of command line options, perhaps by splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+* Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+* Consider adding additional report formats
+    * https://github.com/marcelm/cutadapt/issues/112
+* Performance enhancements using
+    * http://numba.pydata.org/
+    * https://github.com/undefx/vecpy
+    * https://github.com/serge-sans-paille/pythran
+* >90% test coverage
+* Fuzz testing using AFL
+    * http://lcamtuf.coredump.cx/afl/
+    * https://github.com/jwilk/python-afl
 
 ### Beyond 2.0
 
@@ -113,7 +133,7 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 * Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
 * Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcomming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
 
-While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 2.0, which is planned for early 2017.
+While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change substantially. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 2.0, which is planned for sometime in 2017.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 

@@ -16,18 +16,20 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
             with temporary_path('tmp2-' + expected2.format(aligner=aligner)) as p2:
                 p = params.copy()
                 p += ['--aligner', aligner, '-o', p1, '-p', p2]
-                p += ['-pe1', datapath(in1.format(aligner=aligner)),
-                      '-pe2', datapath(in2.format(aligner=aligner))]
+                infiles = [datapath(i.format(aligner=aligner)) for i in (in1, in2)]
+                for infile_args in zip(('-pe1', '-pe2'), infiles):
+                    p.extend(infile_args)
                 result = atropos.main(p)
                 assert isinstance(result, tuple)
-                assert len(result) == 3
+                assert len(result) == 2
                 if error_on_rc:
-                    assert result[0] == 0, "Return code {} != 0".format(result[0])
+                    err = result[1]['error'] if result[1] and 'error' in result[1] else None
+                    assert result[0] == 0, "Return code {} != 0; error = {}".format(result[0], err)
                 if assert_files_equal:
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
                 if callback:
-                    callback(aligner, p1, p2, result)
+                    callback(aligner, infiles, (p1, p2), result)
 
 def run_interleaved(params, inpath, expected, aligners=('adapter',)):
     if type(params) is str:
@@ -38,7 +40,7 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',)):
             p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner)), '-L', tmp]
             result = atropos.main(p)
             assert isinstance(result, tuple)
-            assert len(result) == 3
+            assert len(result) == 2
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
 # def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
@@ -73,7 +75,7 @@ def test_paired_end_legacy():
 def test_untrimmed_paired_output():
     with temporary_path("tmp-untrimmed.1.fastq") as untrimmed1:
         with temporary_path("tmp-untrimmed.2.fastq") as untrimmed2:
-            def callback(aligner, p1, p2, result):
+            def callback(aligner, infiles, outfiles, result):
                 assert files_equal(cutpath('paired-untrimmed.1.fastq'), untrimmed1)
                 assert files_equal(cutpath('paired-untrimmed.2.fastq'), untrimmed2)
             run_paired(['-a', 'TTAGACATAT',
@@ -144,7 +146,7 @@ def test_unmatched_read_names():
                     '-a XX -o out1.fastq -p out2.fastq'.split() +
                     ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
                 assert isinstance(result, tuple)
-                assert len(result) == 3
+                assert len(result) == 2
                 assert result[0] != 0
         finally:
             os.remove('out1.fastq')
@@ -254,7 +256,7 @@ def test_pair_filter():
 def test_too_short_paired_output():
     with temporary_path("temp-too-short.1.fastq") as p1:
         with temporary_path("temp-too-short.2.fastq") as p2:
-            def callback(aligner, _1, _2, result):
+            def callback(aligner, infiles, outfiles, result):
                 assert files_equal(cutpath('paired-too-short.1.fastq'), p1)
                 assert files_equal(cutpath('paired-too-short.2.fastq'), p2)
             run_paired('-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output '
@@ -267,7 +269,7 @@ def test_too_short_paired_output():
 def test_too_long_output():
     with temporary_path("temp-too-long.1.fastq") as p1:
         with temporary_path("temp-too-long.2.fastq") as p2:
-            def callback(aligner, _1, _2, result):
+            def callback(aligner, infiles, outfiles, result):
                 assert files_equal(cutpath('paired_{aligner}.1.fastq'.format(aligner=aligner)), p1)
                 assert files_equal(cutpath('paired_{aligner}.2.fastq'.format(aligner=aligner)), p2)
             run_paired('-a TTAGACATAT -A CAGTGGAGTA -M 14 --too-long-output '
@@ -322,20 +324,61 @@ def test_overwrite():
                expected1='lowq.fastq', expected2='highq.fastq')
 
 def test_no_writer_process():
-    def check_multifile(aligner, p1, p2, result):
-        assert os.path.basename(p1) == 'tmp1-out.1.fastq'
-        assert os.path.basename(p2) == 'tmp2-out.2.fastq'
-        tmpdir = os.path.dirname(p1)
-        assert tmpdir == os.path.dirname(p2)
+    def check_multifile(aligner, infiles, outfiles, result):
+        assert os.path.basename(outfiles[0]) == 'tmp1-out.1.fastq'
+        assert os.path.basename(outfiles[1]) == 'tmp2-out.2.fastq'
+        tmpdir = os.path.dirname(outfiles[0])
+        assert tmpdir == os.path.dirname(outfiles[1])
+        
+        # TODO: If the final worker doesn't get the chance to process any
+        # batches, the last output file is never created.
         assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.0.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.1.fastq'))
+        #assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.2.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.0.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.1.fastq'))
+        #assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.2.fastq'))
+        
         # TODO: check contents
     
-    run_paired('--threads 2 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG" -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+    run_paired('--threads 3 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
         in1='big.1.fq', in2='big.2.fq',
         expected1='out.1.fastq', expected2='out.2.fastq',
         aligners=BACK_ALIGNERS, assert_files_equal=False,
         callback=check_multifile
+    )
+
+def test_summary():
+    def check_summary(aligner, infiles, outfiles, result):
+        summary = result[1]
+        assert summary is not None
+        assert isinstance(summary, dict)
+        assert summary['command_line'] == [
+            'trim', '--threads', '2',
+            '-a', 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG',
+            '-A', 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+            '--aligner', aligner,
+            '-o', outfiles[0], '-p', outfiles[1],
+            '-pe1', infiles[0], '-pe2', infiles[1]]
+        assert summary['sample_id'] == 'big'
+        assert summary['mode'] == 'parallel'
+        assert summary['threads'] == 2
+        # infiles are 100 125 bp PE reads
+        expected_record_counts = {}
+        expected_record_counts[tuple(infiles)] = 100
+        assert summary['record_counts'] == expected_record_counts
+        expected_bp_counts = {}
+        expected_bp_counts[tuple(infiles)] = [12500, 12500]
+        assert summary['bp_counts'] == expected_bp_counts
+        assert 'timing' in summary
+        assert 'wallclock' in summary['timing']
+        assert summary['timing']['wallclock'] > 0
+        assert 'cpu' in summary['timing']
+        assert summary['timing']['cpu'] > 0
+    run_paired(
+        '--threads 2 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+        in1='big.1.fq', in2='big.2.fq',
+        expected1='out.1.fastq', expected2='out.2.fastq',
+        aligners=BACK_ALIGNERS, assert_files_equal=False,
+        callback=check_summary
     )

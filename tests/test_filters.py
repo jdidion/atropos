@@ -2,8 +2,8 @@
 """
 Tests write output (should it return True or False or write)
 """
-from atropos.filters import NContentFilter, DISCARD, KEEP, SingleWrapper, PairedWrapper
-from atropos.seqio import Sequence
+from atropos.trim.filters import NContentFilter, DISCARD, KEEP, SingleWrapper, PairedWrapper
+from atropos.io.seqio import Sequence
 
 def test_ncontentfilter():
     # third parameter is True if read should be discarded
