@@ -76,7 +76,6 @@ We welcome any contributions via GitHub issues and pull requests. See the  [docu
     * Support for report output in JSON, YAML, and pickle
     * Support for report templates using jinja2
     * Implementation of a separate Atropos MultiQC module that will be submitted for inclusion in that project
-    * Also look at the QCML used in ngs-bits
 * Static code analysis (pylint).
 * Add developer/contributor documentation and guidelines.
 

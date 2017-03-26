@@ -19,8 +19,8 @@ from atropos import check_importability, __version__
 import atropos.commands
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
 from atropos.io.compression import splitext_compressed
-from atropos.reports import generate_reports
-from atropos.util import MAGNITUDE, MergingDict, Timing
+from atropos.reports import create_summary, generate_reports
+from atropos.util import MAGNITUDE, Timing
 
 # Print a helpful error message if the extension modules cannot be imported.
 check_importability()
@@ -453,12 +453,8 @@ class Command(object):
             Tuple (rc, {summary})
         """
         retcode = 0
-        summary = MergingDict()
-        summary['version'] = __version__
-        summary['python'] = platform.python_version()
-        summary['command_line'] = [self.name] + self.orig_args.copy()
-        summary['options'] = self.options.__dict__.copy()
-        summary['sample_id'] = self.options.sample_id
+        summary = create_summary(
+            __version__, self.name, self.orig_args, self.options)
         
         with Timing() as timing:
             try:
@@ -478,11 +474,16 @@ class Command(object):
                 if self.options.quiet:
                     report_file = None
                 elif report_file == '-':
-                    report_file = STDERR if self.options.output is None else STDOUT
+                    report_file = STDOUT
+                    # Send report to stderr if main output will be going to
+                    # stdout
+                    if self.options.output is None:
+                        report_file = STDERR
             
             if report_file:
-                logging.getLogger().debug("Generating report file")
-                generate_reports(summary, report_file, self.options.report_formats)
+                logging.getLogger().debug("Writing report to %s", report_file)
+                generate_reports(
+                    summary, report_file, self.options.report_formats)
             else:
                 logging.getLogger().debug("Not generating report file")
         

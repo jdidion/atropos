@@ -2,17 +2,18 @@
 
 v1.1.0 (dev)
 -------------
-* In progress:
-    * Integration with MultiQC.
-    * Benchmarking against AdapterRemoval2.
-* Static code analysis (pylint).
-* Added optional dependency on jinja2, which enables generating reports using templates.
+
 * New 'qc' command computes read-level statistics.
 * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
 * Major refactoring and improvement of reporting.
+    * Text report now has data lined up in columns.
+    * Reports can also be generated in JSON, YAML, and pickle formats.
+    * Added optional dependency on jinja2, which enables generating reports using templates (including user-defined).
+    * Currently implementing Atropos module for MultiQC, which will read reports in JSON format.
 * Major internal code reorganization.
-* Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
+* Static code analysis (pylint).
 * Switched to pytest for testing
+* Command-specific help will now show with 'atropos <command>' or 'atropos <command> -h'
 * Fixed adapter masking in InsertAligner (issue #7; thanks @lllaaa).
 * Added developer/contributor documentation and guidelines.
 

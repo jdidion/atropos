@@ -1,5 +1,3 @@
-Note: The code in this project is currently being transitioned to adhere to the style guidelines below. We apologies for any remaining inconsistencies.
-
 Style-wise, we try to adhere to the [Google python style guidelines](https://google.github.io/styleguide/pyguide.html).
 
 We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon).
