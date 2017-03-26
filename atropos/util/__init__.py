@@ -253,7 +253,7 @@ class Const(Mergeable):
         """
         if self != other:
             raise ValueError("{} != {}".format(self, other))
-        return self.value
+        return self
     
     def __eq__(self, other):
         """Returns True if `self.value==other` (or `other.value` if `other` is
@@ -262,6 +262,9 @@ class Const(Mergeable):
         if isinstance(other, Const):
             other = other.value
         return self.value == other
+    
+    def __repr__(self):
+        return str(self.value)
 
 class MergingDict(OrderedDict, Mergeable):
     """An :class:`collections.OrderedDict` that implements :class:`Mergeable`.

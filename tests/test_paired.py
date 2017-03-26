@@ -329,13 +329,19 @@ def test_no_writer_process():
         assert os.path.basename(outfiles[1]) == 'tmp2-out.2.fastq'
         tmpdir = os.path.dirname(outfiles[0])
         assert tmpdir == os.path.dirname(outfiles[1])
+        
+        # TODO: If the final worker doesn't get the chance to process any
+        # batches, the last output file is never created.
         assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.0.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.1.fastq'))
+        #assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.2.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.0.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.1.fastq'))
+        #assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.2.fastq'))
+        
         # TODO: check contents
     
-    run_paired('--threads 2 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+    run_paired('--threads 3 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
         in1='big.1.fq', in2='big.2.fq',
         expected1='out.1.fastq', expected2='out.2.fastq',
         aligners=BACK_ALIGNERS, assert_files_equal=False,

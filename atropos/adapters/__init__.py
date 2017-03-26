@@ -35,7 +35,7 @@ class AdapterType(object):
     def asdict(self):
         """Returns AdapterType fields in a dict.
         """
-        return dict(name=self.name, desc=self.desc, flags=self.flags)
+        return dict(name=self.name, desc=self.desc, flags=Const(self.flags))
 
 ADAPTER_TYPES = dict(
     back=AdapterType(

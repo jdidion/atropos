@@ -17,6 +17,36 @@ class Writers(object):
         self.force_create = force_create
         self.suffix = None
     
+    def get_writer(self, file_desc, compressed=False):
+        """Create the writer for a file descriptor if it does not already
+        exist.
+        
+        Args:
+            file_desc: File descriptor. If `compressed==True`, this is a tuple
+                (path, mode), otherwise it's only a path.
+            compressed: Whether data has already been compressed.
+        
+        Returns:
+            The writer.
+        """
+        if compressed:
+            path, mode = file_desc
+        else:
+            path = file_desc
+        
+        if path not in self.writers:
+            if self.suffix:
+                real_path = add_suffix_to_path(path, self.suffix)
+            else:
+                real_path = path
+            # TODO: test whether O_NONBLOCK allows non-blocking write to NFS
+            if compressed:
+                self.writers[path] = open_output(real_path, mode)
+            else:
+                self.writers[path] = xopen(real_path, "w")
+        
+        return self.writers[path]
+    
     def write_result(self, result, compressed=False):
         """Write results to output.
         
@@ -36,22 +66,10 @@ class Writers(object):
         Args:
             file_desc: File descriptor. If `compressed==True`, this is a tuple
                 (path, mode), otherwise it's only a path.
+            data: The data to write.
+            compressed: Whether data has already been compressed.
         """
-        if compressed:
-            path, mode = file_desc
-        else:
-            path = file_desc
-        if path not in self.writers:
-            if self.suffix:
-                real_path = add_suffix_to_path(path, self.suffix)
-            else:
-                real_path = path
-            # TODO: test whether O_NONBLOCK allows non-blocking write to NFS
-            if compressed:
-                self.writers[path] = open_output(real_path, mode)
-            else:
-                self.writers[path] = xopen(real_path, "w")
-        self.writers[path].write(data)
+        self.get_writer(file_desc, compressed).write(data)
     
     def close(self):
         """Close all outputs.
