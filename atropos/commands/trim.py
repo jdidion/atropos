@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 import textwrap
-from atropos import AtroposError
 from atropos.commands import (
     Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
 from atropos.commands import load_known_adapters
@@ -725,7 +724,7 @@ def run_parallel(
         def ensure_alive(self):
             super().ensure_alive()
             if self.writer_manager and not self.writer_manager.is_active():
-                raise AtroposError("Writer process exited")
+                raise MulticoreError("Writer process exited")
         
         def after_enqueue(self):
             # Tell the writer thread the max number of batches to expect
@@ -813,7 +812,7 @@ def run_parallel(
             if total_batches is not None:
                 self.consume_pending()
                 if self.cur_batch != total_batches:
-                    raise AtroposError(
+                    raise MulticoreError(
                         "OrderPreservingWriterResultHandler finishing without "
                         "having seen {} batches".format(total_batches))
             self.writers.close()

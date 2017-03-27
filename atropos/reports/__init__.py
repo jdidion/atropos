@@ -1,5 +1,6 @@
 """Interface to report generation.
 """
+from collections import Iterable
 import importlib
 import os
 import platform
@@ -98,7 +99,11 @@ def simplify(summary):
     
     def _recurse(dest, src):
         for key, value in src.items():
-            key = str(key)
+            if not isinstance(key, str):
+                if isinstance(key, Iterable):
+                    key = ','.join(key)
+                else:
+                    key = str(key)
             if isinstance(value, dict):
                 dest[key] = OrderedDict()
                 _recurse(dest[key], value)
