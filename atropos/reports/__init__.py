@@ -11,27 +11,6 @@ from atropos.util import MergingDict
 TEXT_SERIALIZERS = ['json', 'yaml']
 BINARY_SERIALIZERS = ['pickle']
 
-def create_summary(version, command, args, options):
-    """Create the initial summary dict.
-    
-    Args:
-        version: Program version.
-        command: Atropos subcommand.
-        args: Other Atropos command line arguments.
-        options: Parsed command line options.
-    
-    Returns:
-        The summary dict.
-    """
-    summary = MergingDict()
-    summary['program'] = 'Atropos'
-    summary['version'] = version
-    summary['python'] = platform.python_version()
-    summary['command_line'] = [command] + list(args)
-    summary['options'] = options.__dict__.copy()
-    summary['sample_id'] = options.sample_id
-    return summary
-
 def serialize(obj, fmt, mode, outfile, **kwargs):
     """Serialize a summary dict to a file.
     

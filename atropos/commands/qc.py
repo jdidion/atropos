@@ -3,7 +3,7 @@
 """
 import logging
 from atropos.commands import (
-    Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
+    Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin)
 from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.util import run_interruptible
@@ -43,20 +43,19 @@ class PairedEndQcPipeline(PairedEndPipelineMixin, QcPipeline):
     def __init__(self, **kwargs):
         super().__init__(PairedEndReadStatistics, **kwargs)
 
-def execute(options, summary):
+def execute(reader, options, summary):
     """Execute the qc command.
     
     Args:
         options: Command-line options.
         summary: The summary dict.
     """
-    reader, _, qualities, _ = create_reader(options)
     if options.paired:
         pipeline_class = PairedEndQcPipeline
     else:
         pipeline_class = SingleEndQcPipeline
     pipeline_args = dict(
-        qualities=qualities,
+        qualities=reader.delivers_qualities,
         tile_key_regexp=options.tile_key_regexp)
     
     if options.threads is None:
@@ -69,8 +68,6 @@ def execute(options, summary):
             reader, pipeline_class, pipeline_args, summary, options.threads,
             options.process_timeout, options.read_queue_size)
     
-    reader.close()
-    
     return retcode
 
 def run_parallel(
@@ -79,7 +76,7 @@ def run_parallel(
     """Execute qc in parallel mode.
     
     Args:
-        reader: Iterator over batches of reads (most likely a BatchIterator)
+        reader: Iterator over batches of reads (most likely a BatchReader)
         read_stats: Template ReadStatistics object.
         threads: Number of worker threads to use; additional threads are used
             for the main proccess and the writer process (if requested).

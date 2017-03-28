@@ -11,7 +11,7 @@ class ProgressMessageReader(object):
     Args:
         iterable: The iterable to wrap.
         batch_size: The number of records in each iterable item (iterable is
-            typically a BatchIterator).
+            typically a BatchReader).
         interval: The reporting interval.
         max_items: Max number of items, if known in advance.
         mag_format: Function that formats an integer as a string with magnitude
@@ -75,7 +75,7 @@ def create_progress_reader(
         mag_format: Function that formats an integer as a string with magnitude
             (e.g. 1000000 => 1M).
         batch_size: The number of records in each iterable item (iterable is
-            typically a BatchIterator).
+            typically a BatchReader).
         kwargs: Additional arguments to pass to the progress bar constructor.
     
     Returns:
@@ -128,7 +128,7 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
     
     class ProgressBarReader(progressbar.ProgressBar):
         """Extension of ProgressBar that supports starting and stopping the
-        BatchIterator.
+        BatchReader.
         """
         def __init__(self, iterable, widgets, max_value=None):
             super(ProgressBarReader, self).__init__(

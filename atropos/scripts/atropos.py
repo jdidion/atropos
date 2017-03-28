@@ -19,8 +19,9 @@ from atropos import check_importability, __version__
 import atropos.commands
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
 from atropos.io.compression import splitext_compressed
-from atropos.reports import create_summary, generate_reports
-from atropos.util import MAGNITUDE, Timing
+from atropos.io.seqio import SINGLE, PAIRED
+from atropos.reports import generate_reports
+from atropos.util import MAGNITUDE
 
 # Print a helpful error message if the extension modules cannot be imported.
 check_importability()
@@ -48,7 +49,7 @@ class TypeWithArgs(object): # pylint: disable=no-member
     def __call__(self, string):
         return self._do_call(string, *self.args, **self.kwargs) or string
     
-    def _do_call(string, *args, **kwargs):
+    def _do_call(self, string, *args, **kwargs):
         """Convert and/or validate `string`.
         """
         raise NotImplementedError()
@@ -271,7 +272,8 @@ class Command(object):
             default_outfile=STDOUT,
             report_file=None,
             report_formats=None,
-            batch_size=1000)
+            batch_size=1000,
+            counter_magnitude="M")
         self.parser.add_argument(
             "--debug",
             action='store_true', default=False,
@@ -317,7 +319,7 @@ class Command(object):
             help="A single-end read file.")
         group.add_argument(
             "--single-input-read",
-            type=int, choices=(1, 2), default=None,
+            type=int, dest='input_read', choices=(1, 2), default=None,
             help="When treating an interleaved FASTQ or paired-end SAM/BAM "
                  "file as single-end, this option specifies which of the two "
                  "reads to process. (both reads used)")
@@ -407,7 +409,7 @@ class Command(object):
             options.paired = False
             options.input1 = options.single_input
             options.input2 = options.single_quals
-        elif options.interleaved_input and options.single_input_read:
+        elif options.interleaved_input and options.input_read:
             options.input1 = options.interleaved_input
             options.paired = False
         else:
@@ -418,6 +420,9 @@ class Command(object):
                     "trimming. If this is an interleaved file, use '-l' "
                     "instead.")
             options.paired = True
+        
+        if options.input_read is None:
+            options.input_read = PAIRED if options.paired else SINGLE
         
         # Set sample ID from the input file name(s)
         if options.sample_id is None:
@@ -452,21 +457,8 @@ class Command(object):
         Returns:
             Tuple (rc, {summary})
         """
-        retcode = 0
-        summary = create_summary(
-            __version__, self.name, self.orig_args, self.options)
-        
-        with Timing() as timing:
-            try:
-                retcode = atropos.commands.execute_command(
-                    self.name, self.options, summary)
-            except Exception as err: # pylint: disable=broad-except
-                summary['error'] = dict(
-                    message=str(err),
-                    details=sys.exc_info())
-                retcode = 1
-            finally:
-                summary['timing'] = timing.summarize()
+        retcode, summary = atropos.commands.execute_command(
+            self.name, self.options, self.orig_args)
         
         if retcode == 0 and self.options.report_file:
             report_file = self.options.report_file
@@ -1452,7 +1444,9 @@ class DetectCommand(Command):
     
     def add_command_options(self):
         parser = self.parser
-        parser.set_defaults(max_reads=10000)
+        parser.set_defaults(
+            max_reads=10000,
+            counter_magnitude="K")
         parser.add_argument(
             "-d",
             "--detector",
@@ -1528,7 +1522,9 @@ error rate."""
     
     def add_command_options(self):
         parser = self.parser
-        parser.set_defaults(max_reads=10000)
+        parser.set_defaults(
+            max_reads=10000,
+            counter_magnitude="K")
         parser.add_argument(
             "-a",
             "--algorithm",

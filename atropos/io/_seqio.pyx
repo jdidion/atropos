@@ -151,18 +151,19 @@ cdef class Sequence(object):
         return (Sequence, (self.name, self.sequence, self.qualities, self.name2))
 
 class FastqReader(SequenceReader):
+    """Reader for FASTQ files. Does not support multi-line FASTQ files.
     """
-    Reader for FASTQ files. Does not support multi-line FASTQ files.
-    """
-    def __init__(self, file, sequence_class=Sequence):
+    file_format = "FASTQ"
+    delivers_qualities = True
+    
+    def __init__(self, filename, sequence_class=Sequence):
         """
         file is a filename or a file-like object.
         If file is a filename, then .gz files are supported.
         """
-        super(FastqReader, self).__init__(file)
+        super().__init__(filename)
         self.sequence_class = sequence_class
-        self.delivers_qualities = True
-
+    
     def __iter__(self):
         """
         Yield Sequence objects

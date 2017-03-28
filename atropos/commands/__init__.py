@@ -3,11 +3,13 @@
 import copy
 import importlib
 import logging
+import platform
 import random
 import sys
-from atropos import get_package_path
+from atropos import get_package_path, __version__
 from atropos.adapters import AdapterCache
 from atropos.io.seqio import open_reader
+from atropos.util import MergingDict, Timing
 
 class Pipeline(object):
     """Base class for analysis pipelines.
@@ -120,26 +122,53 @@ class PairedEndPipelineMixin(object):
         bps[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
 
-class BatchIterator(object):
-    """Iterator that yields batches of sequence records.
+class BatchReader(object):
+    """An iterator that yields batches of sequence records.
     
     Args:
-        reader: The iterator over records.
-        size: Batch size.
-        max_reads: Maxiumum number of records to read.
+        options: Namespace-like object with configuration options.
     """
-    def __init__(self, reader, size, max_reads=None):
-        self.reader = reader
+    def __init__(self, options):
+        interleaved = bool(options.interleaved_input)
+        input1 = options.interleaved_input if interleaved else options.input1
+        input2 = None
+        qualfile = None
+        if options.paired and not interleaved:
+            input2 = options.input2
+        else:
+            qualfile = options.input2
+        
+        self.reader = reader = open_reader(
+            input1, file2=input2, qualfile=qualfile,
+            colorspace=options.colorspace, file_format=options.format,
+            interleaved=interleaved,
+            input_read=options.input_read)
+        
+        # Wrap reader in subsampler
+        if options.subsample:
+            reader = subsample(reader, options.subsample)
+        
         self.iterable = enumerate(reader, 1)
-        self.size = size
-        self.max_reads = max_reads
+        self.size = options.batch_size or 1000
+        self.max_reads = options.max_reads
         self.batches = 0
         self.done = False
-        self._empty_batch = [None] * size
-        self._source = None
+        self._empty_batch = [None] * self.size
+        
+        if options.progress:
+            # Wrap iterator in progress bar
+            from atropos.io.progress import create_progress_reader
+            self.iterator = create_progress_reader(
+                self, options.progress, self.size, self.max_reads,
+                options.counter_magnitude)
+        else:
+            self.iterator = self
+    
+    def __getattr__(self, name):
+        return getattr(self.reader, name)
     
     def __iter__(self):
-        return self
+        return self.iterator
     
     def __next__(self):
         if self.done:
@@ -177,7 +206,10 @@ class BatchIterator(object):
         
         batch_meta = dict(
             index=self.batches,
-            source=self._source,
+            # HACK: Using input_names is temporary until multi-file input is
+            # supported, at which point the reader will keep track of the
+            # current source files.
+            source=self.input_names,
             size=batch_index)
         
         if batch_index == self.size:
@@ -190,8 +222,16 @@ class BatchIterator(object):
         """
         self.done = True
         self.reader.close()
+    
+    def summarize(self):
+        summary = self.reader.summarize()
+        summary.update(
+            batch_size=self.size,
+            max_reads=self.max_reads,
+            batches=self.batches)
+        return summary
 
-def execute_command(name, options, summary):
+def execute_command(name, options, orig_args):
     """Execute a subcommand. Loads module `name` within the atropos.commands
     package and calls that module's `execute` method.
     
@@ -199,57 +239,32 @@ def execute_command(name, options, summary):
         options: Command-line options.
         summary: The summary dict.
     """
-    mod = importlib.import_module("atropos.commands.{}".format(name))
-    return mod.execute(options, summary)
-
-def create_reader(options, counter_magnitude="M"):
-    """Create sequence reader based on configured options.
+    retcode = 0
+    summary = MergingDict()
+    summary['program'] = 'Atropos'
+    summary['version'] = __version__
+    summary['python'] = platform.python_version()
+    summary['command_line'] = [name] + list(orig_args)
+    summary['options'] = options.__dict__.copy()
+    summary['sample_id'] = options.sample_id
     
-    Args:
-        options: Namespace-like object with configuration options.
-        counter_magnitude: Magnitutde to use for progress bar.
+    reader = BatchReader(options)
     
-    Returns:
-        BatchIterator, possibly wrapped in progress bar.
-    """
-    interleaved = bool(options.interleaved_input)
-    input1 = options.interleaved_input if interleaved else options.input1
-    input2 = qualfile = None
-    if options.paired and not interleaved:
-        input2 = options.input2
-    else:
-        qualfile = options.input2
+    with Timing() as timing:
+        try:
+            mod = importlib.import_module("atropos.commands.{}".format(name))
+            retcode = mod.execute(reader, options, summary)
+        except Exception as err: # pylint: disable=broad-except
+            summary['error'] = dict(
+                message=str(err),
+                details=sys.exc_info())
+            retcode = 1
+        finally:
+            reader.close()
+            summary['input'] = reader.summarize()
+            summary['timing'] = timing.summarize()
     
-    reader = open_reader(
-        input1, file2=input2, qualfile=qualfile, colorspace=options.colorspace,
-        fileformat=options.format, interleaved=interleaved,
-        single_input_read=options.single_input_read)
-    
-    qualities = reader.delivers_qualities
-    
-    # Wrap reader in subsampler
-    if options.subsample:
-        reader = subsample(reader, options.subsample)
-    
-    # Wrap reader in batch iterator
-    batch_size = options.batch_size or 1000
-    reader = BatchIterator(reader, batch_size, options.max_reads)
-    
-    # HACK: This is temporary until multi-file input is supported, at which
-    # point the reader will keep track of the current source files.
-    if input2:
-        reader._source = (input1, input2)
-    else:
-        reader._source = input1
-    
-    # Wrap iterator in progress bar
-    if options.progress:
-        from atropos.io.progress import create_progress_reader
-        reader = create_progress_reader(
-            reader, options.progress, batch_size, options.max_reads,
-            counter_magnitude)
-    
-    return (reader, (input1, input2), qualities, qualfile is not None)
+    return (retcode, summary)
 
 def subsample(reader, frac):
     """Generator that yields a random subsample of records.

@@ -224,14 +224,13 @@ class ParallelPipelineRunner(object):
     """Run a pipeline in parallel.
     
     Args:
-        reader: A :class:`BatchIterator`.
+        reader: A :class:`BatchReader`.
         pipeline: A :class:`Pipeline`.
         threads: Number of threads to use.
         input_queue_size:
         timeout:
     """
-    def __init__(
-            self, reader, pipeline, threads, input_queue_size, timeout):
+    def __init__(self, reader, pipeline, threads, input_queue_size, timeout):
         self.reader = reader
         self.pipeline = pipeline
         self.threads = threads

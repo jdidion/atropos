@@ -5,7 +5,7 @@ import logging
 import math
 import re
 from atropos.align import Aligner, SEMIGLOBAL
-from atropos.commands import create_reader, load_known_adapters
+from atropos.commands import load_known_adapters
 from atropos.io import open_output
 from atropos.util import (
     reverse_complement, sequence_complexity, enumerate_range)
@@ -27,7 +27,7 @@ from atropos.util import (
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last
 # download.
 
-def execute(options, summary):
+def execute(reader, options, summary):
     """Execute the detect command.
     
     Args:
@@ -41,7 +41,6 @@ def execute(options, summary):
     known_contaminants = None
     if include != 'unknown':
         known_contaminants = load_known_adapters(options)
-    batch_iterator, names, _, _ = create_reader(options, counter_magnitude="K")
     
     detector = options.detector
     if not detector:
@@ -65,26 +64,24 @@ def execute(options, summary):
             "Detecting contaminants using the kmer-based algorithm")
         detector_class = KhmerDetector
     
-    try:
-        detector_args = dict(
-            kmer_size=kmer_size, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
-            known_contaminants=known_contaminants)
-        if options.paired:
-            detector = PairedDetector(detector_class, **detector_args)
-        else:
-            detector = detector_class(**detector_args)
-            names = names[0]
-        
-        with open_output(options.output) as out:
-            print(
-                "\nDetecting adapters and other potential contaminant "
-                "sequences based on {}-mers in {} reads".format(
-                    kmer_size, n_reads),
-                file=out)
-            detector.consume_all_batches(batch_iterator)
-            detector.summarize(out, names, include=include)
-    finally:
-        batch_iterator.close()
+    input_names = reader.input_names
+    detector_args = dict(
+        kmer_size=kmer_size, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
+        known_contaminants=known_contaminants)
+    if options.paired:
+        detector = PairedDetector(detector_class, **detector_args)
+    else:
+        detector = detector_class(**detector_args)
+        input_names = names[0]
+    
+    with open_output(options.output) as out:
+        print(
+            "\nDetecting adapters and other potential contaminant "
+            "sequences based on {}-mers in {} reads".format(
+                kmer_size, n_reads),
+            file=out)
+        detector.consume_all_batches(reader)
+        detector.summarize(out, input_names, include=include)
     
     return 0
 

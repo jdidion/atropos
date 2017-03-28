@@ -4,43 +4,35 @@ from collections import defaultdict
 import csv
 import re
 from atropos import AtroposError
-from atropos.commands import create_reader
 from atropos.io import open_output
 from atropos.util import qual2prob
 
-def execute(options, summary):
+def execute(reader, options, summary):
     """Execute the error detection command.
     
     Args:
         options: Command-line options.
         summary: The summary dict.
     """
-    batch_iterator, names, qualities, _ = create_reader(
-        options, counter_magnitude="K")
-    try:
-        if not qualities:
-            raise ValueError(
-                "Cannot estimate error rate without base qualities")
-        
-        if options.algorithm == 'quality':
-            estimator_class = BaseQualityErrorEstimator
-        elif options.algorithm == 'shadow':
-            estimator_class = ShadowRegressionErrorEstimator
-        
-        if options.paired:
-            estimator = PairedErrorEstimator(
-                max_read_len=options.max_bases,
-                estimator_class=estimator_class)
-        else:
-            estimator = estimator_class(max_read_len=options.max_bases)
-        
-        estimator.consume_all_batches(batch_iterator)
+    if not reader.delivers_qualities:
+        raise ValueError("Cannot estimate error rate without base qualities")
     
-    finally:
-        batch_iterator.close()
+    if options.algorithm == 'quality':
+        estimator_class = BaseQualityErrorEstimator
+    elif options.algorithm == 'shadow':
+        estimator_class = ShadowRegressionErrorEstimator
+    
+    if options.paired:
+        estimator = PairedErrorEstimator(
+            max_read_len=options.max_bases,
+            estimator_class=estimator_class)
+    else:
+        estimator = estimator_class(max_read_len=options.max_bases)
+    
+    estimator.consume_all_batches(reader)
     
     with open_output(options.output) as out:
-        estimator.summarize(out, names)
+        estimator.summarize(out, reader.input_names)
     
     return 0
 

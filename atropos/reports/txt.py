@@ -5,9 +5,10 @@ and multiqc reports.
 """
 import math
 import textwrap
+from atropos.io.seqio import PAIRED
 from atropos.util import truncate_string
 
-INDENT = '    '
+INDENT = '  '
 PARAGRAPH = textwrap.TextWrapper()
 INDENTED = textwrap.TextWrapper(initial_indent=INDENT, subsequent_indent=INDENT)
 
@@ -18,11 +19,15 @@ class Printer(object):
         outfile: The output file.
         kwargs: Additional keyword arguments passed to the print function.
     """
-    def __init__(self, outfile, **kwargs):
+    def __init__(self, outfile, indent=None, **kwargs):
         self.outfile = outfile
+        self.indent = indent
         self.print_args = kwargs
     
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, indent=None, **kwargs):
+        indent = indent or self.indent
+        if indent:
+            self._print(indent, end='')
         self._print(*args, **kwargs)
     
     def _print(self, *args, **kwargs):
@@ -47,7 +52,8 @@ class TitlePrinter(Printer):
         kwargs: Additional keyword arguments passed to the print function.
     """
     def __init__(
-            self, outfile, levels=(('=', '='), ('-', '-'), ('-', None), ('~', None)),
+            self, outfile,
+            levels=(('=', '='), ('-', '-'), ('-', None), ('~', None)),
             **kwargs):
         super().__init__(outfile, **kwargs)
         self.levels = levels
@@ -55,8 +61,8 @@ class TitlePrinter(Printer):
     def __call__(self, *title, level=None, newline=True, **kwargs):
         title = ' '.join(title)
         
-        if level:
-            if level > len(self.levels):
+        if level is not None:
+            if level >= len(self.levels):
                 raise ValueError("Invalid level: {}".format(level))
             underline, overline = self.levels[level]
             if overline is True:
@@ -67,7 +73,7 @@ class TitlePrinter(Printer):
         
         self._print(title, **kwargs)
         
-        if level and underline:
+        if level is not None and underline:
             self._print(underline * width, **kwargs)
         
         if newline:
@@ -237,6 +243,33 @@ def print_summary_report(summary, outfile):
     _print_title = TitlePrinter(outfile)
     _print = Printer(outfile)
     
+    _print_title("Atropos", level=0)
+    _print("Atropos version: {}".format(summary['version']))
+    _print("Python version: {}".format(summary['python']))
+    _print("Command line parameters: {}".format(" ".join(summary['command_line'])))
+    _print()
+    
+    inp = summary['input']
+    _print("Sample ID: {}".format(summary['sample_id']))
+    fmt = inp['file_format']
+    if inp['input_read'] == PAIRED:
+        fmt += ', Paired'
+    else:
+        fmt += ', Read {}'.format(inp['input_read'])
+    if inp['colorspace']:
+        fmt += ', Colorspace'
+    if inp['interleaved']:
+        fmt += ', Interleaved'
+    if inp['delivers_qualities']:
+        fmt += ', w/ Qualities'
+    else:
+        fmt += ', w/o Qualities'
+    _print("Input format: {}".format(fmt))
+    _print("Input files:")
+    for infile in inp['input_names']:
+        _print(infile, indent=INDENT)
+    _print()
+    
     timing = summary['timing']
     total = summary["total_record_count"]
     wctime = ["Wallclock time: {:.2F} s".format(timing["wallclock"])]
@@ -244,15 +277,9 @@ def print_summary_report(summary, outfile):
         wctime.append("({0:.0F} us/read; {1:.2F} M reads/minute)".format(
             1E6 * timing["wallclock"] / total,
             total / timing["wallclock"] * 60 / 1E6))
-    
-    _print_title("Atropos", level=0)
-    _print("Atropos version: ".format(summary['version']))
-    _print("Python version: ".format(summary['python']))
-    _print("Command line parameters: {}".format(" ".join(summary['command_line'])))
     _print("Start time: {}".format(timing['start']))
     _print(*wctime)
     _print("CPU time (main process): {0:.2F} s".format(timing['cpu']))
-    _print("Sample ID: {}".format(summary['sample_id']))
     _print()
 
 def print_trim_report(summary, outfile):
@@ -306,7 +333,7 @@ def print_trim_report(summary, outfile):
                     "Read {} with adapter".format(read+1),
                     adapter_cutter['records_with_adapters'][read],
                     adapter_cutter['fraction_records_with_adapters'][read],
-                    indent=('  ', ''), pct=True)
+                    indent=(INDENT, ''), pct=True)
         else:
             _print(
                 "Reads with adapter",
@@ -343,7 +370,7 @@ def print_trim_report(summary, outfile):
         for read in range(2):
             _print(
                 "Read {}".format(read+1), summary['total_bp_counts'][read],
-                indent=('  ', ''))
+                indent=(INDENT, ''))
     
     def _print_bp(title, data, key, default=0):
         if paired:
@@ -355,7 +382,7 @@ def print_trim_report(summary, outfile):
                     "Read {}".format(read+1),
                     data[key][read],
                     data['fraction_{}'.format(key)][read],
-                    indent=('  ', ''), pct=True, default=default)
+                    indent=(INDENT, ''), pct=True, default=default)
         else:
             _print(
                 title, data[key][0], data['fraction_{}'.format(key)][0],
@@ -398,7 +425,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
     
     _print = Printer(outfile)
     _print_title = TitlePrinter(outfile)
-    _print_adj = RowPrinter(outfile, (12, 5), pct=True, indent=('  ', ''))
+    _print_adj = RowPrinter(outfile, (12, 5), pct=True, indent=(INDENT, ''))
     
     seq_printer = RowPrinter(
         outfile, (max_seq_len, 14, 3, max_width), ('<', '<', '>'))

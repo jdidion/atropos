@@ -6,7 +6,7 @@ import os
 import sys
 import textwrap
 from atropos.commands import (
-    Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin, create_reader)
+    Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin)
 from atropos.commands import load_known_adapters
 from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
@@ -227,15 +227,13 @@ class WriterResultHandler(ResultHandler):
     def finish(self, total_batches=None):
         self.writers.close()
 
-def execute(options, summary):
+def execute(reader, options, summary):
     """Execute the trim command.
     
     Args:
         options: Command-line options.
         summary: The summary dict.
     """
-    reader, _, qualities, has_qual_file = create_reader(options)
-    
     if options.adapter_max_rmp or options.aligner == 'insert':
         match_probability = RandomMatchProbability()
     
@@ -280,9 +278,9 @@ def execute(options, summary):
             options.cut == [] and options.cut2 == [] and
             options.cut_min == [] and options.cut_min2 == [] and
             (options.minimum_length is None or options.minimum_length <= 0) and
-            options.maximum_length == sys.maxsize and
-            not has_qual_file and options.max_n is None and not options.trim_n
-            and (not options.paired or options.overwrite_low_quality is None)):
+            options.maximum_length == sys.maxsize and not options.trim_n and
+            not reader.has_qualfile and options.max_n is None and
+            (not options.paired or options.overwrite_low_quality is None)):
         raise ValueError("You need to provide at least one adapter sequence.")
     
     if (
@@ -400,7 +398,7 @@ def execute(options, summary):
     if options.double_encode:
         modifiers.add_modifier(DoubleEncoder)
     
-    if options.zero_cap and qualities:
+    if options.zero_cap and reader.delivers_qualities:
         modifiers.add_modifier(ZeroCapper, quality_base=options.quality_base)
     
     if options.trim_primer:
@@ -428,7 +426,7 @@ def execute(options, summary):
         output2 = options.paired_output
     
     seq_formatter_args = dict(
-        qualities=qualities,
+        qualities=reader.delivers_qualities,
         colorspace=options.colorspace,
         interleaved=interleaved
     )
@@ -503,7 +501,8 @@ def execute(options, summary):
     if options.stats:
         record_handler = StatsRecordHandlerWrapper(
             record_handler, options.paired, mode=options.stats,
-            qualities=qualities, tile_key_regexp=options.tile_key_regexp)
+            qualities=reader.delivers_qualities,
+            tile_key_regexp=options.tile_key_regexp)
     
     logger = logging.getLogger()
     num_adapters = sum(len(a) for a in modifiers.get_adapters())
@@ -542,8 +541,6 @@ def execute(options, summary):
             options.threads, options.process_timeout, options.preserve_order,
             options.read_queue_size, options.result_queue_size,
             options.writer_process, options.compression)
-    
-    reader.close()
     
     if retcode == 0:
         # For trim stats, any value with a name that starts with 'records_' will
@@ -665,7 +662,7 @@ def run_parallel(
     kill the program.
     
     Args:
-        reader: Iterator over batches of reads (most likely a BatchIterator).
+        reader: Iterator over batches of reads (most likely a BatchReader).
         record_handler: RecordHandler object.
         writers: Writers object.
         pipeline_class: Class of pipeline to instantiate.
