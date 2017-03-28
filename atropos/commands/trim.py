@@ -11,7 +11,6 @@ from atropos.commands import load_known_adapters
 from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
-# TODO: Only import used members
 from atropos.trim.modifiers import (
     AdapterCutter, DoubleEncoder, InsertAdapterCutter, LengthTagModifier,
     MergeOverlapping, MinCutter, NEndTrimmer, NextseqQualityTrimmer,
@@ -544,7 +543,7 @@ def execute(reader, options, summary):
     
     if retcode == 0:
         # For trim stats, any value with a name that starts with 'records_' will
-        # have 'fraction_<var>' computed as value / total_reads, and any value
+        # have 'fraction_<var>' computed as value / total_records, and any value
         # with a name that starts with 'bp_' will have 'fraction_<var>' and
         # 'total_<var>' computed. We also replace any `Const`s with their
         # values.
@@ -587,8 +586,6 @@ def execute(reader, options, summary):
                                     frac(val, total_records) for val in value]
                                 total = sum(val for val in value if val)
                                 dict_val["total_{}".format(key)] = total
-                                dict_val["fraction_total_{}".format(key)] = \
-                                    frac(total, total_records)
                             else:
                                 dict_val[frac_key] = frac(value, total_records)
                         elif key.startswith('bp_'):

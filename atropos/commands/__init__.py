@@ -247,6 +247,8 @@ def execute_command(name, options, orig_args):
     summary['command_line'] = [name] + list(orig_args)
     summary['options'] = options.__dict__.copy()
     summary['sample_id'] = options.sample_id
+    # This is a holding area for top-level derived stats
+    summary['derived'] = {}
     
     reader = BatchReader(options)
     

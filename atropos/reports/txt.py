@@ -249,24 +249,10 @@ def print_summary_report(summary, outfile):
     _print("Command line parameters: {}".format(" ".join(summary['command_line'])))
     _print()
     
-    inp = summary['input']
     _print("Sample ID: {}".format(summary['sample_id']))
-    fmt = inp['file_format']
-    if inp['input_read'] == PAIRED:
-        fmt += ', Paired'
-    else:
-        fmt += ', Read {}'.format(inp['input_read'])
-    if inp['colorspace']:
-        fmt += ', Colorspace'
-    if inp['interleaved']:
-        fmt += ', Interleaved'
-    if inp['delivers_qualities']:
-        fmt += ', w/ Qualities'
-    else:
-        fmt += ', w/o Qualities'
-    _print("Input format: {}".format(fmt))
+    _print("Input format: {}".format(summary['derived']['input_format']))
     _print("Input files:")
-    for infile in inp['input_names']:
+    for infile in summary['input']['input_names']:
         _print(infile, indent=INDENT)
     _print()
     
