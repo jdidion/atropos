@@ -3,6 +3,7 @@
 text-based reports. This will eventually be deprecated in favor of the jinja
 and multiqc reports.
 """
+import functools
 import math
 import textwrap
 from atropos.io.seqio import PAIRED
@@ -670,28 +671,35 @@ def print_stats_report(data, outfile):
         for histbin in hist:
             _print(*histbin)
     
-    def _print_base_histogram(title, col_names, hist):
+    def _print_base_histogram(title, hist, extra_width=4):
         _print_title(title, level=2)
-        _print('Position', *col_names, extra_width=4)
-        for row in hist:
-            total_count = sum(row[1:])
+        _print('Pos', *hist['columns'], extra_width=extra_width)
+        for pos, row in hist['rows'].items():
+            total_count = sum(row)
             base_pcts = (
                 round(count * 100 / total_count, 1)
-                for count in row[1:])
-            _print(row[0], *base_pcts, extra_width=4)
+                for count in row)
+            _print(pos, *base_pcts, extra_width=extra_width)
     
-    def _print_tile_histogram(
-            title, value_cols, hist, index_cols=('Tile',), index_widths=(5,)):
-        _print_title(title, level=2)
-        ncol = len(value_cols)
-        # As far as I know, tiles are max 4 digits
-        max_width = max(
+    def _print_tile_histogram(title, hist):
+        ncol = len(hist['columns'])
+        max_tile_width = max(
             4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
-        _print(
-            *(index_cols + value_cols), colwidths=index_widths,
-            extra_width=max_width)
-        for row in hist:
-            _print(*row, colwidths=index_widths, extra_width=max_width)
+        _print_base_histogram(title, hist, extra_width=max_tile_width)
+    
+    def _print_tile_base_histogram(title, hist):
+        """Print a histogram of position x tile, with values as the median
+        base quality.
+        """
+        quals = hist['columns']
+        tiles = hist['columns2']
+        meds = (
+            (pos, tuple(
+                weighted_median(quals, tile_counts)
+                for tile_counts in tiles.values()))
+            for pos, tiles in hist['rows'])
+        # TODO
+        pass
     
     _print('', 'Read1', 'Read2', underline=True)
     
@@ -721,44 +729,58 @@ def print_stats_report(data, outfile):
     if 'tile_sequence_qualities' in data['read1']:
         _print_tile_histogram(
             "Read 1 per-tile sequence qualities (%)",
-            *data['read1']['tile_sequence_qualities'])
+            data['read1']['tile_sequence_qualities'])
         _print()
         _print_tile_histogram(
             "Read 2 per-tile sequence qualities (%)",
-            *data['read2']['tile_sequence_qualities'])
+            data['read2']['tile_sequence_qualities'])
         _print()
     
     # Base-level stats
     if 'base_qualities' in data['read1']:
         _print_base_histogram(
             "Read 1 base qualities (%)",
-            *data['read1']['base_qualities'])
+            data['read1']['base_qualities'])
         _print()
         _print_base_histogram(
             "Read 2 base qualities (%)",
-            *data['read2']['base_qualities'])
+            data['read2']['base_qualities'])
         _print()
     _print_base_histogram(
         "Read 1 base composition (%)",
-        *data['read1']['bases'])
+        data['read1']['bases'])
     _print()
     _print_base_histogram(
         "Read 2 base composition (%)",
-        *data['read2']['bases'])
+        data['read2']['bases'])
     _print()
     if 'tile_base_qualities' in data['read1']:
-        _print_tile_histogram(
+        _print_tile_base_histogram(
             "Read 1 per-tile base qualities (%)",
-            *data['read1']['tile_base_qualities'],
-            index_cols=('Position', 'Tile'),
-            index_widths=(35, 5))
+            data['read1']['tile_base_qualities'])
         _print()
-        _print_tile_histogram(
+        _print_tile_base_histogram(
             "Read 2 per-tile base qualities (%)",
-            *data['read2']['tile_base_qualities'],
-            index_cols=('Position', 'Tile'),
-            index_widths=(35, 5))
+            data['read2']['tile_base_qualities'])
         _print()
+
+def weighted_median(vals, counts):
+    counts_cumsum = functools.reduce(
+        lambda c, x: c + [c[-1] + x], counts, [0])[1:]
+    total = counts_cumsum[-1]
+    if total == 0:
+        return None
+    mid1 = mid2 = (total // 2) + 1
+    if total % 2 == 0:
+        mid1 -= 1
+    val1 = val2 = None
+    for i, val in enumerate(counts_cumsum):
+        if val1 is None and mid1 <= val:
+            val1 = vals[i]
+        if mid2 <= val:
+            val2 = vals[i]
+            break
+    return float(val1 + val2) / 2
 
 def sizeof(*x):
     """Returns the largest string size of all objects in x, where x is a

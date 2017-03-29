@@ -199,7 +199,7 @@ class NestedDict(dict):
             self[name] = CountingDict()
         return self.get(name)
     
-    def flatten(self, shape="long"):
+    def summarize(self, shape="long"):
         """Returns a flattened version of the nested dict.
         
         Args:
@@ -207,8 +207,9 @@ class NestedDict(dict):
         
         Returns:
             When `shape=='long'`, a list of (key1, key2, value) tuples.
-            When `shape=='wide'`, a list of (keys2, [(key1, values...)]),
-                where `keys2` is the set of keys in the child dicts.
+            When `shape=='wide'`, a dict of
+                {columns:keys2, rows: {key1, values}}, where `keys2` is the set
+                of keys in the child dicts.
         """
         keys1 = sorted(self.keys())
         if shape == "long":
@@ -222,10 +223,11 @@ class NestedDict(dict):
             for child in self.values():
                 keys2.update(child.keys())
             keys2 = tuple(sorted(keys2))
-            return (keys2, [
-                (key1,) + tuple(self[key1].get(key2, 0) for key2 in keys2)
-                for key1 in keys1
-            ])
+            return dict(
+                columns=keys2,
+                rows=ordered_dict(
+                    (key1, tuple(self[key1].get(key2, 0) for key2 in keys2))
+                    for key1 in keys1))
 
 class Mergeable(object):
     """Marker class for an object that can merge itself with another.
@@ -330,6 +332,12 @@ def merge_values(v_dest, v_src):
     else:
         assert v_dest == v_src
     return v_dest
+
+def ordered_dict(iterable):
+    d = OrderedDict()
+    for key, value in iterable:
+        d[key] = value
+    return d
 
 def complement(seq):
     """Returns the complement of nucleotide sequence `seq`.

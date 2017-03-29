@@ -2,7 +2,7 @@
 """Collect statistics to use in the QC report.
 """
 import re
-from atropos.util import CountingDict, NestedDict, qual2int
+from atropos.util import CountingDict, NestedDict, ordered_dict, qual2int
 
 DEFAULT_TILE_KEY_REGEXP = r"@(((?:[^\:]+)\:){5})"
 """Regexp for the default Illumina read name format."""
@@ -14,6 +14,8 @@ class PositionDicts(object):
         self.dicts = []
     
     def __getitem__(self, idx):
+        if idx >= len(self.dicts):
+            self.extend(idx+1)
         return self.dicts[idx]
     
     def extend(self, size):
@@ -30,7 +32,7 @@ class BaseCountingDicts(PositionDicts):
     """
     dict_class = CountingDict
     
-    def flatten(self, is_qualities=False):
+    def summarize(self, is_qualities=False):
         """Flatten into a table with N rows (where N is the size of the
         sequence) and the columns are counts by nucleotide.
         
@@ -38,29 +40,31 @@ class BaseCountingDicts(PositionDicts):
             is_qualities: Whether values are base qualities.
         
         Returns:
-            A tuple of (header, [rows]), where each row is
-            (position, base_counts...)
+            A tuple of (columns, [rows]), where each row is
+            (position, (base_counts...))
         """
         keys = set()
         for dict_item in self.dicts:
             keys.update(dict_item.keys())
         if is_qualities:
             keys = tuple(sorted(keys))
-            header = tuple(qual2int(k) for k in keys)
+            columns = tuple(qual2int(k) for k in keys)
         else:
             acgt = ('A','C','G','T')
             n_val = ('N',) if 'N' in keys else ()
-            header = keys = acgt + tuple(keys - set(acgt + n_val)) + n_val
-        return (header, [
-            (idx,) + tuple(dict_item.get(key, 0) for key in keys)
-            for idx, dict_item in enumerate(self.dicts, 1)])
+            columns = keys = acgt + tuple(keys - set(acgt + n_val)) + n_val
+        return dict(
+            columns=columns,
+            rows=ordered_dict(
+                (idx, tuple(dict_item.get(key, 0) for key in keys))
+                for idx, dict_item in enumerate(self.dicts, 1)))
 
 class BaseNestedDicts(PositionDicts):
     """A PositionDicts in which items are NestedDicts.
     """
     dict_class = NestedDict
     
-    def flatten(self, is_qualities=False):
+    def summarize(self, is_qualities=False):
         """Flatten into a table of N*K rows, where N is the sequence size and
         K is the union of keys in the nested dicts, and the columns are counts
         by nucleotide.
@@ -76,11 +80,17 @@ class BaseNestedDicts(PositionDicts):
                 keys2.update(dict2.keys())
         keys1 = tuple(sorted(keys1))
         keys2 = tuple(sorted(keys2))
-        header = tuple(qual2int(k) for k in keys2) if is_qualities else keys2
-        return (header, [
-            (idx, key1,) + tuple(dict_item[key1].get(key2, 0) for key2 in keys2)
+        columns = tuple(qual2int(k) for k in keys2) if is_qualities else keys2
+        return dict(
+            columns=columns,
+            columns2=keys1,
+            rows=ordered_dict(
+                (idx, ordered_dict(
+                    (key1, tuple(
+                        dict_item[key1].get(key2, 0)
+                        for key2 in keys2))))
             for key1 in keys1
-            for idx, dict_item in enumerate(self.dicts, 1)])
+            for idx, dict_item in enumerate(self.dicts, 1)))
 
 class ReadStatistics(object):
     """Accumulates statistics on sequencing reads.
@@ -235,17 +245,17 @@ class ReadStatistics(object):
             count=self.count,
             length=self.sequence_lengths.sorted_items(),
             gc=self.sequence_gc.sorted_items(),
-            bases=self.bases.flatten())
+            bases=self.bases.summarize())
         if self.sequence_qualities:
             summary['qualities'] = self.sequence_qualities.sorted_items()
         if self.base_qualities:
-            summary['base_qualities'] = self.base_qualities.flatten(
+            summary['base_qualities'] = self.base_qualities.summarize(
                 is_qualities=True)
         if self.track_tiles:
-            summary['tile_base_qualities'] = self.tile_base_qualities.flatten(
+            summary['tile_base_qualities'] = self.tile_base_qualities.summarize(
                 is_qualities=True)
             summary['tile_sequence_qualities'] = \
-                self.tile_sequence_qualities.flatten(shape="wide")
+                self.tile_sequence_qualities.summarize(shape="wide")
         return summary
 
 class SingleEndReadStatistics(ReadStatistics):
