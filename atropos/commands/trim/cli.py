@@ -9,13 +9,16 @@ from atropos.commands.cli import (
 from atropos.io import STDOUT, STDERR
 
 class CommandParser(BaseCommandParser):
+    name = 'trim'
     usage = """
 atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
 atropos trim -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq -pe1 in1.fastq -pe2 in2.fastq
 """
     description = """
-Atropos version {version}
-
+Trim adapters and low-quality bases, and perform other NGS preprocessing. This
+command provides most of Atropos' functionality.
+"""
+    details = """
 Replace "ADAPTER" with the actual sequence of your 3' adapter. IUPAC wildcard
 characters are supported. The reverse complement is *not* automatically
 searched. All reads from input.fastq will be written to output.fastq with the
@@ -23,9 +26,10 @@ adapter sequence removed. Adapter matching is error-tolerant. Multiple adapter
 sequences can be given (use further -a options), but only the best-matching
 adapter will be removed.
 
-Input may also be in FASTA format. Compressed input and output is supported and
-auto-detected from the file name (.gz, .xz, .bz2). Use the file name '-' for
-standard input/output. Without the -o option, output is sent to standard output.
+Input may also be in FASTA, SAM, or BAM format. Compressed input and output is
+supported and auto-detected from the file name (.gz, .xz, .bz2). Use the file
+name '-' for standard input/output. Without the -o option, output is sent to
+standard output.
 """
     
     def add_command_options(self):

@@ -23,6 +23,11 @@ class BaseCommandParser(object):
     
     Subclasses must define name, description, and usage members.
     """
+    preamble = "Atropos version {version}"
+    usage = "atropos {command} [options]"
+    description = ''
+    details = ''
+    
     def __init__(self):
         self.groups = {}
         self.create_parser()
@@ -48,10 +53,19 @@ class BaseCommandParser(object):
     def create_parser(self):
         """Create the ArgumentParser.
         """
+        format_args = dict(
+            name=self.name,
+            version=__version__)
         self.parser = ArgumentParser(
-            usage=self.usage,
-            description=self.description.format(version=__version__),
+            usage=self.usage.format(**format_args),
+            description=self.get_description(**format_args),
             formatter_class=ParagraphHelpFormatter)
+    
+    def get_description(self, **kwargs):
+        description = "{}\n\n{}\n\n{}".format(*(
+            part.strip()
+            for part in (self.preamble, self.description, self.details)))
+        return description.format(**kwargs)
     
     def add_group(
             self, name, title=None, description=None, mutex=False,

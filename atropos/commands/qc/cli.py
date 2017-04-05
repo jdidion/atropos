@@ -5,13 +5,15 @@ from atropos.commands.cli import (
     writeable_file)
 
 class CommandParser(BaseCommandParser):
+    name = 'qc'
     usage = """
 atropos qc -se input.fastq
 atropos qc -pe1 in1.fastq -pe2 in2.fastq
 """
     description = """
 Compute read-level statistics. The output is identical to running the 'trim'
-command with '--stats pre'.
+command with '--stats pre'. Use this command to get an idea of the quality of
+your raw data.
 """
 
     def add_command_options(self):

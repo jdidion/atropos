@@ -1,9 +1,33 @@
-"""Functions for listing and running commands.
+"""
+Atropos version {}
+
+usage: atropos <command> [options]
+
+commands
+--------
+{}
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+Use "atropos <command> --help" to see all options for a specific command.
+See http://atropos.readthedocs.org/ for full documentation.
+
+Atropos is a fork of Cutadapt 1.10 (
+https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d4999)
+by John Didion, et al., "Atropos: sensitive, specific, and speedy trimming of
+NGS reads, submitted.
+
+Cutadapt (https://github.com/marcelm/cutadapt) was developed by Marcel Martin,
+"Cutadapt Removes Adapter Sequences From High-Throughput Sequencing Reads,"
+EMBnet Journal, 2011, 17(1):10-12.
 """
 from importlib import import_module
 import logging
 import os
 from pkgutil import walk_packages
+import re
+import textwrap
 from atropos import __version__
 
 class Command(object):
@@ -69,6 +93,15 @@ class Command(object):
         """Returns the command's description string.
         """
         return self.get_command_parser_class().description
+    
+    def get_help(self, fmt="* {name}: {description}", wrap=80, indent=2):
+        helpstr = fmt.format(
+            name=self.name, description=self.description.strip())
+        if wrap:
+            helpstr = "\n".join(textwrap.wrap(
+                re.sub('\s+', ' ', helpstr), wrap,
+                subsequent_indent=' ' * indent))
+        return helpstr
     
     def parse_args(self, args):
         """Parse the command line options.
@@ -171,23 +204,5 @@ def execute_cli(args=()):
 def print_subcommands():
     """Prints usage message listing the available subcommands.
     """
-    print("Atropos version {}\n".format(__version__))
-    print("usage: atropos <command> [options]\n")
-    print("commands:")
-    for command in iter_commands():
-        print("  {}: {}".format(command.name, command.description))
-    print(
-        "\noptional arguments:\n  -h, --help  show this help message and exit")
-    print("""
-Use "atropos <command> --help" to see all options for a specific command.
-See http://atropos.readthedocs.org/ for full documentation.
-
-Atropos is a fork of Cutadapt 1.10 (
-https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d4999)
-by John Didion, et al., "Atropos: sensitive, specific, and speedy trimming of
-NGS reads, submitted.
-
-Cutadapt (https://github.com/marcelm/cutadapt) was developed by Marcel Martin,
-"Cutadapt Removes Adapter Sequences From High-Throughput Sequencing Reads,"
-EMBnet Journal, 2011, 17(1):10-12.
-""")
+    print(__doc__.format(__version__, "\n".join(
+        command.get_help() for command in iter_commands())))
