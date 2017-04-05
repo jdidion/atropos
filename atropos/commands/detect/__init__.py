@@ -5,8 +5,7 @@ import logging
 import math
 import re
 from atropos.align import Aligner, SEMIGLOBAL
-from atropos.commands import load_known_adapters
-from atropos.io import open_output
+from atropos.commands.base import BaseCommandRunner
 from atropos.util import (
     reverse_complement, sequence_complexity, enumerate_range)
 
@@ -27,63 +26,63 @@ from atropos.util import (
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last
 # download.
 
-def execute(reader, options, summary):
-    """Execute the detect command.
+class CommandRunner(BaseCommandRunner):
+    name = 'detect'
     
-    Args:
-        options: Command-line options.
-        summary: The summary dict.
-    """
-    kmer_size = options.kmer_size or 12
-    n_reads = options.max_reads
-    overrep_cutoff = 100
-    include = options.include_contaminants or "all"
-    known_contaminants = None
-    if include != 'unknown':
-        known_contaminants = load_known_adapters(options)
-    
-    detector = options.detector
-    if not detector:
-        if known_contaminants and include == 'known':
-            detector = 'known'
-        elif n_reads <= 50000:
-            detector = 'heuristic'
+    def __call__(self):
+        kmer_size = self.kmer_size or 12
+        n_reads = self.max_reads
+        overrep_cutoff = 100
+        include = self.include_contaminants or "all"
+        known_contaminants = None
+        if include != 'unknown':
+            known_contaminants = self.load_known_adapters()
+        
+        detector = self.detector
+        if not detector:
+            if known_contaminants and include == 'known':
+                detector = 'known'
+            elif n_reads <= 50000:
+                detector = 'heuristic'
+            else:
+                detector = 'khmer'
+        
+        if detector == 'known':
+            logging.getLogger().debug(
+                "Detecting contaminants using the known-only algorithm")
+            detector_class = KnownContaminantDetector
+        elif detector == 'heuristic':
+            logging.getLogger().debug(
+                "Detecting contaminants using the heuristic algorithm")
+            detector_class = HeuristicDetector
+        elif detector == 'khmer':
+            logging.getLogger().debug(
+                "Detecting contaminants using the kmer-based algorithm")
+            detector_class = KhmerDetector
+        
+        input_names = self.input_names
+        detector_args = dict(
+            kmer_size=kmer_size, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
+            known_contaminants=known_contaminants)
+        if self.paired:
+            detector = PairedDetector(detector_class, **detector_args)
         else:
-            detector = 'khmer'
-    
-    if detector == 'known':
-        logging.getLogger().debug(
-            "Detecting contaminants using the known-only algorithm")
-        detector_class = KnownContaminantDetector
-    elif detector == 'heuristic':
-        logging.getLogger().debug(
-            "Detecting contaminants using the heuristic algorithm")
-        detector_class = HeuristicDetector
-    elif detector == 'khmer':
-        logging.getLogger().debug(
-            "Detecting contaminants using the kmer-based algorithm")
-        detector_class = KhmerDetector
-    
-    input_names = reader.input_names
-    detector_args = dict(
-        kmer_size=kmer_size, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
-        known_contaminants=known_contaminants)
-    if options.paired:
-        detector = PairedDetector(detector_class, **detector_args)
-    else:
-        detector = detector_class(**detector_args)
-        input_names = names[0]
-    
-    with open_output(options.output) as out:
-        print(
-            "\nDetecting adapters and other potential contaminant "
-            "sequences based on {}-mers in {} reads".format(
-                kmer_size, n_reads),
-            file=out)
-        detector.consume_all_batches(reader)
-        detector.summarize(out, input_names, include=include)
-    
-    return 0
+            detector = detector_class(**detector_args)
+            input_names = input_names[0]
+        
+        self.summary['detect'] = dict(
+            kmer_size=kmer_size,
+            n_reads=n_reads,
+            include=include,
+            detector=detector)
+        
+        logging.getLogger().info(
+            "Detecting adapters and other potential contaminant "
+            "sequences based on %d-mers in %d reads", kmer_size, n_reads)
+        
+        detector.consume_all_batches(self)
+        
+        return 0
 
 class Match(object):
     """A contaminant match.

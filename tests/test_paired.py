@@ -2,8 +2,9 @@
 from pytest import raises
 import os
 import shutil
-from atropos.scripts import atropos
-from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
+from atropos.commands import execute_cli, get_command
+from .utils import (
+    run, files_equal, datapath, cutpath, redirect_stderr, temporary_path)
 
 BACK_ALIGNERS = ('adapter', 'insert')
 
@@ -19,12 +20,15 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                 infiles = [datapath(i.format(aligner=aligner)) for i in (in1, in2)]
                 for infile_args in zip(('-pe1', '-pe2'), infiles):
                     p.extend(infile_args)
-                result = atropos.main(p)
+                command = get_command('trim')
+                result = command.execute(p)
                 assert isinstance(result, tuple)
                 assert len(result) == 2
                 if error_on_rc:
-                    err = result[1]['error'] if result[1] and 'error' in result[1] else None
-                    assert result[0] == 0, "Return code {} != 0; error = {}".format(result[0], err)
+                    err = result[1]['exception'] if result[1] and 'exception' in result[1] else None
+                    from traceback import format_exception
+                    if result[0] != 0:
+                        raise AssertionError("Return code {} != 0".format(result[0])) from err['details'][1]
                 if assert_files_equal:
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
@@ -38,7 +42,8 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',)):
         with temporary_path(expected.format(aligner=aligner)) as tmp:
             p = params.copy()
             p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner)), '-L', tmp]
-            result = atropos.main(p)
+            command = get_command('trim')
+            result = command.execute(p)
             assert isinstance(result, tuple)
             assert len(result) == 2
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
@@ -53,7 +58,7 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',)):
 #                 p = params.copy()
 #                 p += ['--aligner', aligner, '--interleaved', '-o', p1, '-p', p2]
 #                 p += [datapath(inpath.format(aligner=aligner))]
-#                 assert atropos.main(p) is None
+#                 assert execute_cli(p) == 0
 #                 assert files_equal(cutpath(expected.format(aligner=aligner)), p1)
 #                 assert files_equal(cutpath(expected.format(aligner=aligner)), p2)
 
@@ -100,15 +105,15 @@ def test_explicit_format_with_paired():
 
 def test_no_trimming_legacy():
     # make sure that this doesn't divide by zero
-    atropos.main(['-a', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
+    execute_cli(['-a', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 def test_no_trimming():
     # make sure that this doesn't divide by zero
-    atropos.main(['-a', 'XXXXX', '-A', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
+    execute_cli(['-a', 'XXXXX', '-A', 'XXXXX', '-o', '/dev/null', '-p', '/dev/null', '-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 def test_missing_file():
     with raises(SystemExit), redirect_stderr():
-        atropos.main(['-a', 'XX', '--paired-output', 'out.fastq', datapath('paired.1.fastq')])
+        execute_cli(['-a', 'XX', '--paired-output', 'out.fastq', datapath('paired.1.fastq')])
 
 def test_first_too_short():
     with temporary_path("truncated.1.fastq") as trunc1:
@@ -119,7 +124,7 @@ def test_first_too_short():
         with open(trunc1, 'w') as f:
             f.writelines(lines)
         with raises(SystemExit), redirect_stderr():
-            atropos.main('-a XX --paired-output out.fastq'.split() + [trunc1, datapath('paired.2.fastq')])
+            execute_cli('-a XX --paired-output out.fastq'.split() + [trunc1, datapath('paired.2.fastq')])
 
 def test_second_too_short():
     with temporary_path("truncated.2.fastq") as trunc2:
@@ -130,7 +135,7 @@ def test_second_too_short():
         with open(trunc2, 'w') as f:
             f.writelines(lines)
         with raises(SystemExit), redirect_stderr():
-            atropos.main('-a XX --paired-output out.fastq'.split() + [datapath('paired.1.fastq'), trunc2])
+            execute_cli('-a XX --paired-output out.fastq'.split() + [datapath('paired.1.fastq'), trunc2])
 
 def test_unmatched_read_names():
     with temporary_path("swapped.1.fastq") as swapped:
@@ -142,7 +147,8 @@ def test_unmatched_read_names():
             with open(swapped, 'w') as f:
                 f.writelines(lines)
             with redirect_stderr():
-                result = atropos.main(
+                command = get_command('trim')
+                result = command.execute(
                     '-a XX -o out1.fastq -p out2.fastq'.split() +
                     ['-pe1', swapped, '-pe2', datapath('paired.2.fastq')])
                 assert isinstance(result, tuple)
@@ -235,16 +241,14 @@ def test_interleaved_no_paired_output():
             params = '-a XX --interleaved'.split()
             with raises(SystemExit), redirect_stderr():
                 params += [ '-o', p1, '-p1', p2, 'paired.1.fastq', 'paired.2.fastq']
-                atropos.main(params)
+                execute_cli(params)
 
-"""
 # TODO
-def test_interleaved_input_paired_output():
-    '''single-pass interleaved paired-end with -q and -m, paired output'''
-    run_interleaved2('-q 20 -a TTAGACATAT -A CAGTGGAGTA -m 14 -M 90',
-        inpath='interleaved.fastq', expected1='pairedq1.fastq', expected2='pairedq2.fastq'
-    )
-"""
+# def test_interleaved_input_paired_output():
+#     '''single-pass interleaved paired-end with -q and -m, paired output'''
+#     run_interleaved2('-q 20 -a TTAGACATAT -A CAGTGGAGTA -m 14 -M 90',
+#         inpath='interleaved.fastq', expected1='pairedq1.fastq', expected2='pairedq2.fastq'
+#     )
 
 def test_pair_filter():
     run_paired('--pair-filter=both -a TTAGACATAT -A GGAGTA -m 14',

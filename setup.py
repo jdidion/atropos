@@ -9,7 +9,7 @@ Cython is run when
 import os.path
 import sys
 
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from distutils.version import LooseVersion
 from distutils.command.sdist import sdist as _sdist
 from distutils.command.build_ext import build_ext as _build_ext
@@ -81,7 +81,7 @@ def check_cython_version():
 
 extensions = [
     Extension('atropos.align._align', sources=['atropos/align/_align.pyx']),
-    Extension('atropos.trim._qualtrim', sources=['atropos/trim/_qualtrim.pyx']),
+    Extension('atropos.commands.trim._qualtrim', sources=['atropos/commands/trim/_qualtrim.pyx']),
     Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
 ]
 
@@ -126,21 +126,11 @@ setup(
     description = 'trim adapters from high-throughput sequencing reads',
     license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
     ext_modules = extensions,
-    packages = [
-        'atropos',
-        'atropos.adapters',
-        'atropos.align',
-        'atropos.commands',
-        'atropos.io',
-        'atropos.reports',
-        'atropos.scripts',
-        'atropos.trim',
-        'atropos.util'
-    ],
+    packages = find_packages(),
     scripts = ['bin/atropos'],
     package_data = { 'atropos' : [
         'adapters/*.fa',
-        'reports/templates/*'
+        'commands/**/templates/*'
     ] },
     tests_require = ['pytest'], #, 'jinja2', 'pysam'],
     extras_require = {

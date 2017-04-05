@@ -1,10 +1,10 @@
 """Classes for formatting and writing trimmed reads to output.
 """
 import sys
-from atropos.trim.filters import NoFilter
 from atropos.io import STDOUT, xopen, open_output
 from atropos.io.compression import splitext_compressed
 from atropos.io.seqio import create_seq_formatter
+from .filters import NoFilter
 
 class Writers(object):
     """Manages writing to one or more outputs.

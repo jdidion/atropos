@@ -10,7 +10,7 @@ import re
 import sys
 from urllib.error import URLError
 from urllib.request import urlopen
-from atropos import align, get_package_path
+from atropos import align
 from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
 from atropos.util import (
@@ -73,7 +73,8 @@ LINKED = ADAPTER_TYPES['linked'].flags
 
 # TODO: specify this externally rather than hard-coding
 DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/master/atropos/adapters/sequencing_adapters.fa"
-DEFAULT_ADAPTERS_PATH = get_package_path('adapters', 'sequencing_adapters.fa')
+DEFAULT_ADAPTERS_PATH = os.path.join(
+    os.path.dirname(__file__), 'sequencing_adapters.fa')
 
 class AdapterParser(object):
     """Factory for Adapter classes that all use the same parameters (error rate,

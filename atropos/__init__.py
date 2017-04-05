@@ -32,15 +32,3 @@ See the documentation for alternative ways of installing the program.
 The original error message follows.
 """.format(sys.executable))
         raise
-
-def get_package_path(*relpath):
-    """Resolves a relative path with the Atropos package.
-    
-    Args:
-        relpath: Path components relative to the top-level Atropos package
-            directory.
-    
-    Returns:
-        The absolute path.
-    """
-    return os.path.join(os.path.abspath(os.path.dirname(__file__)), *relpath)

@@ -10,8 +10,8 @@ import re
 from atropos import AtroposError
 from atropos.align import (
     Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2)
-from atropos.trim.qualtrim import quality_trim_index, nextseq_trim_index
 from atropos.util import BASE_COMPLEMENTS, reverse_complement, mean, quals2ints
+from .qualtrim import quality_trim_index, nextseq_trim_index
 
 # Base classes
 

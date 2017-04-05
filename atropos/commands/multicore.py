@@ -215,7 +215,7 @@ class WorkerProcess(Process):
         except Exception as err:
             logging.getLogger().error(
                 "Unexpected error in %s", self.name, exc_info=True)
-            summary['error'] = err
+            summary['exception'] = err
         
         logging.getLogger().debug("%s sending summary", self.name)
         enqueue_summary()
@@ -226,19 +226,18 @@ class ParallelPipelineRunner(object):
     Args:
         reader: A :class:`BatchReader`.
         pipeline: A :class:`Pipeline`.
-        threads: Number of threads to use.
-        input_queue_size:
-        timeout:
+        threads: Number of threads to use. If None, the value will be taken
+            from command_runner.
     """
-    def __init__(self, reader, pipeline, threads, input_queue_size, timeout):
-        self.reader = reader
+    def __init__(self, command_runner, pipeline, threads=None):
+        self.command_runner = command_runner
         self.pipeline = pipeline
-        self.threads = threads
-        self.timeout = max(timeout, RETRY_INTERVAL)
+        self.threads = threads or command_runner.threads
+        self.timeout = max(command_runner.process_timeout, RETRY_INTERVAL)
         # Queue by which batches of reads are sent to worker processes
-        self.input_queue = Queue(input_queue_size)
+        self.input_queue = Queue(command_runner.read_queue_size)
         # Queue for processes to send summary information back to main process
-        self.summary_queue = Queue(threads)
+        self.summary_queue = Queue(self.threads)
         self.worker_processes = None
         self.num_batches = None
         self.seen_summaries = None
@@ -259,16 +258,13 @@ class ParallelPipelineRunner(object):
         """
         pass
     
-    def run(self, summary):
+    def run(self):
         """Run the pipeline.
-        
-        Args:
-            summary: The summary dict.
         
         Returns:
             The return code.
         """
-        retcode = run_interruptible(self, summary)
+        retcode = run_interruptible(self)
         self.terminate(retcode)
         return retcode
     
@@ -283,13 +279,16 @@ class ParallelPipelineRunner(object):
         for process in self.worker_processes:
             kill(process, retcode, self.timeout)
     
-    def __call__(self, summary):
+    def __call__(self):
+        # Start worker processes, reserve a thread for the reader process,
+        # which we will get back after it completes
         worker_args = (
             self.input_queue, self.pipeline, self.summary_queue, self.timeout)
         self.worker_processes = launch_workers(self.threads - 1, worker_args)
         
         self.num_batches = enqueue_all(
-            self.reader, self.input_queue, self.timeout, self.ensure_alive)
+            self.command_runner, self.input_queue, self.timeout,
+            self.ensure_alive)
         
         logging.getLogger().debug(
             "Main loop complete; saw %d batches", self.num_batches)
@@ -349,17 +348,17 @@ class ParallelPipelineRunner(object):
                 raise MulticoreError(
                     "Worker process {} died unexpectedly".format(worker_index))
             elif (
-                    'error' in worker_summary and
-                    worker_summary['error'] is not None):
+                    'exception' in worker_summary and
+                    worker_summary['exception'] is not None):
                 raise AtroposError(
                     "Worker process {} died unexpectedly".format(worker_index),
-                    worker_summary['error'])
+                    worker_summary['exception'])
             else:
                 logging.getLogger().debug(
                     "Processing summary for worker %d", worker_index)
             self.seen_summaries.add(worker_index)
             self.seen_batches |= worker_batches
-            summary.merge(worker_summary)
+            self.command_runner.summary.merge(worker_summary)
         
         # Check if any batches were missed
         if self.num_batches > 0:

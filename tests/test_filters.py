@@ -2,7 +2,8 @@
 """
 Tests write output (should it return True or False or write)
 """
-from atropos.trim.filters import NContentFilter, DISCARD, KEEP, SingleWrapper, PairedWrapper
+from atropos.commands.trim.filters import (
+    NContentFilter, DISCARD, KEEP, SingleWrapper, PairedWrapper)
 from atropos.io.seqio import Sequence
 
 def test_ncontentfilter():

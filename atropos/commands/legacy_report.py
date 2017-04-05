@@ -6,7 +6,7 @@ and multiqc reports.
 import functools
 import math
 import textwrap
-from atropos.io.seqio import PAIRED
+from atropos.commands.reports import BaseReportGenerator
 from atropos.util import truncate_string
 
 INDENT = '  '
@@ -138,7 +138,7 @@ class RowPrinter(Printer):
                 justification, indent.
             extra_width, extra_justification, extra_indent: colwidth/
                 justification/indent to use for extra fields.
-            header: The header row.
+            header: Whether this is a header row.
             underline: Whether to use an underline after the header row. Either
                 a bool or a character.
             pct: Whether floating point values should be formatted as
@@ -178,7 +178,7 @@ class RowPrinter(Printer):
         # adjust colwidths if this is a header
         if header:
             colwidths = tuple(
-                max(w, len(a))
+                max(w, len(str(a)))
                 for w, a in zip(colwidths, args))
         
         fmt_str = []
@@ -207,6 +207,14 @@ class RowPrinter(Printer):
             sepline = ' '.join((underline * width) for width in colwidths)
             self._print(sepline, **kwargs)
 
+class LegacyReportGenerator(BaseReportGenerator):
+    def generate_text_report(self, fmt, summary, outfile, **kwargs):
+        if fmt == 'txt':
+            from atropos.commands.legacy_report import generate_report
+            generate_report(summary, outfile)
+        else:
+            super().generate_from_template(fmt, summary, outfile, **kwargs)
+
 def generate_report(summary, outfile):
     """Generate a report.
     
@@ -214,11 +222,6 @@ def generate_report(summary, outfile):
         summary: The summary dict.
         outfile: The output file name/object.
     """
-    # This is some debug code to pretty-print the summary to a file.
-    #from pprint import pprint
-    #with open('summary.dump.txt', 'w') as o:
-    #    pprint(summary, o)
-    
     is_path = isinstance(outfile, str)
     if is_path:
         outfile = open(outfile, 'wt')
@@ -443,29 +446,19 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
         the reads).
         
         Args:
-            d: A dictionary mapping lengths of trimmed sequences to their
+            data: A dictionary mapping lengths of trimmed sequences to their
                 respective frequency
             adapter_length: adapter length
             num_reads: total no. of reads.
             error_rate: Max error rate.
             errors: Histogram of actual numbers of errors.
         """
-        def errs_to_str(length, err):
-            """Get count for a position and error bin.
-            """
-            if err in errors[length]:
-                return str(errors[length][err])
-            return "0"
-        
         hist = []
         for length, count in data.items():
-            # when length surpasses adapter_length, the
-            # probability does not increase anymore
+            # when length surpasses adapter_length, the probability does not
+            # increase anymore
             estimated = num_reads * 0.25 ** min(length, adapter_length)
-            max_errors = max(errors[length].keys())
-            errs = ' '.join(
-                errs_to_str(length, err)
-                for err in range(max_errors+1))
+            errs = ' '.join(str(err) for err in errors['rows'][length])
             hist.append((
                 length, count, estimated,
                 int(error_rate * min(length, adapter_length)), errs))
@@ -671,9 +664,10 @@ def print_stats_report(data, outfile):
         for histbin in hist:
             _print(*histbin)
     
-    def _print_base_histogram(title, hist, extra_width=4):
+    def _print_base_histogram(title, hist, extra_width=4, index_name='Pos'):
         _print_title(title, level=2)
-        _print('Pos', *hist['columns'], extra_width=extra_width)
+        _print(
+            index_name, *hist['columns'], header=True, extra_width=extra_width)
         for pos, row in hist['rows'].items():
             total_count = sum(row)
             base_pcts = (
@@ -685,7 +679,8 @@ def print_stats_report(data, outfile):
         ncol = len(hist['columns'])
         max_tile_width = max(
             4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
-        _print_base_histogram(title, hist, extra_width=max_tile_width)
+        _print_base_histogram(
+            title, hist, extra_width=max_tile_width, index_name='Tile')
     
     def _print_tile_base_histogram(title, hist):
         """Print a histogram of position x tile, with values as the median
@@ -693,15 +688,21 @@ def print_stats_report(data, outfile):
         """
         quals = hist['columns']
         tiles = hist['columns2']
-        meds = (
-            (pos, tuple(
-                weighted_median(quals, tile_counts)
-                for tile_counts in tiles.values()))
-            for pos, tiles in hist['rows'])
-        # TODO
-        pass
+        ncol = len(tiles)
+        max_tile_width = max(
+            4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
+        _print_title(title, level=2)
+        _print('Pos', *tiles, header=True, extra_width=max_tile_width)
+        for pos, tiles in hist['rows'].items():
+            # compute the weighted median for each tile at each position
+            _print(
+                pos,
+                *(
+                    weighted_median(quals, tile_counts)
+                    for tile_counts in tiles.values()),
+                extra_width=max_tile_width)
     
-    _print('', 'Read1', 'Read2', underline=True)
+    _print('', 'Read1', 'Read2', header=True)
     
     # Sequence-level stats
     _print(
@@ -765,6 +766,16 @@ def print_stats_report(data, outfile):
         _print()
 
 def weighted_median(vals, counts):
+    """Compute the median of `vals` weighted by `counts`.
+    
+    Args:
+        vals: Sequence of unique values.
+        counts: Sequence of counts, where each count is the number of times the
+            value at the corresponding position appears in the sample.
+    
+    Returns:
+        The weighted median.
+    """
     counts_cumsum = functools.reduce(
         lambda c, x: c + [c[-1] + x], counts, [0])[1:]
     total = counts_cumsum[-1]

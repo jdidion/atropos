@@ -156,12 +156,12 @@ class FastqReader(SequenceReader):
     file_format = "FASTQ"
     delivers_qualities = True
     
-    def __init__(self, filename, sequence_class=Sequence):
+    def __init__(self, filename, quality_base=33, sequence_class=Sequence):
         """
         file is a filename or a file-like object.
         If file is a filename, then .gz files are supported.
         """
-        super().__init__(filename)
+        super().__init__(filename, quality_base=quality_base)
         self.sequence_class = sequence_class
     
     def __iter__(self):

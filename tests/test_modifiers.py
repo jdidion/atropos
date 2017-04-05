@@ -1,8 +1,8 @@
 # coding: utf-8
-from atropos.io.seqio import Sequence
-from atropos.trim.modifiers import *
 from atropos.adapters import *
 from atropos.align import MatchInfo
+from atropos.commands.trim.modifiers import *
+from atropos.io.seqio import Sequence
 from atropos.util import reverse_complement as rc
 
 DUMMY_ADAPTER = Adapter("ACGT", FRONT)

@@ -2,7 +2,8 @@
 import math
 from .utils import approx_equal
 from atropos.adapters import BACK
-from atropos.align import locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
+from atropos.align import (
+    locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner)
 from atropos.util import RandomMatchProbability
 
 class TestAligner():

@@ -2,12 +2,13 @@
 # TODO
 # test with the --output option
 # test reading from standard input
-from pytest import raises
 from io import StringIO
 import os
+from pytest import raises
 import sys
-from atropos.scripts import atropos
-from .utils import run, files_equal, datapath, cutpath, redirect_stderr, temporary_path
+from atropos.commands import execute_cli, get_command
+from .utils import (
+    run, files_equal, datapath, cutpath, redirect_stderr, temporary_path)
 
 def test_example():
     run('-N -b ADAPTER', 'example.fa', 'example.fa')
@@ -266,20 +267,17 @@ except ImportError:
 
 def test_qualfile_only():
     with raises(SystemExit), redirect_stderr():
-        atropos.main(['-sq', datapath('E3M.qual')])
+        execute_cli(['-sq', datapath('E3M.qual')])
 
 
 def test_no_args():
     with redirect_stderr():
-        result = atropos.main([])
-        assert isinstance(result, tuple)
-        assert len(result) == 3
-        assert result[0] != 0
+        assert execute_cli() != 0
 
 
 def test_two_fastqs():
     with raises(SystemExit), redirect_stderr():
-        atropos.main(['-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
+        execute_cli(['-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
 
 
 def test_anchored_no_indels():
@@ -336,7 +334,8 @@ def test_adapter_file_3p_anchored_no_indels():
 def test_demultiplex():
     multiout = os.path.join(os.path.dirname(__file__), 'data', 'tmp-demulti.{name}.fasta')
     params = ['-a', 'first=AATTTCAGGAATT', '-a', 'second=GTTCTCTAGTTCT', '-o', multiout, '-se', datapath('twoadapters.fasta')]
-    result = atropos.main(params)
+    command = get_command('trim')
+    result = command.execute(params)
     assert isinstance(result, tuple)
     assert len(result) == 2
     assert result[0] == 0
@@ -364,7 +363,7 @@ def test_quiet_is_quiet():
         old_stderr = sys.stderr
         sys.stdout = captured_standard_output
         sys.stderr = captured_standard_error
-        atropos.main(['-o', '/dev/null', '--quiet', '-a', 'XXXX', '-se', datapath('illumina.fastq.gz')])
+        execute_cli(['-o', '/dev/null', '--quiet', '-a', 'XXXX', '-se', datapath('illumina.fastq.gz')])
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr

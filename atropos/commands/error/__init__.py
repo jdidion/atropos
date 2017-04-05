@@ -4,37 +4,35 @@ from collections import defaultdict
 import csv
 import re
 from atropos import AtroposError
+from atropos.commands.base import BaseCommandRunner
 from atropos.io import open_output
 from atropos.util import qual2prob
 
-def execute(reader, options, summary):
-    """Execute the error detection command.
+class CommandRunner(BaseCommandRunner):
+    name = 'error'
     
-    Args:
-        options: Command-line options.
-        summary: The summary dict.
-    """
-    if not reader.delivers_qualities:
-        raise ValueError("Cannot estimate error rate without base qualities")
-    
-    if options.algorithm == 'quality':
-        estimator_class = BaseQualityErrorEstimator
-    elif options.algorithm == 'shadow':
-        estimator_class = ShadowRegressionErrorEstimator
-    
-    if options.paired:
-        estimator = PairedErrorEstimator(
-            max_read_len=options.max_bases,
-            estimator_class=estimator_class)
-    else:
-        estimator = estimator_class(max_read_len=options.max_bases)
-    
-    estimator.consume_all_batches(reader)
-    
-    with open_output(options.output) as out:
-        estimator.summarize(out, reader.input_names)
-    
-    return 0
+    def __call__(self):
+        if not self.delivers_qualities:
+            raise ValueError(
+                "Cannot estimate error rate without base qualities")
+        
+        if self.algorithm == 'quality':
+            estimator_class = BaseQualityErrorEstimator
+        elif self.algorithm == 'shadow':
+            estimator_class = ShadowRegressionErrorEstimator
+        
+        if self.paired:
+            estimator = PairedErrorEstimator(
+                max_read_len=self.max_bases,
+                estimator_class=estimator_class)
+        else:
+            estimator = estimator_class(max_read_len=self.max_bases)
+        
+        self.summary['error_estimator'] = estimator
+        
+        estimator.consume_all_batches(self)
+        
+        return 0
 
 class ErrorEstimator(object):
     """Base class for error estimators.

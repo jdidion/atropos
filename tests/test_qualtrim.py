@@ -1,6 +1,6 @@
 # coding: utf-8
+from atropos.commands.trim.qualtrim import nextseq_trim_index
 from atropos.io.seqio import Sequence
-from atropos.trim.qualtrim import nextseq_trim_index
 
 def test_nextseq_trim():
     s = Sequence('n', '', '')

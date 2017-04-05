@@ -1,6 +1,6 @@
 # coding: utf-8
 from atropos.util.colorspace import encode, decode
-from atropos.scripts.atropos import main
+from atropos.commands import execute_cli
 from .utils import run, datapath
 
 # If there are any unknown characters in the test sequence,
@@ -68,7 +68,7 @@ def test_qualtrim_csfastaqual():
 def test_E3M():
     '''Read the E3M dataset'''
     # not really colorspace, but a fasta/qual file pair
-    main(['-o', '/dev/null', '-se', datapath("E3M.fasta"), '-sq', datapath("E3M.qual")])
+    execute_cli(['-o', '/dev/null', '-se', datapath("E3M.fasta"), '-sq', datapath("E3M.qual")])
 
 
 def test_bwa():

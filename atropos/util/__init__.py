@@ -111,129 +111,19 @@ class RandomMatchProbability(object):
             next_i += 1
         self.max_n = idx
 
-class Timestamp(object):
-    """Records datetime and clock time at object creation.
-    """
-    def __init__(self):
-        self.dtime = datetime.now()
-        self.clock = time.clock()
-    
-    def timestamp(self):
-        """Returns the unix timestamp.
-        """
-        return self.dtime.timestamp()
-    
-    def isoformat(self):
-        """Returns the datetime in ISO format.
-        """
-        return self.dtime.isoformat()
-    
-    def __sub__(self, other, minval=0.01):
-        """Subtract another timestamp from this one.
-        
-        Args:
-            other: The other timestamp.
-            minval: The minimum difference.
-        
-        Returns:
-            A dict of {wallclock=<datetime_diff>, cpu=<clock_diff>}.
-        """
-        return dict(
-            wallclock=max(minval, self.timestamp() - other.timestamp()),
-            cpu=max(minval, self.clock - other.clock))
-
-class Timing(object):
-    """Context manager that maintains timing information using
-    :class:`Timestamp`s. Maintains a start time on __enter__, and can be updated
-    with the current time by the user. Does a final update on __exit__.
-    """
-    def __init__(self):
-        self.start_time = None
-        self.cur_time = None
-    
-    def __enter__(self):
-        self.start_time = Timestamp()
-        return self
-    
-    def __exit__(self, exception_type, exception_value, traceback):
-        self.update()
-    
-    def update(self):
-        """Set :attr:`self.cur_time` to the current time.
-        """
-        self.cur_time = Timestamp()
-    
-    def summarize(self):
-        """Returns a summary dict
-        {start=<start_time>, wallclock=<datetime_diff>, cpu=<clock_diff>}.
-        """
-        if not self.cur_time:
-            self.update()
-        assert self.start_time is not None
-        summary = dict(start=self.start_time.isoformat())
-        summary.update(self.cur_time - self.start_time)
-        return summary
-
-class CountingDict(dict):
-    """A dictionary that always returns 0 on get of a missing key.
-    """
-    def __getitem__(self, name):
-        return self.get(name, 0)
-    
-    def sorted_items(self, sort_by=0):
-        """Returns a tuple of sorted items.
-        
-        Args:
-            sort_by: Whether to sort by key (0) or value (1).
-        
-        Returns:
-            A tuple of sorted items.
-        """
-        return tuple(sorted(self.items(), key=lambda item: item[sort_by]))
-
-class NestedDict(dict):
-    """A dict that initalizes :class:`CountingDict`s for missing keys.
-    """
-    def __getitem__(self, name):
-        if name not in self:
-            self[name] = CountingDict()
-        return self.get(name)
-    
-    def summarize(self, shape="long"):
-        """Returns a flattened version of the nested dict.
-        
-        Args:
-            shape: The flattened shape: 'long' or 'wide'.
-        
-        Returns:
-            When `shape=='long'`, a list of (key1, key2, value) tuples.
-            When `shape=='wide'`, a dict of
-                {columns:keys2, rows: {key1, values}}, where `keys2` is the set
-                of keys in the child dicts.
-        """
-        keys1 = sorted(self.keys())
-        if shape == "long":
-            return [
-                (key1, key2, value)
-                for key1 in keys1
-                for key2, value in self[key1].items()
-            ]
-        else:
-            keys2 = set()
-            for child in self.values():
-                keys2.update(child.keys())
-            keys2 = tuple(sorted(keys2))
-            return dict(
-                columns=keys2,
-                rows=ordered_dict(
-                    (key1, tuple(self[key1].get(key2, 0) for key2 in keys2))
-                    for key1 in keys1))
-
 class Mergeable(object):
-    """Marker class for an object that can merge itself with another.
+    """Base class for objects that can merge themselves with another.
     """
     def merge(self, other):
         """Merges `other` with `self` and returns the merged value.
+        """
+        raise NotImplementedError()
+
+class Summarizable(object):
+    """Base class for objects that can summarize themselves.
+    """
+    def summarize(self):
+        """Returns a summary dict.
         """
         raise NotImplementedError()
 
@@ -267,6 +157,153 @@ class Const(Mergeable):
     
     def __repr__(self):
         return str(self.value)
+
+class Timestamp(object):
+    """Records datetime and clock time at object creation.
+    """
+    def __init__(self):
+        self.dtime = datetime.now()
+        self.clock = time.clock()
+    
+    def timestamp(self):
+        """Returns the unix timestamp.
+        """
+        return self.dtime.timestamp()
+    
+    def isoformat(self):
+        """Returns the datetime in ISO format.
+        """
+        return self.dtime.isoformat()
+    
+    def __sub__(self, other, minval=0.01):
+        """Subtract another timestamp from this one.
+        
+        Args:
+            other: The other timestamp.
+            minval: The minimum difference.
+        
+        Returns:
+            A dict of {wallclock=<datetime_diff>, cpu=<clock_diff>}.
+        """
+        return dict(
+            wallclock=max(minval, self.timestamp() - other.timestamp()),
+            cpu=max(minval, self.clock - other.clock))
+
+class Timing(Summarizable):
+    """Context manager that maintains timing information using
+    :class:`Timestamp`s. Maintains a start time on __enter__, and can be updated
+    with the current time by the user. Does a final update on __exit__.
+    """
+    def __init__(self):
+        self.start_time = None
+        self.cur_time = None
+    
+    def __enter__(self):
+        self.start_time = Timestamp()
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.update()
+    
+    def update(self):
+        """Set :attr:`self.cur_time` to the current time.
+        """
+        self.cur_time = Timestamp()
+    
+    def summarize(self):
+        """Returns a summary dict
+        {start=<start_time>, wallclock=<datetime_diff>, cpu=<clock_diff>}.
+        """
+        if not self.cur_time:
+            self.update()
+        assert self.start_time is not None
+        summary = dict(start=self.start_time.isoformat())
+        summary.update(self.cur_time - self.start_time)
+        return summary
+
+class CountingDict(dict, Mergeable, Summarizable):
+    """A dictionary that always returns 0 on get of a missing key.
+    
+    Args:
+        sort_by: Whether summary is sorted by key (0) or value (1).
+    """
+    def __init__(self, sort_by=0):
+        super().__init__()
+        self.sort_by = sort_by
+    
+    def __getitem__(self, name):
+        return self.get(name, 0)
+    
+    def merge(self, other):
+        if not isinstance(other, CountingDict):
+            raise ValueError(
+                "Cannot merge object of type {}".format(type(other)))
+        for key, value in other.items():
+            self[key] += value
+        return self
+    
+    def get_sorted_items(self):
+        """Returns an iterable of (key, value) sorted according to this
+        CountingDict's `sort_by` param.
+        """
+        return sorted(self.items(), key=lambda item: item[self.sort_by])
+    
+    def summarize(self):
+        """Returns an OrderedDict of sorted items.
+        """
+        return ordered_dict(self.get_sorted_items())
+
+class NestedDict(dict, Mergeable, Summarizable):
+    """A dict that initalizes :class:`CountingDict`s for missing keys.
+    
+    Args:
+        shape: The flattened shape: 'long' or 'wide'.
+    """
+    def __init__(self, shape="long"):
+        super().__init__()
+        self.shape = shape
+    
+    def __getitem__(self, name):
+        if name not in self:
+            self[name] = CountingDict()
+        return self.get(name)
+    
+    def merge(self, other):
+        if not isinstance(other, NestedDict):
+            raise ValueError(
+                "Cannot merge object of type {}".format(type(other)))
+        for key, value in other.items():
+            if key in self:
+                self[key].merge(value)
+            else:
+                self[key] = value
+        return self
+    
+    def summarize(self):
+        """Returns a flattened version of the nested dict.
+        
+        Returns:
+            When `shape=='long'`, a list of (key1, key2, value) tuples.
+            When `shape=='wide'`, a dict of
+                {columns:keys2, rows: {key1, values}}, where `keys2` is the set
+                of keys in the child dicts.
+        """
+        keys1 = sorted(self.keys())
+        if self.shape == "wide":
+            return tuple(
+                (key1, key2, value)
+                for key1 in keys1
+                for key2, value in self[key1].items())
+        else:
+            keys2 = set()
+            for child in self.values():
+                keys2.update(child.keys())
+            keys2 = tuple(sorted(keys2))
+            return dict(
+                columns=keys2,
+                rows=ordered_dict(
+                    (key1, tuple(self[key1].get(key2, 0) for key2 in keys2))
+                    for key1 in keys1))
 
 class MergingDict(OrderedDict, Mergeable):
     """An :class:`collections.OrderedDict` that implements :class:`Mergeable`.
@@ -334,10 +371,12 @@ def merge_values(v_dest, v_src):
     return v_dest
 
 def ordered_dict(iterable):
-    d = OrderedDict()
+    """Create an OrderedDict from an iterable of (key, value) tuples.
+    """
+    ordict = OrderedDict()
     for key, value in iterable:
-        d[key] = value
-    return d
+        ordict[key] = value
+    return ordict
 
 def complement(seq):
     """Returns the complement of nucleotide sequence `seq`.

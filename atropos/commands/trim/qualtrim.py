@@ -3,7 +3,7 @@
 """
 # Import cythonized functions, defaulting to pure python implementations.
 try:
-    from atropos.trim._qualtrim import quality_trim_index, nextseq_trim_index
+    from ._qualtrim import quality_trim_index, nextseq_trim_index
 
 except:
     import logging

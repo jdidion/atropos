@@ -2,16 +2,23 @@
 """Collect statistics to use in the QC report.
 """
 import re
-from atropos.util import CountingDict, NestedDict, ordered_dict, qual2int
+from atropos.util import (
+    CountingDict, NestedDict, Mergeable, Summarizable, ordered_dict, qual2int)
 
-DEFAULT_TILE_KEY_REGEXP = r"@(((?:[^\:]+)\:){5})"
+DEFAULT_TILE_KEY_REGEXP = r"^(?:[^\:]+\:){4}([^\:]+)"
 """Regexp for the default Illumina read name format."""
 
-class PositionDicts(object):
+class PositionDicts(Mergeable, Summarizable):
     """A sequence of dicts, one for each position in a sequence.
+    
+    Args:
+        is_qualities: Whether values are base qualities.
+        quality_base: Base for quality values.
     """
-    def __init__(self):
+    def __init__(self, is_qualities=False, quality_base=33):
         self.dicts = []
+        self.is_qualities = is_qualities
+        self.quality_base = quality_base
     
     def __getitem__(self, idx):
         if idx >= len(self.dicts):
@@ -25,6 +32,20 @@ class PositionDicts(object):
         if diff > 0:
             for _ in range(diff):
                 self.dicts.append(self.dict_class())
+    
+    def merge(self, other):
+        if not isinstance(other, BaseCountingDicts):
+            raise ValueError(
+                "Cannot merge object of type {}".format(type(other)))
+        other_len = len(other.dicts)
+        min_len = min(len(self.dicts), other_len)
+        for i in range(min_len):
+            self.dicts[i].merge(other.dicts[i])
+        if other_len > min_len:
+            self.dicts.extend(other.dicts[min_len:other_len])
+    
+    def summarize(self):
+        raise NotImplementedError()
 
 class BaseCountingDicts(PositionDicts):
     """A PositionDicts in which the items are CountingDicts that count the
@@ -32,12 +53,9 @@ class BaseCountingDicts(PositionDicts):
     """
     dict_class = CountingDict
     
-    def summarize(self, is_qualities=False):
+    def summarize(self):
         """Flatten into a table with N rows (where N is the size of the
         sequence) and the columns are counts by nucleotide.
-        
-        Args:
-            is_qualities: Whether values are base qualities.
         
         Returns:
             A tuple of (columns, [rows]), where each row is
@@ -46,9 +64,9 @@ class BaseCountingDicts(PositionDicts):
         keys = set()
         for dict_item in self.dicts:
             keys.update(dict_item.keys())
-        if is_qualities:
+        if self.is_qualities:
             keys = tuple(sorted(keys))
-            columns = tuple(qual2int(k) for k in keys)
+            columns = tuple(qual2int(k, self.quality_base) for k in keys)
         else:
             acgt = ('A','C','G','T')
             n_val = ('N',) if 'N' in keys else ()
@@ -64,13 +82,10 @@ class BaseNestedDicts(PositionDicts):
     """
     dict_class = NestedDict
     
-    def summarize(self, is_qualities=False):
+    def summarize(self):
         """Flatten into a table of N*K rows, where N is the sequence size and
         K is the union of keys in the nested dicts, and the columns are counts
         by nucleotide.
-        
-        Args:
-            is_qualities: Whether the values are qualities.
         """
         keys1 = set()
         keys2 = set()
@@ -80,27 +95,30 @@ class BaseNestedDicts(PositionDicts):
                 keys2.update(dict2.keys())
         keys1 = tuple(sorted(keys1))
         keys2 = tuple(sorted(keys2))
-        columns = tuple(qual2int(k) for k in keys2) if is_qualities else keys2
+        if self.is_qualities:
+            columns = tuple(qual2int(k, self.quality_base) for k in keys2)
+        else:
+            columns = keys2
         return dict(
             columns=columns,
             columns2=keys1,
             rows=ordered_dict(
                 (idx, ordered_dict(
-                    (key1, tuple(
-                        dict_item[key1].get(key2, 0)
-                        for key2 in keys2))))
-            for key1 in keys1
-            for idx, dict_item in enumerate(self.dicts, 1)))
+                    (key1, tuple(dict_item[key1].get(key2, 0) for key2 in keys2))
+                    for key1 in keys1))
+                for idx, dict_item in enumerate(self.dicts, 1)))
 
 class ReadStatistics(object):
     """Accumulates statistics on sequencing reads.
     
     Args:
         qualities: Whether to collect base quality statistics.
-        tile_key_regexp: Regular expression for extracting the tile ID from the
-            read name. Only applies to Illumina sequences.
+        tiles: Whether to collect tile-level statistics. If True, the default
+            regular expression is used, otherwise must be a regular expression
+            string or compiled re for extracting the tile ID from the read name.
+            Only applies to Illumina sequences.
     """
-    def __init__(self, qualities=None, tile_key_regexp=None):
+    def __init__(self, qualities=None, quality_base=33, tiles=None):
         # max read length
         self.max_read_len = 0
         # read count
@@ -114,14 +132,14 @@ class ReadStatistics(object):
         
         # whether to collect base quality stats
         self.qualities = qualities
+        self.quality_base = quality_base
         self.tile_key_regexp = None
         self.sequence_qualities = None
         self.base_qualities = None
         self.tile_base_qualities = None
         
         if qualities:
-            if tile_key_regexp is True:
-                tile_key_regexp = DEFAULT_TILE_KEY_REGEXP
+            tile_key_regexp = DEFAULT_TILE_KEY_REGEXP if tiles is True else tiles
             if isinstance(tile_key_regexp, str):
                 tile_key_regexp = re.compile(tile_key_regexp)
             self.tile_key_regexp = tile_key_regexp
@@ -134,10 +152,12 @@ class ReadStatistics(object):
         # per-sequence mean qualities
         self.sequence_qualities = CountingDict()
         # per-position quality composition
-        self.base_qualities = BaseCountingDicts()
+        self.base_qualities = BaseCountingDicts(
+            is_qualities=True, quality_base=self.quality_base)
         if self.tile_key_regexp:
-            self.tile_base_qualities = BaseNestedDicts()
-            self.tile_sequence_qualities = NestedDict()
+            self.tile_base_qualities = BaseNestedDicts(
+                is_qualities=True, quality_base=self.quality_base)
+            self.tile_sequence_qualities = NestedDict(shape="wide")
     
     # These are attributes that are computed on the fly. If called by name
     # (without leading '_'), __getattr__ uses the method to compute the value
@@ -179,35 +199,38 @@ class ReadStatistics(object):
         
         seq = record.sequence
         seqlen = len(seq)
-        gc_pct = round((seq.count('C') + seq.count('G')) * 100 / seqlen)
         
         self.count += 1
         self.sequence_lengths[seqlen] += 1
-        self.sequence_gc[gc_pct] += 1
         
-        if seqlen > self.max_read_len:
-            self._extend_bases(seqlen)
+        if seqlen > 0:
+            gc_pct = round((seq.count('C') + seq.count('G')) * 100 / seqlen)
+            self.sequence_gc[gc_pct] += 1
+            
+            if seqlen > self.max_read_len:
+                self._extend_bases(seqlen)
+            
+            quals = tile = None
+            
+            if self.qualities:
+                quals = record.qualities
+                # mean read quality
+                meanqual = round(
+                    sum(ord(q) - self.quality_base for q in quals) / seqlen)
+                self.sequence_qualities[meanqual] += 1
+                # tile ID
+                if self.track_tiles:
+                    tile_match = self.tile_key_regexp.match(record.name)
+                    if tile_match:
+                        tile = tile_match.group(1)
+                        self.tile_sequence_qualities[tile][meanqual] += 1
+                    else:
+                        raise ValueError("{} did not match {}".format(
+                            self.tile_key_regexp, record.name))
         
-        qual = tile = None
-        
-        if self.qualities:
-            quals = record.qualities
-            # mean read quality
-            meanqual = round(sum(ord(q) for q in quals) / seqlen)
-            self.sequence_qualities[meanqual] += 1
-            # tile ID
-            if self.track_tiles:
-                tile_match = self.tile_key_regexp.match(record.name)
-                if tile_match:
-                    tile = tile_match.group(1)
-                    self.tile_sequence_qualities[tile][meanqual] += 1
-                else:
-                    raise ValueError("{} did not match {}".format(
-                        self.tile_key_regexp, record.name))
-        
-        # per-base nucleotide and quality composition
-        for i, (base, qual) in enumerate(zip(seq, quals)):
-            self.add_base(i, base, qual, tile)
+            # per-base nucleotide and quality composition
+            for i, (base, qual) in enumerate(zip(seq, quals)):
+                self.add_base(i, base, qual, tile)
         
         # TODO: positional k-mer profiles
     
@@ -243,19 +266,16 @@ class ReadStatistics(object):
         """
         summary = dict(
             count=self.count,
-            length=self.sequence_lengths.sorted_items(),
-            gc=self.sequence_gc.sorted_items(),
-            bases=self.bases.summarize())
+            length=self.sequence_lengths.summarize(),
+            gc=self.sequence_gc.summarize(),
+            bases=self.bases)
         if self.sequence_qualities:
-            summary['qualities'] = self.sequence_qualities.sorted_items()
+            summary['qualities'] = self.sequence_qualities
         if self.base_qualities:
-            summary['base_qualities'] = self.base_qualities.summarize(
-                is_qualities=True)
+            summary['base_qualities'] = self.base_qualities
         if self.track_tiles:
-            summary['tile_base_qualities'] = self.tile_base_qualities.summarize(
-                is_qualities=True)
-            summary['tile_sequence_qualities'] = \
-                self.tile_sequence_qualities.summarize(shape="wide")
+            summary['tile_base_qualities'] = self.tile_base_qualities
+            summary['tile_sequence_qualities'] = self.tile_sequence_qualities
         return summary
 
 class SingleEndReadStatistics(ReadStatistics):

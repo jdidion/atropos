@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import os
 import sys
 import traceback
-from atropos.scripts import atropos
+from atropos.commands import get_command
 
 @contextmanager
 def redirect_stderr():
@@ -65,12 +65,13 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
         else:
             params += ['-o', tmp_fastaq] # TODO not parallelizable
         print(params)
-        retcode, summary = atropos.main(params)
+        command = get_command('trim')
+        retcode, summary = command.execute(params)
         assert summary is not None
         assert isinstance(summary, dict)
-        if 'error' in summary and summary['error'] is not None:
+        if 'exception' in summary and summary['exception'] is not None:
             assert retcode != 0
-            err = summary['error']
+            err = summary['exception']
             traceback.print_exception(*err['details'])
             raise Exception("Unexpected error: {}".format(err['message']))
         else:
