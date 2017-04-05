@@ -235,7 +235,7 @@ class BaseCommandRunner(object):
         try:
             read_index, record = next(self.iterable)
         except:
-            self.close()
+            self.finish()
             raise
         
         batch = copy.copy(self._empty_batch)
@@ -251,14 +251,14 @@ class BaseCommandRunner(object):
                 batch[batch_index] = record
                 batch_index += 1
             except StopIteration:
-                self.close()
+                self.finish()
                 break
             except:
-                self.close()
+                self.finish()
                 raise
         
         if self.max_reads and read_index >= self.max_reads:
-            self.close()
+            self.finish()
         
         self.batches += 1
         

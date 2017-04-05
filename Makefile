@@ -41,7 +41,9 @@ lint:
 clean:
 	rm -Rf __pycache__ \
 	       **/__pycache__/* \
-		   atropos/**/*.so \
+		   **/*.c \
+		   **/*.so \
+		   **/*.pyc \
 		   dist \
 		   build \
 		   .adapters \
