@@ -1,10 +1,11 @@
 FROM ubuntu-core:alpha-3
 
-RUN snappy install python3 cython
+RUN snappy install python3 cython python3-pip
+RUN pip install tqdm pysam
 
 ADD . /atropos/
 
-RUN cd /atropos/ && python setup.py install && python setup.py build_ext -i
+RUN cd /atropos/ && make install
 
 ENTRYPOINT ["/atropos/bin/atropos"]
 CMD ["--help"]

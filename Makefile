@@ -2,7 +2,7 @@ tests = tests
 module = atropos
 
 BUILD = python setup.py build_ext -i && python setup.py install
-TEST = py.test $(tests)
+TEST = py.test -v $(tests)
 
 all:
 	$(BUILD)
@@ -35,3 +35,9 @@ readme:
 
 lint:
 	pylint $(module)
+
+clean:
+	rm -Rf **/__pycache__/*
+	rm -Rf atropos/**/*.so
+	rm -Rf dist
+	rm -Rf build
