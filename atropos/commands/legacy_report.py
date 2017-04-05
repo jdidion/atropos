@@ -1,7 +1,7 @@
 # coding: utf-8
 """Routines for printing a text report. This is the legacy code for generating
-text-based reports. This will eventually be deprecated in favor of the jinja
-and multiqc reports.
+text-based reports. This will eventually be deprecated in favor of the Jinja2
+and MultiQC reports.
 """
 import functools
 import math
@@ -210,7 +210,6 @@ class RowPrinter(Printer):
 class LegacyReportGenerator(BaseReportGenerator):
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            from atropos.commands.legacy_report import generate_report
             generate_report(summary, outfile)
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)
@@ -315,7 +314,9 @@ def print_trim_report(summary, outfile):
     
     _print_title("Trimming", level=1)
     _print(pairs_or_reads, 'records', 'fraction', header=True)
-    _print("Total {} processed".format('read pairs' if paired else 'reads'), total)
+    _print(
+        "Total {} processed".format('read pairs' if paired else 'reads'),
+        total)
     if adapter_cutter:
         if paired:
             for read in range(2):
@@ -801,5 +802,5 @@ def sizeof(*x):
         return max(len(s) for s in x)
     elif isinstance(x[0], int):
         return len(str(max(x)))
-    else:
+    elif isinstance(x[0], float):
         return len(str(round(max(x), 1)))
