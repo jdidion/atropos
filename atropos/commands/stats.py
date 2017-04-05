@@ -124,9 +124,9 @@ class ReadStatistics(object):
         # read count
         self.count = 0
         # read length distribution
-        self.sequence_lengths = CountingDict()
+        self.sequence_lengths = CountingDict(summary_type='tuple')
         # per-sequence GC percentage
-        self.sequence_gc = CountingDict()
+        self.sequence_gc = CountingDict(summary_type='tuple')
         # per-position base composition
         self.bases = BaseCountingDicts()
         
@@ -150,7 +150,7 @@ class ReadStatistics(object):
     
     def _init_qualities(self):
         # per-sequence mean qualities
-        self.sequence_qualities = CountingDict()
+        self.sequence_qualities = CountingDict(summary_type='tuple')
         # per-position quality composition
         self.base_qualities = BaseCountingDicts(
             is_qualities=True, quality_base=self.quality_base)

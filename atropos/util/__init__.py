@@ -227,9 +227,10 @@ class CountingDict(dict, Mergeable, Summarizable):
     Args:
         sort_by: Whether summary is sorted by key (0) or value (1).
     """
-    def __init__(self, sort_by=0):
+    def __init__(self, sort_by=0, summary_type='dict'):
         super().__init__()
         self.sort_by = sort_by
+        self.summary_type = summary_type
     
     def __getitem__(self, name):
         return self.get(name, 0)
@@ -251,7 +252,8 @@ class CountingDict(dict, Mergeable, Summarizable):
     def summarize(self):
         """Returns an OrderedDict of sorted items.
         """
-        return ordered_dict(self.get_sorted_items())
+        summary_func = ordered_dict if self.summary_type == 'dict' else tuple
+        return summary_func(self.get_sorted_items())
 
 class NestedDict(dict, Mergeable, Summarizable):
     """A dict that initalizes :class:`CountingDict`s for missing keys.
