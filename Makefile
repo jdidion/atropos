@@ -1,8 +1,10 @@
 tests = tests
 module = atropos
+pytestops =
+#pytestops = "-v -s"
 
 BUILD = python setup.py build_ext -i && python setup.py install
-TEST = py.test -v $(tests)
+TEST = py.test $(pytestops) $(tests)
 
 all:
 	$(BUILD)
@@ -37,7 +39,10 @@ lint:
 	pylint $(module)
 
 clean:
-	rm -Rf **/__pycache__/*
-	rm -Rf atropos/**/*.so
-	rm -Rf dist
-	rm -Rf build
+	rm -Rf __pycache__ \
+	       **/__pycache__/* \
+		   atropos/**/*.so \
+		   dist \
+		   build \
+		   .adapters \
+		   atropos.egg-info

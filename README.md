@@ -21,7 +21,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 ## Dependencies
 
 * Required
-    * Python 3.3+ (python 2.x is NOT supported)
+    * Python 3.3+ (python 2.x is NOT supported) - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
     * Cython 0.25.2+ (`pip install Cython`)
 * Optional
     * pytest (for running unit tests)
