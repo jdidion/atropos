@@ -249,7 +249,8 @@ def print_summary_report(summary, outfile):
     _print_title("Atropos", level=0)
     _print("Atropos version: {}".format(summary['version']))
     _print("Python version: {}".format(summary['python']))
-    _print("Command line parameters: {}".format(" ".join(summary['command_line'])))
+    _print("Command line parameters: {} {}".format(
+        summary['command'], " ".join(summary['options']['orig_args'])))
     _print()
     
     _print("Sample ID: {}".format(summary['sample_id']))
@@ -655,9 +656,9 @@ def print_stats_report(data, outfile):
         outfile: The output file.
     """
     paired = 'read2' in data
-    max_count = data['read1']['count']
+    max_count = data['read1']['counts']
     if paired:
-        max_count = max(max_count, data['read2']['count'])
+        max_count = max(max_count, data['read2']['counts'])
     max_width = len(str(max_count))
     # add space for commas and column separation
     max_width += (max_width // 3) + 1
@@ -690,7 +691,7 @@ def print_stats_report(data, outfile):
     def _print_tile_histogram(title, hist):
         ncol = len(hist['columns'])
         max_tile_width = max(
-            4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
+            4, len(str(math.ceil(data['read1']['counts'] / ncol)))) + 1
         _print_base_histogram(
             title, hist, extra_width=max_tile_width, index_name='Tile')
     
@@ -702,7 +703,7 @@ def print_stats_report(data, outfile):
         tiles = hist['columns2']
         ncol = len(tiles)
         max_tile_width = max(
-            4, len(str(math.ceil(data['read1']['count'] / ncol)))) + 1
+            4, len(str(math.ceil(data['read1']['counts'] / ncol)))) + 1
         _print_title(title, level=2)
         _print('Pos', *tiles, header=True, extra_width=max_tile_width)
         for pos, tiles in hist['rows'].items():
@@ -719,13 +720,13 @@ def print_stats_report(data, outfile):
     # Sequence-level stats
     _print(
         "Read pairs:" if paired else "Reads:",
-        data['read1']['count'],
-        data['read2']['count'])
+        data['read1']['counts'],
+        data['read2']['counts'])
     _print()
     _print_histogram(
         "Sequence lengths:",
-        data['read1']['length'],
-        data['read2']['length'])
+        data['read1']['lengths'],
+        data['read2']['lengths'])
     _print()
     if 'qualities' in data['read1']:
         _print_histogram(

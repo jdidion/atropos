@@ -95,11 +95,13 @@ class Command(object):
         return self.get_command_parser_class().description
     
     def get_help(self, fmt="* {name}: {description}", wrap=80, indent=2):
+        """Returns a string to include in the command help.
+        """
         helpstr = fmt.format(
             name=self.name, description=self.description.strip())
         if wrap:
             helpstr = "\n".join(textwrap.wrap(
-                re.sub('\s+', ' ', helpstr), wrap,
+                re.sub(r'\s+', ' ', helpstr), wrap,
                 subsequent_indent=' ' * indent))
         return helpstr
     

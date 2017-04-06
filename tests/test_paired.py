@@ -357,8 +357,9 @@ def test_summary():
         summary = result[1]
         assert summary is not None
         assert isinstance(summary, dict)
-        assert summary['command_line'] == [
-            'trim', '--threads', '2',
+        assert summary['command'] == 'trim'
+        assert summary['options']['orig_args'] == [
+            '--threads', '2',
             '-a', 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG',
             '-A', 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
             '--aligner', aligner,

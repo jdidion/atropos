@@ -265,8 +265,8 @@ class ReadStatistics(object):
         """Returns a summary dict.
         """
         summary = dict(
-            count=self.count,
-            length=self.sequence_lengths.summarize(),
+            counts=self.count,
+            lengths=self.sequence_lengths.summarize(),
             gc=self.sequence_gc.summarize(),
             bases=self.bases)
         if self.sequence_qualities:

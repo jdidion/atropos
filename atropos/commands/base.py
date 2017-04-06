@@ -281,8 +281,7 @@ class BaseCommandRunner(object):
         self.summary['program'] = 'Atropos'
         self.summary['version'] = __version__
         self.summary['python'] = platform.python_version()
-        self.summary['command_line'] = \
-            [self.name] + list(self.options.orig_args)
+        self.summary['command'] = self.name
         self.summary['options'] = self.options.__dict__.copy()
         self.summary['timing'] = self.timing
         self.summary['sample_id'] = self.options.sample_id
