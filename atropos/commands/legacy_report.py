@@ -670,10 +670,10 @@ def print_stats_report(data, outfile):
         _print_title(title, level=2)
         if hist2:
             hist = (
-                (bin1[0], bin1[1], bin2[1])
-                for bin1, bin2 in zip(hist1, hist2))
+                (key, hist1.get(key, 0), hist2.get(key, 0))
+                for key in sorted(set(hist1.keys()) | set(hist2.keys())))
         else:
-            hist = hist1
+            hist = sorted(hist1.items(), key=lambda x: x[0])
         for histbin in hist:
             _print(*histbin)
     

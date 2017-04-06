@@ -255,6 +255,19 @@ class CountingDict(dict, Mergeable, Summarizable):
         summary_func = ordered_dict if self.summary_type == 'dict' else tuple
         return summary_func(self.get_sorted_items())
 
+class Histogram(CountingDict):
+    """Counting dict that returns a summary dict that contains summary stats.
+    """
+    def summarize(self):
+        hist = super().summarize()
+        return dict(
+            hist=hist,
+            summary=self.summarize_hist(hist))
+    
+    def summarize_hist(self, hist):
+        # TODO
+        pass
+
 class NestedDict(dict, Mergeable, Summarizable):
     """A dict that initalizes :class:`CountingDict`s for missing keys.
     
