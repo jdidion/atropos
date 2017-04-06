@@ -441,6 +441,9 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 prev, adapter_length, int(error_rate * adapter_length)))
         _print()
     
+    # TODO: compute max width for error counts column, print secondary header
+    # with number of errors, space-pad each sub-column, think about whether to
+    # show trailing zeroes.
     def print_histogram(data, adapter_length, num_reads, error_rate, errors):
         """Print a histogram. Also, print the no. of reads expected to be
         trimmed by chance (assuming a uniform distribution of nucleotides in
