@@ -28,7 +28,7 @@ class UnknownFileType(AtroposError):
 
 class SequenceReaderBase(Summarizable): # pylint: disable=no-member
     """Sequence readers must provide the following properties:
-    - input_names: (file1, file2)
+    - input_names: (read1 file, read2 file)
     - input_read: 1, 2, or 3
     - file_format: string, e.g. FASTA, FASTQ, etc.
     - delivers_qualities: bool
@@ -289,7 +289,7 @@ class FastaQualReader(SequenceReaderBase):
     
     @property
     def input_names(self):
-        return (self.fastareader.name, self.qualreader.name)
+        return ((self.fastareader.name, self.qualreader.name), None)
     
     def __iter__(self):
         """Yield Sequence objects.
@@ -366,7 +366,9 @@ class PairedSequenceReader(SequenceReaderBase):
     
     @property
     def input_names(self):
-        return (self.reader1.name, self.reader2.name)
+        return (
+            self.reader1.input_names[0], 
+            self.reader2.input_names[0])
     
     def __getattr__(self, name):
         return getattr(self.reader1, name)
@@ -431,10 +433,6 @@ class InterleavedSequenceReader(SequenceReaderBase):
         self.reader = open_reader(
             path, quality_base=quality_base, colorspace=colorspace,
             file_format=file_format)
-    
-    @property
-    def input_names(self):
-        return (self.reader.name, None)
     
     def __getattr__(self, name):
         return getattr(self.reader, name)

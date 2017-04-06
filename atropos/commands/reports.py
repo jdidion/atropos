@@ -7,8 +7,11 @@ import sys
 from atropos.io import STDOUT, STDERR
 from atropos.io.seqio import PAIRED
 
-TEXT_SERIALIZERS = ['json', 'yaml']
-BINARY_SERIALIZERS = ['pickle']
+SERIALIZERS = dict(
+    json='t',
+    yaml='t',
+    pickle='b'
+)
 
 class BaseReportGenerator(object):
     """Base class for command report generators.
@@ -49,13 +52,9 @@ class BaseReportGenerator(object):
         self.add_derived_data(summary)
         
         for fmt, outfile in zip(self.report_formats, self.report_files):
-            if fmt in BINARY_SERIALIZERS:
-                self.serialize(summary, fmt, 'b', outfile, **kwargs)
-            elif fmt in TEXT_SERIALIZERS:
-                # need to simplify some aspects of the summary to make it
-                # compatible with JSON serialization
-                summary = self.simplify(summary)
-                self.serialize(summary, fmt, 't', outfile, **kwargs)
+            if fmt in SERIALIZERS:
+                mode = SERIALIZERS[fmt]
+                self.serialize(summary, fmt, mode, outfile, **kwargs)
             else:
                 self.generate_text_report(fmt, summary, outfile, **kwargs)
     
@@ -98,31 +97,6 @@ class BaseReportGenerator(object):
         mod = importlib.import_module(fmt)
         with open(outfile, 'w' + mode) as stream:
             mod.dump(obj, stream, **kwargs)
-    
-    def simplify(self, summary):
-        """Simplify a summary dict for serialization to an external format (e.g.
-        JSON, YAML).
-        
-        1. JSON does not allow non-string map keys.
-        """
-        from collections import OrderedDict
-        
-        def _recurse(dest, src):
-            for key, value in src.items():
-                if not isinstance(key, str):
-                    if isinstance(key, Iterable):
-                        key = ','.join(key)
-                    else:
-                        key = str(key)
-                if isinstance(value, dict):
-                    dest[key] = OrderedDict()
-                    _recurse(dest[key], value)
-                else:
-                    dest[key] = value
-        
-        simplified = OrderedDict()
-        _recurse(simplified, summary)
-        return simplified
     
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         """Generate a text report. By default, calls generate_from_template.

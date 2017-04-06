@@ -10,6 +10,9 @@ class ReportGenerator(BaseReportGenerator):
         if fmt == 'txt':
             estimator = summary['error_estimator']
             with open_output(outfile) as out:
-                estimator.summarize(out, summary['input']['input_names'])
+                names = summary['input']['input_names']
+                if names and len(names) == 1:
+                    names = names[0]
+                estimator.summarize(out, )
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)

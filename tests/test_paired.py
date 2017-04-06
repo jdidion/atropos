@@ -369,10 +369,10 @@ def test_summary():
         assert summary['threads'] == 2
         # infiles are 100 125 bp PE reads
         expected_record_counts = {}
-        expected_record_counts[tuple(infiles)] = 100
+        expected_record_counts[0] = 100
         assert summary['record_counts'] == expected_record_counts
         expected_bp_counts = {}
-        expected_bp_counts[tuple(infiles)] = [12500, 12500]
+        expected_bp_counts[0] = [12500, 12500]
         assert summary['bp_counts'] == expected_bp_counts
         assert 'timing' in summary
         assert 'wallclock' in summary['timing']

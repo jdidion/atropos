@@ -10,8 +10,9 @@ class ReportGenerator(BaseReportGenerator):
         if fmt == 'txt':
             detector = summary['detect']['detector']
             with open_output(outfile) as out:
-                detector.summarize(
-                    out, summary['input']['input_names'],
-                    summary['detect']['include'])
+                names = summary['input']['input_names']
+                if names and len(names) == 1:
+                    names = names[0]
+                detector.summarize(out, names, summary['detect']['include'])
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)

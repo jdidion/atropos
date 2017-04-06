@@ -264,10 +264,10 @@ class BaseCommandRunner(object):
         
         batch_meta = dict(
             index=self.batches,
-            # HACK: Using input_names is temporary until multi-file input is
-            # supported, at which point the reader will keep track of the
-            # current source files.
-            source=self.input_names,
+            # TODO: When multi-file input is supported, 'source' will need to
+            # be the index of the current file/pair from which records are
+            # being read.
+            source=0,
             size=batch_index)
         
         if batch_index == self.size:
