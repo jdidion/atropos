@@ -635,7 +635,11 @@ def print_post_trim_report(summary, outfile):
         _print_title("Destination: {}".format(dest), level=2)
         for source, data in stats.items():
             _print_title("Source", level=3, newline=False)
-            for read, src in enumerate(source, 1):
+            # TODO: When multi-file input is supported, this code will need to
+            # get summary['input']['input_names'][source]
+            for read, src in enumerate(summary['input']['input_names'], 1):
+                if src is None:
+                    continue
                 _print("Read {}: {}".format(read, src))
             _print()
             print_stats_report(data, outfile)
