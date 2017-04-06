@@ -157,7 +157,7 @@ class ReadStatistics(object):
         if self.tile_key_regexp:
             self.tile_base_qualities = BaseNestedDicts(
                 is_qualities=True, quality_base=self.quality_base)
-            self.tile_sequence_qualities = NestedDict(shape="wide")
+            self.tile_sequence_qualities = NestedDict()
     
     # These are attributes that are computed on the fly. If called by name
     # (without leading '_'), __getattr__ uses the method to compute the value

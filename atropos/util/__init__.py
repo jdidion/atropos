@@ -261,7 +261,7 @@ class NestedDict(dict, Mergeable, Summarizable):
     Args:
         shape: The flattened shape: 'long' or 'wide'.
     """
-    def __init__(self, shape="long"):
+    def __init__(self, shape="wide"):
         super().__init__()
         self.shape = shape
     
@@ -291,7 +291,7 @@ class NestedDict(dict, Mergeable, Summarizable):
                 of keys in the child dicts.
         """
         keys1 = sorted(self.keys())
-        if self.shape == "wide":
+        if self.shape == "long":
             return tuple(
                 (key1, key2, value)
                 for key1 in keys1

@@ -6,8 +6,8 @@ and MultiQC reports.
 import functools
 import math
 import textwrap
-from atropos.commands.reports import BaseReportGenerator
 from atropos.util import truncate_string
+from .reports import BaseReportGenerator
 
 INDENT = '  '
 PARAGRAPH = textwrap.TextWrapper()
