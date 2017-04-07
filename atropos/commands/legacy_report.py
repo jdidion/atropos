@@ -6,7 +6,7 @@ and MultiQC reports.
 import functools
 import math
 import textwrap
-from atropos.util import truncate_string
+from atropos.util import truncate_string, weighted_median
 from .reports import BaseReportGenerator
 
 INDENT = '  '
@@ -725,19 +725,19 @@ def print_stats_report(data, outfile):
     _print()
     _print_histogram(
         "Sequence lengths:",
-        data['read1']['lengths'],
-        data['read2']['lengths'])
+        data['read1']['lengths']['hist'],
+        data['read2']['lengths']['hist'])
     _print()
     if 'qualities' in data['read1']:
         _print_histogram(
             "Sequence qualities:",
-            data['read1']['qualities'],
-            data['read2']['qualities'])
+            data['read1']['qualities']['hist'],
+            data['read2']['qualities']['hist'])
         _print()
     _print_histogram(
         "Sequence GC content (%)",
-        data['read1']['gc'],
-        data['read2']['gc'])
+        data['read1']['gc']['hist'],
+        data['read2']['gc']['hist'])
     _print()
     
     if 'tile_sequence_qualities' in data['read1']:
@@ -777,34 +777,6 @@ def print_stats_report(data, outfile):
             "Read 2 per-tile base qualities (%)",
             data['read2']['tile_base_qualities'])
         _print()
-
-def weighted_median(vals, counts):
-    """Compute the median of `vals` weighted by `counts`.
-    
-    Args:
-        vals: Sequence of unique values.
-        counts: Sequence of counts, where each count is the number of times the
-            value at the corresponding position appears in the sample.
-    
-    Returns:
-        The weighted median.
-    """
-    counts_cumsum = functools.reduce(
-        lambda c, x: c + [c[-1] + x], counts, [0])[1:]
-    total = counts_cumsum[-1]
-    if total == 0:
-        return None
-    mid1 = mid2 = (total // 2) + 1
-    if total % 2 == 0:
-        mid1 -= 1
-    val1 = val2 = None
-    for i, val in enumerate(counts_cumsum):
-        if val1 is None and mid1 <= val:
-            val1 = vals[i]
-        if mid2 <= val:
-            val2 = vals[i]
-            break
-    return float(val1 + val2) / 2
 
 def sizeof(*x):
     """Returns the largest string size of all objects in x, where x is a

@@ -3,7 +3,8 @@
 """
 import re
 from atropos.util import (
-    CountingDict, NestedDict, Mergeable, Summarizable, ordered_dict, qual2int)
+    CountingDict, NestedDict, Histogram, Mergeable, Summarizable, ordered_dict, 
+    qual2int)
 
 DEFAULT_TILE_KEY_REGEXP = r"^(?:[^\:]+\:){4}([^\:]+)"
 """Regexp for the default Illumina read name format."""
@@ -69,7 +70,7 @@ class BaseCountingDicts(PositionDicts):
             columns = tuple(qual2int(k, self.quality_base) for k in keys)
         else:
             acgt = ('A','C','G','T')
-            n_val = ('N',) if 'N' in keys else ()
+            n_val = ('N',)
             columns = keys = acgt + tuple(keys - set(acgt + n_val)) + n_val
         return dict(
             columns=columns,
@@ -126,7 +127,7 @@ class ReadStatistics(object):
         # read length distribution
         self.sequence_lengths = Histogram()
         # per-sequence GC percentage
-        self.sequence_gc = CountingDict()
+        self.sequence_gc = Histogram()
         # per-position base composition
         self.bases = BaseCountingDicts()
         
@@ -150,7 +151,7 @@ class ReadStatistics(object):
     
     def _init_qualities(self):
         # per-sequence mean qualities
-        self.sequence_qualities = CountingDict()
+        self.sequence_qualities = Histogram()
         # per-position quality composition
         self.base_qualities = BaseCountingDicts(
             is_qualities=True, quality_base=self.quality_base)

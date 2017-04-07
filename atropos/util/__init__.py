@@ -3,6 +3,7 @@
 from collections import OrderedDict, Iterable
 from datetime import datetime
 import errno
+import functools
 import logging
 import math
 from numbers import Number
@@ -227,13 +228,21 @@ class CountingDict(dict, Mergeable, Summarizable):
     Args:
         sort_by: Whether summary is sorted by key (0) or value (1).
     """
-    def __init__(self, sort_by=0, summary_type='dict'):
+    def __init__(self, keys=None, sort_by=0, summary_type='dict'):
         super().__init__()
         self.sort_by = sort_by
         self.summary_type = summary_type
+        if keys:
+            for key in keys:
+                self.increment(key)
     
     def __getitem__(self, name):
         return self.get(name, 0)
+    
+    def increment(self, key, inc=1):
+        """Increment the count of `key` by `inc`.
+        """
+        self[key] += inc
     
     def merge(self, other):
         if not isinstance(other, CountingDict):
@@ -262,11 +271,19 @@ class Histogram(CountingDict):
         hist = super().summarize()
         return dict(
             hist=hist,
-            summary=self.summarize_hist(hist))
+            summary=self.get_summary_stats())
     
-    def summarize_hist(self, hist):
-        # TODO
-        pass
+    def get_summary_stats(self):
+        """Returns dict with mean, median, and modes of histogram.
+        """
+        values = tuple(self.keys())
+        counts = tuple(self.values())
+        mu0 = weighted_mean(values, counts)
+        return dict(
+            mean=mu0,
+            stdev=weighted_stdev(values, counts, mu0),
+            median=weighted_median(values, counts),
+            modes=weighted_modes(values, counts))
 
 class NestedDict(dict, Mergeable, Summarizable):
     """A dict that initalizes :class:`CountingDict`s for missing keys.
@@ -473,18 +490,67 @@ def enumerate_range(collection, start, end):
         yield (idx, next(itr))
         idx += 1
 
-def mean(data):
+def mean(values):
     """Computes the mean of a sequence of numeric values.
     
     Args:
-        data: Sequence of numeric values.
+        values: Sequence of numeric values.
     
     Returns:
         The mean (floating point).
     """
-    return sum(data) / len(data)
+    if len(values) == 0:
+        raise ValueError("Cannot determine the mode of an empty sequence")
+    return sum(values) / len(values)
 
-def median(data):
+def weighted_mean(values, counts):
+    """Computes the mean of a sequence of numeric values weighted by counts.
+    
+    Args:
+        values: Sequence of numeric values.
+    
+    Returns:
+        The weighted mean (floating point).
+    """
+    datalen = len(values)
+    if datalen == 0:
+        raise ValueError("Cannot determine the mena of an empty sequence")
+    if datalen != len(counts):
+        raise ValueError("'values' and 'counts' must be the same length")
+    return sum(v * c for v, c in zip(values, counts)) / sum(counts)
+
+def stdev(values, mu0=None):
+    """Returns standard deviation of values having the specified mean.
+    """
+    datalen = len(values)
+    if datalen == 0:
+        raise ValueError("Cannot determine the stdev of an empty sequence")
+    if datalen == 1:
+        return 0
+    if mu0 is None:
+        mu0 = mean(values)
+    return math.sqrt(sum((val - mu0) ** 2 for val in values) / len(values))
+
+def weighted_stdev(values, counts, mu0=None):
+    """Returns standard deviation of values having the specified mean weighted
+    by counts.
+    """
+    datalen = len(values)
+    if datalen == 0:
+        raise ValueError("Cannot determine the stdev of an empty sequence")
+    if datalen != len(counts):
+        raise ValueError("'values' and 'counts' must be the same length")
+    if datalen == 1:
+        return 0
+    if mu0 is None:
+        mu0 = weighted_mean(values, counts)
+    return math.sqrt(
+        sum(
+            ((val - mu0) ** 2) * count 
+            for val, count in zip(values, counts)) / 
+        sum(counts))
+
+def median(values):
     """Median function borrowed from python statistics module, and sped up by
     in-place sorting of the array.
     
@@ -494,17 +560,85 @@ def median(data):
     Returns:
         The median (floating point).
     """
-    datalen = len(data)
+    datalen = len(values)
     if datalen == 0:
-        raise ValueError("no median for empty data")
+        raise ValueError("Cannot determine the median of an empty sequence")
     
-    data.sort()
+    values.sort()
     
     idx = datalen // 2
     if datalen % 2 == 1:
-        return data[idx]
+        return values[idx]
     else:
-        return (data[idx - 1] + data[idx]) / 2
+        return (values[idx - 1] + values[idx]) / 2
+
+def weighted_median(values, counts):
+    """Compute the median of `values` weighted by `counts`.
+    
+    Args:
+        values: Sequence of unique values.
+        counts: Sequence of counts, where each count is the number of times the
+            value at the corresponding position appears in the sample.
+    
+    Returns:
+        The weighted median.
+    """
+    datalen = len(values)
+    if datalen == 0:
+        raise ValueError("Cannot determine the median of an empty sequence")
+    if datalen != len(counts):
+        raise ValueError("'values' and 'counts' must be the same length")
+    counts_cumsum = functools.reduce(
+        lambda c, x: c + [c[-1] + x], counts, [0])[1:]
+    total = counts_cumsum[-1]
+    if total == 0:
+        return None
+    mid1 = mid2 = (total // 2) + 1
+    if total % 2 == 0:
+        mid1 -= 1
+    val1 = val2 = None
+    for i, val in enumerate(counts_cumsum):
+        if val1 is None and mid1 <= val:
+            val1 = values[i]
+        if mid2 <= val:
+            val2 = values[i]
+            break
+    return float(val1 + val2) / 2
+
+def modes(values):
+    """Returns a sorted sequence of the modal (i.e. most frequent) values.
+    """
+    datalen = len(values)
+    if datalen == 0:
+        raise ValueError("Cannot determine the mode of an empty sequence")
+    elif datalen == 1:
+        return values
+    return _find_modes(CountingDict(values).items())
+
+def weighted_modes(values, counts):
+    """Returns a sorted sequence of the modal (i.e. most frequent) values
+    weighted by counts.
+    """
+    datalen = len(values)
+    if datalen == 0:
+        raise ValueError("Cannot determine the mode of an empty sequence")
+    if datalen != len(counts):
+        raise ValueError("'values' and 'counts' must be the same length")
+    if datalen == 1:
+        return values
+    return _find_modes(zip(values, counts))
+
+def _find_modes(value_count_iter):
+    sorted_counts = sorted(value_count_iter, key=lambda x: x[1], reverse=True)
+    modal_values = [sorted_counts[0][0]]
+    mode_count = sorted_counts[0][1]
+    for value, count in sorted_counts[1:]:
+        if count == mode_count:
+            modal_values.append(value)
+        else:
+            break
+    modal_values.sort()
+    return modal_values
 
 def truncate_string(string, max_len=100):
     """Shorten string s to at most n characters, appending "..." if necessary.
