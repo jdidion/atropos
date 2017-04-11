@@ -234,11 +234,6 @@ class WriterResultHandler(ResultHandler):
 class TrimSummary(Summary):
     """Summary that adds aggregate values for record and bp stats.
     """
-    def finish(self):
-        if 'total_bp_counts' in self:
-            self['sum_total_bp_count'] = sum(self['total_bp_counts'])
-        super().finish()
-        
     def _post_process_other(self, dict_val, key, value):
         """For trim stats, any value with a name that starts with 'records_'
         will have 'fraction_<var>' computed as value / total_records, and any

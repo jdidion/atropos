@@ -3,7 +3,6 @@
 text-based reports. This will eventually be deprecated in favor of the Jinja2
 and MultiQC reports.
 """
-import functools
 import math
 import textwrap
 from atropos.util import truncate_string, weighted_median
@@ -300,10 +299,10 @@ def print_trim_report(summary, outfile):
         summary['trim'][key]
         for key in ('modifiers', 'filters', 'formatters'))
     adapter_cutter = None
-    if 'AdapterCutter' in modifiers:
-        adapter_cutter = modifiers['AdapterCutter']
-    elif 'InsertAdapterCutter' in modifiers:
-        adapter_cutter = modifiers['InsertAdapterCutter']
+    for modifier_dict in modifiers.values():
+        if 'adapters' in modifier_dict:
+            adapter_cutter = modifier_dict
+            break
     correction_enabled = summary["options"]["correct_mismatches"]
     corrected = None
     trimmers = []

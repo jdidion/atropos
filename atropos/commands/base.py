@@ -96,12 +96,13 @@ class Pipeline(object):
         Args:
             summary: Summary dict to update.
         """
+        total_bp_counts = tuple(sum(b) for b in zip(*self.bp_counts.values()))
         summary.update(
             record_counts=self.record_counts,
             total_record_count=sum(self.record_counts.values()),
             bp_counts=self.bp_counts,
-            total_bp_counts=tuple(
-                sum(b) for b in zip(*self.bp_counts.values())))
+            total_bp_counts=total_bp_counts,
+            sum_total_bp_count=sum(total_bp_counts))
 
 class SingleEndPipelineMixin(object):
     """Mixin for pipelines that implements `handle_record` for single-end data.
@@ -290,8 +291,6 @@ class BaseCommandRunner(object):
             batch_size=self.size,
             max_reads=self.max_reads,
             batches=self.batches)
-        # This is a holding area for top-level derived stats
-        self.summary['derived'] = {}
     
     def run(self):
         """Run the command, wrapping it in a Timing, catching any exceptions,
@@ -329,9 +328,6 @@ class BaseCommandRunner(object):
         if not self.done:
             self.done = True
             self.reader.close()
-        # The summary may contain :class:`Summarizable`s that need to be
-        # replaced with the results of their `summarize` method. In addition,
-        # subclasses may want to add aggregate stats to the summary.
         self.summary.finish()
     
     def load_known_adapters(self):

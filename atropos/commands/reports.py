@@ -1,6 +1,5 @@
 """Interface to report generation.
 """
-from collections import Iterable
 import importlib
 import os
 import sys
@@ -62,7 +61,7 @@ class BaseReportGenerator(object):
         """Get some additional fields that are useful in the report.
         """
         derived = {}
-        derived['avg_sequence_length'] = tuple(
+        derived['mean_sequence_lengths'] = tuple(
             None if bp is None else bp / summary['total_record_count']
             for bp in summary['total_bp_counts'])
         
