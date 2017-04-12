@@ -1,6 +1,6 @@
 # Changes
 
-v1.1.0 (2017.04.12)
+v1.1.1 (2017.04.12)
 -------------------
 
 * New 'qc' command computes read-level statistics.
