@@ -14,7 +14,8 @@ from atropos import align
 from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
 from atropos.util import (
-    MergingDict, NestedDict, CountingDict, Const, reverse_complement)
+    IUPAC_BASES, GC_BASES, MergingDict, NestedDict, CountingDict, Const, 
+    reverse_complement)
 from atropos.util import colorspace as cs
 
 class AdapterType(object):
@@ -219,11 +220,13 @@ class Adapter(object):
             could happen by random chance.
         max_rmp: Maximum random-match probability below which a match is
             considered genuine.
+        gc_content: Expected GC content of sequences.
     """
     def __init__(
             self, sequence, where, max_error_rate=0.1, min_overlap=3,
             read_wildcards=False, adapter_wildcards=True, name=None,
-            indels=True, indel_cost=1, match_probability=None, max_rmp=None):
+            indels=True, indel_cost=1, match_probability=None, max_rmp=None,
+            gc_content=0.5):
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
         self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
@@ -231,13 +234,17 @@ class Adapter(object):
         self.where = where
         self.max_error_rate = max_error_rate
         self.min_overlap = min(min_overlap, len(self.sequence))
-        self.match_probability = None
-        if match_probability and max_rmp is not None:
-            self.match_probability = match_probability
-            self.max_rmp = max_rmp
+        self.match_probability = match_probability
+        self.max_rmp = max_rmp
+        self.gc_content = gc_content
         self.indels = indels
+        seq_set = set(self.sequence)
         self.adapter_wildcards = (
-            adapter_wildcards and not set(self.sequence) <= set('ACGT'))
+            adapter_wildcards and not seq_set <= set('ACGT'))
+        if self.adapter_wildcards and not seq_set <= IUPAC_BASES:
+            raise ValueError(
+                'Invalid character(s) in adapter sequence: {}'.format(
+                    ','.join(seq_set - IUPAC_BASES)))
         self.read_wildcards = read_wildcards
         # redirect trimmed() to appropriate function depending on adapter type
         trimmers = {
@@ -342,7 +349,7 @@ class Adapter(object):
                     self.min_overlap and errors / size <=
                     self.max_error_rate
                 ) and (
-                    self.match_probability is None or
+                    self.max_rmp is None or
                     self.match_probability(matches, size) <= self.max_rmp)):
                 return Match(
                     astart, astop, rstart, rstop, matches, errors,
@@ -386,9 +393,43 @@ class Adapter(object):
             adjacent_base = ''
         self.adjacent_bases[adjacent_base] += 1
         return match.read[:match.rstart]
-
+    
     def __len__(self):
         return len(self.sequence)
+    
+    def random_match_probabilities(self):
+        """Estimate probabilities that this adapter matches a random sequence. 
+        Indels are not taken into account.
+
+        Returns:
+            A list of probabilities the same length as this adapter's sequence,
+            where the value at position 'i' is the probability that i bases of
+            this adapter match a random sequence.
+        """
+        if self._front_flag:
+            seq = self.sequence[::-1]
+        else:
+            seq = self.sequence
+        
+        #matches = 0
+        base_probs = (self.gc_content, (1 - self.gc_content) / 2.0)
+        probabilities = [1.0] + ([0] * len(seq))
+        c_bases = frozenset(GC_BASES if self.adapter_wildcards else 'GC')
+        
+        # TODO: this doesn't work; need to figure out if RandomMatchProbability
+        # can be used for this.
+        #for idx, base in enumerate(seq, 1):
+        #    if base in c_bases:
+        #        matches += 1
+        #    probabilities[idx] = self.match_probability(
+        #        matches, idx, *base_probs)
+        
+        cur_p = 1.0
+        for idx, base in enumerate(seq, 1):
+            cur_p *= base_probs[0 if base in c_bases else 1]
+            probabilities[idx] = cur_p
+
+        return probabilities
     
     def summarize(self):
         """Summarize the activities of this :class:`Adapter`.
@@ -400,7 +441,8 @@ class Adapter(object):
             adapter_class=self.__class__.__name__,
             total_front=total_front,
             total_back=total_back,
-            total=total_front + total_back)
+            total=total_front + total_back,
+            match_probabilities=self.random_match_probabilities())
         
         where = self.where
         assert (
@@ -429,6 +471,9 @@ class ColorspaceAdapter(Adapter):
         args, kwargs: Arguments to pass to :class:`Adapter` constructor.
     """
     def __init__(self, *args, **kwargs):
+        if kwargs.get('adapter_wildcards', False):
+            raise ValueError("Wildcards not supported for colorspace adapters")
+        kwargs['adapter_wildcards'] = False
         super(ColorspaceAdapter, self).__init__(*args, **kwargs)
         has_nucleotide_seq = False
         if set(self.sequence) <= set('ACGT'):
@@ -639,7 +684,11 @@ class LinkedAdapter(object):
         
         stats["where"] = where_int_to_dict(where)
         stats["front_sequence"] = Const(self.front_adapter.sequence)
+        stats["front_match_probabilities"] = Const(
+            self.front_adapter.random_match_probabilities())
         stats["back_sequence"] = Const(self.back_adapter.sequence)
+        stats["back_match_probabilities"] = Const(
+            self.back_adapter.random_match_probabilities())
         stats["front_max_error_rate"] = Const(self.front_adapter.max_error_rate)
         stats["back_max_error_rate"] = Const(self.back_adapter.max_error_rate)
         stats["front_lengths_front"] = self.front_adapter.lengths_front

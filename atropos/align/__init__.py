@@ -119,7 +119,7 @@ class Match(object):
         is not available.
         """
         wildcards = [
-            self.read.sequence[self.rstart + i:self.rstart + i + 1]
+            self.read.sequence[self.rstart + i]
             for i in range(self.length)
             if (self.adapter.sequence[self.astart + i] == wildcard_char and
                 self.rstart + i < len(self.read.sequence))

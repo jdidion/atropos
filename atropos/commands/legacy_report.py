@@ -444,7 +444,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
     # TODO: compute max width for error counts column, print secondary header
     # with number of errors, space-pad each sub-column, think about whether to
     # show trailing zeroes.
-    def print_histogram(data, adapter_length, num_reads, error_rate, errors):
+    def print_histogram(data, adapter_length, num_reads, error_rate, errors, match_probabilities):
         """Print a histogram. Also, print the no. of reads expected to be
         trimmed by chance (assuming a uniform distribution of nucleotides in
         the reads).
@@ -456,12 +456,15 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
             num_reads: total no. of reads.
             error_rate: Max error rate.
             errors: Histogram of actual numbers of errors.
+            match_probabilities: List of random match proabilities for each
+                position in the adapter seqeunce.
         """
         hist = []
         for length, count in data.items():
             # when length surpasses adapter_length, the probability does not
             # increase anymore
-            estimated = num_reads * 0.25 ** min(length, adapter_length)
+            estimated = (
+                num_reads * match_probabilities[min(length, adapter_length)])
             errs = ' '.join(str(err) for err in errors['rows'][length])
             hist.append((
                 length, count, estimated,
@@ -558,12 +561,14 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 _print("Overview of removed sequences (5'):")
                 print_histogram(
                     adapter["lengths_front"], seq_len, total_records,
-                    adapter["max_error_rate"], adapter["errors_front"])
+                    adapter["max_error_rate"], adapter["errors_front"],
+                    adapter['match_probabilities'])
                 _print()
                 _print("Overview of removed sequences (3' or within):")
                 print_histogram(
                     adapter["lengths_back"], seq_len, total_records,
-                    adapter["max_error_rate"], adapter["errors_back"])
+                    adapter["max_error_rate"], adapter["errors_back"],
+                    adapter['match_probabilities'])
             
             elif where_name == "linked":
                 print_error_ranges(front_len, adapter["front_max_error_rate"])
@@ -572,19 +577,22 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 print_histogram(
                     adapter["front_lengths_front"], front_len, total_records,
                     adapter["front_max_error_rate"],
-                    adapter["front_errors_front"])
+                    adapter["front_errors_front"], 
+                    adapter['front_match_probabilities'])
                 _print()
                 _print("Overview of removed sequences at 3' end:")
                 print_histogram(
                     adapter["back_lengths_back"], back_len, total_records,
-                    adapter["back_max_error_rate"], adapter["back_errors_back"])
+                    adapter["back_max_error_rate"], adapter["back_errors_back"],
+                    adapter['back_match_probabilities'])
             
             elif where_name in ("front", "prefix"):
                 print_error_ranges(seq_len, adapter["max_error_rate"])
                 _print("Overview of removed sequences:")
                 print_histogram(
                     adapter["lengths_front"], seq_len, total_records,
-                    adapter["max_error_rate"], adapter["errors_front"])
+                    adapter["max_error_rate"], adapter["errors_front"],
+                    adapter['match_probabilities'])
             
             elif where_name in ("back", "suffix"):
                 print_error_ranges(seq_len, adapter["max_error_rate"])
@@ -593,7 +601,8 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 _print("Overview of removed sequences:")
                 print_histogram(
                     adapter["lengths_back"], seq_len, total_records,
-                    adapter["max_error_rate"], adapter["errors_back"])
+                    adapter["max_error_rate"], adapter["errors_back"],
+                    adapter['match_probabilities'])
     
     if warning:
         _print('WARNING:')

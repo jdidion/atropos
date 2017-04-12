@@ -109,6 +109,10 @@ standard output.
             action='store_const', dest='action', const='mask',
             help="Mask adapters with 'N' characters instead of trimming "
                  "them. (no)")
+        group.add_argument(
+            "--gc-content",
+            type=probability, default=0.5,
+            help="Expected GC content of sequences.")
         
         ## Arguments specific to the choice of aligner
         

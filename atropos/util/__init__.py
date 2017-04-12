@@ -33,6 +33,12 @@ def build_iso_nucleotide_table():
 
 BASE_COMPLEMENTS = build_iso_nucleotide_table()
 
+IUPAC_BASES = frozenset(('X',) + tuple(BASE_COMPLEMENTS.keys()))
+"""Valid IUPAC bases, plus 'X'"""
+
+GC_BASES = frozenset('CGRYSKMBDHVN')
+"""IUPAC bases that include C or G."""
+
 MAGNITUDE = dict(
     G=1E9,
     M=1E6,
@@ -66,7 +72,7 @@ class RandomMatchProbability(object):
             The probability.
         """
         # First see if we have the result in the cache
-        key = (matches, size)
+        key = (matches, size, match_prob)
         prob = self.cache.get(key, None)
         if prob:
             return prob

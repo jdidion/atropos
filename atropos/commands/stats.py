@@ -216,6 +216,8 @@ class ReadStatistics(object):
             if self.qualities:
                 quals = record.qualities
                 # mean read quality
+                # NOTE: we use round here, as opposed to FastQC which uses
+                # floor, resulting in slightly different quality profiles
                 meanqual = round(
                     sum(ord(q) - self.quality_base for q in quals) / seqlen)
                 self.sequence_qualities[meanqual] += 1

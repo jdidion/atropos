@@ -281,8 +281,7 @@ class CommandRunner(BaseCommandRunner):
     
     def __call__(self):
         options = self.options
-        if options.adapter_max_rmp or options.aligner == 'insert':
-            match_probability = RandomMatchProbability()
+        match_probability = RandomMatchProbability()
         
         # Create Adapters
         
@@ -299,10 +298,9 @@ class CommandRunner(BaseCommandRunner):
                 read_wildcards=options.match_read_wildcards,
                 adapter_wildcards=options.match_adapter_wildcards,
                 indels=options.indels, indel_cost=options.indel_cost,
-                cache=adapter_cache
-            )
+                cache=adapter_cache, gc_content=options.gc_content,
+                match_probability=match_probability)
             if options.adapter_max_rmp:
-                parser_args['match_probability'] = match_probability
                 parser_args['max_rmp'] = options.adapter_max_rmp
             adapter_parser = AdapterParser(**parser_args)
             
