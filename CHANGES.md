@@ -1,7 +1,7 @@
 # Changes
 
-v1.1.0 (dev)
--------------
+v1.1.0 (2017.04.12)
+-------------------
 
 * New 'qc' command computes read-level statistics.
 * The 'trim' command can also compute read-level statistic pre- and/or post-trimming using the new '--stats' option.
