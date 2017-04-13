@@ -2,7 +2,6 @@
 scripts=`pwd`
 root=`dirname $scripts`
 mkdir $root/software/build
-automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 # Set this to the location of the hg19 reference multifasta.
 # If this file doesn't exist, the bwameth index won't be built.
 genome_dir=$root/data/reference
@@ -21,26 +20,10 @@ annotations=$genome_dir/gencode.v19.annotation.gtf
 # your local environment. So you would run:
 # python setup.py build_ext -i && python setup.py install
 
-# Install modified ART
-mkdir ../software/build/art &&
-    cd ../software/build/art &&
-    cp ../../art_illumina_src151.tar.gz . &&
-    tar -xzf art_illumina_src151.tar.gz &&
-    cp ../../art_illumina_src151-adapter-enabled.tar.gz . &&
-    tar -xzf art_illumina_src151-adapter-enabled.tar.gz &&
-    cd art_illumina_dir &&
-    for f in config.sub config.guess install-sh depcomp missing INSTALL
-    do
-    rm $f
-    ln -s $automake_dir/$f .
-    done &&
-    ./configure --prefix $root/software &&
-    make &&
-    make install &&
-    cd ../../../scripts
+# TODO: switch to using Docker instances for all these software
 
 # Install version of Atropos on which manuscript is based
-pip install atropos==1.0.23
+pip install atropos==1.1.1
 
 # Install Skewer from conda
 conda install skewer
@@ -54,10 +37,22 @@ cd ../software/build &&
     git checkout 8713481a9a7404cb3e69f7660b94d9847dbe632b &&
     make build_3rdparty &&
     make build_tools_release &&
-    ln -s bin/SeqPurge ../../../bin &&
+    ln -s "$(pwd)/bin/SeqPurge" $root/software/bin &&
     cd ../../../scripts &&
     echo "You may need to 'export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$root/software/bin'"
 
+# Install AdapterRemoval2
+cd ../software/build &&
+  wget -O adapterremoval-2.2.0.tar.gz https://github.com/MikkelSchubert/adapterremoval/archive/v2.2.0.tar.gz &&
+  tar xvzf adapterremoval-2.2.0.tar.gz &&
+  cd adapterremoval-2.2.0 &&
+  make && 
+  ln -s "$(pwd)/build/AdapterRemoval" $root/software/bin &&
+  cd ../../../scripts
+
+# TODO: install bwa, star
+
+# Build the aligner indexes
 if [ -f $genome ]
 then
     if [ ! -f $genome_dir/STAR ]
