@@ -2,7 +2,6 @@
 """Summarize the mapping results of trimmed versus untrimmed reads.
 This requires that both input bams be name-sorted.
 """
-
 import argparse
 from collections import defaultdict
 from common import *
@@ -11,6 +10,21 @@ from glob import glob
 import os
 import tqdm
 from atropos.xopen import open_output
+
+
+# There is the option to compute edit distance between the untrimmed and 
+# trimmed reads. We did not use those metrics in the paper. If you want to 
+# enable the edit distance calculation, you need to install the 'editdistance'
+# pyton library.
+#
+# pip install editdistance
+#
+# # Note: if this doesn't work for you, you'll need to checkout the 
+# editdistance repository and edit setup.py to enable the 'cythonize' command, 
+# which will recompile the cython code for your local environment. So you would 
+# run:
+# 
+# python setup.py build_ext -i && python setup.py install
 
 nuc = ('A','C','G','T','N')
 
