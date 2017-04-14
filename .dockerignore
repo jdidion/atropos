@@ -1,0 +1,8 @@
+.adapters
+.git
+paper
+build
+dist
+*.egg-info
+.cache
+__pycache__

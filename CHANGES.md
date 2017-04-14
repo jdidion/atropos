@@ -1,5 +1,11 @@
 # Changes
 
+v1.1.2 (dev)
+------------
+* Updated Dockefile to use smaller, Alpine-based image.
+* Added Docker image for v1.1.1 to Docker Hub.
+* Updated Travis config to automatically build Docker images for each release.
+
 v1.1.1 (2017.04.12)
 -------------------
 
