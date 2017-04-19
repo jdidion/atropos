@@ -10,12 +10,12 @@
 FROM alpine
 
 # GCC
-RUN apk add --no-cache g++
+RUN apk add --no-cache g++ make git
 
 # Clone ngs-bits
 RUN git clone --recursive https://github.com/relipmoc/skewer && \
     cd skewer && \
     make 
 
-ENTRYPOINT ["/skewer/bin/skewer"]
+ENTRYPOINT ["/skewer/skewer"]
 CMD ["--help"]

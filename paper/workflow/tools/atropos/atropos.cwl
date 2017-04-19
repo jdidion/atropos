@@ -5,6 +5,7 @@ class: CommandLineTool
 requirements:
 - class: DockerRequirement
   dockerPull: jdidion/atropos:1.1.1
+- class: InlineJavascriptRequirement
 
 baseCommand: [atropos, trim]
 
@@ -12,10 +13,10 @@ inputs:
   paired_input1:
     type: File
     format: [
-      http://edamontology.org/format_1929, # FASTA
-      http://edamontology.org/format_1930, # FASTQ
-      http://edamontology.org/format_2572, # BAM
-      http://edamontology.org/format_2573  # SAM
+      "http://edamontology.org/format_1929", # FASTA
+      "http://edamontology.org/format_1930", # FASTQ
+      "http://edamontology.org/format_2572", # BAM
+      "http://edamontology.org/format_2573"  # SAM
     ]
     streamable: true
     inputBinding:
@@ -23,18 +24,18 @@ inputs:
   paired_output1:
     type: File
     format: [
-      http://edamontology.org/format_1929, # FASTA
-      http://edamontology.org/format_1930, # FASTQ
-      http://edamontology.org/format_2572, # BAM
-      http://edamontology.org/format_2573  # SAM
+      "http://edamontology.org/format_1929", # FASTA
+      "http://edamontology.org/format_1930", # FASTQ
+      "http://edamontology.org/format_2572", # BAM
+      "http://edamontology.org/format_2573"  # SAM
     ]
     inputBinding:
       prefix: -o
   paired_input2:
     type: File?
     format: [
-      http://edamontology.org/format_1929, # FASTA
-      http://edamontology.org/format_1930  # FASTQ
+      "http://edamontology.org/format_1929", # FASTA
+      "http://edamontology.org/format_1930"  # FASTQ
     ]
     streamable: true
     inputBinding:
@@ -42,20 +43,23 @@ inputs:
   paired_output2:
     type: File?
     format: [
-      http://edamontology.org/format_1929, # FASTA
-      http://edamontology.org/format_1930  # FASTQ
+      "http://edamontology.org/format_1929", # FASTA
+      "http://edamontology.org/format_1930"  # FASTQ
     ]
     inputBinding:
       prefix: -p
   adapter1:
     type: [File, string]
-    format: http://edamontology.org/format_1929 # FASTA
+    format: "http://edamontology.org/format_1929" # FASTA
     streamable: true
     inputBinding:
       prefix: -a
   adapter2:
-    type: [File?, string?]
-    format: http://edamontology.org/format_1929 # FASTA
+    type:
+    - "null"
+    - File
+    - string
+    format: "http://edamontology.org/format_1929" # FASTA
     streamable: true
     inputBinding:
       prefix: -A
@@ -75,38 +79,38 @@ inputs:
       prefix: --op-order
     default: GACQW
   quality:
-    type: number?
+    type: int?
     inputBinding:
       prefix: -q
     default: 0
   trim_n:
-    type: bool?
+    type: boolean?
     inputBinding:
       prefix: --trim-n
   min_len:
-    type: number?
+    type: int?
     inputBinding:
       prefix: -m
     default: 0
   batch_size:
-    type: number?
+    type: int?
     inputBinding:
       prefix: --batch-size
     default: 1000
   report_file:
     type: File?
     format: [
-      http://edamontology.org/format_2330, # txt
-      http://edamontology.org/format_3464  # JSON
+      "http://edamontology.org/format_2330", # txt
+      "http://edamontology.org/format_3464"  # JSON
     ]
     inputBinding:
       prefix: --report-file
   no_default_adatpers:
-    type: bool?
+    type: boolean?
     inputBinding:
       prefix: --no-default-adapters
   no_cache_adapters:
-    type: bool?
+    type: boolean?
     inputBinding:
       prefix: --no-cache-adapters
   log_level:
@@ -115,16 +119,16 @@ inputs:
       prefix: --log-level
     default: ERROR
   quiet:
-    type: bool?
+    type: boolean?
     inputBinding:
       prefix: --quiet
   error_rate:
-    type: number
+    type: double
     inputBinding:
       prefix: -e
     default: 0.1
   insert_match_error_rate:
-    type: number?
+    type: double?
     inputBinding:
       prefix: --insert-match-error-rate
     default: 0.2
@@ -149,6 +153,6 @@ outputs:
     outputBinding:
       glob: $(inputs.paired_output2)
   report:
-    type: [File?]
+    type: File?
     outputBinding:
       glob: $(inputs.report_file)

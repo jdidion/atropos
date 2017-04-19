@@ -224,7 +224,7 @@ do
     "$SKEWER -m pe -l $MIN_LEN $skewer_extra" \
     "-o ${outdir}/${profile} -z --quiet" \
     "-x $ADAPTER1 -y $ADAPTER2 -t $threads" \
-    "-q $qcut $n $fq1 $fq2 > ${outdir}/${profile}.summary.txt" >> $commands
+    "-q $qcut -n $fq1 $fq2 > ${outdir}/${profile}.summary.txt" >> $commands
   done
 
   # Generate commands to map reads
