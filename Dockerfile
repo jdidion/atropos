@@ -8,7 +8,7 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
         g++ \
         zlib-dev bzip2-dev xz-dev
 
-RUN pip install tqdm pysam
+RUN pip install tqdm pysam jinja2
 
 ADD . /atropos/
 

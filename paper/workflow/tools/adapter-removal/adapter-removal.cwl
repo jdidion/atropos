@@ -4,7 +4,7 @@ class: CommandLineTool
 
 requirements:
 - class: DockerRequirement
-  dockerPull: jdidion/seqpurge
+  dockerPull: jdidion/adapterremoval
 - class: InlineJavascriptRequirement
 
 baseCommand: [AdapterRemoval]

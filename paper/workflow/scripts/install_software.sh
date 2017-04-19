@@ -16,28 +16,6 @@ pip install atropos==1.1.1
 # Install Skewer from conda
 conda install skewer
 
-# Install SeqPurge
-# We tested using the version from GitHub represented by commit
-# 8713481a9a7404cb3e69f7660b94d9847dbe632b
-cd ../software/build &&
-    git clone --recursive https://github.com/imgag/ngs-bits.git &&
-    cd ngs-bits &&
-    git checkout 8713481a9a7404cb3e69f7660b94d9847dbe632b &&
-    make build_3rdparty &&
-    make build_tools_release &&
-    ln -s "$(pwd)/bin/SeqPurge" $root/software/bin &&
-    cd ../../../scripts &&
-    echo "You may need to 'export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$root/software/bin'"
-
-# Install AdapterRemoval2
-cd ../software/build &&
-  wget -O adapterremoval-2.2.0.tar.gz https://github.com/MikkelSchubert/adapterremoval/archive/v2.2.0.tar.gz &&
-  tar xvzf adapterremoval-2.2.0.tar.gz &&
-  cd adapterremoval-2.2.0 &&
-  make && 
-  ln -s "$(pwd)/build/AdapterRemoval" $root/software/bin &&
-  cd ../../../scripts
-
 # TODO: install bwa, star
 
 # Build the aligner indexes
