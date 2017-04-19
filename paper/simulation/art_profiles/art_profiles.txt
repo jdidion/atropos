@@ -1,0 +1,6 @@
+0.2% R1 "The acutal error rate of the profile is 0.0018"
+0.2% R2 "The acutal error rate of the profile is 0.0019"
+0.6% R1 "The acutal error rate of the profile is 0.0063"
+0.6% R2 "The acutal error rate of the profile is 0.0063"
+1.2% R1 "The acutal error rate of the profile is 0.0119"
+1.2% R2 "The acutal error rate of the profile is 0.012"

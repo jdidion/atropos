@@ -2,6 +2,7 @@ tests = tests
 module = atropos
 pytestops =
 #pytestops = "-v -s"
+repo = jdidion/atropos
 
 BUILD = python setup.py build_ext -i && python setup.py install
 TEST = py.test $(pytestops) $(tests)
@@ -48,3 +49,12 @@ clean:
 		   build \
 		   .adapters \
 		   atropos.egg-info
+
+docker:
+	# build
+	docker build -f Dockerfile -t $(repo):$(version) .
+	# add alternate tags
+	docker tag $(repo):$(version) jdidion/atropos:latest
+	# push to Docker Hub
+	docker login -e johndidion@gmail.com -u jdidion && \
+	docker push $(repo)

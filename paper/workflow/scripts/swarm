@@ -1,0 +1,251 @@
+#!/usr/bin/perl -w
+
+eval 'exec /usr/bin/perl -w -S $0 ${1+"$@"}'
+    if 0; # not running under some shell
+# $Id: swarm 7610 2016-01-23 19:25:36Z pchines $
+
+use strict;
+use Pod::Usage;
+use Getopt::Long;
+use GTB::File qw(Open);
+use GTB::Run::SGE;
+
+=head1 NAME
+
+swarm - submit batch jobs to SGE
+
+=head1 SYNOPSIS
+
+Submit each line of batch file as an SGE task on a single CPU, with default
+resources:
+
+    swarm -f batchfile
+
+Submit each line as an SGE task on SL6 nodes on the trek cluster:
+
+    swarm -f batchfile -s SL6
+
+For additional information on options, type "swarm -h -h".
+
+=head1 DESCRIPTION
+
+This script is similar to biowulf's swarm command, and has been written to
+use the same command line options, to the extent possible.  It will take a
+file of commands (one per line) and submit each one as a task of an SGE job
+array (however, see --bundle option below).
+
+SGE options are read from C<~/.sge_request> and other normal SGE files, so be
+sure to add -V and -cwd to this file, if you want them to apply.
+
+Multiple commands may appear on each line, separated by standard semicolons
+or logical conjunctions.  Lines may contain redirection, but should not
+include ampersand to run commands in the background.
+
+The program creates a temporary script in your current working directory to
+control the swarm.  This file will automatically be removed when the last
+task completes.
+
+=cut
+
+our $EMPTY = q{};
+our $SPACE = q{ };
+our $COMMA = q{,};
+our %Opt = (bundle           => 1,
+            'gb-per-process' => 1,
+            modules          => [],
+            'sge-opts'       => $EMPTY,
+           );
+
+GetOptions(\%Opt, qw(bundle=i concurrent=i dryrun file=s gb-per-process=f
+            hold_jid=s jobid modules|m=s name=s
+            quiet resource-list=s sge-opts|sgeopts=s threads-per-process=i
+            help|h+ manual version
+            )) || pod2usage(1);
+if ($Opt{manual})  { pod2usage(verbose => 2); }
+if ($Opt{help})    { pod2usage(verbose => $Opt{help}-1); }
+if ($Opt{version}) { die "swarm, ", q$Revision: 7610 $, "\n"; }
+if (!$Opt{file}) {
+    pod2usage("Must provide batch -file");
+}
+if (@ARGV) {
+    pod2usage("No arguments expected; use -file to specify single batch file");
+}
+if ($Opt{'threads-per-process'} && $Opt{'threads-per-process'} < 2) {
+    debug("Ignoring --threads-per-process $Opt{'threads-per-process'}");
+    delete $Opt{'threads-per-process'};
+}
+my $mem_p = $Opt{'gb-per-process'};
+my $mem_t = $mem_p;
+if ($Opt{'threads-per-process'}) {
+    $mem_t /= $Opt{'threads-per-process'};
+}
+my %opts = parse_opts($Opt{'sge-opts'});
+$opts{'-l'} .= ",mem_free=${mem_t}G,h_vmem=${mem_t}G";
+$opts{'-l'} =~ s/^,//;
+if ($Opt{'resource-list'}) {
+    $opts{'-l'} .= ",$Opt{'resource-list'}";
+}
+if ($Opt{'threads-per-process'}) {
+    $opts{'-pe'} = "make-dedicated $Opt{'threads-per-process'}";
+}
+if (!$Opt{name} && $Opt{file} =~ /\w/) {
+    my $n = $Opt{file};
+    $n =~ s{.*/}{};
+    $n =~ s{^sh\.}{};
+    $n =~ s{\.sh$}{};
+    $n =~ s{[^\w.-]+}{};
+    $Opt{name} = $n;
+}
+if ($Opt{quiet}) {
+    $opts{'-o'} = '/dev/null';
+    $opts{'-e'} = '/dev/null';
+}
+my @m = map { split /$COMMA/ } @{ $Opt{modules} };
+
+my $sge = GTB::Run::SGE->new(dryrun => $Opt{dryrun});
+my $ifh = Open($Opt{file});
+while (my $line = <$ifh>) {
+    $sge->add_task($line);
+}
+my $jid = $sge->submit_swarm(
+        job_name => $Opt{name} || "swarm$$",
+        hold_jid => $Opt{hold_jid},
+        modules  => join($COMMA, @m),
+        sge_opts => \%opts,
+        bundle     => $Opt{bundle},
+        concurrent => $Opt{concurrent},
+        );
+if ($Opt{jobid}) {
+    print "$jid\n";
+}
+
+sub parse_opts {
+    my $opts = shift;
+    my %opts;
+    $opts =~ s/^\s+//;
+    $opts =~ s/\s+$//;
+    return () if $opts eq $EMPTY;
+    my @pairs = split /\s*(-\w+)/, $opts;
+    if ($pairs[0] eq "") {
+        shift @pairs;
+    }
+    elsif ($pairs[0] !~ /^SL6$/i) {
+        die "Error parsing sge-opts: must start with dash, not '$opts'\n";
+    }
+    my $i = 0;
+    while ($i < @pairs) {
+        if ($pairs[$i] =~ /^SL6$/i) {
+            $opts{'-P'} = 'SL6';
+            $opts{'-q'} = 'low6.q';
+            ++$i;
+            next;
+        }
+        elsif ($pairs[$i] !~ /^-/) {
+            die "Error parsing sge-opts: $Opt{'sge-opts'} at '$pairs[$i]'\n";
+        }
+        my $key = $pairs[$i];
+        my $val = $EMPTY;
+        ++$i;
+        while ($i < @pairs && $pairs[$i] !~ /^-/) {
+            $val .= $pairs[$i];
+            ++$i;
+        }
+        $opts{$key} = $val;
+    }
+    return %opts;
+}
+
+=head1 AUTHOR
+
+ Peter Chines <pchines@mail.nih.gov>
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--bundle>
+
+Number of commands to run serially and submit as one task.
+
+=item B<--concurrent> N
+
+Number of tasks to run simultaneously.  Default is no limit (i.e., it will
+depend on availability of resources and SGE queuing).
+
+=item B<--dryrun>
+
+Generate swarm script, but don't submit the job.
+
+=item B<--file> BATCHFILE
+
+Required.  File of commands to be run.  Can be a single dash to indicate that
+the commands should be read from STDIN.
+
+=item B<--gb-per-process> N
+
+Amount of memory to allocate to each command (bundle).  Will generate a
+C<-l mem_free=Xg,h_vmem=Ng> request, where X = Ngb / threads_per_process.
+Note that works around the non-obvious SGE behavior of multiplying the free 
+memory allocation (but not the hard memory limit) by the number of CPUs,
+so just specify the total amount of memory each swarm job will need.
+
+The addition of the h_vmem resource means that your job will be killed if it
+exceeds the allocated virtual memory limit, so choose it carefully.  In
+particular, be sure to set this value 10-20% higher than the java heap size
+(-Xmx) when running java programs.
+
+=item B<--hold_jid> jobid[,jobid2...]
+
+=item B<--hold_jid> job_name[,job_name2]
+
+Hold all swarm job tasks until specified SGE job ends (not necessarily
+successfully).
+
+=item B<--jobid>
+
+Print SGE job id of swarm job to standard output.  Makes it easier to make
+other jobs dependent on completion of this swarm.
+
+=item B<--modules> MOD1[,MOD2]
+
+Environment modules to load before running commands.
+
+=item B<--name> jobname
+
+Specify the SGE job name; otherwise is named swarmXXXX where XXXX is the
+current Unix process id.
+
+=item B<--quiet>
+
+Do not produce files for STDOUT or STDERR produced by tasks.  This is
+a bad idea unless you know there won't be any such output.
+
+=item B<--resource-list> oracle=1,epcr=1
+
+Additional SGE resource requests, separated by commas.
+
+=item B<--sge-opts> "SGE options"
+
+Any additional SGE options you wish to set.  Similar to C<--resource-list>,
+except that this option requires you to specify the full option, e.g.
+C<--sge-opts '-l oracle=1'>.  It is your responsibilty to ensure that these
+options are valid and don't conflict with the auto-generated options.
+
+As a special case, if the value of this option contains the word C<SL6> by
+itself (no leading dash), the appropriate options will be added to submit the
+swarm to the new Scientific Linux 6 nodes on trek.
+
+=item B<--threads-per-process> N
+
+If individual commands require more than one CPU slot, specify how many.
+This will generate a C<-pe make-dedicated N> resource request.
+
+=item B<--help>
+
+=item B<--manual>
+
+Display synoposis.  Two C<-h -h> provides option help.  C<-man> provides
+complete documentation.
+
+=back
+
