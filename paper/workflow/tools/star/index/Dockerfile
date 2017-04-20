@@ -36,10 +36,11 @@ RUN wget --no-parent --no-directories -O /annotations/${FILE} ${URL} && \
     gunzip /annotations/${FILE}
 
 ## build index
-RUN STAR --runMode genomeGenerate --runThreadN ${THREADS} \
+ENV INDEX_CMD "STAR --runMode genomeGenerate --runThreadN ${THREADS} \
         --genomeDir /genomes --genomeFastaFiles /genomes/hg37.fa \
         --sjdbGTFfile /annotations/gencode.v${GENCODE_VERSION}lift37.annotation.gtf \
-        --sjdbOverhang 75
+        --sjdbOverhang 75 --limitGenomeGenerateRAM 16000000000"
+RUN ${INDEX_CMD}
 
 # hg38
 
@@ -56,10 +57,11 @@ RUN wget --no-parent --no-directories -O /annotations/${FILE} ${URL} && \
     gunzip /annotations/${FILE}
 
 # Build star index
-RUN STAR --runMode genomeGenerate --runThreadN ${THREADS} \
+ENV INDEX_CMD "STAR --runMode genomeGenerate --runThreadN ${THREADS} \
         --genomeDir /genomes --genomeFastaFiles /genomes/hg38.fa \
         --sjdbGTFfile /annotations/gencode.v${GENCODE_VERSION}.annotation.gtf \
-        --sjdbOverhang 75
+        --sjdbOverhang 75 --limitGenomeGenerateRAM 16000000000"
+RUN ${INDEX_CMD}
 
 RUN apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) && \
     rm -rf /var/lib/apt/lists/* && \

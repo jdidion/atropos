@@ -29,7 +29,7 @@ ADD . /atropos/
 RUN cd /atropos/ && make install
 
 # Cleanup
-RUN rm -rf /var/cache/apk/* && apk del deps
+RUN rm -rf /var/cache/apk/* /atropos && apk del deps
 
 ENTRYPOINT ["/atropos/bin/atropos"]
 CMD ["--help"]

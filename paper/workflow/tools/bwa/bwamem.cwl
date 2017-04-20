@@ -32,7 +32,7 @@ inputs:
     type: File?
     inputBinding:
       position: 1
-    default: /genomes/hg38
+    default: /genomes/hg38.fa
   reads:
     type: File[]
     inputBinding:

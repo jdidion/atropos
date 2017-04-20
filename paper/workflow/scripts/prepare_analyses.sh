@@ -225,6 +225,19 @@ do
     "-o ${outdir}/${profile} -z --quiet" \
     "-x $ADAPTER1 -y $ADAPTER2 -t $threads" \
     "-q $qcut -n $fq1 $fq2 > ${outdir}/${profile}.summary.txt" >> $commands
+
+    # Rename all fastq files to have a .[12].fq.gz extension
+for file in results/**/skewer*trimmed-pair1.fastq.gz
+do
+    base="${file%%-trimmed-pair1.*}"
+    mv $file $base.1.fq.gz
+done
+for file in results/**/skewer*trimmed-pair2.fastq.gz
+do
+    base="${file%%-trimmed-pair2.*}"
+    mv $file $base.2.fq.gz
+done
+
   done
 
   # Generate commands to map reads
@@ -237,6 +250,11 @@ do
         echo "STAR index does not exist; make sure to build it before running the align commands"
       fi
       
+STAR --runThreadN $threads --genomeDir $genome --readFilesIn Read1 Read2 \
+  --outMultimapperOrder Random --outFilterMultimapNmax 100000 --outSAMmultNmax 1 \
+  --outFileNamePrefix ${outdir}/${name}_rna \
+  --outSAMtype BAM Unsorted --outSAMunmapped Within KeepPairs
+
       echo "./star_align.sh unmapped $base $threads $STAR_INDEX_DIR" >> $align_commands
       echo "$SAMTOOLS sort -n -O bam -@ $threads -o ${outdir}/untrimmed.sorted.bam" \
       "${outdir}/untrimmed_rnaAligned.out.bam" >> $sort_commands

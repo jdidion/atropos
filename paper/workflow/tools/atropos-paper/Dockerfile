@@ -12,37 +12,37 @@
 # Pull Cmd:         docker pull jdidion/atropos_paper
 # Run Cmd:          docker run --rm jdidion/atropos_paper <cmd>
 #################################################################
-FROM python:alpine
+FROM jedisct1/phusion-baseimage-latest
 WORKDIR /tmp
+RUN mkdir /annotations
 
-RUN apk add --no-cache g++ make git wget
+RUN apt-get update && apt-get -y upgrade
+RUN apt-get install -y libc6-dev build-essential tcsh devscripts debhelper git wget
+RUN apt-get clean
 
 ENV GENCODE_VERSION '26'
 
 # Fetch GENCODE GTFs
-RUN wget -o /annotations 'ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_${GENCODE_VERSION}/GRCh37_mapping/gencode.v${GENCODE_VERSION}lift37.annotation.gtf.gz'
-RUN wget -o /annotations 'ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_${GENCODE_VERSION}/gencode.v${GENCODE_VERSION}.annotation.gtf.gz'
+ENV FILE "gencode.v${GENCODE_VERSION}lift37.annotation.gtf.gz"
+RUN wget -o /annotations/${FILE} "ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_${GENCODE_VERSION}/GRCh37_mapping/${FILE}"
+ENV FILE "gencode.v${GENCODE_VERSION}.annotation.gtf.gz"
+RUN wget -o /annotations/${FILE} "ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_${GENCODE_VERSION}/${FILE}"
 
 # bedops
 ENV VERSION 2.4.26
-ENV URL "https://github.com/bedops/bedops/archive/v${VERISON}.tar.gz"
+ENV URL "https://github.com/bedops/bedops/archive/v${VERSION}.tar.gz"
 RUN wget -q -O - $URL | tar -zxv && \
-    cd v${VERSION} && \
+    cd bedops-${VERSION} && \
     make && \
     make install && \
     cp bin/* /usr/local/bin
 
-# ngs toolkit
-ENV VERSION 2.8.2
-ENV URL "https://github.com/ncbi/ngs-tools/archive/${VERSION}.tar.gz"
-RUN wget -q -O - $URL | tar -zxv && \
-    cd ${VERSION} &&
-    ./configure --build-prefix=/usr/local/ &&
-    make &&
-    make install
+# sra-tools
+ENV VERSION 2.8.2-1
+RUN wget "http://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${VERSION}/sratoolkit.${VERSION}-ubuntu64.tar.gz" && \
+    tar zxfv sratoolkit.${VERSION}-ubuntu64.tar.gz && \
+    cp -r sratoolkit.${VERSION}-ubuntu64/bin/* /usr/local/bin
 
-# add my scripts
-ADD ../../scripts /scripts
-
-RUN rm -rf /var/cache/apk/* /tmp/* && \
-    apk del deps
+RUN apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /tmp/*
