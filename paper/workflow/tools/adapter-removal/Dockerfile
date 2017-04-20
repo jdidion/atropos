@@ -15,10 +15,13 @@
 # name. I'm not trying to take credit for anyone's work :)
 #################################################################
 FROM alpine
+WORKDIR /tmp
 RUN apk add --no-cache g++ git make zlib-dev bzip2-dev perl
 RUN git clone --recursive https://github.com/MikkelSchubert/adapterremoval && \
     cd adapterremoval && \
-    make 
+    make && \
+    mv /tmp/adapterremoval/build/AdapterRemoval /usr/local/bin && \
+    rm -Rf /tmp/adapterremoval
 
-ENTRYPOINT ["/adapterremoval/build/AdapterRemoval"]
+ENTRYPOINT ["/usr/local/bin/AdapterRemoval"]
 CMD ["--help"]

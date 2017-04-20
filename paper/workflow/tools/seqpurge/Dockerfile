@@ -15,11 +15,14 @@
 # name. I'm not trying to take credit for anyone's work :)
 #################################################################
 FROM haffmans/cmake-qt5
+WORKDIR /tmp
 RUN apt-get -y install g++ libqt5xmlpatterns5-dev libqt5sql5-mysql
 RUN git clone --recursive https://github.com/imgag/ngs-bits.git && \
     cd ngs-bits && \
     make build_3rdparty && \
-    make build_tools_release
+    make build_tools_release && \
+    mv /ngs-bits/bin/SeqPurge /usr/local/bin && \
+    rm -Rf /tmp/ngs-bits
 
-ENTRYPOINT ["/ngs-bits/bin/SeqPurge"]
+ENTRYPOINT ["/usr/local/bin/SeqPurge"]
 CMD ["--help"]

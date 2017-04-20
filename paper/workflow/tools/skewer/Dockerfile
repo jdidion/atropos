@@ -15,10 +15,13 @@
 # name. I'm not trying to take credit for anyone's work :)
 #################################################################
 FROM alpine
+WORKDIR /tmp
 RUN apk add --no-cache g++ make git
 RUN git clone --recursive https://github.com/relipmoc/skewer && \
     cd skewer && \
-    make 
+    make && \
+    mv /tmp/skewer/skewer /usr/local/bin && \
+    rm -Rf /tmp/skewer
 
-ENTRYPOINT ["/skewer/skewer"]
+ENTRYPOINT ["/usr/local/bin/skewer"]
 CMD ["--help"]

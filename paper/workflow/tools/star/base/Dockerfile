@@ -12,7 +12,6 @@
 # Run Cmd:          docker run --rm jdidion/star STAR
 #################################################################
 FROM alpine
-ENV DEBIAN_FRONTEND noninteractive
 WORKDIR /tmp
 
 # GCC
