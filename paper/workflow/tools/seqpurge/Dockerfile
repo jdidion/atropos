@@ -16,13 +16,18 @@
 #################################################################
 FROM haffmans/cmake-qt5
 WORKDIR /tmp
+# install deps
 RUN apt-get -y install g++ libqt5xmlpatterns5-dev libqt5sql5-mysql
+# install ngs-bits
 RUN git clone --recursive https://github.com/imgag/ngs-bits.git && \
     cd ngs-bits && \
     make build_3rdparty && \
     make build_tools_release && \
     mv /ngs-bits/bin/SeqPurge /usr/local/bin && \
     rm -Rf /tmp/ngs-bits
-
+# cleanup
+RUN apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /tmp/*
 ENTRYPOINT ["/usr/local/bin/SeqPurge"]
 CMD ["--help"]

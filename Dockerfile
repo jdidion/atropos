@@ -24,9 +24,12 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
 # Additional Atropos dependencies
 RUN pip install tqdm pysam jinja2
 
+# Attach project directory and install
 ADD . /atropos/
-
 RUN cd /atropos/ && make install
+
+# Cleanup
+RUN rm -rf /var/cache/apk/* && apk del deps
 
 ENTRYPOINT ["/atropos/bin/atropos"]
 CMD ["--help"]

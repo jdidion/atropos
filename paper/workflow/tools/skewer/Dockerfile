@@ -16,12 +16,16 @@
 #################################################################
 FROM alpine
 WORKDIR /tmp
+# install deps
 RUN apk add --no-cache g++ make git
+# install skewer
 RUN git clone --recursive https://github.com/relipmoc/skewer && \
     cd skewer && \
     make && \
     mv /tmp/skewer/skewer /usr/local/bin && \
     rm -Rf /tmp/skewer
-
+# cleanup
+RUN rm -rf /var/cache/apk/* /tmp/* && \
+    apk del deps
 ENTRYPOINT ["/usr/local/bin/skewer"]
 CMD ["--help"]
