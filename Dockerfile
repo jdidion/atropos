@@ -1,4 +1,17 @@
-FROM snakeego/cython # python3 Alpine image with cython
+#################################################################
+# Dockerfile
+#
+# Software:         Atropos
+# Software Version: 1.1.0
+# Description:      Atropos image
+# Website:          https://github.com/jdidion/atropos
+# Provides:         atropos
+# Base Image:       snakeego/cython
+# Build Cmd:        docker build -f Dockerfile -t jdidion/atropos:latest .
+# Pull Cmd:         docker pull jdidion/atropos
+# Run Cmd:          docker run
+#################################################################
+FROM snakeego/cython
 
 # GCC
 RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
@@ -8,6 +21,7 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
         g++ \
         zlib-dev bzip2-dev xz-dev
 
+# Additional Atropos dependencies
 RUN pip install tqdm pysam jinja2
 
 ADD . /atropos/
