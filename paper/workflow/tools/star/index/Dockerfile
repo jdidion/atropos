@@ -18,14 +18,14 @@ RUN mkdir /genomes
 RUN mkdir /annotations
 ENV GENCODE_VERSION 26
 # Number of threads to use for building index
-ENV THREADS 4
+ENV THREADS 2
 
 RUN apt-get update && apt-get install --yes wget gzip
 
 # hg19/37
 
 ## download reference genome
-RUN wget -r --no-parent --no-directories -A 'chr22*' 'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes' && \
+RUN wget -r --no-parent --no-directories -A 'chr*' 'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes' && \
     zcat *.gz > /genomes/hg37.fa && \
     samtools faidx /genomes/hg37.fa
 
