@@ -2,7 +2,7 @@
 # Dockerfile
 #
 # Software:         bwa and bwa-meth, plus genome indexes
-# Software Version: 0.7.15, 0.10
+# Software Version: 0.7.15|0.10
 # Description:      Alpine bwa and bwa-meth Image with genome indexes
 # Website:          https://github.com/lh3/bwa
 #                   https://github.com/brentp/bwa-meth
