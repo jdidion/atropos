@@ -17,18 +17,6 @@ install:
 test:
 	$(TEST)
 
-release:
-	# tag
-	git tag $(version)
-	# build
-	$(BUILD)
-	$(TEST)
-	python setup.py sdist bdist_wheel
-	# release
-	twine register dist/$(module)-$(version).tar.gz
-	twine upload dist/$(module)-$(version).tar.gz
-	git push origin --tags
-
 docs:
 	make -C docs api
 	make -C docs html
@@ -49,6 +37,19 @@ clean:
 	rm -Rf build
 	rm -Rf .adapters
 	rm -Rf atropos.egg-info
+
+release:
+	$(clean)
+	# tag
+	git tag $(version)
+	# build
+	$(BUILD)
+	$(TEST)
+	python setup.py sdist bdist_wheel
+	# release
+	twine register dist/$(module)-$(version).tar.gz
+	twine upload dist/$(module)-$(version).tar.gz
+	git push origin --tags
 
 docker:
 	# build
