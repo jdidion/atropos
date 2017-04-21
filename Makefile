@@ -40,15 +40,15 @@ lint:
 	pylint $(module)
 
 clean:
-	rm -Rf __pycache__ \
-	       **/__pycache__/* \
-		   **/*.c \
-		   **/*.so \
-		   **/*.pyc \
-		   dist \
-		   build \
-		   .adapters \
-		   atropos.egg-info
+	rm -Rf __pycache__
+	rm -Rf **/__pycache__/*
+	rm -Rf **/*.c
+	rm -Rf **/*.so
+	rm -Rf **/*.pyc
+	rm -Rf dist
+	rm -Rf build
+	rm -Rf .adapters
+	rm -Rf atropos.egg-info
 
 docker:
 	# build
