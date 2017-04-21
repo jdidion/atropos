@@ -18,25 +18,13 @@ FROM jdidion/bwabase
 WORKDIR /tmp
 
 RUN apk --update add wget
-RUN mkdir /genomes
-
-# Fetch hg19/37
-RUN wget -r --no-parent --no-directories -A 'chr*' 'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes' && \
-    zcat *.gz > /genomes/hg37.fa && \
-    samtools faidx /genomes/hg37.fa
-
-# Fetch hg38
-RUN wget -O hg38.fa.gz 'http://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz' && \
-    gunzip hg38.fa.gz && \
-    mv hg38.fa /genomes && \
-    samtools faidx /genomes/hg38.fa
 
 # Build bwa indexes
 RUN bwa index /genomes/hg37.fa
-RUN bwa index /genomes/hg38.fa
-
 # Build bwa-meth indexes
 RUN bwameth.py index /genomes/hg37.fa
+
+RUN bwa index /genomes/hg38.fa
 RUN bwameth.py index /genomes/hg38.fa
 
 RUN rm -rf /var/cache/apk/* /tmp/* && \

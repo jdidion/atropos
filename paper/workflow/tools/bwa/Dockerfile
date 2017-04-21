@@ -8,10 +8,10 @@
 #                   https://github.com/brentp/bwa-meth
 # Provides:         bwa|bwa-meth.py
 # Base Image:       alpine:python
-# Build Cmd:        docker build -t jdidion/bwabase:latest .
-# Pull Cmd:         docker pull jdidion/bwabase
-# Run Cmd:          docker run --rm jdidion/bwabase bwa
-#                   docker run --rm jdidion/bwabase python bwa-meth.py
+# Build Cmd:        docker build -t jdidion/bwa:latest .
+# Pull Cmd:         docker pull jdidion/bwa
+# Run Cmd:          docker run --rm jdidion/bwa bwa
+#                   docker run --rm jdidion/bwa python bwa-meth.py
 #################################################################
 # python3 Alpine image with gcc
 FROM python:alpine
