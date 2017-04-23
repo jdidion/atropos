@@ -36,3 +36,5 @@ paper/data/real/
 paper/data/rna/
 paper/data/wgbs/
 .cache
+*.gtf
+*.fa

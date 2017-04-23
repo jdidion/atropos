@@ -9,5 +9,11 @@
 
 /* Parameters
  * ----------
- * The following are exptected to be defined externally:
- * - 
+ * The following are expected to be defined externally:
+ * - min_len: minimum read length
+ * - batch_size: read batch size
+ * - quals: quality thresholds for trimming
+ * - aligners: Atropos aligner algorithms to use
+ * - adapter1, adapter2: Adapter sequence
+ * - extra: map of extra arguments for each program
+ */
