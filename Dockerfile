@@ -31,5 +31,7 @@ RUN cd /atropos/ && make install
 # Cleanup
 RUN rm -rf /var/cache/apk/* /atropos && apk del deps
 
-ENTRYPOINT ["/atropos/bin/atropos"]
-CMD ["--help"]
+# Entrypoints don't work well with NextFlow - it wants to execute commands as
+# if they were in the path.
+#ENTRYPOINT ["/atropos/bin/atropos"]
+#CMD ["--help"]

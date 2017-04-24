@@ -22,7 +22,8 @@ RUN git clone --recursive https://github.com/MikkelSchubert/adapterremoval && \
     make && \
     mv /tmp/adapterremoval/build/AdapterRemoval /usr/local/bin && \
     rm -Rf /tmp/adapterremoval
-RUN rm -rf /var/cache/apk/* /tmp/* && \
-    apk del deps
-ENTRYPOINT ["/usr/local/bin/AdapterRemoval"]
-CMD ["--help"]
+RUN rm -rf /var/cache/apk/* /tmp/*
+# Entrypoints don't work well with NextFlow - it wants to execute commands as
+# if they were in the path.
+#ENTRYPOINT ["/usr/local/bin/AdapterRemoval"]
+#CMD ["--help"]

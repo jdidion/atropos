@@ -130,6 +130,7 @@ do
     atropos_extra='--insert-match-error-rate 0.3 -e 0.2 --correct-mismatches liberal -w 15,30,25'
     seqpurge_extra='-ec -match_perc 70'
     skewer_extra='-r 0.3'
+    adapterremoval_extra='--mm <err rate>'
     ADAPTER1="AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATATCGTATGCCGTCTTCTGCTTG" # Custom?
     ADAPTER2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq Universal
   elif [ "$err" == "real_wgbs" ]

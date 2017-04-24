@@ -29,5 +29,7 @@ RUN git clone --recursive https://github.com/imgag/ngs-bits.git && \
 RUN apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /tmp/*
-ENTRYPOINT ["/usr/local/bin/SeqPurge"]
-CMD ["--help"]
+# Entrypoints don't work well with NextFlow - it wants to execute commands as
+# if they were in the path.
+#ENTRYPOINT ["/usr/local/bin/SeqPurge"]
+#CMD ["--help"]
