@@ -37,4 +37,4 @@ paper/data/rna/
 paper/data/wgbs/
 .cache
 *.gtf
-*.fa
+hg3*.fa*
