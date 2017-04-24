@@ -38,3 +38,8 @@ paper/data/wgbs/
 .cache
 *.gtf
 hg3*.fa*
+**/star-index/*.txt
+**/star-index/*.tab
+**/star-index/Genome
+**/star-index/SA
+**/star-index/SAindex
