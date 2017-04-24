@@ -68,6 +68,10 @@ atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCC
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
+## Publication
+
+A [preprint](https://peerj.com/preprints/2452/) is available and the submitted paper is currently under review. The results in the paper can be fully reproduced using the workflow defined in the [paper](paper/README.md) directory.
+
 ## Developers
 
 We welcome any contributions via GitHub issues and pull requests. See the  [documentation](https://atropos.readthedocs.org/) for style guidelines and best practices. We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.
@@ -136,9 +140,9 @@ We welcome any contributions via GitHub issues and pull requests. See the  [docu
 * Implement additional alternate alignment algorithms.
 * Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
 * Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
-* Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcomming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
+* Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcoming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
 
-While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stablized as of version 2.0, which is planned for sometime in 2017.
+While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2017.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 

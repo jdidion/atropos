@@ -10,6 +10,8 @@
 # Huang et al. 2012, http://bioinformatics.oxfordjournals.org/content/28/4/593.full
 # Jiang et al. 2014, http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-182
 
+# TODO: create docker image for Art+R+adjust_error_profiles.R
+
 # Generate error-shifted read quality profiles
 for err in 005 01
 do
@@ -27,7 +29,6 @@ sd_frag=100
 cov=0.1
 
 # Simulate reads
-mkdir ../data/simulated
 for prof in 001 005 01
 do
   # NOTE: REF_GENOME is externally defined to point to the fasta file for hg19/GRCh37.
@@ -35,12 +36,12 @@ do
   art/bin/art_illumina -i $REF_GENOME -p -l $read_len -f $cov -m $mean_frag -s $sd_frag -rs $seed -o sim_${prof} \
     -1 art_profiles/HiSeq2500L125R1_${prof}.txt \
     -2 art_profiles/HiSeq2500L125R2_${prof}.txt
-  # move and rename files
+  # rename files
   for mate in 1 2
   do
     for ext in aln fq
     do
-      mv sim_${prof}${mate}.${ext} ../data/simulated/sim_${prof}.${mate}.${ext}
+      mv sim_${prof}${mate}.${ext} sim_${prof}.${mate}.${ext}
     done
   done
 done

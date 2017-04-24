@@ -1,6 +1,7 @@
 scripts=".."
 root=`pwd`
 mkdir $root/software/build
+# assuming automake was installed using homebrew
 automake_dir=/usr/local/Cellar/automake/1.15/share/automake-1.15
 
 # Install modified ART
