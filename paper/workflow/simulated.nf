@@ -26,6 +26,7 @@ params.adapter2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 params.minLength = 25
 params.batchSize = 5000
 params.dataDir = '.'
+params.dataContainer = "jdidion/atropos_simulated"
 
 // atropos-specific variables
 params.aligners = [ 'insert', 'adapter' ]
@@ -66,11 +67,13 @@ process Extract {
 
 process Atropos {
   tag { name }
+  cpus { threads }
 
   input:
   each err from params.errorRates
   each aligner from params.aligners
   each qcut from params.quals
+  each threads from params.threads
   val compressionArg { compression == "nowriter" ? "--no-writer-process" : "--compression $compression" }
   val name from "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}"
   val fqPrefix from "sim_${err}"
@@ -99,10 +102,12 @@ process Atropos {
 
 process Skewer {
   tag { name }
+  cpus { threads }
 
   input:
   each err from params.errorRates
   each qcut from params.quals
+  each threads from params.threads
   val name from "skewer_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
@@ -127,10 +132,12 @@ process Skewer {
 
 process SeqPurge {
   tag { name }
+  cpus { threads }
 
   input:
   each err from params.errorRates
   each qcut from params.quals
+  each threads from params.threads
   val name from "seqpurge_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
@@ -155,10 +162,12 @@ process SeqPurge {
 
 process AdapterRemoval {
   tag { name }
+  cpus { threads }
 
   input:
   each err from params.errorRates
   each qcut from params.quals
+  each threads from params.threads
   val name from "adapterremoval_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"

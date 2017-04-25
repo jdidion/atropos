@@ -6,7 +6,7 @@ We have created [Docker](https://www.docker.com/) images for all of the software
 
 Our workflows are written in [Nextflow](https://www.nextflow.io/index.html), primarily because it supports both Docker and Singularity, which we need to run benchmarks on both desktop and RedHat-based HPC cluster. We also provide [CWL](http://www.commonwl.org/) tool definitions to simplify the development of alternate workflows.
 
-Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or simulated DNA-Seq). We provide the configuration files we used for both the local and cluster executions. Our cluster runs SGE, so you may need to alter the cluster configuration files for your environment.
+Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or simulated DNA-Seq). We provide a configuration file with profiles we used for both the local and cluster executions. Our cluster runs SGE, so you may need to alter the cluster configuration files for your environment.
 
 # 1. Install software
 
@@ -20,12 +20,16 @@ Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or 
 
 # 2. Simulate reads (optional)
 
-There are already 3 simulated data sets. If you'd like to re-create these, in the workflow/data/simulated directory run:
+There are already 3 simulated data sets. If you'd like to re-create these or add additional data sets, in the containers/data/simulated directory run:
 
     ./install.sh
     ./simulate_reads.sh
 
-# 3. Run the workflows
+# 3. Build containers (optional)
+
+All of the containers defined in the 'containers' subdirectory have already been built and pushed to Docker hub. For full reproducibility, you are free to build the containers yourself, but you'll need to update the scripts to pull them from your own Docker Hub repository.
+
+# 4. Run the workflows
 
 In the 'workflow' directory, run:
 
