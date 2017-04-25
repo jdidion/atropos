@@ -9,7 +9,10 @@
 # Base Image:       snakeego/cython
 # Build Cmd:        docker build -f Dockerfile -t jdidion/atropos:latest .
 # Pull Cmd:         docker pull jdidion/atropos
-# Run Cmd:          docker run
+# Run Cmd:          docker run --rm jdidion/atropos
+# Note: This Dockerfile is for building a container from a copy of the
+# git repository. If you want to build a container without cloning the
+# repo, use the Dockerfile in paper/containers/tools/atropos-paper instead.
 #################################################################
 FROM snakeego/cython
 
@@ -29,9 +32,9 @@ ADD . /atropos/
 RUN cd /atropos/ && make install
 
 # Cleanup
-RUN rm -rf /var/cache/apk/* /atropos && apk del deps
+RUN rm -rf /var/cache/apk/* /atropos
 
 # Entrypoints don't work well with NextFlow - it wants to execute commands as
 # if they were in the path.
-#ENTRYPOINT ["/atropos/bin/atropos"]
-#CMD ["--help"]
+ENTRYPOINT ["/usr/local/bin/atropos"]
+CMD ["--help"]

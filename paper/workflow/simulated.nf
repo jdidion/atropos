@@ -3,19 +3,31 @@
 /* Atropos paper workflow for simulated DNA-Seq reads
  * --------------------------------------------------
  * Configuration is externalized into separate files for desktop and cluster.
- * The main difference is that Docker images are used on desktop, verusus
- * Singularity on the cluster.
- */
-
-/* Parameters
+ * The main difference is that Docker is used to manage images on desktop, 
+ * verusus Singularity on the cluster.
+ *
+ * The read data is contained within a Docker container. During local execution, 
+ * we attach that container directly to the tool container (using --from-volumes 
+ * <data container>). Singularity does not allow for this, so when running on 
+ * the cluster we use a separate process to unpack the data from the container 
+ * into $params.storeDir. Note that storeDir persists beyond the end of the 
+ * script, so we delete it in the shell script that runs the workflow.
+ *
+ * Parameters
  * ----------
  * The following are expected to be defined in params:
+ * - threadCounts: The numbers of threads (cpus) to test
+ * - errorRates: The error rates of the simulated data sets
  * - minLength: minimum read length
  * - batchSize: read batch size
  * - quals: quality thresholds for trimming
- * - aligners: Atropos aligner algorithms to use
+ * - aligners: Atropos aligner algorithms to test
+ * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
  * - dataDir: The local directory where data from the container will be copied
+ *   (for Singularity execution only)
+ * - dataContainer: The name of the Docker Hub repository from which the data
+ *   data container should be pulled.
  */
 
 // variables for all tools
@@ -32,19 +44,8 @@ params.dataContainer = "jdidion/atropos_simulated"
 params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
-err = Channel.from(params.errorRates)
-
-/* The read data is contained within a Docker container 
- * (jdidion/atropos_simulated). During local execution, we attach that container
- * directly to the tool container (using --from-volumes <data container>).
- * Singularity does not allow for this, so when running on the cluster we use a 
- * separate process to unpack the data from the container into $params.storeDir.
- * Note that storeDir persists beyond the end of the script, so we delete it in 
- * the shell script that runs the workflow.
- */
-
 process Extract {
-  storeDir "$params.dataDir"
+  storeDir { params.dataDir }
   
   when:
   singularity.enabled is true
@@ -65,25 +66,33 @@ process Extract {
   """
 }
 
+// channel for output summaries
+results = Channel.create()
+// channel for outputs from /usr/bin/time
+perfs = Channel.create()
+
 process Atropos {
   tag { name }
   cpus { threads }
 
   input:
+  each threads from params.threadCounts
   each err from params.errorRates
-  each aligner from params.aligners
   each qcut from params.quals
-  each threads from params.threads
+  each aligner from params.aligners
+  each compression from params.compressionSchemes
+  
   val compressionArg { compression == "nowriter" ? "--no-writer-process" : "--compression $compression" }
   val name from "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
   file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
-
+  
   output:
   file "${name}.1.fq.gz" into output1
   file "${name}.2.fq.gz" into output2
   file "${name}.report.txt" into reportFile
+  stdout timing
 
   script:
   """
@@ -98,6 +107,20 @@ process Atropos {
     --insert-match-error-rate 0.20 -e 0.10 \
     "$compressionArg -pe1 $input1 -pe2 $input2
   """
+  
+  timing.onComplete {
+    perfs << [ 
+      "name" : name,
+      "value" : it
+    ]
+  }
+
+  afterScript {
+    results << [ 
+      "name" : name,
+      "trimmed" : [ output1, output2 ]
+    ]
+  }
 }
 
 process Skewer {
@@ -105,13 +128,15 @@ process Skewer {
   cpus { threads }
 
   input:
+  each threads from params.threadCounts
   each err from params.errorRates
   each qcut from params.quals
-  each threads from params.threads
+
   val name from "skewer_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
   file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
+  stdout timing
 
   output:
   file "${name}-trimmed-pair1.fastq.gz" into output1
@@ -126,8 +151,21 @@ process Skewer {
     -q $qcut -n $input1 $input2
   """
 
-  output1.onComplete: { it.renameTo("${name}.1.fq.gz") }
-  output2.onComplete: { it.renameTo("${name}.2.fq.gz") }
+  timing.onComplete {
+    perfs << [ 
+      "name" : name,
+      "value" : it
+    ]
+  }
+
+  afterScript {
+    output1.renameTo("${name}.1.fq.gz")
+    output2.renameTo("${name}.2.fq.gz")
+    results << [ 
+      "name" : name,
+      "trimmed" : [ "${name}.1.fq.gz", "${name}.2.fq.gz" ]
+    ]
+  }
 }
 
 process SeqPurge {
@@ -135,9 +173,10 @@ process SeqPurge {
   cpus { threads }
 
   input:
+  each threads from params.threadCounts
   each err from params.errorRates
   each qcut from params.quals
-  each threads from params.threads
+
   val name from "seqpurge_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
@@ -147,6 +186,7 @@ process SeqPurge {
   file "${name}.1.fq.gz" into output1
   file "${name}.2.fq.gz" into output2
   file "${name}.report.txt" into reportFile
+  stdout timing
 
   script:
   """
@@ -158,6 +198,20 @@ process SeqPurge {
     -task.cpus $task.cpus -prefetch $params.batchSize \
     -r 0.20 -summary $reportFile
   """
+
+  timing.onComplete {
+    perfs << [ 
+      "name" : name,
+      "value" : it
+    ]
+  }
+
+  afterScript {
+    results << [ 
+      "name" : name,
+      "trimmed" : [ output1, output2 ]
+    ]
+  }
 }
 
 process AdapterRemoval {
@@ -165,9 +219,10 @@ process AdapterRemoval {
   cpus { threads }
 
   input:
+  each threads from params.threadCounts
   each err from params.errorRates
   each qcut from params.quals
-  each threads from params.threads
+
   val name from "adapterremoval_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
@@ -177,14 +232,60 @@ process AdapterRemoval {
   file "${name}.1.fq.gz" into output1
   file "${name}.2.fq.gz" into output2
   file "${name}.report.txt" into reportFile
+  stdout timing
 
   script:
   """
-  /usr/bin/time -v AdapterRemoval \
+  usr/bin/time -v AdapterRemoval \
     --file1 $input1 --file2 $input2 \
     --output1 $output1 --output2 $output2 --gzip \
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut \
     --minLengthgth $params.minLength --task.cpus $task.cpus
+  """
+
+  timing.onComplete {
+    perfs << [ 
+      "name" : name,
+      "value" : it
+    ]
+  }
+
+  afterScript {
+    results << [ 
+      "name" : name,
+      "trimmed" : [ output1, output2 ]
+    ]
+  }
+}
+
+process Accuracy {
+  input:
+  each result from results
+
+  output:
+  file "${result.name}.txt" into resultFile
+  file "${result.name}.summary.txt" into summaryFile
+  file "${result.name}.table.txt" into tableFile
+
+  script:
+  """
+  python scripts/summarize_simulated_trimming_accuracy.py \
+    -a1 ${params.dataDir}/${fqPrefix}.1.aln \
+    -a2 ${params.dataDir}/${fqPrefix}.2.aln \
+    -r1 ${result.trimmed[0]} -r2 ${result.trimmed[1]} \
+    --name ${result.name} \
+    -o $resultFile -s $summaryFile -t $tableFile
+  """
+}
+
+process Timing {
+  input:
+  stdin timingInfo from perfs
+
+  output:
+
+  script:
+  """
   """
 }

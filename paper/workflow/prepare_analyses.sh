@@ -334,13 +334,6 @@ STAR --runThreadN $threads --genomeDir $genome --readFilesIn Read1 Read2 \
   fi
 done
 
-chmod +x $run
-chmod +x $commands
-chmod +x $align_commands
-chmod +x $sort_commands
-chmod +x $bedops_commands
-chmod +x $summarize_commands
-chmod +x $timing_commands
 
 if [ "$mode" == "local" ]
 then

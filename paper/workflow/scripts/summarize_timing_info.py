@@ -1,14 +1,6 @@
 #!/usr/bin/env python
 """Summarize the timing information output by the command scripts into a nicely
 formatted tsv.
-
-For analyses run locally, there will be a input file:
-
-    python summarize_timing_info.py -i timing_log.txt -o timing_summary.txt
-
-For analyses run on the cluster, there will be one stderr log for each process:
-
-    cat commands_t16.e* | python summarize_timing_info.py -i - -o timing_summary.txt
 """
 
 from argparse import ArgumentParser

@@ -25,8 +25,7 @@ RUN git clone --recursive https://github.com/relipmoc/skewer && \
     mv /tmp/skewer/skewer /usr/local/bin && \
     rm -Rf /tmp/skewer
 # cleanup
-RUN rm -rf /var/cache/apk/* /tmp/* && \
-    apk del deps
+RUN rm -rf /var/cache/apk/* /tmp/*
 # Entrypoints don't work well with NextFlow - it wants to execute commands as
 # if they were in the path.
 #ENTRYPOINT ["/usr/local/bin/skewer"]
