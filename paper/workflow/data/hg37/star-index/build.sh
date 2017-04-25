@@ -15,10 +15,10 @@ INDEX_CMD="STAR --runMode genomeGenerate --runThreadN ${THREADS} \
 # create a data volume from the reference genome image
 docker create -v /data/reference/hg37 --name hg37 jdidion/hg37_reference && \
 # build the STAR index
-mkdir star-index \
+mkdir index && \
 docker run \
     # create a local volume to store the output
-    -v $(pwd)/star-index:/data/index/star/hg37 \
+    -v $(pwd)/index:/star-index:/data/index/star/hg37 \
     # bind reference data volume
     --volumes-from hg37 \
     # run bwa mem from bwa image

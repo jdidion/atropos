@@ -13,4 +13,4 @@
 #################################################################
 # Using jdidion/bwabase as the base image
 FROM jdidion/bwa
-ADD star-index/* /data/index/star/hg38/
+ADD index/* /data/index/star/hg38/
