@@ -7,9 +7,10 @@
 # create a data volume from the reference genome image
 docker create -v /data/reference/hg38 --name hg38 jdidion/hg38_reference && \
 # build the bwa index
+mkdir index && ]
 docker run \
     # create a local volume to store the output
-    -v $(pwd):/data/index/bwa/hg38 \
+    -v $(pwd)/index:/data/index/bwa/hg38 \
     # bind reference data volume
     --volumes-from hg38 \
     # run bwa mem from bwa image

@@ -13,4 +13,4 @@
 #################################################################
 # Using jdidion/bwabase as the base image
 FROM jdidion/bwabase
-ADD hg38* /data/index/bwameth/hg38/
+ADD index/* /data/index/bwameth/hg38/
