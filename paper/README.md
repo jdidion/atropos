@@ -33,7 +33,7 @@ All of the containers defined in the 'containers' subdirectory have already been
 
 In the 'workflow' directory, run:
 
-    ./run-<mode>-workflows.sh
+    ./run-workflows.sh <mode>
 
 Where <mode> is either 'local' or 'cluster'. Note that the first time you run this it will download several Docker images requiring ~XX GB of disk space.
 

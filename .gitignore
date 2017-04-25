@@ -43,3 +43,5 @@ hg3*.fa*
 **/star-index/index/Genome
 **/star-index/index/SA
 **/star-index/index/SAindex
+.nextflow*
+**/work/

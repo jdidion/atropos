@@ -37,7 +37,6 @@ params.adapter1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGC
 params.adapter2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 params.minLength = 25
 params.batchSize = 5000
-params.dataDir = '.'
 params.dataContainer = "jdidion/atropos_simulated"
 
 // atropos-specific variables
@@ -48,7 +47,7 @@ process Extract {
   storeDir { params.dataDir }
   
   when:
-  singularity.enabled is true
+  workflow.profile == 'cluster'
 
   input:
   each err from params.errorRates
@@ -72,7 +71,7 @@ results = Channel.create()
 perfs = Channel.create()
 
 process Atropos {
-  tag { name }
+  tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
 
   input:
@@ -82,16 +81,13 @@ process Atropos {
   each aligner from params.aligners
   each compression from params.compressionSchemes
   
-  val compressionArg { compression == "nowriter" ? "--no-writer-process" : "--compression $compression" }
-  val name from "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}"
-  val fqPrefix from "sim_${err}"
-  file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
-  file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
+  file input1 from "${params.dataDir}/${task.ext.fqPrefix}.1.fq"
+  file input2 from "${params.dataDir}/${task.ext.fqPrefix}.2.fq"
   
   output:
-  file "${name}.1.fq.gz" into output1
-  file "${name}.2.fq.gz" into output2
-  file "${name}.report.txt" into reportFile
+  file "${task.tag}.1.fq.gz" into output1
+  file "${task.tag}.2.fq.gz" into output2
+  file "${task.tag}.report.txt" into reportFile
   stdout timing
 
   script:
@@ -105,7 +101,7 @@ process Atropos {
     "-o $output1 -p $output2 \
     "--log-level ERROR --quiet \
     --insert-match-error-rate 0.20 -e 0.10 \
-    "$compressionArg -pe1 $input1 -pe2 $input2
+    "$task.ext.compressionArg -pe1 $input1 -pe2 $input2
   """
   
   timing.onComplete {
@@ -124,7 +120,7 @@ process Atropos {
 }
 
 process Skewer {
-  tag { name }
+  tag { "skewer_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
 
   input:
@@ -132,7 +128,6 @@ process Skewer {
   each err from params.errorRates
   each qcut from params.quals
 
-  val name from "skewer_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
   file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
@@ -146,7 +141,7 @@ process Skewer {
   """
   /usr/bin/time -v skewer \
     -m pe -l $params.minLength -match_perc 80 \
-    -o $name -z --quiet \
+    -o $task.tag -z --quiet \
     -x $params.adapter1 -y $params.adapter2 -t $task.cpus \
     -q $qcut -n $input1 $input2
   """
@@ -169,7 +164,7 @@ process Skewer {
 }
 
 process SeqPurge {
-  tag { name }
+  tag { "seqpurge_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
 
   input:
@@ -177,7 +172,6 @@ process SeqPurge {
   each err from params.errorRates
   each qcut from params.quals
 
-  val name from "seqpurge_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
   file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
@@ -215,7 +209,7 @@ process SeqPurge {
 }
 
 process AdapterRemoval {
-  tag { name }
+  tag { "adapterremoval_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
 
   input:
@@ -223,7 +217,6 @@ process AdapterRemoval {
   each err from params.errorRates
   each qcut from params.quals
 
-  val name from "adapterremoval_${task.cpus}_${err}_q${qcut}"
   val fqPrefix from "sim_${err}"
   file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
   file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
@@ -284,8 +277,10 @@ process Timing {
   stdin timingInfo from perfs
 
   output:
+  file "${process.executor}.timing.tex" into table
 
   script:
   """
+  python scripts/summarize_timing_info.py -o $table -f latex
   """
 }
