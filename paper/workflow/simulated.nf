@@ -24,10 +24,6 @@
  * - aligners: Atropos aligner algorithms to test
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
- * - dataDir: The local directory where data from the container will be copied
- *   (for Singularity execution only)
- * - dataContainer: The name of the Docker Hub repository from which the data
- *   data container should be pulled.
  */
 
 // variables for all tools
@@ -37,7 +33,6 @@ params.adapter1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGC
 params.adapter2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 params.minLength = 25
 params.batchSize = 5000
-params.dataContainer = "jdidion/atropos_simulated"
 
 // atropos-specific variables
 params.aligners = [ 'insert', 'adapter' ]
@@ -45,44 +40,41 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process Extract {
   container true
-  storeDir { params.dataDir }
   
   input:
   each err from params.errorRates
-  each pair from {[1, 2]}
-  each ext from exts {['fq', 'aln']}
   
   output:
-  file "sim_${err}.${pair}.${ext}" into destFile
+  set err, "sim_${err}.{1,2}.fq", "sim_${err}.{1,2}.aln" into simReads
   
   script:
   """
-  jdidion/atropos_simulated cp /data/simulated/sim_${err}.${pair}.${ext} .
+  jdidion/atropos_simulated cp \
+    /data/simulated/sim_${err}.1.fq  \
+    /data/simulated/sim_${err}.2.fq  \
+    /data/simulated/sim_${err}.1.aln \
+    /data/simulated/sim_${err}.2.aln \
+    .
   """
 }
 
-// channel for output summaries
-results = Channel.create()
 // channel for outputs from /usr/bin/time
 perfs = Channel.create()
 
 process Atropos {
   tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
+  container "jdidion/atropos_paper"
 
   input:
+  set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
-  each err from params.errorRates
   each qcut from params.quals
   each aligner from params.aligners
   each compression from params.compressionSchemes
   
-  file input1 from "${params.dataDir}/${task.ext.fqPrefix}.1.fq"
-  file input2 from "${params.dataDir}/${task.ext.fqPrefix}.2.fq"
-  
   output:
-  file "${task.tag}.1.fq.gz" into output1
-  file "${task.tag}.2.fq.gz" into output2
+  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
   file "${task.tag}.report.txt" into reportFile
   stdout timing
 
@@ -92,25 +84,17 @@ process Atropos {
     -T $task.cpus --aligner $aligner --op-order GACQW \
     "-a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
     "-m $params.minLength --batch-size $params.batchSize \
-    "--report-file $reportFile \
-    "--no-default-adapters --no-cache-adapters \
-    "-o $output1 -p $output2 \
-    "--log-level ERROR --quiet \
+    "--no-default-adapters --no-cache-adapters --log-level ERROR --quiet \
     --insert-match-error-rate 0.20 -e 0.10 \
-    "$task.ext.compressionArg -pe1 $input1 -pe2 $input2
+    "-o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
+    "--report-file "${task.tag}.report.txt" \
+    "$task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
   """
   
   timing.onComplete {
     perfs << [ 
       "name" : name,
       "value" : it
-    ]
-  }
-
-  afterScript {
-    results << [ 
-      "name" : name,
-      "trimmed" : [ output1, output2 ]
     ]
   }
 }
@@ -120,41 +104,28 @@ process Skewer {
   cpus { threads }
 
   input:
+  set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
   each err from params.errorRates
   each qcut from params.quals
 
-  val fqPrefix from "sim_${err}"
-  file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
-  file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
-  stdout timing
-
   output:
-  file "${name}-trimmed-pair1.fastq.gz" into output1
-  file "${name}-trimmed-pair2.fastq.gz" into output2
-  
+  set err, "${task.tag}-trimmed-pair1.pair{1,2}.fastq.gz" into trimmedReads
+  stdout timing  
+
   script:
   """
   /usr/bin/time -v skewer \
     -m pe -l $params.minLength -match_perc 80 \
     -o $task.tag -z --quiet \
     -x $params.adapter1 -y $params.adapter2 -t $task.cpus \
-    -q $qcut -n $input1 $input2
+    -q $qcut -n ${reads[0]} ${reads[1]}
   """
 
   timing.onComplete {
     perfs << [ 
-      "name" : name,
+      "name" : task.tag,
       "value" : it
-    ]
-  }
-
-  afterScript {
-    output1.renameTo("${name}.1.fq.gz")
-    output2.renameTo("${name}.2.fq.gz")
-    results << [ 
-      "name" : name,
-      "trimmed" : [ "${name}.1.fq.gz", "${name}.2.fq.gz" ]
     ]
   }
 }
@@ -164,25 +135,22 @@ process SeqPurge {
   cpus { threads }
 
   input:
+  set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
   each err from params.errorRates
   each qcut from params.quals
 
-  val fqPrefix from "sim_${err}"
-  file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
-  file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
-
   output:
-  file "${name}.1.fq.gz" into output1
-  file "${name}.2.fq.gz" into output2
-  file "${name}.report.txt" into reportFile
+  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
+  file "${task.tag}.report.txt" into reportFile
   stdout timing
 
   script:
   """
   /usr/bin/time -v SeqPurge \
-    -in1 $input1 -in2 $input2 \
-    -out1 $output1 -out2 $output2 \
+    -in1 ${reads[0]} -in2 ${reads[1]} \
+    -out1 ${task.tag}-trimmed-pair1.pair1.fastq.gz \
+    -out2 ${task.tag}-trimmed-pair1.pair2.fastq.gz \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -task.cpus $task.cpus -prefetch $params.batchSize \
@@ -191,15 +159,8 @@ process SeqPurge {
 
   timing.onComplete {
     perfs << [ 
-      "name" : name,
+      "name" : task.tag,
       "value" : it
-    ]
-  }
-
-  afterScript {
-    results << [ 
-      "name" : name,
-      "trimmed" : [ output1, output2 ]
     ]
   }
 }
@@ -209,25 +170,21 @@ process AdapterRemoval {
   cpus { threads }
 
   input:
+  set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
   each err from params.errorRates
   each qcut from params.quals
 
-  val fqPrefix from "sim_${err}"
-  file input1 from "${params.dataDir}/${fqPrefix}.1.fq"
-  file input2 from "${params.dataDir}/${fqPrefix}.2.fq"
-
   output:
-  file "${name}.1.fq.gz" into output1
-  file "${name}.2.fq.gz" into output2
+  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
   file "${name}.report.txt" into reportFile
   stdout timing
 
   script:
   """
   usr/bin/time -v AdapterRemoval \
-    --file1 $input1 --file2 $input2 \
-    --output1 $output1 --output2 $output2 --gzip \
+    --file1 ${reads[0]} --file2 ${reads[1]} \
+    --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut \
     --minLengthgth $params.minLength --task.cpus $task.cpus
@@ -235,15 +192,8 @@ process AdapterRemoval {
 
   timing.onComplete {
     perfs << [ 
-      "name" : name,
+      "name" : task.tag,
       "value" : it
-    ]
-  }
-
-  afterScript {
-    results << [ 
-      "name" : name,
-      "trimmed" : [ output1, output2 ]
     ]
   }
 }

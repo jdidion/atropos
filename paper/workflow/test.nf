@@ -24,10 +24,6 @@
  * - aligners: Atropos aligner algorithms to test
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
- * - dataDir: The local directory where data from the container will be copied
- *   (for Singularity execution only)
- * - dataContainer: The name of the Docker Hub repository from which the data
- *   data container should be pulled.
  */
 
 // variables for all tools
@@ -44,20 +40,21 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process Extract {
   container true
-  storeDir { dataDir }
   
   input:
   each err from params.errorRates
-  each readPair from {[1, 2]}
-  each fileExt from {['fq', 'aln']}
-  val dataDir from params.dataDir
   
   output:
-  file "sim_${err}.${readPair}.${fileExt}" into destFile
+  set err, "sim_${err}.{1,2}.fq", "sim_${err}.{1,2}.aln" into simReads
   
   script:
   """
-  jdidion/atropos_simulated cp /data/simulated/sim_${err}.${readPair}.${fileExt} .
+  jdidion/atropos_simulated cp \
+    /data/simulated/sim_${err}.1.fq  \
+    /data/simulated/sim_${err}.2.fq  \
+    /data/simulated/sim_${err}.1.aln \
+    /data/simulated/sim_${err}.2.aln \
+    .
   """
 }
 
@@ -68,17 +65,21 @@ process Atropos {
   container "jdidion/atropos_paper"
   
   input:
+  set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
-  each err from params.errorRates
   each qcut from params.quals
   each aligner from params.aligners
   each compression from params.compressionSchemes
-  val dataDir from params.dataDir
-  file input1 from "${dataDir}/sim_${err}.1.fq"
-  file input2 from "${dataDir}/sim_${err}.2.fq"
+  
+  output:
+  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
   
   script:
   """
-  echo $task.tag $threads $compression $task.ext.compressionArg $input1 $input2
+  atropos \
+    -pe1 ${reads[0]} -pe2 ${reads[1]} \
+    -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
+    -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT
   """
 }
