@@ -37,7 +37,10 @@ RUN git clone --recursive https://github.com/imgag/ngs-bits.git && \
     mv /tmp/ngs-bits/bin/* /usr/local/bin
 # cleanup build dependencies and then reinstall runtime dependencies
 RUN apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto)
-RUN apt-get install -y qt5-default libqt5xmlpatterns5-dev
+RUN apt-get install -y \
+    qt5-default             \
+    libqt5xmlpatterns5-dev  \
+    bash
 RUN rm -rf /var/lib/apt/lists/* /tmp/*
 # Entrypoints don't work well with NextFlow - it wants to execute commands as
 # if they were in the path.

@@ -16,13 +16,23 @@
 #################################################################
 FROM alpine
 WORKDIR /tmp
-RUN apk add --no-cache g++ git make zlib-dev bzip2-dev perl
+# Install Dependencies
+RUN apk --no-cache add \
+    bash      \
+    g++       \
+    git       \ 
+    make      \
+    zlib-dev  \
+    bzip2-dev \
+    perl
+# Install AdapterRemoval
 RUN git clone --recursive https://github.com/MikkelSchubert/adapterremoval && \
     cd adapterremoval && \
     make && \
     mv /tmp/adapterremoval/build/AdapterRemoval /usr/local/bin && \
-    rm -Rf /tmp/adapterremoval
-RUN rm -rf /var/cache/apk/* /tmp/*
+# Cleanup
+# TODO: remove deps that are not necessary at runtime
+RUN rm -rf /tmp/*
 # Entrypoints don't work well with NextFlow - it wants to execute commands as
 # if they were in the path.
 #ENTRYPOINT ["/usr/local/bin/AdapterRemoval"]

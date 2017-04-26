@@ -19,6 +19,7 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
     && apk --no-cache add --virtual build-deps \
         musl-dev \
         linux-headers \
+        bash \
         g++ \
         git \
         zlib-dev bzip2-dev xz-dev
@@ -26,13 +27,14 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
 # Additional Atropos dependencies
 RUN pip install tqdm pysam jinja2
 
-# Attach project directory and install
+# Clone repo and install
 RUN git clone --recursive https://github.com/jdidion/atropos && \
     cd atropos && \
     make install
 
 # Cleanup
-RUN rm -rf /var/cache/apk/* /tmp/*
+# TODO: remove deps that are not necessary at runtime
+RUN rm -rf /tmp/*
 
 # Entrypoints don't work well with NextFlow - it wants to execute commands as
 # if they were in the path.

@@ -17,7 +17,11 @@
 FROM alpine
 WORKDIR /tmp
 # install deps
-RUN apk add --no-cache g++ make git
+RUN apk add --no-cache \
+    g++  \
+    make \
+    git  \
+    bash
 # install skewer
 RUN git clone --recursive https://github.com/relipmoc/skewer && \
     cd skewer && \
@@ -25,6 +29,7 @@ RUN git clone --recursive https://github.com/relipmoc/skewer && \
     mv /tmp/skewer/skewer /usr/local/bin && \
     rm -Rf /tmp/skewer
 # cleanup
+# TODO: remove deps that are not necessary at runtime
 RUN rm -rf /var/cache/apk/* /tmp/*
 # Entrypoints don't work well with NextFlow - it wants to execute commands as
 # if they were in the path.

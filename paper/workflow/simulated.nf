@@ -44,24 +44,20 @@ params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process Extract {
+  container true
   storeDir { params.dataDir }
   
-  when:
-  workflow.profile == 'cluster'
-
   input:
   each err from params.errorRates
-  val fqPrefix from "sim_${err}"
-
+  each pair from {[1, 2]}
+  each ext from exts {['fq', 'aln']}
+  
   output:
-  file "${fqPrefix}.1.fq"
-  file "${fqPrefix}.1.aln"
-  file "${fqPrefix}.2.fq"
-  file "${fqPrefix}.2.aln"
-
+  file "sim_${err}.${pair}.${ext}" into destFile
+  
   script:
   """
-  cp /data/simulated/${fqPrefix}* .
+  jdidion/atropos_simulated cp /data/simulated/sim_${err}.${pair}.${ext} .
   """
 }
 
