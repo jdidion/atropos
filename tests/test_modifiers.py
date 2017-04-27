@@ -189,8 +189,8 @@ def test_overlapping():
     r2 = reverse_complement(a2 + frag)[0:40]
     q2 = '!' * 40
     parser = AdapterParser()
-    adapter1 = parser.parse(a1)
-    adapter2 = parser.parse(a2)
+    adapter1 = parser.parse_from_spec(a1)
+    adapter2 = parser.parse_from_spec(a2)
     cutter = AdapterCutter([adapter1, adapter2])
     read1 = Sequence('foo', r1, q1)
     read1 = cutter(read1)
@@ -275,8 +275,8 @@ def test_mismatched_adapter_overlaps():
     a2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT" # TruSeq universal
 
     parser = AdapterParser()
-    adapter1 = parser.parse(a1)
-    adapter2 = parser.parse(a2)
+    adapter1 = parser.parse_from_spec(a1)
+    adapter2 = parser.parse_from_spec(a2)
     # the data has a fairly high error rate
     cutter = InsertAdapterCutter(adapter1, adapter2,
         max_insert_mismatch_frac=0.3,
@@ -316,8 +316,8 @@ def test_error_correction():
     read2 = Sequence('foo', r2, q2)
     
     parser = AdapterParser()
-    adapter1 = parser.parse(a1)
-    adapter2 = parser.parse(a2)
+    adapter1 = parser.parse_from_spec(a1)
+    adapter2 = parser.parse_from_spec(a2)
     
     cutter = InsertAdapterCutter(adapter1, adapter2, mismatch_action='liberal')
     
@@ -358,10 +358,10 @@ def test_error_correction_no_insert_match_one_adapter_match():
     read2 = Sequence('foo', r2, q2)
     
     parser1 = AdapterParser()
-    adapter1 = parser1.parse(a1)
+    adapter1 = parser1.parse_from_spec(a1)
     # Allow zero mismatches to prevent adapter alignment
     parser2 = AdapterParser(max_error_rate=0)
-    adapter2 = parser2.parse(a2)
+    adapter2 = parser2.parse_from_spec(a2)
     
     # Allow zero mismatches to prevent insert alignment
     cutter = InsertAdapterCutter(
@@ -404,8 +404,8 @@ def test_error_correction_no_insert_match_two_adapter_matches():
     read2 = Sequence('foo', r2, q2)
     
     parser = AdapterParser()
-    adapter1 = parser.parse(a1)
-    adapter2 = parser.parse(a2)
+    adapter1 = parser.parse_from_spec(a1)
+    adapter2 = parser.parse_from_spec(a2)
     
     # Allow zero mismatches to prevent insert alignment
     cutter = InsertAdapterCutter(

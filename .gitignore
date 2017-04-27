@@ -45,3 +45,4 @@ hg3*.fa*
 **/star-index/index/SAindex
 .nextflow*
 **/work/
+.vscode*

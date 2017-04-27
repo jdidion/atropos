@@ -1,12 +1,13 @@
 # Changes
 
-v1.1.2 (dev)
+v1.1.3 (dev)
 ------------
-* Updated Dockefile to use smaller, Alpine-based image.
-* Added Docker image for v1.1.1 to Docker Hub.
+* Updated Dockerfile to use smaller, Alpine-based image.
+* Added Docker image for v1.1.2 to Docker Hub.
 * Updated Travis config to automatically build Docker images for each release.
+* Ported over improvements to adapter parsing (635eea9) from Cutadapt.
 
-v1.1.1 (2017.04.12)
+v1.1.2 (2017.04.12)
 -------------------
 
 * New 'qc' command computes read-level statistics.

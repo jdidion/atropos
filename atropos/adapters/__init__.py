@@ -91,7 +91,7 @@ class AdapterParser(object):
         self.constructor_args = kwargs
         self.adapter_class = ColorspaceAdapter if colorspace else Adapter
     
-    def parse(self, spec=None, name=None, cmdline_type='back'):
+    def parse(self, spec, cmdline_type='back'):
         """Parse an adapter specification not using ``file:`` notation and return
         an object of an appropriate Adapter class. The notation for anchored
         5' and 3' adapters is supported. If the name parameter is None, then
@@ -110,6 +110,17 @@ class AdapterParser(object):
         Returns:
             An :class:`Adapter` instance.
         """
+        if spec.startswith('file:'):
+            # read adapter sequences from a file
+            with FastaReader(spec[5:]) as fasta:
+                for record in fasta:
+                    name = record.name.split(None, 1)[0]
+                    yield self.parse_from_spec(
+                        record.sequence, cmdline_type, name)
+        else:
+            yield self.parse_from_spec(spec, cmdline_type)
+    
+    def parse_from_spec(self, spec, cmdline_type='back', name=None):
         if cmdline_type not in ADAPTER_TYPES:
             raise ValueError(
                 'cmdline_type cannot be {0!r}'.format(cmdline_type))
@@ -133,36 +144,65 @@ class AdapterParser(object):
         if self.cache and name is not None:
             self.cache.add(name, spec)
         
-        sequence = spec
-        if where == FRONT and spec.startswith('^'):  # -g ^ADAPTER
-            sequence, where = spec[1:], PREFIX
-        elif where == BACK:
-            sequence1, middle, sequence2 = spec.partition('...')
-            if middle == '...':
-                if not sequence1:  # -a ...ADAPTER
-                    sequence = sequence1[3:]
-                elif not sequence2:  # -a ADAPTER...
-                    sequence, where = spec[:-3], PREFIX
-                else:  # -a ADAPTER1...ADAPTER2
-                    if self.colorspace:
-                        raise NotImplementedError(
-                            'Using linked adapters in colorspace is not '
-                            'supported.')
-                    if sequence1.startswith('^') or sequence2.endswith('$'):
-                        raise NotImplementedError(
-                            'Using "$" or "^" when  specifying a linked '
-                            'adapter is not supported.')
-                    return LinkedAdapter(
-                        sequence1, sequence2, name=name,
-                        **self.constructor_args)
-            elif spec.endswith('$'):   # -a ADAPTER$
-                sequence, where = spec[:-1], SUFFIX
+        front_anchored, back_anchored = False, False
+        if spec.startswith('^'):
+            spec = spec[1:]
+            front_anchored = True
+        if spec.endswith('$'):
+            spec = spec[:-1]
+            back_anchored = True
         
-        if not sequence:
-            raise ValueError('The adapter sequence is empty')
+        sequence1, middle, sequence2 = spec.partition('...')
+        if where == ANYWHERE:
+            if front_anchored or back_anchored:
+                raise ValueError("'anywhere' (-b) adapters may not be anchored")
+            if middle == '...':
+                raise ValueError("'anywhere' (-b) adapters may not be linked")
+            return self.adapter_class(
+                sequence=spec, where=where, name=name, **self.constructor_args)
+        
+        assert where == FRONT or where == BACK
+        if middle == '...':
+            if not sequence1:
+                if where == BACK:  # -a ...ADAPTER
+                    spec = sequence2
+                else:  # -g ...ADAPTER
+                    raise ValueError('Invalid adapter specification')
+            elif not sequence2:
+                if where == BACK:  # -a ADAPTER...
+                    spec = sequence1
+                    where = FRONT
+                    front_anchored = True
+                else:  # -g ADAPTER...
+                    spec = sequence1
+            else:
+                # linked adapter
+                if self.colorspace:
+                    raise NotImplementedError(
+                        'Using linked adapters in colorspace is not supported')
+                # automatically anchor 5' adapter if -a is used
+                if where == BACK:
+                    front_anchored = True
+                
+                return LinkedAdapter(sequence1, sequence2, name=name,
+                    front_anchored=front_anchored, back_anchored=back_anchored,
+                    **self.constructor_args)
+        
+        if front_anchored and back_anchored:
+            raise ValueError(
+                'Trying to use both "^" and "$" in adapter specification '
+                '{!r}'.format(orig_spec))
+        if front_anchored:
+            if where == BACK:
+                raise ValueError("Cannot anchor the 3' adapter at its 5' end")
+            where = PREFIX
+        elif back_anchored:
+            if where == FRONT:
+                raise ValueError("Cannot anchor 5' adapter at 3' end")
+            where = SUFFIX
         
         return self.adapter_class(
-            sequence, where, name=name, **self.constructor_args)
+            sequence=spec, where=where, name=name, **self.constructor_args)
     
     def parse_multi(self, back=None, anywhere=None, front=None):
         """Parse all three types of commandline options that can be used to
@@ -183,16 +223,7 @@ class AdapterParser(object):
             if not specs:
                 continue
             for spec in specs:
-                if spec.startswith('file:'):
-                    # read adapter sequences from a file
-                    with FastaReader(spec[5:]) as fasta:
-                        for record in fasta:
-                            name = record.name.split(None, 1)[0]
-                            adapters.append(
-                                self.parse(record.sequence, name, cmdline_type))
-                else:
-                    adapters.append(
-                        self.parse(spec=spec, cmdline_type=cmdline_type))
+                adapters.extend(self.parse(spec, cmdline_type))
         return adapters
 
 class Adapter(object):
@@ -385,7 +416,6 @@ class Adapter(object):
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
-        # TODO move away
         self.lengths_back[len(match.read) - match.rstart] += 1
         self.errors_back[len(match.read) - match.rstart][match.errors] += 1
         adjacent_base = match.read.sequence[match.rstart-1:match.rstart]

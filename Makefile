@@ -1,6 +1,6 @@
 tests = tests
 module = atropos
-pytestops =
+pytestops = "--full-trace"
 #pytestops = "-v -s"
 repo = jdidion/atropos
 
