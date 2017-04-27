@@ -59,27 +59,51 @@ process Extract {
 }
 
 process Atropos {
-  echo true
-  tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
+  //tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
+  tag { "atropos_${task.cpus}_${err}" }
   cpus { threads }
   container "jdidion/atropos_paper"
   
   input:
   set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
-  each qcut from params.quals
-  each aligner from params.aligners
-  each compression from params.compressionSchemes
+  //each qcut from params.quals
+  //each aligner from params.aligners
+  //each compression from params.compressionSchemes
   
   output:
   set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
-  
+  file "${task.tag}.report.txt" into reportFile
+  file "${task.tag}.timing.txt" into timingAtropos
+
   script:
   """
-  atropos \
+  >&2 echo ${task.tag} && \
+  /usr/bin/time -v atropos \
     -pe1 ${reads[0]} -pe2 ${reads[1]} \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
+    --report-file ${task.tag}.report.txt --quiet \
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
-    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
+    2> ${task.tag}.timing.txt
+  """
+}
+
+// concatenate all of the timing results into a single channel
+Channel
+  .empty()
+  .concat(timingAtropos)
+  .set { timing }
+
+process Timing {
+  input:
+  val timingFiles from timing.toList()
+
+  output:
+  file 'timing.txt'
+
+  script:
+  """
+  cat $timingFiles > timing.txt
   """
 }

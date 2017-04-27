@@ -27,7 +27,7 @@ There are already 3 simulated data sets. If you'd like to re-create these or add
 
 # 3. Build containers (optional)
 
-All of the containers defined in the 'containers' subdirectory have already been built and pushed to Docker hub. For full reproducibility, you are free to build the containers yourself, but you'll need to update the scripts to pull them from your own Docker Hub repository.
+All of the containers defined in the 'containers' subdirectory have already been built and pushed to either Docker Hub or Quay.io. For full reproducibility, you are free to build the containers yourself, but you'll need to update the scripts to pull them from your own container repository.
 
 # 4. Run the workflows
 
