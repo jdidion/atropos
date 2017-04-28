@@ -10,7 +10,7 @@
 # Build Cmd:        docker build -f Dockerfile -t mikkelschubert/adapterremoval:latest .
 #                   docker tag mikkelschubert/adapterremoval:latest jdidion/adapterremoval
 # Pull Cmd:         docker pull jdidion/adapterremoval
-# Run Cmd:          docker run
+# Run Cmd:          docker run jdidion/adapterremoval AdapterRemoval --help
 # Note: for me to be able to deploy this, it has to be tagged with my repo
 # name. I'm not trying to take credit for anyone's work :)
 #################################################################
