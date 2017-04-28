@@ -39,22 +39,18 @@ params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process Extract {
-  container true
+  container "jdidion/atropos_simulated"
   
   input:
   each err from params.errorRates
   
   output:
-  set err, "sim_${err}.{1,2}.fq", "sim_${err}.{1,2}.aln" into simReads
+  set err, "sim_${err}.{1,2}.fq" into simReads
   
   script:
   """
-  jdidion/atropos_simulated cp \
-    /data/simulated/sim_${err}.1.fq  \
-    /data/simulated/sim_${err}.2.fq  \
-    /data/simulated/sim_${err}.1.aln \
-    /data/simulated/sim_${err}.2.aln \
-    .
+  head -40 /data/simulated/sim_${err}.1.fq > ./sim_${err}.1.fq && \
+  head -40 /data/simulated/sim_${err}.2.fq > ./sim_${err}.2.fq
   """
 }
 
@@ -85,7 +81,7 @@ process Atropos {
     --report-file ${task.tag}.report.txt --quiet \
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
     -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
-    2> ${task.tag}.timing.txt
+    2>> ${task.tag}.timing.txt
   """
 }
 
@@ -96,18 +92,20 @@ Channel
   .set { timing }
 
 process Timing {
+  container "jdidion/python_bash"
+
   input:
   file timingFiles from timing.toList()
 
   output:
-  file "${process.executor}.timing.txt"
-  file "${process.executor}.timing.tex"
+  file "${task.executor}.timing.txt"
+  file "${task.executor}.timing.tex"
 
   script:
   """
-  cat $timingFiles > ${process.executor}.timing.txt
+  cat $timingFiles > ${task.executor}.timing.txt
   python scripts/summarize_timing_info.py -f latex \
-    -i ${process.executor}.timing.txt \
-    -o ${process.executor}.timing.tex
+    -i ${task.executor}.timing.txt \
+    -o ${task.executor}.timing.tex
   """
 }

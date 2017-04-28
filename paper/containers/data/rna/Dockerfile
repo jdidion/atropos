@@ -6,7 +6,7 @@
 #                   AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT # TruSeq Universal
 # Base Image:       busybox
 #################################################################
-FROM busybox
+FROM blang/busybox-bash
 RUN mkdir -p /data/rna
 ADD SRR521458_1.fastq.gz /data/rna/rna.1.fq.gz
 ADD SRR521458_2.fastq.gz /data/rna/rna.2.fq.gz

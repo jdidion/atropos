@@ -6,7 +6,7 @@
 #                   AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT # TruSeq universal
 # Base Image:       busybox
 #################################################################
-FROM busybox
+FROM blang/busybox-bash
 RUN mkdir -p /data/wgbs
 ADD wgbs.1.fq.gz /data/wgbs/wgbs.1.fq.gz
 ADD wgbs.2.fq.gz /data/wgbs/wgbs.2.fq.gz

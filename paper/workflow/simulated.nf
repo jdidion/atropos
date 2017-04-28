@@ -71,7 +71,7 @@ process Atropos {
   each compression from params.compressionSchemes
   
   output:
-  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
+  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   file "${task.tag}.report.txt" into reportFile
   file "${task.tag}.timing.txt" into timingAtropos
 
@@ -85,15 +85,16 @@ process Atropos {
     --no-default-adapters --no-cache-adapters --log-level ERROR --quiet \
     --insert-match-error-rate 0.20 -e 0.10 \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
-    --report-file "${task.tag}.report.txt --quiet \
+    --report-file ${task.tag}.report.txt --quiet \
     $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]} \
-    2> ${task.tag}.timing.txt
+    2>> ${task.tag}.timing.txt
   """
 }
 
 process Skewer {
   tag { "skewer_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
+  container "jdidion/skewer"
 
   input:
   set err, file(reads), file(alns) from simReads
@@ -102,7 +103,7 @@ process Skewer {
   each qcut from params.quals
 
   output:
-  set err, "${task.tag}-trimmed-pair1.pair{1,2}.fastq.gz" into trimmedReads
+  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
   file "${task.tag}.timing.txt" into timingSkewer
 
   script:
@@ -113,13 +114,17 @@ process Skewer {
     -o $task.tag -z --quiet \
     -x $params.adapter1 -y $params.adapter2 -t $task.cpus \
     -q $qcut -n ${reads[0]} ${reads[1]} \
-    2> ${task.tag}.timing.txt
+    > ${task.tag}.report.txt \
+    2>> ${task.tag}.timing.txt && \
+  mv ${task.tag}-trimmed-pair1.fastq.gz ${task.tag}.1.fq.gz && \
+  mv ${task.tag}-trimmed-pair2.fastq.gz ${task.tag}.2.fq.gz
   """
 }
 
 process SeqPurge {
   tag { "seqpurge_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
+  container "jdidion/seqpurge"
 
   input:
   set err, file(reads), file(alns) from simReads
@@ -128,7 +133,7 @@ process SeqPurge {
   each qcut from params.quals
 
   output:
-  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
+  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
   file "${task.tag}.report.txt" into reportFile
   file "${task.tag}.timing.txt" into timingSeqPurge
 
@@ -143,13 +148,14 @@ process SeqPurge {
     -qcut $qcut -min_len $params.minLength \
     -task.cpus $task.cpus -prefetch $params.batchSize \
     -r 0.20 -summary $reportFile \
-    2> ${task.tag}.timing.txt
+    2>> ${task.tag}.timing.txt
   """
 }
 
 process AdapterRemoval {
   tag { "adapterremoval_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
+  container "jdidion/adapterremoval"
 
   input:
   set err, file(reads), file(alns) from simReads
@@ -158,7 +164,7 @@ process AdapterRemoval {
   each qcut from params.quals
 
   output:
-  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
+  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
   file "${task.tag}.report.txt" into reportFile
   file "${task.tag}.timing.txt" into timingAdapterRemoval
 
@@ -171,33 +177,24 @@ process AdapterRemoval {
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut \
     --minLengthgth $params.minLength --task.cpus $task.cpus \
-    2> ${task.tag}.timing.txt
+    2>> ${task.tag}.timing.txt
   """
 }
 
-process Accuracy {
-  input:
-  each result from results
-
-  output:
-  file "${result.name}.txt" into resultFile
-  file "${result.name}.summary.txt" into summaryFile
-  file "${result.name}.table.txt" into tableFile
-
-  script:
-  """
-  python scripts/summarize_simulated_trimming_accuracy.py \
-    -a1 ${params.dataDir}/${fqPrefix}.1.aln \
-    -a2 ${params.dataDir}/${fqPrefix}.2.aln \
-    -r1 ${result.trimmed[0]} -r2 ${result.trimmed[1]} \
-    --name ${result.name} \
-    -o $resultFile -s $summaryFile -t $tableFile
-  """
-}
-
-// Concatenate all of the timing results into a single channel.
-// If you add a tool process, M=make sure to add the stdout channel
+// Concatenate all of the results into a single channel.
+// If you add a tool process, make sure to add the stdout channel
 // into the concat list here.
+
+Channel
+  .empty()
+  .concat(
+    trimmedAtropos,
+    trimmedSkewer,
+    trimmedSeqPurge,
+    trimmedAdapterRemoval
+  )
+  .set { timing }
+
 Channel
   .empty()
   .concat(
@@ -208,19 +205,40 @@ Channel
   )
   .set { timing }
 
-process Timing {
+process Accuracy {
   input:
-  file timingFiles from timing.toList()
-  
+  each set val(name), val(err), file(alns), file(trimmed) from trimmedReads
+  container "python:alpine"
+
   output:
-  file "${process.executor}.timing.txt"
-  file "${process.executor}.timing.tex"
+  file "${name}.txt" into resultFile
+  file "${name}.summary.txt" into summaryFile
+  file "${name}.table.txt" into tableFile
 
   script:
   """
-  cat $timingFiles > ${process.executor}.timing.txt
+  python scripts/summarize_simulated_trimming_accuracy.py \
+    -a1 ${alns[0]} -a2 ${alns[1]} \
+    -r1 ${trimmed[0]} -r2 ${trimmed[1]} \
+    --name ${name} \
+    -o $resultFile -s $summaryFile -t $tableFile
+  """
+}
+
+process Timing {
+  input:
+  file timingFiles from timing.toList()
+  container "python:alpine"
+
+  output:
+  file "${task.executor}.timing.txt"
+  file "${task.executor}.timing.tex"
+
+  script:
+  """
+  cat $timingFiles > ${task.executor}.timing.txt
   python scripts/summarize_timing_info.py -f latex \
-    -i ${process.executor}.timing.txt \
-    -o ${process.executor}.timing.tex
+    -i ${task.executor}.timing.txt \
+    -o ${task.executor}.timing.tex
   """
 }
