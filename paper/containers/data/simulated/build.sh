@@ -10,14 +10,13 @@
 # Huang et al. 2012, http://bioinformatics.oxfordjournals.org/content/28/4/593.full
 # Jiang et al. 2014, http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-182
 
-# TODO: create docker image for Art+R+adjust_error_profiles.R
-
 # Generate error-shifted read quality profiles
+R_CMD="docker run --rm -v "$PWD":/home/docker -w /home/docker -u docker r-base Rscript --vanilla"
 for err in 005 01
 do
   for mate in 1 2
   do
-    Rscript --vanilla adjust_error_profiles.R -g art_profiles/HiSeq2500L125R${mate}_001.txt art_profiles/data/HiSeq2500L125R${mate}_${err}.txt 0.${err}
+    $R_CMD adjust_error_profiles.R -g art_profiles/HiSeq2500L125R${mate}_001.txt art_profiles/data/HiSeq2500L125R${mate}_${err}.txt 0.${err}
   done
 done
 
@@ -29,11 +28,12 @@ sd_frag=100
 cov=0.1
 
 # Simulate reads
+ART_CMD="docker run --rm -v "$PWD":/art -w /art jdidion/art_skewer art_illumina"
 for prof in 001 005 01
 do
   # NOTE: REF_GENOME is externally defined to point to the fasta file for hg19/GRCh37.
   # This assumes that the modified version of ART has been downloaded and compiled in the bin folder.
-  art/bin/art_illumina -i $REF_GENOME -p -l $read_len -f $cov -m $mean_frag -s $sd_frag -rs $seed -o sim_${prof} \
+  $ART_CMD -i $REF_GENOME -p -l $read_len -f $cov -m $mean_frag -s $sd_frag -rs $seed -o sim_${prof} \
     -1 art_profiles/HiSeq2500L125R1_${prof}.txt \
     -2 art_profiles/HiSeq2500L125R2_${prof}.txt
   # rename files
@@ -45,3 +45,5 @@ do
     done
   done
 done
+
+docker build -f Dockerfile -t jdidion/atropos_simulated .

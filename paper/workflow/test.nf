@@ -97,13 +97,17 @@ Channel
 
 process Timing {
   input:
-  val timingFiles from timing.toList()
+  file timingFiles from timing.toList()
 
   output:
-  file 'timing.txt'
+  file "${process.executor}.timing.txt"
+  file "${process.executor}.timing.tex"
 
   script:
   """
-  cat $timingFiles > timing.txt
+  cat $timingFiles > ${process.executor}.timing.txt
+  python scripts/summarize_timing_info.py -f latex \
+    -i ${process.executor}.timing.txt \
+    -o ${process.executor}.timing.tex
   """
 }

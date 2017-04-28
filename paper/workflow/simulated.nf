@@ -210,7 +210,7 @@ Channel
 
 process Timing {
   input:
-  val timingFiles from timing.toList()
+  file timingFiles from timing.toList()
   
   output:
   file "${process.executor}.timing.txt"

@@ -1,6 +1,6 @@
 # Overview
 
-The scripts in this directory will enable you to re-run the analyses in the Atropos paper. The workflows defined here runs the benchmarks and generates the figures and tables shown in the paper.
+The scripts in this directory will enable you to re-run the analyses in the Atropos paper. The workflows defined here run the benchmarks and generate the figures and tables shown in the paper.
 
 We have created [Docker](https://www.docker.com/) images for all of the software tools used, as well as data volumes containing all the raw data and resources. These images can be used directly on Mac, Windows, and some linux platforms using the Docker engine. On unsupported linux platforms (namely RedHat and derivatives, such as Scientific Linux), [Singularity](http://singularity.lbl.gov/) can be used to execute the containers directly from Docker Hub. 
 
@@ -10,35 +10,51 @@ Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or 
 
 # 1. Install software
 
-* [Docker](https://www.docker.com/) and/or [Singularity](http://singularity.lbl.gov/)
-* Java 7+
-* [Nextflow](https://www.nextflow.io/index.html)
-* If you want to generate your own simulated reads, rather than use the ones we provide, you will need:
-    * [R](https://www.r-project.org/about.html)
-    * A modern C++ compiler (e.g. GCC 5.x)
-    * automake
+* You will need a [Docker](https://www.docker.com/) engine if you want to build the containers yourself. If you only want to run the containers, you can use either Docker or [Singularity](http://singularity.lbl.gov/).
+* [Nextflow](https://www.nextflow.io/index.html), which requires Java 7+.
 
 # 2. Simulate reads (optional)
 
 There are already 3 simulated data sets. If you'd like to re-create these or add additional data sets, in the containers/data/simulated directory run:
 
-    ./install.sh
-    ./simulate_reads.sh
+    ./install.sh        # installs ART
+    ./simulate_reads.sh # generates 3 simulated data sets
 
-# 3. Build containers (optional)
+# 3. Build optional containers
 
-All of the containers defined in the 'containers' subdirectory have already been built and pushed to either Docker Hub or Quay.io. For full reproducibility, you are free to build the containers yourself, but you'll need to update the scripts to pull them from your own container repository.
+All of the containers defined in the 'containers' subdirectory have already been built and pushed to Docker Hub (with two exceptions; see below). For full reproducibility, you are free to build the containers yourself, but you'll need to create your own account on Docker Hub, and you'll need to update the scripts to push/pull containers them from your own repository. Build all the tool containers, then build all the data containers.
 
-# 4. Run the workflows
+In general, for each tool container, run the following sequence of commands:
 
-In the 'workflow' directory, run:
+    # Build the container
+    docker build -f Dockerfile -t <your repo>/<tool name> .
+    
+    # Upload the container to your Docker Hub repo
+    docker push <your repo>/<tool name>
+
+For each data container, run the following sequence of commands:
+
+    # Download the data and build the docker container
+    ./build.sh
+    
+    # Upload the container to your Docker Hub repo
+    docker push <your repo>/<tool name>
+
+# 4. Build STAR index container(s)
+
+The data containers for the STAR indexes (hg37/star-index and hg38/star-index) are too large to be pushed to Docker Hub or Quay.io. Thus, you will unfortunately need to build them yourself. We use GRCh38 in the paper, so to build that container run the build.sh script in containers/data/hg38/star-index.
+
+# 5. Run the workflows
+
+In the 'workflow' directory, first edit the nextflow.config file and customize it to your own computing environment. Then run:
 
     ./run-workflows.sh <mode>
 
-Where <mode> is either 'local' or 'cluster'. Note that the first time you run this it will download several Docker images requiring ~XX GB of disk space.
+Where <mode> is either 'local' or 'cluster'. Note that the first time you run this it will download several Docker images requiring ~[XX] GB of disk space.
 
 # TODO
 
+* Update #4 with an estimate of the total disk space requirement.
 * These papers do a nice job of benchmarking trimmers. Consider adding some more benchmarks.
     * http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-16-S1-S2
     * https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-015-0454-y
