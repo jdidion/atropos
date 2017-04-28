@@ -13,14 +13,7 @@ Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or 
 * You will need a [Docker](https://www.docker.com/) engine if you want to build the containers yourself. If you only want to run the containers, you can use either Docker or [Singularity](http://singularity.lbl.gov/).
 * [Nextflow](https://www.nextflow.io/index.html), which requires Java 7+.
 
-# 2. Simulate reads (optional)
-
-There are already 3 simulated data sets. If you'd like to re-create these or add additional data sets, in the containers/data/simulated directory run:
-
-    ./install.sh        # installs ART
-    ./simulate_reads.sh # generates 3 simulated data sets
-
-# 3. Build optional containers
+# 2. Optional: build containers
 
 All of the containers defined in the 'containers' subdirectory have already been built and pushed to Docker Hub (with two exceptions; see below). For full reproducibility, you are free to build the containers yourself, but you'll need to create your own account on Docker Hub, and you'll need to update the scripts to push/pull containers them from your own repository. Build all the tool containers, then build all the data containers.
 
@@ -38,13 +31,13 @@ For each data container, run the following sequence of commands:
     ./build.sh
     
     # Upload the container to your Docker Hub repo
-    docker push <your repo>/<tool name>
+    docker push <your repo>/<data name>
 
-# 4. Build STAR index container(s)
+# 3. Build STAR index container(s)
 
 The data containers for the STAR indexes (hg37/star-index and hg38/star-index) are too large to be pushed to Docker Hub or Quay.io. Thus, you will unfortunately need to build them yourself. We use GRCh38 in the paper, so to build that container run the build.sh script in containers/data/hg38/star-index.
 
-# 5. Run the workflows
+# 4. Run the workflows
 
 In the 'workflow' directory, first edit the nextflow.config file and customize it to your own computing environment. Then run:
 
