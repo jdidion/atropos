@@ -7,10 +7,9 @@
 # Website:          https://github.com/alexdobin/STAR
 # Provides:         STAR
 # Base Image:       jedisct1/phusion-baseimage-latest
-# Build Cmd:        docker build -t jdidion/starbase:latest .
-# Pull Cmd:         docker pull jdidion/starbase
-# Run Cmd:          docker run --rm jdidion/starbase STAR
+# Build Cmd:        docker build -f Dockerfile -t jdidion/starindex:latest .
+# Pull Cmd:         docker pull jdidion/starindex
+# Run Cmd:          docker run --rm jdidion/starindex STAR
 #################################################################
-# Using jdidion/bwabase as the base image
 FROM jdidion/starbase
 ADD index/* /data/index/star/hg37/

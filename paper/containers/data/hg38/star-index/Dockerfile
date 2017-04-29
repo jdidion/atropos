@@ -11,6 +11,5 @@
 # Pull Cmd:         docker pull jdidion/starbase
 # Run Cmd:          docker run --rm jdidion/starbase STAR
 #################################################################
-# Using jdidion/bwabase as the base image
 FROM jdidion/bwa
 ADD index/* /data/index/star/hg38/

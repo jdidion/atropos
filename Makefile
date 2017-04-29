@@ -2,7 +2,8 @@ tests = tests
 module = atropos
 pytestops = "--full-trace"
 #pytestops = "-v -s"
-repo = jdidion/atropos
+repo = jdidion/$(module)
+desc = ''
 
 BUILD = python setup.py build_ext -i && python setup.py install
 TEST = py.test $(pytestops) $(tests)
@@ -39,6 +40,13 @@ clean:
 	rm -Rf atropos.egg-info
 
 release:
+	# make sure required variables set via commandline
+	ifndef version
+		$(error version is not set)
+	endif
+	ifndef token
+		$(error token is not set)
+	endif
 	$(clean)
 	# tag
 	git tag $(version)
@@ -50,12 +58,18 @@ release:
 	twine register dist/$(module)-$(version).tar.gz
 	twine upload dist/$(module)-$(version).tar.gz
 	git push origin --tags
+	curl -v -i -X POST \
+		-H "Content-Type:application/json" \
+		-H "Authorization: token $(token)" \
+		https://api.github.com/repos/$(repo)/releases \
+		-d '{"tag_name":"$(version)","target_commitish": "master","name": "$(version)","body": "$(desc)","draft": false,"prerelease": false}'
+
 
 docker:
 	# build
 	docker build -f Dockerfile -t $(repo):$(version) .
 	# add alternate tags
-	docker tag $(repo):$(version) jdidion/atropos:latest
+	docker tag $(repo):$(version) $(repo):latest
 	# push to Docker Hub
-	docker login -e johndidion@gmail.com -u jdidion && \
+	docker login -u jdidion && \
 	docker push $(repo)
