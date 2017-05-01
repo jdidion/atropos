@@ -3,9 +3,9 @@ module = atropos
 pytestops = "--full-trace"
 #pytestops = "-v -s"
 repo = jdidion/$(module)
-desc = ''
+desc = ""
 
-BUILD = python setup.py build_ext -i && python setup.py install
+BUILD = python setup.py build_ext -i && python setup.py install $(installargs)
 TEST = py.test $(pytestops) $(tests)
 
 all:
@@ -40,13 +40,6 @@ clean:
 	rm -Rf atropos.egg-info
 
 release:
-	# make sure required variables set via commandline
-	ifndef version
-		$(error version is not set)
-	endif
-	ifndef token
-		$(error token is not set)
-	endif
 	$(clean)
 	# tag
 	git tag $(version)

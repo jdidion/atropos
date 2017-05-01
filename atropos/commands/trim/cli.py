@@ -393,7 +393,10 @@ standard output.
             help="Report type(s) to generate. If multiple, '--report-file' "
                  "is treated as a prefix and the appropriate extensions are "
                  "appended. If unspecified, the format is guessed from the "
-                 "file extension.")
+                 "file extension. Supported formats are: txt (legacy text "
+                 "format), json, yaml, pickle. See the documentation for a "
+                 "full description of the structured output (json/yaml/pickle "
+                 "formats).")
         group.add_argument(
             "--stats",
             nargs="*", default=None,

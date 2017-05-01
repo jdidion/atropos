@@ -117,11 +117,19 @@ class RowPrinter(Printer):
         """
         colwidths = tuple(sizeof(*x) for x in zip(*rows))
         if header:
-            header_widths = (sizeof(h) for h in header)
+            if isinstance(header[0], str):
+                header_widths = (sizeof(h) for h in header)
+                header_rows = [header]
+            else:
+                header_widths = (
+                    max(sizeof(h) for h in header_part) 
+                    for header_part in header)
+                header_rows = list(zip(*header))
             colwidths = tuple(
                 max(h, c)
                 for h, c in zip(header_widths, colwidths))
-            self(*header, colwidths=colwidths, header=True, **kwargs)
+            for i, header_row in enumerate(header_rows, 1):
+                self(*header_row, colwidths=colwidths, header=(i == len(header_rows)), **kwargs)
         for row in rows:
             self(*row, colwidths=colwidths)
     
@@ -191,7 +199,7 @@ class RowPrinter(Printer):
                 if len(value) > width:
                     value = truncate_string(value, width)
             elif isinstance(value, float):
-                typ = '.1' + ('%' if pct else 'f')
+                typ = ',.1' + ('%' if pct else 'f')
             else:
                 typ = ',d'
             fmt_str.append(
@@ -315,19 +323,19 @@ def print_trim_report(summary, outfile):
     _print_title("Trimming", level=1)
     _print(pairs_or_reads, 'records', 'fraction', header=True)
     _print(
-        "Total {} processed".format('read pairs' if paired else 'reads'),
+        "Total {} processed:".format('read pairs' if paired else 'reads'),
         total)
     if adapter_cutter:
         if paired:
             for read in range(2):
                 _print(
-                    "Read {} with adapter".format(read+1),
+                    "Read {} with adapter:".format(read+1),
                     adapter_cutter['records_with_adapters'][read],
                     adapter_cutter['fraction_records_with_adapters'][read],
                     indent=(INDENT, ''), pct=True)
         else:
             _print(
-                "Reads with adapter",
+                "Reads with adapter:",
                 adapter_cutter['records_with_adapters'][0],
                 adapter_cutter['fraction_records_with_adapters'][0],
                 pct=True)
@@ -335,7 +343,7 @@ def print_trim_report(summary, outfile):
     def _print_filter(name, sep):
         if name in filters:
             _print(
-                "{} {} {}".format(pairs_or_reads, sep, name.replace('_', ' ')),
+                "{} {} {}:".format(pairs_or_reads, sep, name.replace('_', ' ')),
                 filters[name]['records_filtered'],
                 filters[name]['fraction_records_filtered'], pct=True)
     
@@ -344,23 +352,23 @@ def print_trim_report(summary, outfile):
     _print_filter('too_many_n', 'with')
     
     _print(
-        '{} written (passing filters)'.format(pairs_or_reads),
+        "{} written (passing filters):".format(pairs_or_reads),
         formatters['records_written'], formatters['fraction_records_written'],
         pct=True)
     
     if corrected:
         _print(
-            'Pairs corrected', corrected['records_corrected'],
+            "Pairs corrected:", corrected['records_corrected'],
             corrected['fraction_records_corrected'], pct=True)
     
     _print()
     _print("Base pairs", 'bp', 'fraction', header=True)
     
-    _print("Total bp processed", total_bp)
+    _print("Total bp processed:", total_bp)
     if paired:
         for read in range(2):
             _print(
-                "Read {}".format(read+1), summary['total_bp_counts'][read],
+                "Read {}:".format(read+1), summary['total_bp_counts'][read],
                 indent=(INDENT, ''))
     
     def _print_bp(title, data, key, default=0):
@@ -370,7 +378,7 @@ def print_trim_report(summary, outfile):
                 data['fraction_total_{}'.format(key)], pct=True)
             for read in range(2):
                 _print(
-                    "Read {}".format(read+1),
+                    "Read {}:".format(read+1),
                     data[key][read],
                     data['fraction_{}'.format(key)][read],
                     indent=(INDENT, ''), pct=True, default=default)
@@ -382,10 +390,10 @@ def print_trim_report(summary, outfile):
     for name, mod in trimmers:
         _print_bp(mod['desc'], mod, 'bp_trimmed')
     
-    _print_bp("Total bp written (filtered)", formatters, 'bp_written')
+    _print_bp("Total bp written (filtered):", formatters, 'bp_written')
     
     if corrected:
-        _print_bp("Total bp corrected", formatters, 'bp_corrected')
+        _print_bp("Total bp corrected:", formatters, 'bp_corrected')
     
     if adapter_cutter:
         _print()
@@ -441,9 +449,6 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 prev, adapter_length, int(error_rate * adapter_length)))
         _print()
     
-    # TODO: compute max width for error counts column, print secondary header
-    # with number of errors, space-pad each sub-column, think about whether to
-    # show trailing zeroes.
     def print_histogram(data, adapter_length, num_reads, error_rate, errors, match_probabilities):
         """Print a histogram. Also, print the no. of reads expected to be
         trimmed by chance (assuming a uniform distribution of nucleotides in
@@ -460,19 +465,42 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 position in the adapter seqeunce.
         """
         hist = []
+        hist_errors = []
         for length, count in data.items():
             # when length surpasses adapter_length, the probability does not
             # increase anymore
             estimated = (
                 num_reads * match_probabilities[min(length, adapter_length)])
-            errs = ' '.join(str(err) for err in errors['rows'][length])
-            hist.append((
+            hist.append([
                 length, count, estimated,
-                int(error_rate * min(length, adapter_length)), errs))
+                int(error_rate * min(length, adapter_length))])
+            hist_errors.append(errors['rows'][length])
+        
+        col_sizes = [len(str(max(col))) for col in zip(*hist_errors)]
+        
+        def _format_hist_errors(errs):
+            trailing = True
+            hist_str = []
+            for i, e in reversed(list(enumerate(errs))):
+                if trailing and e == 0:
+                    pass
+                else:
+                    trailing = False
+                    hist_str.append(('{:<' + str(col_sizes[i]) + 'd}').format(e))
+            return ' '.join(reversed(hist_str))
+        
+        for i, errs in enumerate(hist_errors):
+            hist[i].append(_format_hist_errors(errs))
+        
+        error_header = ' '.join(
+            ('{:<' + str(e) + 'd}').format(i)
+            for i, e in enumerate(col_sizes))
         
         hist_printer.print_rows(
             *hist,
-            header=("length", "count", "expect", "max.err", "error counts"))
+            header=(
+                ("length",""), ("count",""), ("expect",""), ("max.err",""),
+                ("error counts", error_header)))
         hist_printer.newline()
     
     def print_adjacent_bases(bases):
@@ -486,7 +514,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
         total = sum(bases.values())
         if total == 0:
             return False
-        _print('Bases preceding removed adapters:')
+        _print("Bases preceding removed adapters:")
         warnbase = None
         for base in ['A', 'C', 'G', 'T', '']:
             base_label = base if base != '' else 'none/other'
@@ -513,7 +541,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
         
         header = "Adapter {}"
         if paired:
-            header = ('First read: ' if pair == 0 else 'Second read: ') + header
+            header = ("First read: " if pair == 0 else "Second read: ") + header
         
         for name, adapter in adapters[pair].items():
             _print_title(header.format(name), level=1)
@@ -786,13 +814,26 @@ def print_stats_report(data, outfile):
             data['read2']['tile_base_qualities'])
         _print()
 
-def sizeof(*x):
+def sizeof(*x, seps=True, prec=1):
     """Returns the largest string size of all objects in x, where x is a
     sequence of string or numeric values.
+    
+    Args:
+        *x: The objects to test.
+        seps: Whether to include separators (,.) in the size.
+        prec: Precision of float values.
     """
     if isinstance(x[0], str):
         return max(len(s) for s in x)
-    elif isinstance(x[0], int):
-        return len(str(max(x)))
-    elif isinstance(x[0], float):
-        return len(str(round(max(x), 1)))
+    else:
+        if isinstance(x[0], int):
+            numlen = len(str(max(x)))
+            if seps:
+                numlen += (numlen // 3)
+        elif isinstance(x[0], float):
+            numlen = len(str(round(max(x), prec)))
+            if seps:
+                numlen += ((numlen - prec - 1) // 3)
+        else:
+            raise ValueError("Unexpected data type: {}".format(x[0].__class__))
+        return numlen
