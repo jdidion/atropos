@@ -1,11 +1,17 @@
 # Changes
 
-v1.1.3 (dev)
+v1.1.4 (dev)
 ------------
+* Exposed option to set PRNG seed when subsampling reads.
+
+v1.1.3 (2017.05.01)
+-------------------
 * Updated Dockerfile to use smaller, Alpine-based image.
 * Added Docker image for v1.1.2 to Docker Hub.
 * Updated Travis config to automatically build Docker images for each release.
 * Ported over improvements to adapter parsing (635eea9) from Cutadapt.
+* Fixed #12: tqdm progress bar not working.
+* Fixed #13: unnecessary differences in summary output between Cutadapt and Atropos.
 
 v1.1.2 (2017.04.12)
 -------------------

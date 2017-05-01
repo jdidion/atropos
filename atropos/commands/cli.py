@@ -184,6 +184,11 @@ class BaseCommandParser(object):
             type=probability, default=None, metavar="PROB",
             help="Subsample a fraction of reads. (no)")
         group.add_argument(
+            "--subsample-seed",
+            type=int, default=None, metavar="SEED",
+            help="The seed to use for the pseudorandom number generator. Using"
+                 "the same seed will result in the same subsampling of reads.")
+        group.add_argument(
             "--batch-size",
             type=int_or_str, metavar="SIZE",
             help="Number of records to process in each batch. (1000)")
