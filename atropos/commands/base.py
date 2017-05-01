@@ -19,7 +19,7 @@ class Pipeline(object):
     def __call__(self, command_runner, raise_on_error=False, **kwargs):
         self.start(**kwargs)
         try:
-            for batch in command_runner:
+            for batch in command_runner.iterator():
                 self.process_batch(batch)
         except Exception as err:
             if raise_on_error:
@@ -175,7 +175,8 @@ class BaseCommandRunner(object):
         self.batches = 0
         self.done = False
         self._empty_batch = [None] * self.size
-        
+        self._progress_options = None
+
         interleaved = bool(options.interleaved_input)
         input1 = options.interleaved_input if interleaved else options.input1
         input2 = None
@@ -208,13 +209,9 @@ class BaseCommandRunner(object):
         self.iterable = enumerate(reader, 1)
         
         if options.progress:
-            # Wrap iterator in progress bar
-            from atropos.io.progress import create_progress_reader
-            self.iterator = create_progress_reader(
-                self, options.progress, self.size, self.max_reads,
+            self._progress_options = (
+                options.progress, self.size, self.max_reads,
                 options.counter_magnitude)
-        else:
-            self.iterator = self
         
         self.init_summary()
     
@@ -226,8 +223,22 @@ class BaseCommandRunner(object):
         else:
             raise ValueError("Unknown attribute: {}".format(name))
     
+    def iterator(self):
+        """Returns an iterator (an object with the __iter__ method) over
+        input batches. BaseCommandRunner is itself an iterable, and will be
+        wrapped with a progress bar if _progress_options is set.
+        """
+        if self._progress_options:
+            # Wrap iterator in progress bar
+            from atropos.io.progress import create_progress_reader
+            itr = create_progress_reader(self, *self._progress_options)
+            # itr may be none if there are no progress bar libraries available
+            if itr is not None:
+                return itr
+        return self
+
     def __iter__(self):
-        return self.iterator
+        return self
     
     def __next__(self):
         if self.done:
