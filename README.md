@@ -89,6 +89,7 @@ We welcome any contributions via GitHub issues and pull requests. See the  [docu
 * Migrate to xphyle (https://github.com/jdidion/xphyle) for file management.
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
+* Support SAM output.
 * Expand the list of contaminants that are detected by default.
 * Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
 * Accessibility:

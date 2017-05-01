@@ -194,6 +194,9 @@ class BaseCommandRunner(object):
         # Wrap reader in subsampler
         if options.subsample:
             import random
+            if options.subsample_seed:
+                random.seed(options.subsample_seed)
+            
             def subsample(reader, frac):
                 """Generator that yields a random subsample of records.
                 
@@ -204,6 +207,7 @@ class BaseCommandRunner(object):
                 for reads in reader:
                     if random.random() < frac:
                         yield reads
+            
             reader = subsample(reader, options.subsample)
         
         self.iterable = enumerate(reader, 1)
