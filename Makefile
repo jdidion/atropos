@@ -1,6 +1,6 @@
 tests = tests
 module = atropos
-pytestops = "--full-trace"
+#pytestops = "--full-trace"
 #pytestops = "-v -s"
 repo = jdidion/$(module)
 desc = ""

@@ -5,6 +5,7 @@ and MultiQC reports.
 """
 import math
 import textwrap
+from atropos.io import open_output
 from atropos.util import truncate_string, weighted_median
 from .reports import BaseReportGenerator
 
@@ -25,7 +26,10 @@ class Printer(object):
         self.print_args = kwargs
     
     def __call__(self, *args, indent=None, **kwargs):
-        indent = indent or self.indent
+        if isinstance(indent, int):
+            indent = self.indent * indent
+        else:
+            indent = indent or self.indent
         if indent:
             self._print(indent, end='')
         self._print(*args, **kwargs)
@@ -217,7 +221,8 @@ class RowPrinter(Printer):
 class LegacyReportGenerator(BaseReportGenerator):
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            generate_report(summary, outfile)
+            with open_output(outfile, context_wrapper=True) as out:
+                generate_report(summary, out)
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)
 
@@ -228,20 +233,14 @@ def generate_report(summary, outfile):
         summary: The summary dict.
         outfile: The output file name/object.
     """
-    is_path = isinstance(outfile, str)
-    if is_path:
-        outfile = open(outfile, 'wt')
-    try:
-        print_summary_report(summary, outfile)
-        if 'trim' in summary:
-            print_trim_report(summary, outfile)
-        if 'pre' in summary:
-            print_pre_trim_report(summary, outfile)
-        if 'post' in summary:
-            print_post_trim_report(summary, outfile)
-    finally:
-        if is_path:
-            outfile.close()
+    
+    print_summary_report(summary, outfile)
+    if 'trim' in summary:
+        print_trim_report(summary, outfile)
+    if 'pre' in summary:
+        print_pre_trim_report(summary, outfile)
+    if 'post' in summary:
+        print_post_trim_report(summary, outfile)
 
 def print_summary_report(summary, outfile):
     """Print the top-level summary report.
