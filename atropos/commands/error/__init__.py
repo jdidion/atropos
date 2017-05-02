@@ -4,9 +4,10 @@ from collections import defaultdict
 import csv
 import re
 from atropos import AtroposError
-from atropos.commands.base import BaseCommandRunner
+from atropos.commands.base import (
+    BaseCommandRunner, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin)
 from atropos.io import open_output
-from atropos.util import qual2prob
+from atropos.util import qual2prob, run_interruptible
 
 class CommandRunner(BaseCommandRunner):
     name = 'error'
@@ -21,34 +22,28 @@ class CommandRunner(BaseCommandRunner):
         elif self.algorithm == 'shadow':
             estimator_class = ShadowRegressionErrorEstimator
         
+        estimator_args = dict(max_read_len=self.max_bases)
         if self.paired:
             estimator = PairedErrorEstimator(
-                max_read_len=self.max_bases,
-                estimator_class=estimator_class)
+                estimator_class=estimator_class, **estimator_args)
         else:
-            estimator = estimator_class(max_read_len=self.max_bases)
+            estimator = estimator_class(**estimator_args)
         
-        self.summary['error_estimator'] = estimator
+        self.summary['errorrate'] = estimator_args
         
-        estimator.consume_all_batches(self)
-        
-        return 0
+        # currently only single-threaded operation is supproted
+        self.summary.update(mode='serial', threads=1)
+        return run_interruptible(estimator, self, raise_on_error=True)
 
-class ErrorEstimator(object):
+class ErrorEstimator(SingleEndPipelineMixin, Pipeline):
     """Base class for error estimators.
     """
-    def consume_all_batches(self, batch_iterator):
-        """Consume all batches in `batch_iterator`.
-        """
-        for batch_meta, batch in batch_iterator:
-            if batch_meta['size'] == 0:
-                continue
-            for read in batch:
-                self.consume(read)
+    def __init__(self, max_read_len):
+        super().__init__()
+        self.total_len = 0
+        self.max_read_len = max_read_len
     
-    def consume(self, read):
-        """Consume a sequence record.
-        """
+    def handle_reads(self, context, read1, read2=None):
         raise NotImplementedError()
     
     def estimate(self):
@@ -56,27 +51,13 @@ class ErrorEstimator(object):
         """
         raise NotImplementedError()
     
-    # TODO: move report to the report package, have summarize update the
-    # summary dict.
-    
-    def summarize(self, outstream, name=None, show_details=True, indent="  "):
-        """Print a summary report.
-        """
-        print("", file=outstream)
-        if name is not None:
-            header = "File: {}".format(name)
-            print(header, file=outstream)
-            print('-' * len(header), file=outstream)
-        overall, details = self.estimate()
-        print("Error rate: {:.2%}".format(overall), file=outstream)
-        if details and show_details:
-            print("Details:\n", file=outstream)
-            self.print_details(details, outstream, indent)
-    
-    def print_details(self, details, outstream, indent):
-        """Print additional details.
-        """
-        pass
+    def finish(self, summary, **kwargs):
+        super().finish(summary)
+        estimate, details = self.estimate()
+        summary['errorrate'].update(
+            estimate=(estimate,), 
+            total_len=(self.total_len,),
+            details=(details,))
 
 class BaseQualityErrorEstimator(ErrorEstimator):
     """Simple error estimation using base qualities. It is well-known that base
@@ -84,12 +65,11 @@ class BaseQualityErrorEstimator(ErrorEstimator):
     with a grain of salt.
     """
     def __init__(self, max_read_len=None):
+        super().__init__(max_read_len)
         self.total_qual = 0.0
-        self.total_len = 0
-        self.max_read_len = max_read_len
     
-    def consume(self, read):
-        quals = read.qualities
+    def handle_reads(self, context, read1, read2=None):
+        quals = read1.qualities
         readlen = len(quals)
         if self.max_read_len and self.max_read_len < readlen:
             readlen = self.max_read_len
@@ -126,14 +106,13 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
             to consider from each read.
     """
     def __init__(self, method='sub', max_read_len=None, rscript_exe="Rscript"):
+        super().__init__(max_read_len)
         self.seqs = defaultdict(lambda: 0)
-        self.total_len = 0
         self.method = method
-        self.max_read_len = max_read_len
         self.rscript_exe = rscript_exe
     
-    def consume(self, read):
-        seq = read.sequence
+    def handle_reads(self, context, read1, read2=None):
+        seq = read1.sequence
         readlen = len(seq)
         if self.max_read_len and self.max_read_len < readlen:
             readlen = self.max_read_len
@@ -142,11 +121,6 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
             return
         self.seqs[seq] += 1
         self.total_len += readlen
-    
-    def _write_read_counts(self, fileobj):
-        writer = csv.writer(fileobj, delimiter=" ")
-        writer.writerows(sorted(
-            self.seqs.items(), reverse=True, key=lambda i: i[1]))
     
     def estimate(self):
         # This is a temporary solution that requires R and the
@@ -198,71 +172,34 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
             for path in tempfiles:
                 os.remove(path)
     
-    def print_details(self, outstream, details, indent):
-        per_read = details['per_read']
-        per_cycle = details['per_cycle']
-        
-        print(
-            "{}StdErr: {:.2%}".format(indent, per_read['standard error']),
-            file=outstream)
-        print("{}Per-cycle rates:".format(indent), file=outstream)
-        for cycle in per_cycle:
-            print("{}Cycle: {}, Error: {:.2%}, StdErr: {:.2%}".format(
-                indent*2, *cycle))
+    def _write_read_counts(self, fileobj):
+        writer = csv.writer(fileobj, delimiter=" ")
+        writer.writerows(sorted(
+            self.seqs.items(), reverse=True, key=lambda i: i[1]))
 
-class PairedErrorEstimator(object):
+class PairedErrorEstimator(PairedEndPipelineMixin, Pipeline):
     """Estimator for a pair of input files.
     """
-    def __init__(self, max_read_len=None,
-                 estimator_class=BaseQualityErrorEstimator):
-        self.estimator1 = estimator_class(max_read_len=max_read_len)
-        self.estimator2 = estimator_class(max_read_len=max_read_len)
+    def __init__(
+            self, estimator_class=BaseQualityErrorEstimator, **kwargs):
+        super().__init__()
+        self.estimator1 = estimator_class(**kwargs)
+        self.estimator2 = estimator_class(**kwargs)
     
-    def consume_all_batches(self, batch_iterator):
-        """Consume all batches in iterator.
-        """
-        for batch_meta, batch in batch_iterator:
-            if batch_meta['size'] == 0:
-                continue
-            for read1, read2 in batch:
-                self.estimator1.consume(read1)
-                self.estimator2.consume(read2)
+    def handle_reads(self, context, read1, read2):
+        self.estimator1.handle_reads(context, read1)
+        self.estimator2.handle_reads(context, read2)
     
-    def estimate(self):
+    def finish(self, summary, **kwargs):
         """Estimate error rates.
         
         Returns:
             Tuple (read1_estimate, read2_estimate).
         """
-        return (self.estimator1.estimate(), self.estimator2.estimate())
-    
-    def summarize(self, outstream, names=None, show_details=True, indent="  "):
-        """Print a summary of the error detection.
-        """
-        print("", file=outstream)
-        if names:
-            header = "File 1: {}".format(names[0])
-            print(header, file=outstream)
-            print('-' * len(header), file=outstream)
-        err1, details1 = self.estimator1.estimate()
-        print("Error rate: {:.2%}".format(err1), file=outstream)
-        if show_details and details1:
-            print("Details:\n", file=outstream)
-            self.estimator1.print_details(details1, outstream, indent)
-        print("", file=outstream)
-        
-        if names:
-            header = "File 2: {}".format(names[1])
-            print(header, file=outstream)
-            print('-' * len(header), file=outstream)
-        err2, details2 = self.estimator2.estimate()
-        print("Error rate: {:.2%}".format(err2), file=outstream)
-        if show_details and details2:
-            print("Details:\n", file=outstream)
-            self.estimator2.print_details(details2, outstream, indent)
-        print("", file=outstream)
-        
-        len1 = self.estimator1.total_len
-        len2 = self.estimator2.total_len
-        overall_err = ((err1 * len1) + (err2 * len2)) / (len1+len2)
-        print("Overall error rate: {:.2%}".format(overall_err), file=outstream)
+        super().finish(summary)
+        estimate1, details1 = self.estimator1.estimate()
+        estimate2, details2 = self.estimator2.estimate()
+        summary['errorrate'].update(
+            estimate=(estimate1, estimate2),
+            total_len=(self.estimator1.total_len, self.estimator2.total_len),
+            details=(details1, details2))

@@ -8,7 +8,7 @@ from atropos.io import open_output
 class ReportGenerator(BaseReportGenerator):
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            with open_output(outfile) as out:
+            with open_output(outfile, context_wrapper=True) as out:
                 generate_reports(out, summary)
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)
