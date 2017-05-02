@@ -2,8 +2,7 @@
 """
 import importlib
 import os
-import sys
-from atropos.io import STDOUT, STDERR
+from atropos.io import STDOUT, STDERR, open_output
 from atropos.io.seqio import PAIRED
 
 SERIALIZERS = dict(
@@ -22,9 +21,7 @@ class BaseReportGenerator(object):
     def __init__(self, report_file, report_formats=None):
         if report_file in (STDOUT, STDERR):
             self.report_formats = report_formats or ('txt',)
-            self.report_files = (
-                (sys.stderr if report_file == STDERR else sys.stdout,) *
-                len(self.report_formats))
+            self.report_files = (report_file,) * len(self.report_formats)
         else:
             file_parts = os.path.splitext(report_file)
             self.report_formats = (
@@ -94,7 +91,7 @@ class BaseReportGenerator(object):
             kwargs: Additional arguments to pass to the `dump` method.
         """
         mod = importlib.import_module(fmt)
-        with open(outfile, 'w' + mode) as stream:
+        with open_output(outfile, 'w' + mode) as stream:
             mod.dump(obj, stream, **kwargs)
     
     def generate_text_report(self, fmt, summary, outfile, **kwargs):

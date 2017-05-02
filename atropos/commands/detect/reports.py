@@ -1,5 +1,6 @@
 """Report generator for the detect command.
 """
+from itertools import repeat
 from atropos.commands.reports import BaseReportGenerator
 from atropos.commands.legacy_report import Printer, TitlePrinter
 from atropos.io import open_output
@@ -15,17 +16,12 @@ class ReportGenerator(BaseReportGenerator):
 def generate_reports(outstream, summary):
     """Prints text reports for the results from one or a pair of detectors.
     """
-    names = summary['input']['input_names']
-    if names:
-        for input_idx, (n_reads, matches, name) in enumerate(
-                zip(summary['record_counts'], summary['detect']['matches'], names), 1):
-            generate_detector_report(input_idx, n_reads, matches, name)
-    else:
-        for input_idx, (n_reads, matches) in enumerate(
-                zip(summary['record_counts'], summary['detect']['matches']), 1):
-            generate_detector_report(input_idx, n_reads, matches)
+    names = summary['input']['input_names'] or repeat(None)
+    n_reads = summary['record_counts'][0]
+    for input_idx, (matches, name) in enumerate(zip(summary['detect']['matches'], names), 1):
+        generate_detector_report(outstream, input_idx, n_reads, matches, name)
 
-def generate_detector_report(input_idx, n_reads, matches, input_name=None):
+def generate_detector_report(outstream, input_idx, n_reads, matches, input_name=None):
     n_matches = len(matches)
     pad_size = len(str(n_matches))
     
@@ -34,7 +30,7 @@ def generate_detector_report(input_idx, n_reads, matches, input_name=None):
     _print_indent = Printer(outstream, indent=' ' * (pad_size + 2))
     
     _print.newline()
-    _print_title("Input {}".format(input_idx))
+    _print_title("Input {}".format(input_idx), level=0)
     
     if input_name:
         _print("File: {}".format(input_name))

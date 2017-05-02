@@ -5,9 +5,10 @@ import logging
 import math
 import re
 from atropos.align import Aligner, SEMIGLOBAL
-from atropos.commands.base import BaseCommandRunner
+from atropos.commands.base import (
+    BaseCommandRunner, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin)
 from atropos.util import (
-    reverse_complement, sequence_complexity, enumerate_range)
+    reverse_complement, sequence_complexity, enumerate_range, run_interruptible)
 
 # TODO: Test whether using rc=True in parse_known_contaminants is as fast
 # and as accurate as testing both the forward and reverse complement
@@ -24,7 +25,7 @@ from atropos.util import (
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last
 # download.
 
-# TODO: re-write to use base.Pipeline
+# TODO: parallelize adapter detection for multiple input files.
 
 class CommandRunner(BaseCommandRunner):
     name = 'detect'
@@ -67,7 +68,7 @@ class CommandRunner(BaseCommandRunner):
             detector = PairedDetector(detector_class, **detector_args)
         else:
             detector = detector_class(**detector_args)
-        detector.summary['detect'] = detector_args
+        self.summary['detect'] = detector_args
         
         logging.getLogger().info(
             "Detecting adapters and other potential contaminant "
@@ -240,7 +241,7 @@ def create_contaminant_matchers(contaminants, kmer_size):
 
 POLY_A = re.compile('A{8,}.*|A{2,}$')
 
-class Detector(Pipeline, SingleEndPipelineMixin):
+class Detector(SingleEndPipelineMixin, Pipeline):
     """Base class for contaminant detectors.
     
     Args:
@@ -276,13 +277,13 @@ class Detector(Pipeline, SingleEndPipelineMixin):
     
     def handle_records(self, context, records):
         if context['size'] == 0:
-            continue
+            return
         if self._read_length is None:
             self.set_read_length(records[0])
         super().handle_records(context, records)
     
     def handle_reads(self, context, read1, read2=None):
-        seq = self._filter_seq(read.sequence)
+        seq = self._filter_seq(read1.sequence)
         if seq:
             self._read_sequences.add(seq)
     
@@ -359,7 +360,7 @@ class Detector(Pipeline, SingleEndPipelineMixin):
         super().finish(summary)
         summary['detect']['matches'] = (self.matches(**kwargs),)
 
-class PairedDetector(Pipeline, PairedEndPipelineMixin):
+class PairedDetector(PairedEndPipelineMixin, Pipeline):
     """Detector for paired-end reads.
     """
     def __init__(self, detector_class, **kwargs):
@@ -370,7 +371,7 @@ class PairedDetector(Pipeline, PairedEndPipelineMixin):
     
     def handle_records(self, context, records):
         if context['size'] == 0:
-            continue
+            return
         if not self._read_length_set:
             read1, read2 = records[0]
             self.read1_detector.set_read_length(read1)
@@ -379,12 +380,14 @@ class PairedDetector(Pipeline, PairedEndPipelineMixin):
         super().handle_records(context, records)
     
     def handle_reads(self, context, read1, read2):
-        self.read1_detector.handle_reads(read1)
-        self.read2_detector.handle_reads(read2)
+        self.read1_detector.handle_reads(context, read1)
+        self.read2_detector.handle_reads(context, read2)
     
     def finish(self, summary, **kwargs):
         super().finish(summary)
-        summary['detect']['matches'] = self.matches(**kwargs)
+        summary['detect']['matches'] = (
+            self.read1_detector.matches(**kwargs),
+            self.read2_detector.matches(**kwargs))
 
 class KnownContaminantDetector(Detector):
     """Test known contaminants against reads. This has linear complexity and is
