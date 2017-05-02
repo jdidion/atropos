@@ -18,13 +18,13 @@ from atropos.util import (
 # TODO: Look at CountTable in khmer 2.1. Otherwise move to pymer.
 # pymer https://github.com/kdmurray91/pymer/tree/master/pymer
 
-# TODO: Import kmers from FastQC output.
-
 # TODO: In KnownContaminantDetector, accept template sequences with wildcards
 # to match against.
 
 # TODO: Re-download sequencing_adapters.fa if it has been updated since last
 # download.
+
+# TODO: re-write to use base.Pipeline
 
 class CommandRunner(BaseCommandRunner):
     name = 'detect'
