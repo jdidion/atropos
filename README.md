@@ -38,6 +38,12 @@ Then run:
 
 `pip install atropos`
 
+## Conda
+
+There is an Atropos recipe in [Bioconda](https://anaconda.org/bioconda/atropos).
+
+`conda install -c bioconda atropos`
+
 ## Docker
 
 A [Docker image](https://hub.docker.com/r/jdidion/atropos/) is available for Atropos in Docker Hub.
@@ -91,16 +97,16 @@ We welcome any contributions via GitHub issues and pull requests. See the  [docu
 * Accept multiple input files.
 * Support SAM output.
 * Expand the list of contaminants that are detected by default.
-* Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
 * Accessibility:
-    * Create recipes for conda and homebrew.
-    * Create CWL tool description.
+    * Create recipe for homebrew.
+    * Automatically update conda and homebrew recipes for each release.
     * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
 
 ### 1.3
 
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+* Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
 
 ### 1.4
 

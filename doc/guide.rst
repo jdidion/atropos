@@ -31,6 +31,7 @@ Input files for atropos need to be in one the these formats:
 * FASTA (file name extensions: ``.fasta``, ``.fa``, ``.fna``, ``.csfasta``, ``.csfa``)
 * FASTQ (extensions: ``.fastq``, ``.fq``)
 * A pair of a FASTA file and a ``.(cs)qual`` file
+* SAM/BAM (extensions: ``.sam``, ``.bam``)
 
 The latter format is (or was) used for colorspace data from the SOLiD
 instruments.
@@ -39,10 +40,20 @@ The input file format is recognized from the file name extension (given in
 parentheses in the list above). You can also explicitly specify which format
 the input has by using the ``--format`` option.
 
-The output format is the same as the input format, except for the FASTA/QUAL
-pairs -- those will always be converted to FASTQ. Also, atropos does not check
-the output file name: If you input FASTQ data, but use ``-o output.fasta``, then
-the output file will actually be in FASTQ format.
+Paired-end FASTQ files are supported using ``-pe1`` and ``-pe2`` to specify the 
+read 1 and read 2 files, respectively. Interleaved files (FASTQ, SAM, and BAM)
+are supported using the ``-l`` option. Note that interleaved files must be 
+sorted such that both reads appear successively for each read pair. For SAM/BAM,
+the two reads can be in any order since their identity is detected from the
+flags. You must have the ``pysam`` library installed for SAM/BAM support. If you 
+only want to process one of the read pairs from an interleaved file, you can set
+``--single-input-read <1|2>``.
+
+The output file format is determined by the input format. By default, paired-end
+output will be written into two files, one for each read. Set the ``-L`` option
+to write inteleaved output instead. Also, atropos does not check the output file 
+name: If you input FASTQ data, but use ``-o output.fasta``, then the output file 
+will actually be in FASTQ format.
 
 
 Compressed files
@@ -58,9 +69,7 @@ as expected::
 
 All of atropos's options that expect a file name support this.
 
-Files compressed with bzip2 (``.bz2``) or xz (``.xz``) are also supported, but
-only if the Python installation includes the proper modules. xz files require
-Python 3.3 or later.
+Files compressed with bzip2 (``.bz2``) or xz (``.xz``) are also supported.
 
 
 Standard input and output
@@ -100,6 +109,17 @@ statistics output, for example, and do not care about the trimmed reads at all,
 you could use something like this::
 
     atropos -a AACCGGTT -o /dev/null -se input.fastq
+
+
+Subsampling
+-----------
+
+If you only want to processes some of the reads in your input file, you have two
+options. First, you can use the ``--max-reads <N>`` option to only process the
+first ``N`` reads/pairs in the input. Second, you can use the ``--subsample <p>``
+option to sample a (pseudo)random fraction of the reads from the file, where the
+fraction is defined by probability ``0 < p <= 1``. You can set a specific seed
+using ``--subsample-seed`` to guarantee identical subsampling between runs.
 
 
 Read processing
@@ -187,18 +207,37 @@ same number of bases in either direction. So, for example, if you have 150 bp pa
 reads and you have a read pair with an insert size of 130, the sequencer will read the
 130 bp from the forward direction and then read an additional 20 bp of the forward adapter,
 and will then read the same 130 bp in the reverse direction followed by 20 bp of the
-reverse adapter. This means that adapter contamination can be more accurately dectected by
+reverse adapter. This means that adapter contamination can be more accurately detected by
 first aligning the reads to each other and then examining the overhangs for adapter sequences.
 This procedure is called insert alignment, as opposed to adapter alignment. Atropos implements
 a version of the algorithm described in Strum et al. (DOI: 10.1186/s12859-016-1069-7) that
 first attempts insert alignment (leveraging the dynamic programming model that was implemented
-in Cutadapt), followed by adapter alignment if the insert alignment fails. This new algorithm
-only works with paired-end data that contains a single 3' adapter in each direction. To enable
-this aligner, use the `--aligner insert` option.
+in Cutadapt). If the insert match is successful, then a less stringent adapter match is performed.
+Otherwise, the normal Cutadapt-style adapter matching is performed. 
+
+This new algorithm only works with paired-end data that contains a single 3' adapter in 
+each direction. To enable this aligner, use the `--aligner insert` option.
 
     atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
     -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz \
     -pe1 reads.1.fq.gz -pe2 reads.2.fq.gz
+
+There are three parameters that can be used to fine-tune insert matching:
+
+* ``--insert-match-error-rate``: Similar to ``-e/--error-rate``, but specifically
+for matching inserts. We find generally that it is safe and leads to greater
+accuracy when the insert-match error rate is set higher than the global error
+rate. For example ``-e 0.1 --insert-match-error-rate 0.2`` works well for high-quality
+data.
+* ``--insert-match-adapter-error-rate``: Maximum allowed error rate for matching 
+adapters after successful insert match. This is typically used when you want less
+stringent adapter matching when there is already evidence of an insert match. The
+global error rate (``-e``) is still used when the algorithm is not able to make an
+insert match and falls back to adapter matching.
+* ``--insert-max-rmp``:
+
+Overlapping inserts only match when the probablity of "
+                 "observing k of n matching bases is <= PROB
 
 .. _three-prime-adapters:
 
@@ -475,11 +514,18 @@ Reducing random matches
 Since Atropos allows partial matches between the read and the adapter sequence,
 short matches can occur by chance, leading to erroneously trimmed bases. For
 example, roughly 25% of all reads end with a base that is identical to the
-first base of the adapter. To reduce the number of falsely trimmed bases,
-the alignment algorithm requires that at least *three bases* match between
-adapter and read. The minimum overlap length can be changed with the parameter
-``--overlap`` (or its short version ``-O``). Shorter matches are simply
-ignored, and the bases are not trimmed.
+first base of the adapter. To reduce the number of falsely trimmed bases, Atropos
+uses a threshold based on random-match probability (RMP). RMP is the probability
+that two different sequences of length N will match each other by chance. The
+default threshold is 1x10^-6, but you can change this with the ``--adapter-max-rmp``
+option. 
+
+Another way you can control random matches is by specifying a minimum overlap
+between the adapter and the read. The minimum overlap length can be changed with 
+the parameter ``--overlap`` (or its short version ``-O``). Shorter matches are 
+simply ignored, and the bases are not trimmed. Note that we generally find the
+RMP-based control to be sufficient, and thus setting a minimum overlap is usually
+not necessary.
 
 Requiring at least three bases to match is quite conservative. Even if no
 minimum overlap was required, we can compute that we lose only about 0.44 bases
@@ -489,7 +535,7 @@ overlap length of 3, only about 0.07 bases are lost per read.
 
 When choosing an appropriate minimum overlap length, take into account that
 true adapter matches are also lost when the overlap length is higher than
-zero, reducing Atropos' sensitivity.
+zero, reducing Atropos' sensitivity. 
 
 
 .. _wildcards:

@@ -1,0 +1,31 @@
+package:
+  name: atropos
+  version: '<version>'
+
+about:
+  home: https://atropos.readthedocs.io/
+  license: CC0
+  summary: 'trim adapters from high-throughput sequencing reads'
+
+source:
+  url: <pypi url>
+  md5: <pypi md5>
+
+build:
+  number: 0
+  script: $PYTHON setup.py install
+  skip: True  # [py27]
+
+requirements:
+  build:
+    - python
+    - cython
+  run:
+    - python
+    - tqdm
+    - pysam
+    - jinja2
+
+test:
+  commands:
+    - atropos | grep 'Atropos version'
