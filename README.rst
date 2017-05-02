@@ -1,8 +1,4 @@
-.. image:: https://travis-ci.org/jdidion/atropos.svg?branch=master
-    :target: https://travis-ci.org/marcelm/cutadapt
-
-.. image:: https://img.shields.io/pypi/v/atropos.svg?branch=master
-    :target: https://pypi.python.org/pypi/atropos
+|Travis CI| |PyPi| |DOI|
 
 Atropos
 =======
@@ -13,40 +9,80 @@ reads. It is a fork of the venerable Cutadapt read trimmer
 `DOI:10.14806/ej.17.1.200 <http://dx.doi.org/10.14806/ej.17.1.200>`__),
 with the primary improvements being:
 
-1. Multi-threading support, including an extremely fast "parallel write"
-   mode.
-2. Implementation of a new insert alignment-based trimming algorithm for
-   paired-end reads that is substantially more sensitive and specific
-   than the original Cutadapt adapter alignment-based algorithm. This
-   algorithm can also correct mismatches between the overlapping
-   portions of the reads.
-3. Options for trimming specific types of data (miRNA, bisulfite-seq).
-4. A new command ('detect') that will detect adapter sequences and other
-   potential contaminants (this is experimental).
-5. A new command ('error') that will estimate the sequencing error rate,
-   which helps to select the appropriate adapter- and quality- trimming
-   parameter values.
-6. The ability to merge overlapping reads (this is experimental and the
-   functionality is limited).
-7. The ability to write the summary report and log messages to separate
-   files.
-8. The ability to read and write interleaved FASTQ files.
-9. A progress bar, and other minor usability enhancements.
+1.  Multi-threading support, including an extremely fast "parallel
+    write" mode.
+2.  Implementation of a new insert alignment-based trimming algorithm
+    for paired-end reads that is substantially more sensitive and
+    specific than the original Cutadapt adapter alignment-based
+    algorithm. This algorithm can also correct mismatches between the
+    overlapping portions of the reads.
+3.  Options for trimming specific types of data (miRNA, bisulfite-seq).
+4.  A new command ('detect') that will detect adapter sequences and
+    other potential contaminants.
+5.  A new command ('error') that will estimate the sequencing error
+    rate, which helps to select the appropriate adapter- and quality-
+    trimming parameter values.
+6.  A new command ('qc') that generates read statistics similar to
+    FastQC. The trim command can also compute read statistics both
+    before and after trimming (using the '--stats' option).
+7.  Improved summary reports, including support for serialization
+    formats (JSON, YAML, pickle), support for user-defined templates
+    (via the optional Jinja2 dependency), and integration with
+    `MultiQC <http://multiqc.info>`__.
+8.  The ability to merge overlapping reads (this is experimental and the
+    functionality is limited).
+9.  The ability to write the summary report and log messages to separate
+    files.
+10. The ability to read SAM/BAM files and read/write interleaved FASTQ
+    files.
+11. A progress bar, and other minor usability enhancements.
 
-Dependencies
-------------
+Manual installation
+-------------------
 
--  Python 3.3+ (python 2.x is NOT supported)
--  Cython 0.24+ (``pip install Cython``)
--  progressbar2 or tqdm (optional, if you want progressbar support)
--  pysam (optional, if you want support for SAM/BAM input)
--  khmer 2.0+ (``pip install khmer``) (optional, for detecting
-   low-frequency adapter contamination)
+Atropos is available from
+`pypi <https://pypi.python.org/pypi/atropos>`__ and can be installed
+using ``pip``.
 
-Installation
-------------
+First install dependencies:
+
+-  Required
+
+   -  Python 3.3+ (python 2.x is NOT supported) - note: we have
+      identified a possible bug in python 3.4.2 that causes random
+      segmentation faults. We think this mainly affects unit testing
+      (and thus specifically test on 3.4.3). If you encounter this bug,
+      we recommend upgrading to a newer python version.
+   -  Cython 0.25.2+ (``pip install Cython``)
+
+-  Optional
+
+   -  pytest (for running unit tests)
+   -  progressbar2 or tqdm (progressbar support)
+   -  pysam (SAM/BAM input)
+   -  khmer 2.0+ (``pip install khmer``) (for detecting low-frequency
+      adapter contamination)
+   -  jinja2 (for user-defined report formats)
+
+Then run:
 
 ``pip install atropos``
+
+Conda
+-----
+
+There is an Atropos recipe in
+`Bioconda <https://anaconda.org/bioconda/atropos>`__.
+
+``conda install -c bioconda atropos``
+
+Docker
+------
+
+A `Docker image <https://hub.docker.com/r/jdidion/atropos/>`__ is
+available for Atropos in Docker Hub.
+
+``docker run jdidion/atropos <arguments>``
 
 Usage
 -----
@@ -79,6 +115,22 @@ To take advantage of the new aligner (if you have paired-end reads with
 See the `Documentation <https://atropos.readthedocs.org/>`__ for more
 complete usage information.
 
+Publication
+-----------
+
+A `preprint <https://peerj.com/preprints/2452/>`__ is available and the
+submitted paper is currently under review. The results in the paper can
+be fully reproduced using the workflow defined in the
+`paper <paper/README.md>`__ directory.
+
+Developers
+----------
+
+We welcome any contributions via GitHub issues and pull requests. See
+the `documentation <https://atropos.readthedocs.org/>`__ for style
+guidelines and best practices. We enforce the `Contributor
+Covenant <http://contributor-covenant.org/>`__ code of conduct.
+
 Links
 -----
 
@@ -89,28 +141,35 @@ Links
 Roadmap
 -------
 
-1.1
+1.2
 ~~~
 
 -  Migrate to xphyle (https://github.com/jdidion/xphyle) for file
    management.
--  Integrate userstats (opt-in, of course) to gather user statistics and
-   crash reports.
 -  Provide option for RNA-seq data that will trim polyA sequence.
 -  Accept multiple input files.
+-  Support SAM output.
 -  Expand the list of contaminants that are detected by default.
+-  Accessibility:
 
-1.2
+   -  Create recipe for homebrew.
+   -  Automatically update conda and homebrew recipes for each release.
+   -  Create Galaxy tool description using
+      `argparse2tool <https://github.com/erasche/argparse2tool#cwl-specific-functionality>`__.
+
+1.3
 ~~~
 
--  Provide PacBio-specific options
+-  Provide PacBio- and nanopore-specific options
    (https://github.com/marcelm/cutadapt/issues/120).
 -  Currently, InsertAligner requires a single 3' adapter for each end.
    Adapter trimming will later be generalized so that A) the
    InsertAligner can handle multiple matched pairs of adapters and/or B)
    multiple different aligners can be used for different adapters.
+-  Automate creation and sending of user statistics and crash reports
+   using `pytattle <https://github.com/biologyguy/PyTattle>`__.
 
-1.3
+1.4
 ~~~
 
 -  Migrate to seqio (https://github.com/jdidion/seqio) for
@@ -121,7 +180,7 @@ Roadmap
    1) pre-sort reads inline using samtools or sambamba, or 2) cache each
    read in memory until its mate is found.
 
-1.4
+1.5
 ~~~
 
 -  Provide more user control over anchoring of adapters:
@@ -137,22 +196,35 @@ Roadmap
 -  Add option to InsertAdapter to trim overhangs without adapter
    matching.
 
-1.5
+1.6
 ~~~
 
 -  Implement a public plugin API.
--  Improvements to the summary report, and addition of a
-   computer-parsable report for use in QC pipelines
-
-   -  https://github.com/marcelm/cutadapt/issues/112
-   -  Also look at the QCML used in ngs-bits
+-  Add more logging and convert log messages from old-style to new-style
+   format strings.
 
 2.0
 ~~~
 
--  Simplification of command line options, perhaps by splitting
+-  Simplification of command line options, perhaps by further splitting
    functionality up into different sub-commands, but also by more
    intelligent choices for default option values based on context.
+-  Consider adding additional report formats
+
+   -  https://github.com/marcelm/cutadapt/issues/112
+
+-  Performance enhancements using
+
+   -  http://numba.pydata.org/
+   -  https://github.com/undefx/vecpy
+   -  https://github.com/serge-sans-paille/pythran
+
+-  90% test coverage
+
+-  Fuzz testing using AFL
+
+   -  http://lcamtuf.coredump.cx/afl/
+   -  https://github.com/jwilk/python-afl
 
 Beyond 2.0
 ~~~~~~~~~~
@@ -163,16 +235,17 @@ Beyond 2.0
 -  Implement the quality trimming algorithm used in UrQt:
    http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
 -  Scythe is an interesting new trimmer. Depending on how the benchmarks
-   look in the forthcomming paper, we will add it to the list of tools
-   we compare against Atropos, and perhaps implement their Bayesian
+   look in the forthcoming paper, we will add it to the list of tools we
+   compare against Atropos, and perhaps implement their Bayesian
    approach for adapter match.
+-  Experiment with replacing the multicore implementation with an
+   asyncio-based implementation (using ProcessPoolExecutor and uvloop).
 
 While we consider the command-line interface to be stable, the internal
-code organization of Atropos is likely to change substantially. At this
-time, we recommend to not directly interface with Atropos as a library
-(or to be prepared for your code to break). The internal code
-organization will be stablized as of version 2.0, which is planned for
-early 2017.
+code organization of Atropos is likely to change. At this time, we
+recommend to not directly interface with Atropos as a library (or to be
+prepared for your code to break). The internal code organization will be
+stabilized as of version 2.0, which is planned for sometime in 2017.
 
 If you would like to suggest additional enhancements, you can submit
 issues and/or pull requests at our GitHub page.
@@ -193,5 +266,9 @@ submitted for peer review shortly. For now, you can cite it as:
     specific, sensitive, and speedy trimming of sequencing reads."
     https://peerj.com/preprints/2452/
 
-.. |https://travis-ci.org/jdidion/atropos| image:: https://travis-ci.org/jdidion/atropos.svg?branch=master
-.. |https://pypi.python.org/pypi/atropos| image:: https://img.shields.io/pypi/v/atropos.svg?branch=master
+.. |Travis CI| image:: https://travis-ci.org/jdidion/atropos.svg?branch=master
+   :target: https://travis-ci.org/jdidion/atropos]
+.. |PyPi| image:: https://img.shields.io/pypi/v/atropos.svg?branch=master
+   :target: https://pypi.python.org/pypi/atropos
+.. |DOI| image:: https://zenodo.org/badge/61393086.svg
+   :target: https://zenodo.org/badge/latestdoi/61393086

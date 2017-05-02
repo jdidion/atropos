@@ -234,10 +234,28 @@ adapters after successful insert match. This is typically used when you want les
 stringent adapter matching when there is already evidence of an insert match. The
 global error rate (``-e``) is still used when the algorithm is not able to make an
 insert match and falls back to adapter matching.
-* ``--insert-max-rmp``:
+* ``--insert-max-rmp``: Random match probability (RMP) is the probability
+that two different sequences of length N will match each other by chance. You can
+specify an RMP threshold in addition to/instead of error rate and minimum overlap.
 
-Overlapping inserts only match when the probablity of "
-                 "observing k of n matching bases is <= PROB
+.. _correction
+
+Error correction
+----------------
+
+Read pairs that overlap are derived from the same sequence, and are thus expected to be identical.
+However, all sequencing technologies are associated with some level of error that may lead to
+mismatches. The insert aligner is able to correct mismatches between overlapping reads using one
+of three strategies (set using the ``--correct-mismatches`` option):
+
+* conservative: When the qualities of the bases are different, set the base to be the one with the
+  highest quality/lowest error probability. When the qualities are equal, do not change them.
+* liberal: Same policy as 'conservative', except that when qualities are the same set the base to
+  be the one from the read with the highest median quality.
+* N: Set the base to 'N' in both pairs.
+
+Note that in all cases where error correction is enabled, if exactly one base is an N, it is set
+to be the base from the other pair.
 
 .. _three-prime-adapters:
 
@@ -425,7 +443,6 @@ Read before trimming           Read after trimming Detected adapter type
 
 The ``-b`` option cannot be used with colorspace data.
 
-
 .. _error-tolerance:
 
 Error tolerance
@@ -515,10 +532,8 @@ Since Atropos allows partial matches between the read and the adapter sequence,
 short matches can occur by chance, leading to erroneously trimmed bases. For
 example, roughly 25% of all reads end with a base that is identical to the
 first base of the adapter. To reduce the number of falsely trimmed bases, Atropos
-uses a threshold based on random-match probability (RMP). RMP is the probability
-that two different sequences of length N will match each other by chance. The
-default threshold is 1x10^-6, but you can change this with the ``--adapter-max-rmp``
-option. 
+uses a threshold based on random-match probability (RMP). The default threshold 
+is 1x10^-6, but you can change this with the ``--adapter-max-rmp`` option. 
 
 Another way you can control random matches is by specifying a minimum overlap
 between the adapter and the read. The minimum overlap length can be changed with 
@@ -580,6 +595,28 @@ you use this feature. For poly-A trimming, for example, you would write::
 
     atropos -a "A{100}" -o output.fastq -se input.fastq
 
+
+.. _adapter_list
+
+Specifying adapters by name
+---------------------------
+
+Rather than enter your adapter sequences each time or maintain separate adapter
+files for each of your datasets, you can maintain a single adapter file (in 
+FASTA format) and specify adapters by name::
+
+    atropos -F myadapters.fa -a TruSeq1 -A TruSeq2 ...
+
+If you are using standard adapter sequences, it is likely that they are already
+included in the `Atropos adapter definition file 
+<https://github.com/jdidion/atropos/blob/master/atropos/adapters/sequencing_adapters.fa>`_,
+in which case you can omit the ``-F`` option and Atropos will automatically fetch
+the file from the GitHub repository (assuming you have an internet connection).
+Atropos will cache the adapters found in either the default or the user-specified
+adapter file (in a .adapters file, unless you specify a different path using the
+``--adapter-cache-file`` option). You can disable the fetching and use of the 
+default adapter file with the ``--no-default-adapters`` option. You can disable
+adapter caching using the ``--no-cache-adapters`` option.
 
 .. _modifying-reads:
 
@@ -1213,6 +1250,68 @@ Atropos supports the following options to deal with ``N`` bases in your reads:
     quality trimming: ``N`` bases typically also have a low quality value
     associated with them.
 
+.. _merging
+
+Read merging and overwriting
+============================
+
+Overlapping reads can lead to double-counting of sites in down-stream quantitative
+analyses that treat each read in a pair independently. Atropos can merge overlapping
+reads, which means that the pair will be collapsed into a single read. 
+
+Read merging is enable by the ``--merge-overlapping`` option. During merging,
+any mismatches are corrected according to the mismatch correction policy (determined
+by ``--correct-mismatches``, see :ref:`Error correction <correction>`). The following
+parameters enable fine-tuning of the merge process:
+
+* ``--merge-min-overlap``: The minimum overlap between reads required for merging. 
+  If this number is (0,1.0], it specifies the minimum length as the fraction of 
+  the length of the *shorter* read in the pair; otherwise it specifies the minimum 
+  number of overlapping base pairs (with an absolute minimum of 2 bp).
+* ``--merge-error-rate``: The maximum error rate when aligning reads for merging.
+
+*IMPORTANT*: By default, merged reads are discarded. Merged reads cannot be written
+to FASTQ output because it breaks the required read pairing between files. You can
+write merged reads to a separate, "single-end" FASTQ file using the ``--merged-output``
+option.
+
+Overwriting low-quality reads
+-----------------------------
+
+In some atypical situations, you may end up with data in which one read in a pair is
+of substantially worse quality than the other read. In such cases, you may want to
+ignore the poor-quality read entirely and, rather than throw out the read pair,
+substitute the better quality read for the worse-quality read. This is done using
+``--overwrite-low-quality LOWQ,HIGHQ,WINDOW``, meaining that when one read has
+mean quality < LOWQ and the other read has  mean quality >= HIGHQ over the first 
+WINDOW bases, the better-quality read overwrites the worse-quality read.
+
+Note that if read merging is enabled, such reads will be treated as merged and
+either discarded or written to ``--merged-output``.
+
+Whether read-merging occurs also depends on the :ref:`order of trimming operations
+<ooo>`.
+
+.. _ooo
+
+Order of modifications
+======================
+
+Read trimming tools that support both adapter and quality trimming differ in the
+order in which the apply these operations. Cutadapt performs adapter trimming
+first, followed by quality trimming. Atropos enables you to specify the order in
+which you'd like operations applied using ``--op-order``. The order of the 
+following 5 operations can be customized:
+
+* A = adapter trimming
+* C = cutting (unconditional)
+* G = NextSeq trimming
+* Q = quality trimming
+* W = overwrite poor quality reads
+
+The default order of operations is "CGQAW" to maintain backward-compatibility
+with Cutadapt. However, we find that using the order "GAWCQ" generally leads to 
+better results; this is likely to become the default in Atropos 2.0+.
 
 .. _bisulfite:
 
@@ -1443,6 +1542,44 @@ We can see that no matches longer than 12 have zero errors. In this
 case, it indicates that the 13th base of the given adapter sequence is
 incorrect.
 
+Saving to file
+--------------
+
+You can re-direct the summary report to a file using the ``--report-file`` option.
+
+Serialized formats
+------------------
+
+Atropos collects statistics on all aspects of the trimming process. These statistics
+are used in generating the summary report. However, you can also choose to output
+the statistics in raw form into a serialized file format. Currently, three formats
+are supported:
+
+* `JSON <http://www.json.org/>`_
+* `YAML <http://yaml.org/>`_
+* `Pickle <https://docs.python.org/3/library/pickle.html>`_
+
+Note that JSON and YAML are language-independent, text-based formats, while
+Pickle is a python-specific binary format.
+
+You can save one of these formats in one of two ways:
+
+* Change the file extension of the ``--report-file``::
+        
+        atropos --report-file summary.yaml ...
+        
+* Set the ``--report-formats`` option. When doing this, you can specify more than
+one type of output file, and you use the ``--report-file`` option to specify the 
+file name prefix::
+        
+        atropos --report-file summary --report-formats txt yaml json
+
+We provide an Atropos module in the `MultiQC <http://multiqc.info/>`_ package that
+reads the JSON summary output directly.
+
+TODO: Describe the format of the JSON/YAML/Pickle dictionary.
+
+TODO: Document using custom report formats via Jinja2 templates.
 
 .. _info-file:
 
@@ -1490,3 +1627,107 @@ concatenation of columns 5-7 be identical to the original read sequence (and
 accordingly for columns 9-11). For subsequent lines, the shown sequence are the
 ones that were used in subsequent rounds of adapter trimming, that is, they get
 successively shorter.
+
+.. _qc
+
+Quality control statistics
+==========================
+
+FastQC is a popular program for generating quality control (QC) metrics on raw
+read data. It is common practice to examine QC metrics both before and after
+trimming to identify any systematic data quality issues, to observe the 
+improvements in data quality due to trimming, and to ensure that trimming does 
+not introduce any unintended side-effects. Since both read trimming and QC 
+involve iterating over all reads in the dataset, we reasoned that implementing 
+both operations in the same tool would reduce the overall processing time, and 
+also eliminate the need to install two separate tools.
+
+You can enable QC using the ``--stats`` option of the ``trim`` subcommand. This
+option takes one of three values controlling at what point(s) QC metrics are
+collected: pre, post, and both. The ``--stats`` option can take additional arguments
+to customize which metrics are collected. Currently, only the ``tiles`` parameter
+is supported, which enables collecting tile-level metrics (Illumina only)::
+
+    atropos --stats pre:tiles
+
+To collect tile-level metrics, Atropos must parse the read name to obtain the tile
+ID. By default it uses a regular expression that matches standard Illumina read names::
+
+    ^(?:[^\:]+\:){4}([^\:]+)
+    
+If you need to modify this regular expression, you can pass it as an argument to
+the tiles argument::
+
+    atropos --stats "pre:tiles=<myregexp>"
+
+Additionally, there is a ``qc`` subcommand that only collects QC metrics (i.e. it
+does not perform trimming).
+
+QC metrics are added to the summary reports. Additionally, the Atropos 
+`MultiQC <http://multiqc.info/>`_ module can display a summary of the QC metrics.
+
+.. _detect
+
+Adapter detection
+=================
+
+Often, details of sequencing library construction are not fully communicated 
+from the individual or facility that generated the library to the individual(s) 
+performing data analysis. Manual determination of sequencing adapters and other 
+potential library contaminants can be a tedious and error-prone task. Atropos
+provides the ``detect`` subcommand to guess the most likely adapter sequence
+from a sample of your data::
+
+    atropos detect -pe1 read1.fq -pe2 read2.fq
+
+There are three algorithms you can use for detection. Atropos choses one by
+default based on the other command line options, but you can specify an algorithm
+using the ``-d/--detector`` option. The available detectors are:
+
+* heuristic: Use a heuristic algorithm to detect adapter sequences. This is the
+slowest and most memory-intensive algorithm, but also the most accurate.
+* khmer: Use the khmer library to identify frequent contaminants. This requires
+the optional khmer dependency to be installed. This algorithm is able to detect
+more rare contaminants than the heuristic algorithm, and is also more 
+memory-efficient, but it also has higher false-positive and false-negative error
+rates. It is recommended to only use this algorithm if the heuristic algorithm 
+fails.
+* known: Only match reads against known adapter sequences. The previous two
+algorithms can also match detected contaminant sequences against known adapters.
+
+Because adapter sequences have been designed not to match any known sequence in 
+nature, a sequence (or pair of sequences) that occurs at high frequency and 
+matches a known adapter sequence is likely to be the true sequence(s) used as 
+adapters in the dataset. Thus, our algorithm optionally matches the 
+high-abundance ``k``-mers to a list of known adapters/contaminants. By default,
+Atropos uses a curated list of commonly used adapter sequences. You can specify
+your own file (in FASTA format) using the ``--known-adapters-file`` option (see
+:ref:`"Specifying adapters by name <adapter_list>` for details). When a 
+contaminant list is not provided, or when the adapter does not match a known 
+sequence, we advise you to take caution when using the results of this 
+detection process, as a highly abundant sequence might simply be derived from a 
+frequently repeated element in the genome.
+
+.. _error
+
+Error rate estimation
+=====================
+
+One of the most important parameters for adapter trimming is the error rate
+(``-e``). For high-quality Illumina data, the default settings are sufficient.
+However, it's difficult to know the data quality a priori. Atropos provides the 
+``error`` subcommand to estimate the error rate for setting the ``-e`` option::
+
+    atropos error -pe1 read1.fq -pe2 read2.fq
+
+There are two error rate estimation algorithms provided. The default algorithm
+simply averages the base quality scores in a sample of reads. This is likely to
+be an overestimation of the true error rate, but computing it is very fast. A
+more accurate but *much* slower algorithm is Shadow Regression (Wang et al., 
+"Estimation of sequencing error rates in short reads", BMC Bioinformatics 2012 
+13:185, DOI: 10.1186/1471-2105-13-185). Using the shadow regression algorithm
+requires for R to be installed, as well as the ``ShadowRegression`` R package.
+
+Once you've estimated the error rate, we recommend setting the ``-e`` option to
+~10X the error rate. For example, if the estimated error is 0.9% (0.009), a good
+value for ``-e`` is 0.1.
