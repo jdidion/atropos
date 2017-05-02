@@ -1,19 +1,13 @@
 # Changes
 
-<<<<<<< HEAD
-v1.1.4 (dev)
-------------
-* Exposed option to set PRNG seed when subsampling reads.
-=======
 v1.1.5 (dev)
 ------------
-
+* Major update to the documentation.
 
 v1.1.4 (2017.05.02)
 -------------------
 * Exposed option to set PRNG seed when subsampling reads.
 * Fixed issue #14: 'detect' and 'error' commands were broken. This involved rewriting those commands to use the same pipeline and reporting frameworks as the 'trim' and 'qc' commands.
->>>>>>> issue14
 
 v1.1.3 (2017.05.01)
 -------------------
