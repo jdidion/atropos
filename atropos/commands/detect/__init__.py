@@ -60,29 +60,22 @@ class CommandRunner(BaseCommandRunner):
                 "Detecting contaminants using the kmer-based algorithm")
             detector_class = KhmerDetector
         
-        input_names = self.input_names
         detector_args = dict(
             kmer_size=kmer_size, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
-            known_contaminants=known_contaminants)
+            include=include, known_contaminants=known_contaminants)
         if self.paired:
             detector = PairedDetector(detector_class, **detector_args)
         else:
             detector = detector_class(**detector_args)
-            input_names = input_names[0]
-        
-        self.summary['detect'] = dict(
-            kmer_size=kmer_size,
-            n_reads=n_reads,
-            include=include,
-            detector=detector)
+        detector.summary['detect'] = detector_args
         
         logging.getLogger().info(
             "Detecting adapters and other potential contaminant "
             "sequences based on %d-mers in %d reads", kmer_size, n_reads)
         
-        detector.consume_all_batches(self)
-        
-        return 0
+        # currently only single-threaded operation is supproted
+        self.summary.update(mode='serial', threads=1)
+        return run_interruptible(detector, self, raise_on_error=True)
 
 class Match(object):
     """A contaminant match.
@@ -247,7 +240,7 @@ def create_contaminant_matchers(contaminants, kmer_size):
 
 POLY_A = re.compile('A{8,}.*|A{2,}$')
 
-class Detector(object):
+class Detector(Pipeline, SingleEndPipelineMixin):
     """Base class for contaminant detectors.
     
     Args:
@@ -259,10 +252,12 @@ class Detector(object):
     """
     def __init__(
             self, kmer_size=12, n_reads=10000, overrep_cutoff=100,
-            known_contaminants=None):
+            include='all', known_contaminants=None):
+        super().__init__()
         self.kmer_size = kmer_size
         self.n_reads = n_reads
         self.overrep_cutoff = overrep_cutoff
+        self.include = include
         self.known_contaminants = known_contaminants
         self._read_length = None
         self._read_sequences = set()
@@ -275,43 +270,18 @@ class Detector(object):
         """
         raise NotImplementedError()
     
-    def consume_all(self, reader):
-        """Consume up to self.n_reads reads from the reader.
-        
-        Args:
-            reader: Iterator over sequence records.
-        """
-        read = next(reader)
-        self.consume_first(read)
-        for read in enumerate_range(reader, 1, self.n_reads):
-            self.consume(read)
-    
-    def consume_all_batches(self, batch_iterator):
-        """Consume all reads from the specified batch_iterator. It is expected
-        that the iterator was constructed with max_reads == n_reads.
-        
-        Args:
-            batch_iterator: Iterator over batches of sequence records.
-        """
-        for batch_num, (batch_meta, batch) in enumerate(batch_iterator):
-            if batch_meta['size'] == 0:
-                continue
-            if batch_num == 0:
-                self.consume_first(batch[0])
-                batch = batch[1:]
-            for read in batch:
-                self.consume(read)
-        
-    def consume_first(self, read):
-        """Consumes the first sequence record, which determines the read length.
-        """
+    def set_read_length(self, record):
         assert self._read_length is None
-        self._read_length = len(read.sequence)
-        self.consume(read)
+        self._read_length = len(record.sequence)
     
-    def consume(self, read):
-        """Consumes a single read.
-        """
+    def handle_records(self, context, records):
+        if context['size'] == 0:
+            continue
+        if self._read_length is None:
+            self.set_read_length(records[0])
+        super().handle_records(context, records)
+    
+    def handle_reads(self, context, read1, read2=None):
         seq = self._filter_seq(read.sequence)
         if seq:
             self._read_sequences.add(seq)
@@ -334,12 +304,11 @@ class Detector(object):
         return self._matches
     
     def _filter_and_sort(
-            self, include="all", min_len=None, min_complexity=1.1,
-            min_match_frac=0.1, limit=20):
+            self, min_len=None, min_complexity=1.1, min_match_frac=0.1, 
+            limit=20):
         """Identify, filter, and sort contaminants.
         
         Args:
-            include: Contaminants to include; 'all', 'known', or 'unknown'.
             min_len: Minimum contaminant length.
             min_complexity: Minimum sequence complexity.
             min_match_frac: Minimum fraction of matching kmers.
@@ -360,9 +329,9 @@ class Detector(object):
                 return False
             if min_complexity and match.seq_complexity < min_complexity:
                 return False
-            if include == 'known' and not match.is_known:
+            if self.include == 'known' and not match.is_known:
                 return False
-            elif include == 'unknown' and match.is_known:
+            elif self.include == 'unknown' and match.is_known:
                 return False
             if (
                     min_match_frac and match.is_known and
@@ -386,58 +355,36 @@ class Detector(object):
         """
         raise NotImplementedError()
     
-    def summarize(self, outstream, name=None, **kwargs):
-        """Print a summary.
-        """
-        header = "File: {}".format(name) if name else None
-        summarize_contaminants(
-            outstream, self.matches(**kwargs), self.n_reads, header)
+    def finish(self, summary, **kwargs):
+        super().finish(summary)
+        summary['detect']['matches'] = (self.matches(**kwargs),)
 
-class PairedDetector(object):
+class PairedDetector(Pipeline, PairedEndPipelineMixin):
     """Detector for paired-end reads.
     """
     def __init__(self, detector_class, **kwargs):
+        super().__init__()
         self.read1_detector = detector_class(**kwargs)
         self.read2_detector = detector_class(**kwargs)
+        self._read_length_set = False
     
-    def consume_all(self, reader):
-        """Consume all records in `reader`.
-        """
-        read1, read2 = next(reader)
-        self.read1_detector.consume_first(read1)
-        self.read2_detector.consume_first(read2)
-        for read1, read2 in reader:
-            self.read1_detector.consume(read1)
-            self.read2_detector.consume(read2)
+    def handle_records(self, context, records):
+        if context['size'] == 0:
+            continue
+        if not self._read_length_set:
+            read1, read2 = records[0]
+            self.read1_detector.set_read_length(read1)
+            self.read2_detector.set_read_length(read2)
+            self._read_length_set = True
+        super().handle_records(context, records)
     
-    def consume_all_batches(self, batch_iterator):
-        """Consume all batches in `batch_iterator`.
-        """
-        for batch_num, (batch_meta, batch) in enumerate(batch_iterator):
-            if batch_meta['size'] == 0:
-                continue
-            if batch_num == 0:
-                read1, read2 = batch[0]
-                self.read1_detector.consume_first(read1)
-                self.read2_detector.consume_first(read2)
-                batch = batch[1:]
-            for read1, read2 in batch:
-                self.read1_detector.consume(read1)
-                self.read2_detector.consume(read2)
+    def handle_reads(self, context, read1, read2):
+        self.read1_detector.handle_reads(read1)
+        self.read2_detector.handle_reads(read2)
     
-    def matches(self, **kwargs):
-        """Returns the tuple (read1_matches, read2_matches).
-        """
-        return (
-            self.read1_detector.matches(**kwargs),
-            self.read2_detector.matches(**kwargs))
-    
-    def summarize(self, outstream, names=(None, None), **kwargs):
-        """Print a summary.
-        """
-        name1, name2 = names
-        self.read1_detector.summarize(outstream, name1, **kwargs)
-        self.read2_detector.summarize(outstream, name2, **kwargs)
+    def finish(self, summary, **kwargs):
+        super().finish(summary)
+        summary['detect']['matches'] = self.matches(**kwargs)
 
 class KnownContaminantDetector(Detector):
     """Test known contaminants against reads. This has linear complexity and is
@@ -786,58 +733,3 @@ def align(seq1, seq2, min_overlap_frac=0.9):
         return seq1[match[0]:match[1]]
     else:
         return None
-
-# TODO: move report to the report package, have summarize update the
-# summary dict.
-
-def summarize_contaminants(outstream, matches, n_reads, header=None):
-    """Prints a report.
-    """
-    print("", file=outstream)
-    
-    if header:
-        print(header, file=outstream)
-        print('-' * len(header), file=outstream)
-    
-    n_matches = len(matches)
-    print(
-        "Detected {} adapters/contaminants:".format(n_matches),
-        file=outstream)
-    
-    if n_matches == 0:
-        print("Try increasing --max-reads", file=outstream)
-        return
-    
-    pad = len(str(len(matches)))
-    pad2 = ' ' * (pad + 2)
-    def println(string):
-        """Print a string with padding.
-        """
-        print(pad2 + string, file=outstream)
-    
-    for idx, match in enumerate(matches):
-        print(
-            ("{:>" + str(pad) + "}. Longest kmer: {}").format(idx+1, match.seq),
-            file=outstream)
-        if match.longest_match:
-            println("Longest matching sequence: {}".format(
-                match.longest_match[0]))
-        if match.is_known:
-            println("Name(s): {}".format(
-                ",\n{}".format(' ' * (pad + 11)).join(match.names)))
-            println("Known sequence(s): {}".format(
-                ",\n{}".format(' ' * (pad + 11)).join(match.known_seqs)))
-            println(
-                "Known sequence K-mers that match detected contaminant: "
-                "{:.2%}".format(match.match_frac))
-        if match.abundance:
-            println("Abundance (full-length) in {} reads: {} ({:.1%})".format(
-                n_reads, match.abundance, match.abundance / n_reads))
-        if match.match_frac2:
-            println(
-                "Detected contaminant kmers that match known sequence: "
-                "{:.2%}".format(match.match_frac2))
-        if match.count_is_frequency:
-            println("Frequency of k-mers: {:.2%}".format(match.count))
-        else:
-            println("Number of k-mer matches: {}".format(match.count))
