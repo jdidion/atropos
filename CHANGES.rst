@@ -1,8 +1,8 @@
 Changes
 =======
 
-<<<<<<< HEAD v1.1.4 (dev) ------------ \* Exposed option to set PRNG
-seed when subsampling reads. ======= v1.1.5 (dev) ------------
+v1.1.5 (dev)
+------------
 
 v1.1.4 (2017.05.02)
 -------------------

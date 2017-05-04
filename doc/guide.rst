@@ -1046,6 +1046,8 @@ If your adapter sequences are all similar and differ only by a variable barcode
 sequence, you should use a single adapter sequence instead that
 :ref:`contains wildcard characters <wildcards>`.
 
+**NOTE:** The insert-match algorithm currently only supports using a single pair
+of 3' adapters.
 
 .. _named-adapters:
 
