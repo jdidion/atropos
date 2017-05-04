@@ -3,6 +3,7 @@ Changes
 
 v1.1.5 (dev)
 ------------
+-  Major update to the documentation.
 
 v1.1.4 (2017.05.02)
 -------------------

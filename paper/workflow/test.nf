@@ -74,7 +74,7 @@ process Atropos {
 
   script:
   """
-  >&2 echo ${task.tag} && \
+  echo ${task.tag} >> ${task.tag}.timing.txt && \
   /usr/bin/time -v atropos \
     -pe1 ${reads[0]} -pe2 ${reads[1]} \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
@@ -91,21 +91,17 @@ Channel
   .concat(timingAtropos)
   .set { timing }
 
-process Timing {
+process MergeTiming {
   container "jdidion/python_bash"
 
   input:
   file timingFiles from timing.toList()
 
   output:
-  file "${task.executor}.timing.txt"
-  file "${task.executor}.timing.tex"
+  file "timing.txt"
 
   script:
   """
-  cat $timingFiles > ${task.executor}.timing.txt
-  python scripts/summarize_timing_info.py -f latex \
-    -i ${task.executor}.timing.txt \
-    -o ${task.executor}.timing.tex
+  cat $timingFiles > timing.txt
   """
 }

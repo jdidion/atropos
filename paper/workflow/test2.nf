@@ -4,7 +4,7 @@ process A {
     val animal from { [ 'horse', 'cow' ] }
 
     output:
-    file "${animal}.txt" into A_results
+    set val(animal), file "${animal}.txt" into A_results
 
     """
     echo -n "${animal}!" > ${animal}.txt
@@ -16,7 +16,7 @@ process B {
     val flower from { [ 'weed', 'clover' ] }
 
     output:
-    file "${flower}.txt" into B_results
+    set val(flower), file "${flower}.txt" into B_results
 
     """
     echo -n "${flower}!" > ${flower}.txt
@@ -28,14 +28,24 @@ Channel.empty().
     set { C_results }
 
 process Combine {
-    echo true
-
     input:
-    file c from C_results.toList()
-
-    script:
+    set val(item), file(combined) from C_results
     
+    output:
+    stdout merged
+    
+    script:
+    template "parse_gtime.py"
+}
+
+process echoMerged {
+    echo true
+    
+    input:
+    val merged
+    
+    script:
     """
-    cat $c
+    echo $merged
     """
 }
