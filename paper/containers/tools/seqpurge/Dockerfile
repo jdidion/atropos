@@ -25,8 +25,7 @@ ENV BUILD_PACKAGES \
     libbz2-dev \
     zlib1g-dev \
     qt5-qmake \
-    libqt5sql5-mysql
-ENV RUNTIME_PACKAGES \
+    libqt5sql5-mysql \
     qt5-default \
     libqt5xmlpatterns5-dev
 RUN apt-get update \
@@ -40,8 +39,6 @@ RUN apt-get update \
     && make build_tools_release \
     && mv /tmp/ngs-bits/bin/* /usr/local/bin \
     && cd .. \
-    && apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $RUNTIME_PACKAGES \
     && rm -rf /var/lib/apt/lists/* /tmp/* \
     && locale-gen en_US.UTF-8 \
     && update-locale LANG=en_US.UTF-8
