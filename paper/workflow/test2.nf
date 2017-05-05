@@ -1,25 +1,25 @@
 
 process A {
     input:
-    val animal from { [ 'horse', 'cow' ] }
+    val animal from { [ 'horse_4_rna_20', 'cow_4_rna_20' ] }
 
     output:
-    set val(animal), file "${animal}.txt" into A_results
+    set val(animal), file("${animal}.txt") into A_results
 
     """
-    echo -n "${animal}!" > ${animal}.txt
+    gtime -v -o ${animal}.txt echo -n "${animal}!"
     """
 }
 
 process B {
     input:
-    val flower from { [ 'weed', 'clover' ] }
+    val flower from { [ 'weed_4_rna_20', 'clover_4_rna_20' ] }
 
     output:
-    set val(flower), file "${flower}.txt" into B_results
+    set val(flower), file("${flower}.txt") into B_results
 
     """
-    echo -n "${flower}!" > ${flower}.txt
+    gtime -v -o ${flower}.txt echo -n "${flower}!"
     """
 }
 
@@ -27,9 +27,11 @@ Channel.empty().
     concat(A_results, B_results).
     set { C_results }
 
-process Combine {
+process ParseCombined {
+    container "jdidion/python_bash"
+    
     input:
-    set val(item), file(combined) from C_results
+    set val(item), file(timing) from C_results
     
     output:
     stdout merged
@@ -42,10 +44,12 @@ process echoMerged {
     echo true
     
     input:
-    val merged
+    val mergedRows from merged.toList()
     
     script:
+    mergedData = mergedRows.join("")
+    
     """
-    echo $merged
+    echo '$mergedData'
     """
 }

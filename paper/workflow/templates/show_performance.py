@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sb
 from mako.template import Template
 
-TABLE_TEMPLATE = Template(r"""
+table_template = Template(r"""
 <%
 threads = table.Threads.unique()
 progs = table.Program.unique()
@@ -25,7 +25,7 @@ progs = table.Program.unique()
     % endif
     % for p in progs:
         % for t in threads:
-        <% row = table[lambda df: df.Program == p and df.Threads == t, :] %>
+        <% row = table.loc[t][p] %>
         ${" & ".join(str(r) for r in row)} 
         
         % endfor 
@@ -40,7 +40,7 @@ progs = table.Program.unique()
     % endif
     % for p in progs:
         ${p}
-        <% row = table[table.loc['Program'] == p, 'Duration'] %>
+        <% row = table.loc[p], 'Memory'] %>
         ${" & ".join(r for r in row)} 
         
         % endfor 
@@ -48,12 +48,24 @@ progs = table.Program.unique()
     % endfor
     \hline
     
+    % if len(threads) == 1:
+    \hfill{} & \multicolumn{2}{c}{CPU Usage (GB)} \\\hline
+    % else
+    \hfill{} & \multicolumn{${len(threads)*2}}{c}{CPU Usage (Min$|$Max %)} \\\hline
+    % endif
+    % for p in progs:
+        ${p}
+        <% row = table.loc[p], 'CPU'] %>
+        ${" & ".join(r for r in row)} 
+        
+        % endfor 
+        \\
+    % endfor
+    
 \end{tabular}
 \caption{\label{tab:${name}}${caption}}
 \end{table}
 """)
-
-
 
 # master table
 table = pd.read_csv(sys.stdin, sep='\t', names=(
@@ -61,9 +73,18 @@ table = pd.read_csv(sys.stdin, sep='\t', names=(
 
 # generate table
 with open("${output.1}", "wt") as o:
-    latex = template.render(table.
-        groupby(['Program', 'Threads']).
+    o.write(table_template.render(table.
+        groupby(['Threads', 'Program']).
         agg([min, max]).
-        sort_values(['Threads', 'Program']))
-    o.write(latex)
+        sortlevel()))
 
+# generate figure
+threads = table.Threads.unique()
+if len(threads) == 1:
+    plot = sb.PairGrid(
+        table, x_vars=("Program"), y_vars=('Duration', 'Memory', 'CPU'))
+else:
+    plot = sb.PairGrid(
+        table, x_vars=("Program"), y_vars=('Duration', 'Memory', 'CPU'),
+        hue="Program")
+plot.map(sb.barplot).savefig("{}.svg".format())

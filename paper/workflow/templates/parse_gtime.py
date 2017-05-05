@@ -10,10 +10,14 @@ and write a tab-delimited row to stdout with the following fields:
 6. Max CPU usage
 7. Max memory usage
 """
+import os
+import re
 import sys
 import fileinput
 
-profile = $item.split("_")
+profile = os.environ.get("item", "$item").split("_")
+timing_file = os.environ.get("timing", "$timing")
+
 if profile[0] == 'atropos':
     if len(profile) == 7:
         prog, threads, dataset1, dataset2, qcut, aligner, writer = profile
@@ -34,26 +38,28 @@ except:
     pass
 qcut = qcut[1:]
 
-lines = list(fileinput())
+with open(timing_file, 'rt') as i:
+    lines = i.readlines()
 
 cpu = lines[3]
-cpu_match = re.match("Percent of CPU this job got: (\d+)%", cpu)
+cpu_match = re.match("\\s*Percent of CPU this job got: (\\d+)%", cpu)
 assert cpu_match is not None
-cpu_frac = float(cpu_match.group(1)) / 100
+cpu_frac = float(cpu_match.group(1))
 
 wc_time = lines[4]
-wc_match = re.match(
-    "Elapsed \(wall clock\) time \(h:mm:ss or m:ss\): (?:(\d+)h )?(\d+)m ([\d\.]+)s",
-    wc_time)
+wc_match_prefix = "\\s*Elapsed \\(wall clock\\) time \\(h:mm:ss or m:ss\\): "
+wc_match = re.match(wc_match_prefix + "(?:(\\d+)h )?(\\d+)m ([\\d\\.]+)s", wc_time)
+if wc_match is None:
+    wc_match = re.match(wc_match_prefix + "(?:(\\d+):)?(\\d+):([\\d\\.]+)", wc_time)
 assert wc_match is not None
-duration = ':'.join(
-    '{:2d}'.format(wc_match.group(1) or 0),
-    '{:2d}'.format(wc_match.group(2)),
-    '{:0.2f}'.format(wc_match.group(3)))
+duration = ':'.join((
+    '{:02d}'.format(int(wc_match.group(1) or 0)),
+    '{:02d}'.format(int(wc_match.group(2))),
+    '{:0.2f}'.format(float(wc_match.group(3)))))
 
 memory = lines[9]
-memory_match = re.match("Maximum resident set size \(kbytes\): (\d+)", memory)
+memory_match = re.match("\\s*Maximum resident set size \\(kbytes\\): (\\d+)", memory)
 assert memory_match is not None
 memory_bytes = int(memory_match.group(1)) * 1000
 
-print(prog, threads, dataset, qcut, duration, cpu, memory, sep="\t")
+print(prog, threads, dataset, qcut, duration, cpu_frac, memory_bytes, sep="\t")

@@ -33,6 +33,8 @@ For each data container, run the following sequence of commands:
     # Upload the container to your Docker Hub repo
     docker push <your repo>/<data name>
 
+On a technical note, we use Phusion (https://hub.docker.com/r/phusion/baseimage/) as the base image for the containers for the tools we benchmark. This is primarily for convenience and comparability (i.e. removing base image as a variable); you could build smaller images using Alpine with a little extra work.
+
 # 3. Build STAR index container(s)
 
 The data containers for the STAR indexes (hg37/star-index and hg38/star-index) are too large to be pushed to Docker Hub or Quay.io. Thus, you will unfortunately need to build them yourself. We use GRCh38 in the paper, so to build that container run the build.sh script in containers/data/hg38/star-index.

@@ -6,7 +6,7 @@
 # Description:      ART read simulator, modified to introduce adapter sequences
 # Website:          https://sourceforge.net/projects/skewer/files/Simulator/
 # Provides:         ART
-# Base Image:       jedisct1/phusion-baseimage-latest
+# Base Image:       phusion/baseimage:latest
 # Build Cmd:        docker build -f Dockerfile -t jdidion/art_skewer:latest .
 # Pull Cmd:         docker pull jdidion/art_skewer
 # Run Cmd:          docker run jdidion/art_skewer
@@ -16,26 +16,28 @@
 # Note: For me to be able to deploy this, it has to be tagged with my repo
 # name. I'm not trying to take credit for anyone's work :)
 #################################################################
-FROM jedisct1/phusion-baseimage-latest
+FROM phusion/baseimage:latest
 WORKDIR /tmp
-# Install compiler and perl stuff
-RUN apt-get update && \
-    apt-get install --yes \
-        apt-utils \
-        build-essential \
-        gcc-multilib \
-        automake \
-        intltool \
-        pkg-config \
-        libgsl-dev \
-        bash
-# Install modified ART
+ENV BUILD_PACKAGES \
+    build-essential \
+    gcc-multilib \
+    automake \
+    intltool \
+    pkg-config \
+    libgsl-dev
 ADD art_illumina_src151.tar.gz .
 ADD art_illumina_src151-adapter-enabled.tar.gz .
-RUN cd art_illumina_dir && \
-    for f in config.sub config.guess install-sh depcomp missing INSTALL ; do rm -f $f ; ln -s /usr/share/automake-1.15/$f . ; done && \
-    ./configure --prefix /usr/local && \
-    make && \
-    make install
-# Cleanup
-RUN rm -rf /tmp/*
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        $BUILD_PACKAGES \
+    && cd art_illumina_dir \
+    && for f in config.sub config.guess install-sh depcomp missing INSTALL ; do rm -f $f ; ln -s /usr/share/automake-1.15/$f . ; done \
+    && ./configure --prefix /usr/local \
+    && make \
+    && make install \
+    && cd .. \
+    && apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) \
+    && rm -rf /var/lib/apt/lists/* /tmp/* \
+    && locale-gen en_US.UTF-8 \
+    && update-locale LANG=en_US.UTF-8
