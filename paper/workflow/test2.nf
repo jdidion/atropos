@@ -7,7 +7,7 @@ process A {
     set val(animal), file("${animal}.txt") into A_results
 
     """
-    gtime -v -o ${animal}.txt echo -n "${animal}!"
+    /usr/bin/time -v -o ${animal}.txt echo -n "${animal}!"
     """
 }
 
@@ -19,7 +19,7 @@ process B {
     set val(flower), file("${flower}.txt") into B_results
 
     """
-    gtime -v -o ${flower}.txt echo -n "${flower}!"
+    /usr/bin/time -v -o ${flower}.txt echo -n "${flower}!"
     """
 }
 
