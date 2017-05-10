@@ -55,33 +55,30 @@ process Extract {
 }
 
 process Atropos {
-  //tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
-  tag { "atropos_${task.cpus}_${err}" }
+  tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
   container "jdidion/atropos_paper"
   
   input:
   set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
-  //each qcut from params.quals
-  //each aligner from params.aligners
-  //each compression from params.compressionSchemes
+  each qcut from params.quals
+  each aligner from params.aligners
+  each compression from params.compressionSchemes
   
   output:
-  set err, "${task.tag}.{1,2}.fq.gz" into trimmedReads
-  file "${task.tag}.report.txt" into reportFile
-  file "${task.tag}.timing.txt" into timingAtropos
-
+  set err, file("${task.tag}.{1,2}.fq.gz") into trimmedReads
+  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
+  file "${task.tag}.report.txt"
+  
   script:
   """
-  echo ${task.tag} >> ${task.tag}.timing.txt && \
-  /usr/bin/time -v atropos \
+  /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
     -pe1 ${reads[0]} -pe2 ${reads[1]} \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
-    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
-    2>> ${task.tag}.timing.txt
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT
   """
 }
 
@@ -89,19 +86,32 @@ process Atropos {
 Channel
   .empty()
   .concat(timingAtropos)
-  .set { timing }
+  .set { timingMerged }
 
-process MergeTiming {
-  container "jdidion/python_bash"
 
-  input:
-  file timingFiles from timing.toList()
+process ParseTiming {
+    container "jdidion/python_bash"
+    
+    input:
+    set val(item), file(timing) from timingMerged
+    
+    output:
+    stdout timingParsed
+    
+    script:
+    template "parse_gtime.py"
+}
 
-  output:
-  file "timing.txt"
-
-  script:
-  """
-  cat $timingFiles > timing.txt
-  """
+process echoParsed {
+    echo true
+    
+    input:
+    val parsedRows from timingParsed.toList()
+    
+    script:
+    parsedData = parsedRows.join("")
+    
+    """
+    echo '$parsedData'
+    """
 }

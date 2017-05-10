@@ -39,15 +39,15 @@ except:
 qcut = qcut[1:]
 
 with open(timing_file, 'rt') as i:
-    lines = i.readlines()
+    lines = [line.strip() for line in i.readlines()]
 
 cpu = lines[3]
-cpu_match = re.match("\\s*Percent of CPU this job got: (\\d+)%", cpu)
+cpu_match = re.match("Percent of CPU this job got: (\\d+)%", cpu)
 assert cpu_match is not None
 cpu_frac = float(cpu_match.group(1))
 
 wc_time = lines[4]
-wc_match_prefix = "\\s*Elapsed \\(wall clock\\) time \\(h:mm:ss or m:ss\\): "
+wc_match_prefix = "Elapsed \\(wall clock\\) time \\(h:mm:ss or m:ss\\): "
 wc_match = re.match(wc_match_prefix + "(?:(\\d+)h )?(\\d+)m ([\\d\\.]+)s", wc_time)
 if wc_match is None:
     wc_match = re.match(wc_match_prefix + "(?:(\\d+):)?(\\d+):([\\d\\.]+)", wc_time)
@@ -58,7 +58,7 @@ duration = ':'.join((
     '{:0.2f}'.format(float(wc_match.group(3)))))
 
 memory = lines[9]
-memory_match = re.match("\\s*Maximum resident set size \\(kbytes\\): (\\d+)", memory)
+memory_match = re.match("Maximum resident set size \\(kbytes\\): (\\d+)", memory)
 assert memory_match is not None
 memory_bytes = int(memory_match.group(1)) * 1000
 
