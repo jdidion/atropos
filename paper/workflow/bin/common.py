@@ -5,11 +5,14 @@ DEFAULT_ADAPTERS = [
     "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 ]
 
-class fileoutput(object):
+class fileopen(object):
     def __init__(self, path, mode='wt'):
         self.close = False
         if path == '-':
-            self.fh = sys.stdout
+            if 'w' in mode:
+                self.fh = sys.stdout
+            else:
+                self.fh = sys.stdin
         else:
             self.fh = open(path, mode)
             self.close = True

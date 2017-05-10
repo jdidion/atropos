@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-"""Given rows from parse_gtime, generate a figure and a latex table of results.
-"""
-import sys
-import numpy as np
-import pandas as pd
-import seaborn as sb
-from mako.template import Template
-
-table_template = Template(r"""
 <%
 threads = table.Threads.unique()
 progs = table.Program.unique()
@@ -65,26 +55,3 @@ progs = table.Program.unique()
 \end{tabular}
 \caption{\label{tab:${name}}${caption}}
 \end{table}
-""")
-
-# master table
-table = pd.read_csv(sys.stdin, sep='\t', names=(
-    'Program', 'Threads', 'Dataset', 'Quality', 'Duration', 'CPU', 'Memory'))
-
-# generate table
-with open("${output.1}", "wt") as o:
-    o.write(table_template.render(table.
-        groupby(['Threads', 'Program']).
-        agg([min, max]).
-        sortlevel()))
-
-# generate figure
-threads = table.Threads.unique()
-if len(threads) == 1:
-    plot = sb.PairGrid(
-        table, x_vars=("Program"), y_vars=('Duration', 'Memory', 'CPU'))
-else:
-    plot = sb.PairGrid(
-        table, x_vars=("Program"), y_vars=('Duration', 'Memory', 'CPU'),
-        hue="Program")
-plot.map(sb.barplot).savefig("{}.svg".format())

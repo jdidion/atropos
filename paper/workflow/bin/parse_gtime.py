@@ -10,13 +10,20 @@ and write a tab-delimited row to stdout with the following fields:
 6. Max CPU usage
 7. Max memory usage
 """
+import argparse
+from common import fileopen
 import os
 import re
 import sys
 import fileinput
 
-profile = os.environ.get("item", "$item").split("_")
-timing_file = os.environ.get("timing", "$timing")
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--input", default="-")
+parser.add_argument("-o", "--output", default="-")
+parser.add_argument("-p", "--profile")
+args = parser.parse_args()
+
+profile = args.profile.split("_")
 
 if profile[0] == 'atropos':
     if len(profile) == 7:
@@ -38,7 +45,7 @@ except:
     pass
 qcut = qcut[1:]
 
-with open(timing_file, 'rt') as i:
+with fileopen(args.input, 'rt') as i:
     lines = [line.strip() for line in i.readlines()]
 
 cpu = lines[3]
@@ -62,4 +69,5 @@ memory_match = re.match("Maximum resident set size \\(kbytes\\): (\\d+)", memory
 assert memory_match is not None
 memory_bytes = int(memory_match.group(1)) * 1000
 
-print(prog, threads, dataset, qcut, duration, cpu_frac, memory_bytes, sep="\t")
+with fileopen(args.output, "wt") as out:
+    print(prog, threads, dataset, qcut, duration, cpu_frac, memory_bytes, sep="\t", file=out)

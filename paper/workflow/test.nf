@@ -102,16 +102,16 @@ process ParseTiming {
     template "parse_gtime.py"
 }
 
-process echoParsed {
-    echo true
+process ShowPerformance {
+    container "jdidion/python_bash"
     
     input:
     val parsedRows from timingParsed.toList()
     
-    script:
-    parsedData = parsedRows.join("")
+    output:
+    file "timing.tex"
+    file "timing.svg"
     
-    """
-    echo '$parsedData'
-    """
+    script:
+    template "show_performance.py"
 }
