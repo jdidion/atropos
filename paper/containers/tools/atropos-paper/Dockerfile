@@ -16,7 +16,8 @@ WORKDIR /tmp
 ENV BUILD_PACKAGES \
     git
 ENV RUNTIME_PACKAGES \
-    python3-pip
+    python3-pip \
+    time
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
@@ -30,6 +31,7 @@ RUN apt-get update \
     && make install \
     && cd ..\
     && apt-get remove --purge -y $BUILD_PACKAGES \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* /tmp/* \
     && locale-gen en_US.UTF-8 \
     && update-locale LANG=en_US.UTF-8

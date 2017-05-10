@@ -25,9 +25,11 @@ ENV BUILD_PACKAGES \
     libbz2-dev \
     zlib1g-dev \
     qt5-qmake \
-    libqt5sql5-mysql \
+    libqt5sql5-mysql
+ENV RUNTIME_PACKAGES \
     qt5-default \
-    libqt5xmlpatterns5-dev
+    libqt5xmlpatterns5-dev \
+    time
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \

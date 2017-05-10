@@ -34,11 +34,14 @@ ENV BUILD_PACKAGES \
     wget \
     ca-certificates \
     openssl
+ENV RUNTIME_PACKAGES \
+    time
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         $BUILD_PACKAGES \
+        $RUNTIME_PACKAGES \
     && update-ca-certificates \
     && wget -o /annotations/${GENCODE_37_FILE} "ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_${GENCODE_VERSION}/GRCh37_mapping/${GENCODE_37_FILE}" \
     && wget -o /annotations/${GENCODE_38_FILE} "ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_human/release_${GENCODE_VERSION}/${GENCODE_38_FILE}" \
@@ -51,7 +54,8 @@ RUN apt-get update \
     && wget -q -O - $SRA_URL | tar -zxv \
     && mkdir /opt/fastq-dump/ \
     && mv sratoolkit.${SRA_VERSION}-ubuntu64 /opt/fastq-dump/ \
-    && apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) \
+    && apt-get remove --purge -y $BUILD_PACKAGES \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* /tmp/* \
     && locale-gen en_US.UTF-8 \
     && update-locale LANG=en_US.UTF-8

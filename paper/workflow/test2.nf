@@ -1,5 +1,7 @@
 
 process A {
+    container "jdidion/atropos_paper_analysis"
+    
     input:
     val animal from { [ 'horse_4_rna_20', 'cow_4_rna_20' ] }
 
@@ -12,6 +14,8 @@ process A {
 }
 
 process B {
+    container "jdidion/atropos_paper_analysis"
+    
     input:
     val flower from { [ 'weed_4_rna_20', 'clover_4_rna_20' ] }
 
