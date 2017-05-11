@@ -16,6 +16,7 @@
 #################################################################
 FROM phusion/baseimage:latest
 WORKDIR /tmp
+ENV VERSION v2.2.0
 ENV BUILD_PACKAGES \
     build-essential \
     g++ \
@@ -30,7 +31,7 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         $BUILD_PACKAGES \
         $RUNTIME_PACKAGES \
-    && git clone --recursive https://github.com/MikkelSchubert/adapterremoval \
+    && git clone --recursive --branch $VERSION https://github.com/MikkelSchubert/adapterremoval \
     && cd adapterremoval \
     && make \
     && mv /tmp/adapterremoval/build/AdapterRemoval /usr/local/bin \

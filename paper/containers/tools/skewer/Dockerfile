@@ -16,6 +16,7 @@
 #################################################################
 FROM phusion/baseimage:latest
 WORKDIR /tmp
+ENV VERSION 0.2.2
 ENV BUILD_PACKAGES \
     build-essential \
     g++ \
@@ -27,7 +28,7 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         $BUILD_PACKAGES \
         $RUNTIME_PACKAGES \
-    && git clone --recursive https://github.com/relipmoc/skewer \
+    && git clone --recursive --branch $VERSION https://github.com/relipmoc/skewer \
     && cd skewer \
     && make \
     && mv /tmp/skewer/skewer /usr/local/bin \

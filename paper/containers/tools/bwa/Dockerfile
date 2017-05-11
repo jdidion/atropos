@@ -1,12 +1,12 @@
 #################################################################
 # Dockerfile
 #
-# Software:         bwa and bwa-meth
-# Software Version: 0.7.15, 0.10
+# Software:         bwa, bwa-meth, samtools
+# Software Version: 0.7.15, 0.10, 1.4
 # Description:      Alpine bwa and bwa-meth Image
 # Website:          https://github.com/lh3/bwa
 #                   https://github.com/brentp/bwa-meth
-# Provides:         bwa|bwa-meth.py
+# Provides:         bwa|bwa-meth.py|samtools
 # Base Image:       alpine:python
 # Build Cmd:        docker build -t jdidion/bwa:latest .
 # Pull Cmd:         docker pull jdidion/bwa

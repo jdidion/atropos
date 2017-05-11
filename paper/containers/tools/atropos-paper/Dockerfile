@@ -13,6 +13,7 @@
 #################################################################
 FROM phusion/baseimage:latest
 WORKDIR /tmp
+ENV VERSION 1.1.4
 ENV BUILD_PACKAGES \
     git
 ENV RUNTIME_PACKAGES \
@@ -26,7 +27,7 @@ RUN apt-get update \
     && ln -s /usr/bin/python3 /usr/bin/python \
     && ln -s /usr/bin/pip3 /usr/bin/pip \
     && pip install cython \
-    && git clone --recursive https://github.com/jdidion/atropos \
+    && git clone --recursive --branch $VERSION https://github.com/jdidion/atropos \
     && cd atropos \
     && make install \
     && cd ..\
