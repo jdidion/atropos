@@ -45,6 +45,8 @@ Clone the files in the 'workflow' directory, including the 'bin' subdirectory. I
 
 Where <env> is either 'local' or 'cluster'. Note that the first time you run this it will download several Docker images requiring ~[XX] GB of disk space.
 
+All results will be placed in the 'results' subdirectory. Note that for the paper we tweaked the aesthetics of some of the figures and tables, but the data was left exactly as-is. Of course there will be some variability in the performance metrics, but the relative rankings of the tools should not change significantly -- please let us know if you find otherwise!
+
 # TODO
 
 * Update #4 with an estimate of the total disk space requirement.
