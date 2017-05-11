@@ -1,6 +1,6 @@
 <%
-threads = table.Threads.unique()
-progs = table.Program.unique()
+threads = table.index.levels[0]
+progs = table.index.levels[1]
 %>
 \begin{table}[ht]
 \centering
@@ -14,9 +14,9 @@ progs = table.Program.unique()
     Program & \multicolumn{${len(threads)*2}}{c}{Execution Time (Min$|$Max sec.)} \\\hline
     % endif
     % for p in progs:
+        ${p}
         % for t in threads:
-        <% row = table.loc[t][p] %>
-        ${" & ".join(str(r) for r in row)} 
+        ${table.loc[t, p]['Duration', 'min']} & ${table.loc[t, p]['Duration', 'max']}
         
         % endfor 
         \\
@@ -24,31 +24,31 @@ progs = table.Program.unique()
     \hline
     
     % if len(threads) == 1:
-    \hfill{} & \multicolumn{2}{c}{Memory Usage (GB)} \\\hline
-    % else
-    \hfill{} & \multicolumn{${len(threads)*2}}{c}{Memory Usage (Min$|$Max GB)} \\\hline
+    \hfill{} & \multicolumn{2}{c}{Memory Usage (MB)} \\\hline
+    % else:
+    \hfill{} & \multicolumn{${len(threads)*2}}{c}{Memory Usage (Min$|$Max MB)} \\\hline
     % endif
     % for p in progs:
         ${p}
-        <% row = table.loc[p], 'Memory'] %>
-        ${" & ".join(r for r in row)} 
+        % for t in threads:
+        ${table.loc[t, p]['MemoryMB', 'min']} & ${table.loc[t, p]['MemoryMB', 'max']}
         
-        % endfor 
+        % endfor
         \\
     % endfor
     \hline
     
     % if len(threads) == 1:
     \hfill{} & \multicolumn{2}{c}{CPU Usage (GB)} \\\hline
-    % else
+    % else:
     \hfill{} & \multicolumn{${len(threads)*2}}{c}{CPU Usage (Min$|$Max %)} \\\hline
     % endif
     % for p in progs:
         ${p}
-        <% row = table.loc[p], 'CPU'] %>
-        ${" & ".join(r for r in row)} 
+        % for t in threads:
+        ${table.loc[t, p]['CPUPct', 'min']} & ${table.loc[t, p]['CPUPct', 'max']}
         
-        % endfor 
+        % endfor
         \\
     % endfor
     
