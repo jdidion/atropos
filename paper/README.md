@@ -49,7 +49,7 @@ All results will be placed in the 'results' subdirectory. Note that for the pape
 
 # TODO
 
-* Update #4 with an estimate of the total disk space requirement.
+* Update #3 with an estimate of the total disk space requirement.
 * These papers do a nice job of benchmarking trimmers. Consider adding some more benchmarks.
     * http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-16-S1-S2
     * https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-015-0454-y

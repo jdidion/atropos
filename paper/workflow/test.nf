@@ -45,29 +45,32 @@ process Extract {
   each err from params.errorRates
   
   output:
-  set err, "sim_${err}.{1,2}.fq" into simReads
+  set err, "sim_${err}.{1,2}.fq", "sim_${err}.{1,2}.aln" into simReads
   
   script:
   """
   head -40 /data/simulated/sim_${err}.1.fq > ./sim_${err}.1.fq && \
-  head -40 /data/simulated/sim_${err}.2.fq > ./sim_${err}.2.fq
+  head -40 /data/simulated/sim_${err}.2.fq > ./sim_${err}.2.fq && \
+  head -400 /data/simulated/sim_${err}.1.aln > ./sim_${err}.1.aln && \
+  head -400 /data/simulated/sim_${err}.2.aln > ./sim_${err}.2.aln
   """
 }
 
 process Atropos {
-  tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
+  //tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
+  tag { "atropos_${task.cpus}_${err}_q0_insert_writer" }
   cpus { threads }
   container "jdidion/atropos_paper"
   
   input:
   set err, file(reads), file(alns) from simReads
   each threads from params.threadCounts
-  each qcut from params.quals
-  each aligner from params.aligners
-  each compression from params.compressionSchemes
+  //each qcut from params.quals
+  //each aligner from params.aligners
+  //each compression from params.compressionSchemes
   
   output:
-  set err, file("${task.tag}.{1,2}.fq.gz") into trimmedReads
+  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedReads
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
   file "${task.tag}.report.txt"
   
@@ -108,15 +111,53 @@ process ShowPerformance {
     container "jdidion/python_bash"
     
     input:
-    val parsedRows from timingParsed.toList()
+    val timingRows from timingParsed.toList()
     
     output:
     file "timing.tex"
     file "timing.svg"
     
     script:
-    data = parsedRows.join("")
+    data = timingRows.join("")
     """
     echo '$data' | show_performance.py -n foo -c bar -o timing -f tex svg pickle
     """
+}
+
+process ComputeAccuracy {
+  container "jdidion/python_bash"
+  
+  input:
+  set val(name), val(err), file(alns), file(trimmed) from trimmedReads
+  
+  output:
+  file "${name}.txt" into resultFile
+  file "${name}.summary.txt" into summaryFile
+  stdout tableFile
+
+  script:
+  """
+  compute_simulated_accuracy.py \
+    -a1 ${alns[0]} -a2 ${alns[1]} \
+    -r1 ${trimmed[0]} -r2 ${trimmed[1]} \
+    --name ${name} --no-progress \
+    -o ${name}.txt -s ${name}.summary.txt -t -
+  """
+}
+
+process ShowAccuracy {
+  container "jdidion/python_bash"
+  
+  input:
+  val accuracyRows from tableFile.toList()
+  
+  output:
+  file "accuracy.pickle"
+  
+    
+  script:
+  data = accuracyRows.join("")
+  """
+  echo '$data' | show_simulated_accuracy.py -n foo -c bar -o accuracy
+  """
 }

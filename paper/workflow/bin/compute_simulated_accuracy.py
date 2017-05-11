@@ -2,11 +2,21 @@
 """Summarizes trimming accuracy for simulated reads."""
 
 from argparse import ArgumentParser
-from atropos import xopen
 import csv
 import os
-import editdistance
 from common import *
+
+# Either of these will work
+from editdistance import eval as editdistance
+#from Levenshtein import distance as editdistance
+
+summary_fields = (
+    "retained reads", "mismatch reads", "discarded reads", "total reads", "reads with adapters",
+    "retained reads with adapters", "non-adapter reads trimmed", "adapter reads untrimmed",
+    "adapter reads undertrimmed", "adapter reads overtrimmed", "total ref bases",
+    "total ref edit distance", "total adapter bases", "total retained adapter bases",
+    "total adapter edit dist", "overtrimmed bases", "undertrimmed bases"
+)
 
 def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     adapter_lengths = [len(adapters[i]) for i in (0,1)]
@@ -51,8 +61,8 @@ def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
             if adapter_ref_len > adapter_lengths[i]:
                 adapter_ins = adapter_ref_len - adapter_lengths[i]
         
-        ref_edit_dist = editdistance.eval(ref_seq, read_ref)
-        adapter_edit_dist = editdistance.eval(adapters[i][:adapter_len], "".join(adapter_seq))
+        ref_edit_dist = editdistance(ref_seq, read_ref)
+        adapter_edit_dist = editdistance(adapters[i][:adapter_len], "".join(adapter_seq))
         return [expected_read, expected_read_len,
             (ref_len, ref_edit_dist),
             (int(has_adapter), adapter_len, adapter_edit_dist, adapter_ins, adapter_del, polyA)
@@ -186,7 +196,7 @@ def main():
     parser.add_argument('-a1', '--aln1', help=".aln file associated with simulated read1")
     parser.add_argument('-a2', '--aln2', help=".aln file associated with simulated read2")
     parser.add_argument('-r1', '--reads1', help="trimmed fastq file read1")
-    parser.add_argument('-r2', '--reads2', help="trimmed fastq file read1")
+    parser.add_argument('-r2', '--reads2', help="trimmed fastq file read2")
     parser.add_argument('-l', '--read-length', type=int, default=125)
     parser.add_argument('-o', '--output', default='-')
     parser.add_argument('-s', '--summary', default='-')
@@ -196,11 +206,11 @@ def main():
     parser.add_argument("--no-progress", action="store_true", default=False)
     args = parser.parse_args()
     
-    with open(args.aln1, 'rt') as a1, open(args.aln2, 'rt') as a2:
+    with fileopen(args.aln1, 'rt') as a1, fileopen(args.aln2, 'rt') as a2:
         aln_pair_iterator = zip(aln_iterator(a1), aln_iterator(a2))
         
-        with xopen.xopen(args.reads1, 'rt') as r1, xopen.xopen(args.reads2, 'rt') as r2:
-            read_pair_iterator = zip(fq_iterator(r1, 1), fq_iterator(r2, 2))
+        with fileopen(args.reads1, 'rt') as r1, fileopen(args.reads2, 'rt') as r2:
+            read_pair_iterator = zip(fq_iterator(r1, 1, True), fq_iterator(r2, 2, True))
             
             if not args.no_progress:
                 try:
@@ -209,31 +219,22 @@ def main():
                 except:
                     print("tqdm library is required for a progress bar")
             
-            with fileoutput(args.output) as o:
+            with fileopen(args.output, 'wt') as o:
                 w = csv.writer(o, delimiter="\t")
                 w.writerow((
                     'read_id','mate','expected_len','actual_len','status','has_adapter',
                     'adapter_len','adapter_edit_dist','adapter_ins','adapter_del','polyA'))
-                summary = summarize_accuracy(aln_pair_iterator, read_pair_iterator, w, args.read_length, args.adapters)
-
-            summary_fields = (
-                "retained reads", "mismatch reads", "discarded reads", "total reads", "reads with adapters",
-                "retained reads with adapters", "non-adapter reads trimmed", "adapter reads untrimmed",
-                "adapter reads undertrimmed", "adapter reads overtrimmed", "total ref bases",
-                "total ref edit distance", "total adapter bases", "total retained adapter bases",
-                "total adapter edit dist", "overtrimmed bases", "undertrimmed bases"
-            )
-                
-            with fileoutput(args.summary) as s:
+                summary = summarize_accuracy(
+                    aln_pair_iterator, read_pair_iterator, w, args.read_length, 
+                    args.adapters)
+            
+            with fileopen(args.summary, 'wt') as s:
                 for field, value in zip(("{} " + field for field in summary_fields), summary):
                     print(field.format(value), file=s)
             
             if args.table:
-                header = not os.path.exists(args.table)
-                with fileoutput(args.table, "at") as t:
+                with fileopen(args.table, "wt") as t:
                     w = csv.writer(t, delimiter="\t")
-                    if header:
-                        w.writerow(("name",) + summary_fields)
                     w.writerow((args.name,) + summary)
 
 if __name__ == "__main__":

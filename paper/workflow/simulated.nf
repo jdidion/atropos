@@ -39,7 +39,7 @@ params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process Extract {
-  container true
+  container "jdidion/atropos_simulated"
   
   input:
   each err from params.errorRates
@@ -49,7 +49,7 @@ process Extract {
   
   script:
   """
-  jdidion/atropos_simulated cp \
+  cp \
     /data/simulated/sim_${err}.1.fq  \
     /data/simulated/sim_${err}.2.fq  \
     /data/simulated/sim_${err}.1.aln \
@@ -72,13 +72,12 @@ process Atropos {
   
   output:
   set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
+  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
   file "${task.tag}.report.txt" into reportFile
-  file "${task.tag}.timing.txt" into timingAtropos
-
+  
   script:
   """
-  >&2 echo ${task.tag} && \
-  /usr/bin/time -v atropos \
+  /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
     -T $task.cpus --aligner $aligner --op-order GACQW \
     -a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
     -m $params.minLength --batch-size $params.batchSize \
@@ -86,8 +85,7 @@ process Atropos {
     --insert-match-error-rate 0.20 -e 0.10 \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
     --report-file ${task.tag}.report.txt --quiet \
-    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]} \
-    2>> ${task.tag}.timing.txt
+    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
   """
 }
 
@@ -104,7 +102,7 @@ process Skewer {
 
   output:
   set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
-  file "${task.tag}.timing.txt" into timingSkewer
+  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSkewer
 
   script:
   """
@@ -134,21 +132,19 @@ process SeqPurge {
 
   output:
   set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
+  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSeqPurge
   file "${task.tag}.report.txt" into reportFile
-  file "${task.tag}.timing.txt" into timingSeqPurge
-
+  
   script:
   """
-  >&2 echo ${task.tag} && \
-  /usr/bin/time -v SeqPurge \
+  /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
     -out1 ${task.tag}-trimmed-pair1.pair1.fastq.gz \
     -out2 ${task.tag}-trimmed-pair1.pair2.fastq.gz \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -task.cpus $task.cpus -prefetch $params.batchSize \
-    -r 0.20 -summary $reportFile \
-    2>> ${task.tag}.timing.txt
+    -r 0.20 -summary $reportFile
   """
 }
 
@@ -165,19 +161,17 @@ process AdapterRemoval {
 
   output:
   set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
+  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAdapterRemoval
   file "${task.tag}.report.txt" into reportFile
-  file "${task.tag}.timing.txt" into timingAdapterRemoval
-
+  
   script:
   """
-  >&2 echo ${task.tag} && \
-  usr/bin/time -v AdapterRemoval \
+  usr/bin/time -v -o ${task.tag}.timing.txt AdapterRemoval \
     --file1 ${reads[0]} --file2 ${reads[1]} \
     --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut \
-    --minLengthgth $params.minLength --task.cpus $task.cpus \
-    2>> ${task.tag}.timing.txt
+    --minLengthgth $params.minLength --task.cpus $task.cpus
   """
 }
 
@@ -193,52 +187,57 @@ Channel
     trimmedSeqPurge,
     trimmedAdapterRemoval
   )
-  .set { timing }
+  .set { timingMerged }
 
-Channel
-  .empty()
-  .concat(
-    timingAtropos,
-    timingSkewer,
-    timingSeqPurge,
-    timingAdapterRemoval
-  )
-  .set { timing }
+process ParseTiming {
+    container "jdidion/python_bash"
+    
+    input:
+    set val(item), file(timing) from timingMerged
+    
+    output:
+    stdout timingParsed
+    
+    script:
+    """
+    parse_gtime.py -i $timing -p $item
+    """
+}
 
-process Accuracy {
+process ShowPerformance {
+    container "jdidion/python_bash"
+    
+    input:
+    val parsedRows from timingParsed.toList()
+    
+    output:
+    file "timing.tex"
+    file "timing.svg"
+    
+    script:
+    data = parsedRows.join("")
+    """
+    echo '$data' | show_performance.py -n foo -c bar -o timing -f tex svg pickle
+    """
+}
+
+process ComputeAccuracy {
+  container "jdidion/python_bash"
+  
   input:
-  each set val(name), val(err), file(alns), file(trimmed) from trimmedReads
-  container "python:alpine"
-
+  set val(name), val(err), file(alns), file(trimmed) from trimmedReads
+  
   output:
   file "${name}.txt" into resultFile
   file "${name}.summary.txt" into summaryFile
-  file "${name}.table.txt" into tableFile
+  file "${name}.table.tex" into tableFile
 
   script:
   """
-  python scripts/summarize_simulated_trimming_accuracy.py \
+  compute_simulated_accuracy.py \
     -a1 ${alns[0]} -a2 ${alns[1]} \
     -r1 ${trimmed[0]} -r2 ${trimmed[1]} \
     --name ${name} \
     -o $resultFile -s $summaryFile -t $tableFile
-  """
-}
-
-process Timing {
-  input:
-  file timingFiles from timing.toList()
-  container "python:alpine"
-
-  output:
-  file "${task.executor}.timing.txt"
-  file "${task.executor}.timing.tex"
-
-  script:
-  """
-  cat $timingFiles > ${task.executor}.timing.txt
-  python scripts/summarize_timing_info.py -f latex \
-    -i ${task.executor}.timing.txt \
-    -o ${task.executor}.timing.tex
   """
 }

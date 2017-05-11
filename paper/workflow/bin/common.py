@@ -1,3 +1,4 @@
+import gzip
 import sys
 
 DEFAULT_ADAPTERS = [
@@ -9,10 +10,13 @@ class fileopen(object):
     def __init__(self, path, mode='wt'):
         self.close = False
         if path == '-':
-            if 'w' in mode:
+            if any(m in mode for m in ('w', 'a')):
                 self.fh = sys.stdout
             else:
                 self.fh = sys.stdin
+        elif path.endswith('.gz'):
+            self.fh = gzip.open(path, mode)
+            self.close = True
         else:
             self.fh = open(path, mode)
             self.close = True
@@ -24,13 +28,13 @@ class fileopen(object):
         if self.close:
             self.fh.close()
 
-def fq_iterator(i, mate=None):
+def fq_iterator(i, pair, pair_in_name=False):
     for read in zip(*[i] * 4):
         name = read[0].rstrip()[1:]
-        if mate is None:
-            mate = name[-1]
+        if pair_in_name:
+            assert pair == int(name[-1])
             name = name[:-2]
-        yield (name, mate, read[1].rstrip(), read[3].rstrip())
+        yield (name, pair, read[1].rstrip(), read[3].rstrip())
 
 def aln_iterator(i):
     for line in i:

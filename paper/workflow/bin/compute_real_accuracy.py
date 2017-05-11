@@ -11,7 +11,6 @@ import os
 import tqdm
 from atropos.xopen import open_output
 
-
 # There is the option to compute edit distance between the untrimmed and 
 # trimmed reads. We did not use those metrics in the paper. If you want to 
 # enable the edit distance calculation, you need to install the 'editdistance'

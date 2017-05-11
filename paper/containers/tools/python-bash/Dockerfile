@@ -31,6 +31,7 @@ RUN apk add --no-cache libstdc++ && \
     ln -s locale.h /usr/include/xlocale.h && \
     pip install --upgrade pip && \
     pip install cython && \
+    pip install editdistance && \
     pip install numpy && \
     pip install pandas && \
     pip install matplotlib && \
