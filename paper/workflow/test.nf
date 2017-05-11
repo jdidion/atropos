@@ -99,7 +99,9 @@ process ParseTiming {
     stdout timingParsed
     
     script:
-    template "parse_gtime.py"
+    """
+    parse_gtime.py -i $timing -p $item
+    """
 }
 
 process ShowPerformance {
@@ -113,5 +115,8 @@ process ShowPerformance {
     file "timing.svg"
     
     script:
-    template "show_performance.py"
+    data = parsedRows.join("")
+    """
+    echo '$data' | show_performance.py -n foo -c bar -o timing -f tex svg pickle
+    """
 }

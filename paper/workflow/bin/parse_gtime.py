@@ -31,12 +31,15 @@ if profile[0] == 'atropos':
         dataset = '{}_{}'.format(dataset1, dataset2)
     else:
         prog, threads, dataset, qcut, aligner, writer = profile
-    prog = "{} ({} + {})".format(profile[0], aligner, writer)
-elif len(profile) == 5:
-    prog, threads, dataset1, dataset2, qcut = profile
-    dataset = '{}_{}'.format(dataset1, dataset2)
+    prog = "{} ({})".format(profile[0], aligner)
+    prog2 = "{} ({} + {})".format(profile[0], aligner, writer)
 else:
-    prog, threads, dataset, qcut = profile
+    if len(profile) == 5:
+        prog, threads, dataset1, dataset2, qcut = profile
+        dataset = '{}_{}'.format(dataset1, dataset2)
+    else:
+        prog, threads, dataset, qcut = profile
+    prog2 = prog
 # If this is a simulated dataset, format the error rate
 try:
     float(dataset)
@@ -74,5 +77,5 @@ assert memory_match is not None
 memory_mbytes = int(memory_match.group(1)) / 1000
 
 with fileopen(args.output, "wt") as out:
-    print(prog, threads, dataset, qcut, duration, duration_secs,
+    print(prog, prog2, threads, dataset, qcut, duration_secs,
     cpu_pct, memory_mbytes, sep="\t", file=out)

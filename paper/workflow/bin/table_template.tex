@@ -7,7 +7,7 @@ progs = table.index.levels[1]
 \begin{tabular}{l${'r|r' * len(threads)}}
 \sisetup{detect-weight=true,detect-inline-weight=math}
     % if len(threads) == 1:
-    Program & Min & Max \\
+    Program & Min & Max \\\\
     \hfill{} & \multicolumn{2}{c}{Execution Time (sec.)} \\\hline
     % else:
     \hfill{} & ${" & ".join("\multicolumn{{2}}{{c}}{{{} Threads}}".format(t) for t in threads)} \\\hline
@@ -16,10 +16,10 @@ progs = table.index.levels[1]
     % for p in progs:
         ${p}
         % for t in threads:
-        ${table.loc[t, p]['Duration', 'min']} & ${table.loc[t, p]['Duration', 'max']}
+        ${table.loc[t, p, 'DurationSecs']['value', 'min']} & ${table.loc[t, p, 'DurationSecs']['value', 'max']}
         
         % endfor 
-        \\
+        \\\\
     % endfor
     \hline
     
@@ -31,10 +31,10 @@ progs = table.index.levels[1]
     % for p in progs:
         ${p}
         % for t in threads:
-        ${table.loc[t, p]['MemoryMB', 'min']} & ${table.loc[t, p]['MemoryMB', 'max']}
+        ${table.loc[t, p, 'MemoryMB']['value', 'min']} & ${table.loc[t, p, 'MemoryMB']['value', 'max']}
         
         % endfor
-        \\
+        \\\\
     % endfor
     \hline
     
@@ -46,10 +46,10 @@ progs = table.index.levels[1]
     % for p in progs:
         ${p}
         % for t in threads:
-        ${table.loc[t, p]['CPUPct', 'min']} & ${table.loc[t, p]['CPUPct', 'max']}
+        ${table.loc[t, p, 'CPUPct']['value', 'min']} & ${table.loc[t, p, 'CPUPct']['value', 'max']}
         
         % endfor
-        \\
+        \\\\
     % endfor
     
 \end{tabular}

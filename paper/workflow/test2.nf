@@ -51,14 +51,12 @@ process ShowPerformance {
     val parsedRows from timingParsed.toList()
     
     output:
-    file "timing.txt"
     file "timing.tex"
     file "timing.svg"
-    file "timing.pickle"
     
     script:
     data = parsedRows.join("")
     """
-    echo '$data' | show_performance.py -n foo -c bar -o timing -f txt tex svg pickle
+    echo '$data' | show_performance.py -n foo -c bar -o timing
     """
 }

@@ -19,11 +19,14 @@ args = parser.parse_args()
 
 # read raw data
 with fileopen(args.input, "rt") as inp:
-    table = pd.read_csv(inp, sep='\t', names=(
-        'Program', 'Threads', 'Dataset', 'Quality', 'Duration', 'DurationSecs', 
-        'CPUPct', 'MemoryMB'))
+    table = pd.read_csv(
+        inp, sep='\t', names=(
+            'Program', 'Program2', 'Threads', 'Dataset', 'Quality', 
+            'DurationSecs', 'CPUPct', 'MemoryMB'),
+        dtype={ 'Program' : 'category', 'Dataset' : 'category'})
 
-# write to file if input was from stdin
+# save table (useful if input was stdin)
+
 if 'txt' in args.formats:
     table.to_csv(args.output + ".txt", sep="\t", index=False)
 
@@ -35,6 +38,9 @@ if 'pickle' in args.formats:
 
 # generate latex table
 if 'tex' in args.formats:
+    texdat = table.melt(
+        id_vars=['Program2', 'Threads', 'Dataset', 'Quality'], 
+        value_vars=['DurationSecs','CPUPct','MemoryMB'])
     from mako.template import Template
     table_template = Template(filename=os.path.join(
         os.path.dirname(__file__), "table_template.tex"))
@@ -42,28 +48,44 @@ if 'tex' in args.formats:
     with fileopen(tex_file, "wt") as o:
         o.write(table_template.render(
             name=args.name, caption=args.caption,
-            table=table.
-                groupby(['Threads', 'Program']).
-                agg([min, max]).
+            table=texdat.
+                groupby(['Threads', 'Program2', 'variable']).
+                agg({ 'value' : [min, max] }).
                 sort_index()))
 
 # generate figure
 if 'svg' in args.formats:
+    svgdat = table.melt(
+        id_vars=['Program', 'Threads', 'Dataset', 'Quality'], 
+        value_vars=['DurationSecs','CPUPct','MemoryMB'])
+    svgdat['Program'] = svgdat['Program'].astype('category')
+    svgdat['Dataset'] = svgdat['Dataset'].astype('category')
+    svgdat['variable'] = pd.Categorical(
+        svgdat['variable'], categories=['DurationSecs', 'MemoryMB', 'CPUPct'])
     import matplotlib
     matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
     import seaborn as sb
-    threads = table.Threads.unique()
+    sb.set(style="whitegrid")
+    threads = svgdat.Threads.unique()
     if len(threads) == 1:
-        plot = sb.PairGrid(
-            table, x_vars=("Program"), y_vars=('DurationSecs', 'MemoryMB', 'CPUPct'))
+        plot = sb.factorplot(
+            x='Program', y="value", col="variable", 
+            data=svgdat, kind="bar", ci=None, sharey=False,
+            estimator=min)
     else:
-        plot = sb.PairGrid(
-            table, x_vars=("Program"), y_vars=('DurationSecs', 'MemoryMB', 'CPUPct'),
-            hue="Program")
+        plot = sb.factorplot(
+            x='Threads', y="value", col="variable", hue="Program", 
+            data=svgdat, kind="bar", ci=None, sharey=False,
+            estimator=min)
+    plot.set_xlabels('')
+    plot.axes[0,0].set_ylabel('Runtime (sec)')
+    plot.axes[0,1].set_ylabel('Memory (Mb)')
+    plot.axes[0,2].set_ylabel('CPU (%)')
+    plot.fig.subplots_adjust(wspace=0.35)
+    plot.set_titles('')
+    plot.set_xticklabels(rotation=90)
     svg_file = args.output + ".svg"
-    plot = plot.map(sb.barplot)
-    for i, lab in enumerate(["Duration (sec)", "Memory (MB)", "CPU (%)"]):
-        plot.axes[i][0].set_ylabel(lab)
-    plot.axes[1][0].set_yscale('log', basey=10)
     plot = plot.add_legend()
     plot.savefig(svg_file)
+
