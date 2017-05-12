@@ -40,6 +40,15 @@ clean:
 	rm -Rf .adapters
 	rm -Rf atropos.egg-info
 
+docker:
+	# build
+	docker build -f Dockerfile -t $(repo):$(version) .
+	# add alternate tags
+	docker tag $(repo):$(version) $(repo):latest
+	# push to Docker Hub
+	docker login -u jdidion && \
+	docker push $(repo)
+
 release:
 	$(clean)
 	# tag
@@ -57,13 +66,4 @@ release:
 		-H "Authorization: token $(token)" \
 		https://api.github.com/repos/$(repo)/releases \
 		-d '{"tag_name":"$(version)","target_commitish": "master","name": "$(version)","body": "$(desc)","draft": false,"prerelease": false}'
-
-
-docker:
-	# build
-	docker build -f Dockerfile -t $(repo):$(version) .
-	# add alternate tags
-	docker tag $(repo):$(version) $(repo):latest
-	# push to Docker Hub
-	docker login -u jdidion && \
-	docker push $(repo)
+	$(docker)
