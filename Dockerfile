@@ -16,6 +16,9 @@
 #################################################################
 FROM snakeego/cython
 
+# bash support to enable container usage from cromwell and other workflow engines
+RUN apk add --update bash && rm -rf /var/cache/apk/*
+
 # GCC
 RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
     && apk --no-cache add --virtual build-deps \
