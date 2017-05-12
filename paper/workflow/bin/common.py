@@ -28,6 +28,25 @@ class fileopen(object):
         if self.close:
             self.fh.close()
 
+def parse_profile(profile):
+    profile = profile.split("_")
+    
+    if profile[0] == 'atropos':
+        prog, threads, dataset, qcut, aligner, writer = profile
+        prog = "{} ({})".format(profile[0], aligner)
+        prog2 = "{} ({} + {})".format(profile[0], aligner, writer)
+    else:
+        prog, threads, dataset, qcut = profile
+        prog2 = prog
+    # If this is a simulated dataset, format the error rate
+    try:
+        float(dataset)
+        dataset = '0.' + dataset
+    except:
+        pass
+    qcut = qcut[1:]
+    return (prog, prog2, threads, dataset, qcut)
+
 def fq_iterator(i, pair, pair_in_name=False):
     for read in zip(*[i] * 4):
         name = read[0].rstrip()[1:]

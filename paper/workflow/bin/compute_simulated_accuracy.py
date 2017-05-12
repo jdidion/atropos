@@ -11,10 +11,12 @@ from editdistance import eval as editdistance
 #from Levenshtein import distance as editdistance
 
 summary_fields = (
-    "retained reads", "mismatch reads", "discarded reads", "total reads", "reads with adapters",
-    "retained reads with adapters", "non-adapter reads trimmed", "adapter reads untrimmed",
-    "adapter reads undertrimmed", "adapter reads overtrimmed", "total ref bases",
-    "total ref edit distance", "total adapter bases", "total retained adapter bases",
+    "program", "program2", "threads", "dataset", "qcut", "retained reads", 
+    "mismatch reads", "discarded reads", "total reads", "reads with adapters", 
+    "retained reads with adapters", "non-adapter reads trimmed", 
+    "adapter reads untrimmed", "adapter reads undertrimmed", 
+    "adapter reads overtrimmed", "total ref bases", "total ref edit distance", 
+    "total adapter bases", "total retained adapter bases", 
     "total adapter edit dist", "overtrimmed bases", "undertrimmed bases"
 )
 
@@ -201,10 +203,12 @@ def main():
     parser.add_argument('-o', '--output', default='-')
     parser.add_argument('-s', '--summary', default='-')
     parser.add_argument('-t', '--table', default=None)
-    parser.add_argument("--name", default=None)
+    parser.add_argument("-p", "--profile", default=None)
     parser.add_argument("--adapters", nargs=2, default=DEFAULT_ADAPTERS)
     parser.add_argument("--no-progress", action="store_true", default=False)
     args = parser.parse_args()
+    
+    profile = parse_profile(args.profile)
     
     with fileopen(args.aln1, 'rt') as a1, fileopen(args.aln2, 'rt') as a2:
         aln_pair_iterator = zip(aln_iterator(a1), aln_iterator(a2))
@@ -235,7 +239,7 @@ def main():
             if args.table:
                 with fileopen(args.table, "wt") as t:
                     w = csv.writer(t, delimiter="\t")
-                    w.writerow((args.name,) + summary)
+                    w.writerow(profile + summary)
 
 if __name__ == "__main__":
     main()

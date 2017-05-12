@@ -27,8 +27,11 @@ mean_frag=200
 sd_frag=100
 cov=0.1
 
+# prepare the reference genome data volume
+docker create -v /data/reference/hg37 --name hg37 jdidion/hg37_reference
+REF_GENOME="/data/reference/hg37/hg37.fa"
 # Simulate reads
-ART_CMD="docker run --rm -v "$PWD":/art -w /art jdidion/art_skewer art_illumina"
+ART_CMD="docker run --rm -v "$PWD":/art --volumes-from hg37 -w /art jdidion/art_skewer art_illumina"
 for prof in 001 005 01
 do
   # NOTE: REF_GENOME is externally defined to point to the fasta file for hg19/GRCh37.

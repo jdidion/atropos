@@ -44,7 +44,7 @@ def main():
             value_vars=['DurationSecs','CPUPct','MemoryMB'])
         from mako.template import Template
         table_template = Template(filename=os.path.join(
-            os.path.dirname(__file__), "table_template.tex"))
+            os.path.dirname(__file__), "performance_table.tex"))
         tex_file = args.output + ".tex"
         with fileopen(tex_file, "wt") as o:
             o.write(table_template.render(

@@ -1,0 +1,51 @@
+<% 
+datasets = table.index.levels[0]
+progs = table.index.levels[1]
+columns = (
+    ('reads', 'Wrongly Trimmed'),
+    ('reads', 'Over-trimmed'),
+    ('reads', 'Under-trimmed'),
+    ('reads', 'Total Error'),
+    ('bases', 'Over-trimmed'),
+    ('bases', 'Under-trimmed'),
+    ('bases', 'Total Error'))
+pct_columns = (
+    ('pct', 'Wrongly Trimmed'),
+    ('pct', 'Over-trimmed'),
+    ('pct', 'Under-trimmed'))
+minvals = {}
+for d in datasets:
+    for col0, col1 in columns + pct_columns:
+        minvals[(d, col0, col1)] = table.loc[d,:].sort_index(level=[col0, col1])[col0, col1][0]
+%>
+\begin{table}[!htbp]
+\centering
+\begin{tabular}{lrrrr|rrr}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+    \hfill{} & \multicolumn{4}{C{8.2cm}}{Reads} & \multicolumn{3}{C{4cm}}{Bases} \\
+    \cmidrule{2-8} 
+    Program & \multicolumn{1}{C{2cm}}{Wrongly Trimmed} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{2.2cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{1cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} \\
+    
+    % for dataset in datasets:
+    \midrule
+    ${dataset} \\
+        % for prog in progs:
+        ${prog} \\
+            % for col0, col1 in columns:
+                <% val = table.loc[d, prog][col0, col1] %>
+                %if val == minvals[(dataset, col0, col1)]:
+                \hlcell{${val}}
+                % else:
+                ${val}
+                % endif
+                % if col0 == 'reads' and (dataset, 'pct', col1) in minvals:
+                (${table.loc[d, prog]['pct', col1]}\%)
+                % endif
+            % endfor
+            \\
+        % endfor
+    %endfor
+\end{tabular}
+\caption{Trimming accuracy on simulated data with three different base-call error rates. Wrongly trimmed: reads that do not contain adapters but were trimmed anyway; Over-trimmed: reads that contain adapters but from which too many bases were removed; Under-trimmed: reads that contain adapters but from which too few bases were removed. Both read-level and base-level error rates are shown. Fractions of total reads/bases are in parentheses. The best tool(s) in each category is highlighted.}\label{simulated-accuracy}
+\end{table}
+
