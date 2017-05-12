@@ -70,7 +70,7 @@ process Atropos {
   //each compression from params.compressionSchemes
   
   output:
-  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedReads
+  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
   file "${task.tag}.report.txt"
   
@@ -86,6 +86,10 @@ process Atropos {
 }
 
 // concatenate all of the timing results into a single channel
+Channel
+  .empty()
+  .concat(trimmedAtropos)
+  .set { trimmedMerged }
 Channel
   .empty()
   .concat(timingAtropos)
@@ -119,8 +123,15 @@ process ShowPerformance {
     
     script:
     data = timingRows.join("")
+    if (workflow.profile == "local") {
+      name = task.ext.local_name
+      caption = task.ext.local_caption
+    } else {
+      name = task.ext.cluster_name
+      caption = task.ext.cluster_caption
+    }
     """
-    echo '$data' | show_performance.py -n foo -c bar -o timing -f tex svg pickle
+    echo '$data' | show_performance.py -n $name -c $caption -o timing -f tex svg pickle
     """
 }
 
@@ -128,7 +139,7 @@ process ComputeAccuracy {
   container "jdidion/python_bash"
   
   input:
-  set val(name), val(err), file(alns), file(trimmed) from trimmedReads
+  set val(name), val(err), file(alns), file(trimmed) from trimmedMerged
   
   output:
   file "${name}.txt" into resultFile
@@ -140,21 +151,21 @@ process ComputeAccuracy {
   compute_simulated_accuracy.py \
     -a1 ${alns[0]} -a2 ${alns[1]} \
     -r1 ${trimmed[0]} -r2 ${trimmed[1]} \
-    --name ${name} --no-progress \
+    -p ${name} --no-progress \
     -o ${name}.txt -s ${name}.summary.txt -t -
   """
 }
 
 process ShowAccuracy {
+  echo true
   container "jdidion/python_bash"
   
   input:
   val accuracyRows from tableFile.toList()
   
   output:
-  file "accuracy.pickle"
+  file "accuracy.tex"
   
-    
   script:
   data = accuracyRows.join("")
   """
