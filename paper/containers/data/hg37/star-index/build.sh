@@ -21,10 +21,10 @@ docker run \
     -v $(pwd)/index:/star-index:/data/index/star/hg37 \
     # bind reference data volume
     --volumes-from hg37 \
-    # run bwa mem from bwa image
+    # run star index from starbase image
     --rm jdidion/star bash -c \
     "cp /data/reference/hg37/hg37.fa /data/index/star/hg37 && ${INDEX_CMD}" && \
 # create a new image that includes the index
-docker build -f Dockerfile -t jdidion/starindex . && \
+docker build -f Dockerfile -t jdidion/star_hg37index . && \
 # cleanup
 rm -Rf star-index
