@@ -34,8 +34,6 @@ REF_GENOME="/data/reference/hg37/hg37.fa"
 ART_CMD="docker run --rm -v "$PWD":/art --volumes-from hg37 -w /art jdidion/art_skewer art_illumina"
 for prof in 001 005 01
 do
-  # NOTE: REF_GENOME is externally defined to point to the fasta file for hg19/GRCh37.
-  # This assumes that the modified version of ART has been downloaded and compiled in the bin folder.
   $ART_CMD -i $REF_GENOME -p -l $read_len -f $cov -m $mean_frag -s $sd_frag -rs $seed -o sim_${prof} \
     -1 art_profiles/HiSeq2500L125R1_${prof}.txt \
     -2 art_profiles/HiSeq2500L125R2_${prof}.txt
