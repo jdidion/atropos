@@ -70,6 +70,9 @@ simReads.into {
 
 /* Process: Atropos adapter trimming
  * ---------------------------------
+ * Post-processing is done when aligner == 'nowriter' to concatenate all the
+ * output files for each pair because the process is expecting a single pair of 
+ * output files.
  */
 process Atropos {
   tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
@@ -89,7 +92,15 @@ process Atropos {
   file "${task.tag}.report.txt"
   
   script:
+  mergeCmd = ''
+  if (compression == 'nowriter') {
+    mergeCmd = """
+    && zcat ${task.tag}.1.*.fq.gz > ${task.tag}.1.fq.gz \
+    && zcat ${task.tag}.2.*.fq.gz > ${task.tag}.2.fq.gz
+    """
+  }
   """
+  echo "<$aligner> <$mergeCmd>" && \
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
     -T $task.cpus --aligner $aligner --op-order GACQW \
     -a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
@@ -98,7 +109,8 @@ process Atropos {
     --insert-match-error-rate 0.20 -e 0.10 \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
     --report-file ${task.tag}.report.txt --quiet \
-    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
+    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]} \
+  $mergeCmd
   """
 }
 
@@ -159,8 +171,7 @@ process SeqPurge {
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
-    -out1 ${task.tag}-trimmed-pair1.pair1.fastq.gz \
-    -out2 ${task.tag}-trimmed-pair1.pair2.fastq.gz \
+    -out1 "${task.tag}.1.fq.gz" -out2 "${task.tag}.2.fq.gz" \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -threads $task.cpus -prefetch $params.batchSize \
@@ -194,7 +205,8 @@ process AdapterRemoval {
     --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut \
-    --minlength $params.minLength --threads $task.cpus
+    --minlength $params.minLength --threads $task.cpus \
+    > "${task.tag}.report.txt"
   """
 }
 

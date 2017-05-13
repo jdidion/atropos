@@ -37,12 +37,16 @@ do
   $ART_CMD -i $REF_GENOME -p -l $read_len -f $cov -m $mean_frag -s $sd_frag -rs $seed -o sim_${prof} \
     -1 art_profiles/HiSeq2500L125R1_${prof}.txt \
     -2 art_profiles/HiSeq2500L125R2_${prof}.txt
-  # rename files
+  # rename and fix files
   for mate in 1 2
   do
     for ext in aln fq
     do
       mv sim_${prof}${mate}.${ext} sim_${prof}.${mate}.${ext}
+      # There is a bug in the modified ART in which reads that are shorter
+      # than the read length even with the adapter apended have null characters
+      # tacked on to the end. We replace them with 'A's.
+      perl -pe 's/\x00/A/g' sim_${prof}.${mate}.${ext}
     done
   done
 done
