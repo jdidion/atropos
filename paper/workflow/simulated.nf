@@ -19,6 +19,13 @@
  * - adapter1, adapter2: Adapter sequence
  * 
  * The figure names and captions are also defined in the config file.
+ *
+ * Note: If Nextflow exits with error 137, this is due to insufficient
+ * memory. There are a few things you can try to work around this:
+ * - Ensure queueSize is set to 1
+ * - Reduce params.batchSize
+ * - If you have all of the software installed locally, you can disable
+ *   Docker/Singularity by commenting out the 'container' directives.
  */
 
 // variables for all tools
@@ -100,17 +107,15 @@ process Atropos {
     """
   }
   """
-  echo "<$aligner> <$mergeCmd>" && \
-  /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
+  /usr/bin/time -v -o ${task.tag}.timing.txt atropos trim \
     -T $task.cpus --aligner $aligner --op-order GACQW \
     -a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
     -m $params.minLength --batch-size $params.batchSize \
-    --no-default-adapters --no-cache-adapters --log-level ERROR --quiet \
+    --no-default-adapters --no-cache-adapters --log-level DEBUG \
     --insert-match-error-rate 0.20 -e 0.10 \
-    -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
+    -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
-    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]} \
-  $mergeCmd
+    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]} $mergeCmd
   """
 }
 
