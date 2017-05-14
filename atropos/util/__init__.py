@@ -671,7 +671,7 @@ def run_interruptible(func, *args, **kwargs):
     retcode = 0
     try:
         func(*args, **kwargs)
-    except KeyboardInterrupt as err:
+    except KeyboardInterrupt:
         logging.getLogger().error("Interrupted")
         retcode = 130
     except IOError as err:
@@ -679,10 +679,10 @@ def run_interruptible(func, *args, **kwargs):
             retcode = 1
         else:
             raise
-    except (AtroposError, EOFError) as err:
+    except (AtroposError, EOFError):
         logging.getLogger().error("Atropos error", exc_info=True)
         retcode = 1
-    except Exception as err: # pylint: disable=broad-except
+    except Exception: # pylint: disable=broad-except
         logging.getLogger().error("Unknown error", exc_info=True)
         retcode = 1
     return retcode

@@ -205,8 +205,8 @@ class WorkerProcess(Process):
                     if batch is None:
                         break
                     logging.getLogger().debug(
-                        "%s processing batch of size %d",
-                        self.name, batch[0]['size'])
+                        "%s processing batch %d of size %d",
+                        self.name, batch[0]['index'], batch[0]['size'])
                     self.pipeline.process_batch(batch)
             finally:
                 self.pipeline.finish(summary, worker=self)
