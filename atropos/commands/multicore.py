@@ -391,7 +391,7 @@ def ensure_processes(
     is_alive = [worker.is_alive() for worker in processes]
     if alive != all(is_alive):
         raise MulticoreError(message.format(",".join(
-            str(i) for i in range(len(is_alive)) if not is_alive[i])))
+            str(i) for i, a in enumerate(is_alive) if a != alive)))
 
 def wait_on(
         condition, *args, wait_message="Waiting {}", timeout=None,
