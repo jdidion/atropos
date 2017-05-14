@@ -1385,11 +1385,27 @@ read input, process reads, and write output. To use multiple cores, specify the
   atropos -T 4 -a ADAPTER -o output.fastq -se input.fastq
 
 It is important to note that, whatever number of threads you give Atropos, it will
-one of those for reading input and, if you use the ``--compression writer`` option
+use one of those for reading input and, if you use the ``--compression writer`` option
 (or if writer compression is used automatically), another for writing output. For
 example, the above command would use 4 cores, 1 reader thread, 1 writer thread, and
 2 trimming threads. It is recommended that you have at least 2 available cores when
 using multi-threading.
+
+Also note that the multi-threading model in Atropos is programmed to not make any
+assumptions about or impose any limiations on the runtimes of individual tasks.
+Instead, there is a "timeout" period, after which the log messages reporting on
+the status of the processing escalate from "debug" to "error." You can change the
+timeout length using the ``--process-timeout`` option. But don't be alarmed if you 
+see messages such as the following:
+
+  ERROR: Waiting on worker summaries for 65.0 seconds
+  ERROR: Workers are still alive and haven't returned summaries: 1,4
+
+This would be interpreted as "All of the data has been loaded, but worker
+threads 1 and 4 are still working on processing some of it." These messages are
+only to keep you abreast of the status -- a few minutes delay is normal, but if
+it starts to be tens of minutes or hours, something probably went wrong and you
+should kill the program (using Ctrl-C).
 
 Parallel writing
 ----------------

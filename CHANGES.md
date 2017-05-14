@@ -3,6 +3,7 @@
 v1.1.5 (dev)
 ------------
 * Major update to the documentation.
+* Fixed error messages in multi-threaded mode.
 
 v1.1.4 (2017.05.02)
 -------------------
