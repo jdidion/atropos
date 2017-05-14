@@ -102,8 +102,8 @@ process Atropos {
   mergeCmd = ''
   if (compression == 'nowriter') {
     mergeCmd = """
-    && zcat ${task.tag}.1.*.fq.gz > ${task.tag}.1.fq.gz \
-    && zcat ${task.tag}.2.*.fq.gz > ${task.tag}.2.fq.gz
+    zcat ${task.tag}.1.*.fq.gz > ${task.tag}.1.fq.gz
+    zcat ${task.tag}.2.*.fq.gz > ${task.tag}.2.fq.gz
     """
   }
   """
@@ -115,7 +115,8 @@ process Atropos {
     --insert-match-error-rate 0.20 -e 0.10 \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
-    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]} $mergeCmd
+    $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
+  $mergeCmd
   """
 }
 
@@ -249,7 +250,7 @@ process ComputeSimulatedAccuracy {
   compute_simulated_accuracy.py \
     -a1 ${alns[0]} -a2 ${alns[1]} \
     -r1 ${trimmed[0]} -r2 ${trimmed[1]} \
-    --name ${name} --no-progress \
+    -p ${name} --no-progress \
     -o ${name}.txt -s ${name}.summary.txt -t -
   """
 }
