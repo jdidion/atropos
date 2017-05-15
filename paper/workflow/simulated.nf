@@ -102,8 +102,8 @@ process Atropos {
   mergeCmd = ''
   if (compression == 'nowriter') {
     mergeCmd = """
-    zcat ${task.tag}.1.*.fq.gz > ${task.tag}.1.fq.gz
-    zcat ${task.tag}.2.*.fq.gz > ${task.tag}.2.fq.gz
+    zcat ${task.tag}.1.*.fq.gz | gzip > ${task.tag}.1.fq.gz
+    zcat ${task.tag}.2.*.fq.gz | gzip > ${task.tag}.2.fq.gz
     """
   }
   """

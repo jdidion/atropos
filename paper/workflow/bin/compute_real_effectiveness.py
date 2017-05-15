@@ -52,11 +52,13 @@ read_fields = [
     ('in_region', -1)
 ]
 
-def write_header(w):
+def get_header():
     rf = [key for key, val in read_fields]
     r1 = ['read1_{}'.format(key) for key in rf]
     r2 = ['read2_{}'.format(key) for key in rf]
-    w.writerow([key for key, val in pair_fields] + r1 + r2)
+    return [key for key, val in pair_fields] + r1 + r2
+
+HEADER = get_header()
 
 class TableRead(object):
     def __init__(self):
@@ -478,7 +480,7 @@ def main():
     try:
         with open_output(args.output) as o, open_output(args.hist) as h:
             ow = csv.writer(o, delimiter="\t")
-            write_header(ow)
+            ow.writerow(HEADER)
             hw = csv.writer(h, delimiter="\t")
             hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
             summarize(untrimmed, trimmed, ow, hw,
