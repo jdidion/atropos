@@ -216,17 +216,32 @@ class Bed(object):
         pass
 
 class Annotations(object):
-    def __init__(self, bed_dir, pattern, untrimmed_name, trimmed_names):
-        self.bed_dir = bed_dir
+    def __init__(self, bed_files_or_dir, pattern, untrimmed_name, trimmed_names):
         self.pattern = pattern
         self.annot_beds = {}
-        self.add(untrimmed_name)
-        for name in trimmed_names:
-            self.add(name)
+        if isinstance(bed_files_or_dir, str):
+            self.bed_dir = bed_dir
+            self.add(untrimmed_name)
+            for name in trimmed_names:
+                self.add(name)
+        else:
+            for path in bed_files_or_dir:
+                for name in trimmed_names:
+                    if os.path.basename(path).startswith(name):
+                        self.add(name, path)
+                        break
+                else:
+                    raise ValueError(
+                        "No matching BAM file for BED path {}".format(path))
+            if untrimmed_name not in self.annot_beds:
+                raise ValueError("No untrimmed BED file")
     
-    def add(self, name):
-        self.annot_beds[name] = AnnotBed(os.path.join(
-            self.bed_dir, self.pattern.format(name=name)))
+    def add(self, name, path=None):
+        if path:
+            self.annot_beds[name] = AnnotBed(path)
+        else:
+            self.annot_beds[name] = AnnotBed(os.path.join(
+                self.bed_dir, self.pattern.format(name=name)))
     
     def set_overlaps(self, read_pair, min_overlap=1.0):
         annot = self.annot_beds[read_pair.prog]
@@ -381,6 +396,7 @@ def summarize(untrimmed, trimmed, ow, hw, mode=None, regions=None,
 def main():
     parser = argparse.ArgumentParser()
     parser.set_defaults(command=None)
+    parser.add_argument("-i", "--bam-files", nargs="+", default=None)
     parser.add_argument("-d", "--bam-dir")
     parser.add_argument("-x", "--bam-extension", default=".sorted.bam")
     parser.add_argument("-p", "--bam-pattern", default=None)
@@ -415,6 +431,9 @@ def main():
     mrna = sp.add_parser('mrna')
     mrna.set_defaults(command='mrna')
     mrna.add_argument(
+        "-b", "--bed-files", nargs="+", default=None,
+        help="BED file names corresponding to BAM files.")
+    mrna.add_argument(
         "-D", "--bed-dir", default=None,
         help="Directory where to find annotation bed files. Defaults to "
             "--bam-dir.")
@@ -430,8 +449,12 @@ def main():
     
     trimmed = {}
     untrimmed = None
-    pattern = (args.bam_pattern or "*{}").format(args.bam_extension)
-    for path in glob(os.path.join(args.bam_dir, pattern)):
+    if args.bam_files:
+        bam_files = args.bam_files
+    else:
+        pattern = (args.bam_pattern or "*{}").format(args.bam_extension)
+        bam_files = list(glob(os.path.join(args.bam_dir, pattern)))
+    for path in bam_files:
         name = os.path.basename(path)[:-len(args.bam_extension)]
         if name == args.untrimmed_name:
             untrimmed = BAMReader(path)
@@ -447,7 +470,7 @@ def main():
         regions = Bed(args.bed, args.slop or 200)
     elif args.command == 'mrna':
         regions = Annotations(
-            args.bed_dir or args.bam_dir,
+            args.bed_files, or args.bed_dir or args.bam_dir,
             args.bed_pattern,
             args.untrimmed_name,
             trimmed.keys())

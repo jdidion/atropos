@@ -9,8 +9,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", default="-")
     parser.add_argument("-o", "--output")
-    parser.add_argument("-n", "--name")
-    parser.add_argument("-c", "--caption")
+    parser.add_argument("-n", "--name", default="table")
+    parser.add_argument("-c", "--caption", default="")
     parser.add_argument(
         "-f", "--formats", choices=('txt', 'tex', 'pickle'), nargs="+",
         default=['tex'])
