@@ -47,13 +47,12 @@ Where <env> is either 'local' or 'cluster'. Note that the first time you run thi
 
 All results will be placed in the 'results' subdirectory.
 
+Note that when re-running the workflow and comparing the results to those shown in the manuscript, there will be some variability in the performance metrics, but the relative rankings of the tools should not change significantly -- please let us know if you find otherwise!
+
 # Manuscript
 
-The manuscript was written using [Overleaf](https://www.overleaf.com). A copy
-of the final latex document will be copied into the 'manuscript' folder upon
-final submission of the paper. To go from the generated figures/tables in 'workflow/results' to the final figures/tables in the manuscript, we tweaked the aesthetics of some figures using Illustrator and of some tables by hand-editing the latex, but the data was left exactly as-is. 
-
-Note that when re-running the workflow and comparing the results to those shown in the manuscript, there will be some variability in the performance metrics, but the relative rankings of the tools should not change significantly -- please let us know if you find otherwise!
+See the [manuscript folder](manuscript/README.md) for details on how the
+manuscript was created.
 
 # TODO
 
