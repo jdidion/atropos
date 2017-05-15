@@ -5,7 +5,8 @@
 # Base Image:       busybox
 #################################################################
 FROM busybox
-RUN mkdir -p /data/reference/hg37
+RUN mkdir -p /data/reference/hg37 \
+ && mkdir -p /data/annotations/hg37
 ADD hg37.fa /data/reference/hg37/hg37.fa
 ADD hg37.fa.fai /data/reference/hg37/hg37.fa.fai
 ADD gencode.v26lift37.annotation.gtf /data/annotations/hg37/gencode.v26lift37.annotation.gtf

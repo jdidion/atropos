@@ -7,10 +7,14 @@ do
   URL='ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes'
   wget -r --no-parent --no-directories -A 'chr*' $URL && \
    zcat *.gz > hg37.fa && rm *.gz && \
-   docker run -v $(pwd):/data --rm jdidion/bwa samtools faidx /data/hg37.fa
+   docker run -v $(pwd):/data --rm jdidion/bwa samtools faidx /tmp/hg37.fa \
 done && \
-wget --no-parent --no-directories -O ${FILE} ${ANNOURL} && \
-gunzip ${FILE} && \
+if [ ! -f ${FILE} ] \
+do \
+  wget --no-parent --no-directories -O ${FILE} ${ANNOURL} && \
+  gunzip ${FILE} \
+done && \
 # Build data container
 docker build -f Dockerfile -t jdidion/hg37_reference:latest . && \
 rm -Rf hg37.fa*
+

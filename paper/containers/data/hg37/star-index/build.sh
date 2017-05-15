@@ -8,23 +8,17 @@
 THREADS=$1
 GENCODE_VERSION=26
 INDEX_CMD="STAR --runMode genomeGenerate --runThreadN ${THREADS} \
-        --genomeDir /data/index/hg37 --genomeFastaFiles /data/index/hg37/hg37.fa \
+        --genomeDir /data/index/star/hg37 \
+        --genomeFastaFiles /data/index/star/hg37/hg37.fa \
         --sjdbGTFfile /data/annotations/hg37/gencode.v${GENCODE_VERSION}lift37.annotation.gtf \
         --sjdbOverhang 75 --limitGenomeGenerateRAM 16000000000"
 
-# create a data volume from the reference genome image
-docker create -v /data/reference/hg37 --name hg37 jdidion/hg37_reference && \
-# build the STAR index
-mkdir index && \
-docker run \
-    # create a local volume to store the output
-    -v $(pwd)/index:/star-index:/data/index/star/hg37 \
-    # bind reference data volume
+docker create -v /data/reference/hg37 --name hg37 jdidion/hg37_reference \
+&& docker run \
     --volumes-from hg37 \
-    # run star index from starbase image
-    --rm jdidion/star bash -c \
-    "cp /data/reference/hg37/hg37.fa /data/index/star/hg37 && ${INDEX_CMD}" && \
-# create a new image that includes the index
-docker build -f Dockerfile -t jdidion/star_hg37index . && \
-# cleanup
-rm -Rf star-index
+    --rm jdidion/starbase bash -c \
+    "mkdir -p /data/index/star/hg37 && \
+     cp /data/reference/hg37/hg37.fa /data/index/star/hg37 && \
+     ${INDEX_CMD}" \
+&& docker commit jdidion/starbase jdidion/star_hg37index \
+&& docker rm -v hg37
