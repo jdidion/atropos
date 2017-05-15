@@ -94,7 +94,7 @@ process Atropos {
   each compression from params.compressionSchemes
   
   output:
-  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
+  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
   file "${task.tag}.report.txt"
   
@@ -137,7 +137,7 @@ process Skewer {
   each qcut from params.quals
 
   output:
-  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
+  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSkewer
   file "${task.tag}.report.txt"
   
@@ -169,7 +169,7 @@ process SeqPurge {
   each qcut from params.quals
 
   output:
-  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
+  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSeqPurge
   file "${task.tag}.report.txt"
   
@@ -200,7 +200,7 @@ process AdapterRemoval {
   each qcut from params.quals
 
   output:
-  set val("${task.tag}"), err, alns, file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
+  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAdapterRemoval
   file "${task.tag}.report.txt"
   
