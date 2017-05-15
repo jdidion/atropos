@@ -32,13 +32,14 @@ def main():
         
         num_reads = max(tab.read_idx)
         
-        quals = \
-            table.pivot(index='read_idx', columns='prog', values='read1_quality').append(
-            table.pivot(index='read_idx', columns='prog', values='read2_quality'))
+        quals = table.pivot(index='read_idx', columns='prog', values='read1_quality').\
+            append(table.pivot(index='read_idx', columns='prog', values='read2_quality')).\
+            drop('')
         
         if args.exclude_discarded:
+            tab3.apply(lambda x: any(x==-1), 1)
     
-    if (exclude.discarded) {
+        if (exclude.discarded) {
             w <- apply(quals[,3:ncol(quals)], 1, function(x) any(x==-1))
             quals <- quals[!w,]
         }
