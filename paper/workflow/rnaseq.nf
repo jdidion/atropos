@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
-/* Atropos paper workflow for simulated DNA-Seq reads
- * --------------------------------------------------
+/* Atropos paper workflow for real RNA-Seq reads
+ * ---------------------------------------------
  * Configuration is externalized into separate profiles for local and cluster.
  * The main difference is that Docker is used to manage images on desktop, 
  * verusus Singularity on the cluster.
@@ -16,8 +16,6 @@
  * - aligners: Atropos aligner algorithms to test
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
- * 
- * The figure names and captions are also defined in the config file.
  */
 
 // variables for all tools
@@ -38,7 +36,7 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
  * not support attaching volumes, we use a process to unpack the data from the 
  * container.
  */
-process Extract {
+process ExtractReads {
   container "jdidion/atropos_rnaseq"
   
   output:
@@ -55,10 +53,23 @@ process Extract {
 
 // Split the input reads channel into one per tool process.
 rnaseqReads.into {
+  untrimmedRnaseqReads
   atroposRnaseqReads
   skewerRnaseqReads
   seqPurgeRnaseqReads
   adapterRemovalRnaseqReads
+}
+
+process ExtractAnnotations {
+  container "jdidion/hg38_reference"
+  
+  output:
+  file "gencode.v26.annotation.gtf" into annotations
+  
+  script:
+  """
+  cp /data/reference/hg38/gencode.v26.annotation.gtf .
+  """
 }
 
 /* Process: Atropos adapter trimming
@@ -70,7 +81,7 @@ process Atropos {
   container "jdidion/atropos_paper"
 
   input:
-  file(reads) from atroposSimReads
+  file(reads) from atroposRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
   each aligner from params.aligners
@@ -106,7 +117,7 @@ process Skewer {
   container "jdidion/skewer"
 
   input:
-  file(reads) from skewerSimReads
+  file(reads) from skewerRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
 
@@ -137,7 +148,7 @@ process SeqPurge {
   container "jdidion/seqpurge"
 
   input:
-  file(reads) from seqPurgeSimReads
+  file(reads) from seqPurgeRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
 
@@ -168,7 +179,7 @@ process AdapterRemoval {
   container "jdidion/adapterremoval"
 
   input:
-  file(reads) from adapterRemovalSimReads
+  file(reads) from adapterRemovalRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
 
@@ -188,14 +199,23 @@ process AdapterRemoval {
   """
 }
 
+/* Channel: Untrimmed
+ * ------------------
+ * Need to create a set from the untrimmed reads so it can be merged with
+ * the trimmed reads.
+ */
+untrimmed = Channel.value(["untrimmed", untrimmedRnaseqReads])
+
 /* Channel: merged tool outputs
  * ----------------------------
- * If you add a tool process, make sure to add the trimmedXXX channel
- * into the concat list here.
+ * We also add in the untrimmed output, which we need to align for evaluation of
+ * effectiveness. If you add a tool process, make sure to add the trimmedXXX 
+ * channel into the concat list here.
  */
 Channel
   .empty()
   .concat(
+    untrimmed,
     trimmedAtropos,
     trimmedSkewer,
     trimmedSeqPurge,
@@ -203,13 +223,96 @@ Channel
   )
   .set { trimmedMerged }
 
+/* Process: Align reads using STAR
+ * -------------------------------
+ * Alignments are written to an unsorted BAM file and then name sorted by
+ * samtools.
+ */
 process StarAlign {
   container "jdidion/star_hg38index"
+  
+  input:
+  set val(name), file(fastq) from trimmedMerged
+  
+  output:
+  file("${name}_rnaseq_Aligned.{bam,bam.bai}")
+  set val(name), file("${name}_rnaseq.name_sorted.bam") into sorted
+  set val(name), file("${name}.star.timing.txt") into timingStar
+  
+  script:
   """
-  STAR --runThreadN $threads --genomeDir $genome --readFilesIn Read1 Read2 \
-  --outMultimapperOrder Random --outFilterMultimapNmax 100000 --outSAMmultNmax 1 \
-  --outFileNamePrefix ${outdir}/${name}_rna \
-  --outSAMtype BAM Unsorted --outSAMunmapped Within KeepPairs
+  /usr/bin/time -v -o ${name}.star.timing.txt STAR \
+    --runThreadN $threads --genomeDir /data/index/star/hg38 \
+    --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
+    --outMultimapperOrder Random --outFilterMultimapNmax 100000 \
+    --outSAMmultNmax 1 --outSAMtype BAM Unsorted \
+    --outSAMunmapped Within KeepPairs --outFileNamePrefix ${name}_rnaseq_ \
+  && samtools sort -n -O bam -@ $threads \
+    -o ${name}_rnaseq.name_sorted.bam ${name}_rnaseq_Aligned.bam
+  """
+
+// clone sorted bams
+sorted.into {
+  sortedBam2Bed
+  sortedEffectiveness
+}
+
+/* Process: Convert aligned reads into table format
+ * ------------------------------------------------
+ */
+process Bam2Bed {
+  container "jdidion/atropos_paper_analysis"
+  
+  input:
+  set val(name), file(sortedBam) from sortedBam2Bed
+  file annotations
+  
+  output:
+  file "${name}.overlap.txt" into overlap
+  
+  script:
+  """
+  bam2bed --all-reads --do-not-sort < $sortedBam \
+    | cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id - $annotations \
+    > ${name}.overlap.txt
+  """
+}
+
+/* Process: Summarize trimming effectiveness
+ * -----------------------------------------
+ */
+process ComputeEffectiveness {
+  input:
+  val bamFileList from sortedEffectiveness.toList()
+  val bedFileList from overlap.toList()
+  
+  output:
+  file "effectiveness.txt" into effectiveness
+  
+  script:
+  bamFiles = bamFileList.join(" ")
+  bedFiles = bedFileList.join(" ")
+  """
+  compute_real_effectiveness.py \
+    -i $bamFileList -o effectiveness.txt \
+    --no-edit-distance --no-progress \
+    mrna -b $bedFileList
+  """
+}
+
+/* Process: Generate plot
+ * ----------------------
+ */
+process ShowEffectiveness {
+  input:
+  file effData from effectiveness
+  
+  output:
+  file "rnaseq_effectiveness.svg"
+  
+  script:
+  """
+  show_rnaseq_effectiveness.py -i $effData -o rnaseq_effectiveness.svg
   """
 }
 
@@ -231,18 +334,18 @@ Channel
 /* Process: parse performance data for each tool
  * ---------------------------------------------
  */
-process ParseSimualtedTiming {
+process ParseTrimmingTiming {
     container "jdidion/python_bash"
     
     input:
-    set val(item), file(timing) from timingMerged
+    set val(name), file(timing) from timingMerged
     
     output:
-    stdout timingParsed
+    stdout timingMergedParsed
     
     script:
     """
-    parse_gtime.py -i $timing -p $item
+    parse_gtime.py -i $timing -p $name
     """
 }
 
@@ -251,28 +354,61 @@ process ParseSimualtedTiming {
  * Aggregate all the parsed performance data and pass it to stdin of the
  * bin/show_performance.py script.
  */
-process ShowSimulatedPerformance {
+process ShowWgbsTrimmingPerformance {
     container "jdidion/python_bash"
     publishDir "$publishDir", mode: 'copy', overwrite: true
     
     input:
-    val parsedRows from timingParsed.toList()
+    val parsedRows from timingMergedParsed.toList()
     
     output:
-    file "performance.tex"
-    file "performance.svg"
+    file "trim_performance.tex"
+    file "trim_performance.svg"
     
     script:
     data = parsedRows.join("")
-    if (workflow.profile == "local") {
-      name = task.ext.local_name
-      caption = task.ext.local_caption
-    } else {
-      name = task.ext.cluster_name
-      caption = task.ext.cluster_caption
-    }
-    
     """
-    echo '$data' | show_performance.py -n $name -c $caption -o performance
+    echo '$data' | show_performance.py -o trim_performance
+    """
+}
+
+/* Process: parse performance for STAR alignment
+ * ---------------------------------------------
+ */
+process ParseStarTiming {
+    container "jdidion/python_bash"
+    
+    input:
+    set val(name), file(timing) from timingStar
+    
+    output:
+    stdout timingStarParsed
+    
+    script:
+    """
+    parse_gtime.py -i $timing -p $name
+    """
+}
+
+/* Process: generate STAR alignment performance figure/table
+ * ---------------------------------------------------------
+ * Aggregate all the parsed performance data and pass it to stdin of the
+ * bin/show_performance.py script.
+ */
+process ShowStarPerformance {
+    container "jdidion/python_bash"
+    publishDir "$publishDir", mode: 'copy', overwrite: true
+    
+    input:
+    val parsedRows from timingStar.toList()
+    
+    output:
+    file "star_performance.tex"
+    file "star_performance.svg"
+    
+    script:
+    data = parsedRows.join("")
+    """
+    echo '$data' | show_performance.py -o star_performance
     """
 }
