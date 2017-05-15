@@ -8,7 +8,7 @@
 THREADS=$1
 GENCODE_VERSION=26
 INDEX_CMD="STAR --runMode genomeGenerate --runThreadN ${THREADS} \
-        --genomeDir /index-build/hg38 \
+        --genomeDir /index-build \
         --genomeFastaFiles /index-build/hg38.fa \
         --sjdbGTFfile /data/annotations/hg38/gencode.v${GENCODE_VERSION}.annotation.gtf \
         --sjdbOverhang 75 --limitGenomeGenerateRAM 16000000000"
@@ -21,8 +21,7 @@ docker create \
 && docker run --rm \
   -v $(pwd)/index:/index-build --volumes-from hg38 \
   jdidion/starbase bash -c \
-    "mkdir -p /data/index/star/hg38 && \
-     cp /data/reference/hg38/hg38.fa /index-build/hg38 && \
+    "cp /data/reference/hg38/hg38.fa /index-build && \
      ${INDEX_CMD}" \
 && docker build -f Dockerfile -t jdidion/star_hg38index . \
 && docker rm -v hg38 \
