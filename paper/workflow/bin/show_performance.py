@@ -56,6 +56,12 @@ def main():
 
     # generate figure
     if 'svg' in args.formats:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import seaborn as sb
+        sb.set(style="whitegrid")
+        
         svgdat = table.melt(
             id_vars=['Program', 'Threads', 'Dataset', 'Quality'], 
             value_vars=['DurationSecs','CPUPct','MemoryMB'])
@@ -63,11 +69,7 @@ def main():
         svgdat['Dataset'] = svgdat['Dataset'].astype('category')
         svgdat['variable'] = pd.Categorical(
             svgdat['variable'], categories=['DurationSecs', 'MemoryMB', 'CPUPct'])
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import seaborn as sb
-        sb.set(style="whitegrid")
+        
         threads = svgdat.Threads.unique()
         if len(threads) == 1:
             plot = sb.factorplot(

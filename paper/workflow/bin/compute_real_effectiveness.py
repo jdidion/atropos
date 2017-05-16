@@ -27,6 +27,8 @@ from atropos.xopen import open_output
 
 nuc = ('A','C','G','T','N')
 
+prog_header = ['prog', 'prog2', 'threads', 'dataset', 'qcut']
+
 pair_fields = [
     ('prog', None),
     ('read_name', None),
@@ -56,7 +58,7 @@ def get_header():
     rf = [key for key, val in read_fields]
     r1 = ['read1_{}'.format(key) for key in rf]
     r2 = ['read2_{}'.format(key) for key in rf]
-    return [key for key, val in pair_fields] + r1 + r2
+    return prog_header + [key for key, val in pair_fields[1:]] + r1 + r2
 
 HEADER = get_header()
 
@@ -122,6 +124,7 @@ class TableRow(object):
         for key, val in pair_fields:
             setattr(self, key, val)
         self.prog = prog
+        self.prog_fields = list(parse_profile(prog))
         self.read_name = read_name
         self.read_idx = read_idx
         self.read1 = TableRead()
@@ -155,8 +158,8 @@ class TableRow(object):
         self.read2.set_trimming(u2, r2, use_edit_distance)
     
     def write(self, w):
-        w.writerow([
-            getattr(self, key) for key, val in pair_fields
+        w.writerow(self.prog_fields + [
+            getattr(self, key) for key, val in pair_fields[1:]
         ] + [
             getattr(self.read1, key) for key, val in read_fields
         ] + [
@@ -305,6 +308,7 @@ class Hist(object):
     def __init__(self, prog, n_bases):
         # position base histograms
         self.prog = prog
+        self.prog_fields = parse_profile(prog)
         self.n_bases = n_bases
         self.hists = [
             [
@@ -327,7 +331,7 @@ class Hist(object):
             for side in range(2):
                 for base in nuc:
                     for pos, count in enumerate(read_hists[side][base], 1):
-                        w.writerow((self.prog, read, side, pos, base, count))
+                        w.writerow(self.prog_fields + [read, side, pos, base, count])
 
 def summarize(untrimmed, trimmed, ow, hw, mode=None, regions=None,
               n_hist_bases=20, max_reads=None, use_edit_distance=True,
@@ -482,7 +486,7 @@ def main():
             ow = csv.writer(o, delimiter="\t")
             ow.writerow(HEADER)
             hw = csv.writer(h, delimiter="\t")
-            hw.writerow(('prog','read', 'side', 'pos', 'base', 'count'))
+            hw.writerow(prog_header + ['read', 'side', 'pos', 'base', 'count'])
             summarize(untrimmed, trimmed, ow, hw,
                 mode=args.command, regions=regions, max_reads=args.max_reads,
                 use_edit_distance=args.edit_distance, progress=args.progress)

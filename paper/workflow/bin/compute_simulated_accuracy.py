@@ -23,7 +23,6 @@ summary_fields = (
 def summarize_accuracy(aln_iter, read_iter, w, read_length, adapters):
     adapter_lengths = [len(adapters[i]) for i in (0,1)]
     
-    #if read_id != 'chr1-199374': continue
     debug = False
     
     def summarize_alignment(a):

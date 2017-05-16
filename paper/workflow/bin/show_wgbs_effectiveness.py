@@ -25,42 +25,58 @@ def main():
             pickle.dump(table, out)
     
     if 'svg' in args.formats:
-        num_reads = max(tab.read_idx)
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import seaborn as sb
+        sb.set(style="whitegrid")
         
+        # Since neither threads nor compression change the outcome of trimming,
+        # we don't need to worry about stratifying by those metric.
+        table = table[(table.threads==4) & (table.compression=='workercomp')]
+        table = table.drop(['threads', 'compression', 'dataset'])
+        
+        table.groupby('read_idx').apply(lambda x: all(x.read1_quality>=0))
+        
+        # Extract MAPQ values
         quals = table.pivot(
             index='read_idx', columns='prog', values='read1_quality')
         quals = quals.append(table.pivot(
             index='read_idx', columns='prog', values='read2_quality'))
         
+        # Optionally remove rows where the read was discarded by any program
         if args.exclude_discarded:
             quals = quals[quals.apply(lambda x: all(x >= 0), 1)]
         
+        # Create a tidy table of the number of reads above each MAPQ threshold
+        # for each program, along with the delta versus untrimmed
         maxq = quals.apply(max, 1)
         q_thresholds = [1] + list(range(5, 60, 5))
         progs = quals.columns.tolist()
         above_thresholds = pd.DataFrame.from_records([
             [q, sum(maxq >= q)] + quals.apply(lambda x: sum(x >= q), 0).tolist()
             for q in q_thresholds
-        ], columns=['Q', 'MaxAboveThreshold'] + progs).melt(
-            id_vars=['Q', 'MaxAboveThreshold'], var_name="Program", 
+        ], columns=['MAPQ', 'MaxAboveThreshold'] + progs).melt(
+            id_vars=['MAPQ', 'MaxAboveThreshold'], var_name="Program", 
             value_name="AboveThreshold")
-        above_thresholds['delta'] = np.NaN
+        above_thresholds['Delta'] = np.NaN
         for q in q_thresholds:
             for p in set(progs) - set(['untrimmed']):
                 above_thresholds.loc[
-                    above_thresholds.Q == q & above_thresholds.Program == prog,
+                    (above_thresholds.MAPQ == q) & (above_thresholds.Program == p),
                     'delta'
                 ] = above_thresholds.loc[
-                    above_thresholds.Q == q & above_thresholds.Program == prog,
+                    (above_thresholds.MAPQ == q) & (above_thresholds.Program == p),
                     'AboveThreshold'
-                ] - above_thresholds.loc[
-                    above_thresholds.Q == q & above_thresholds.Program == 'untrimmed',
+                ].values[0] - above_thresholds.loc[
+                    (above_thresholds.MAPQ == q) & (above_thresholds.Program == 'untrimmed'),
                     'AboveThreshold'
-                ]
-                    
+                ].values[0]
         
-
-    plot.wgbs.data <- function(data, q.labels=NULL) {
+        plot = sb.pointplot(
+            x='MAPQ', y='Delta', hue='Q',
+            data=above_thresholds[above_thresholds.Program != 'untrimmed'])
+        
         pts <- data$pts
         progs <- data$progs
         pts$prog <- as.character(pts$prog)
@@ -84,7 +100,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-
+# Original R code:
 # process.wgbs <- function(tab, ) {
 #     progs <- c('untrimmed', sort(setdiff(unique(tab$prog), 'untrimmed')))
 #     N <- max(tab$read_idx)
@@ -151,7 +167,28 @@ if __name__ == "__main__":
 #     }
 #     retval
 # }
-
+# New plot function
+# plot.wgbs.data <- function(data, q.labels=NULL) {
+#     pts <- data$pts
+#     progs <- data$progs
+#     pts$prog <- as.character(pts$prog)
+#     colnames(pts) <- c("MAPQ", "x", "Q", "y", "Delta")
+#     if (!is.null(q.labels)) {
+#         for (i in 1:length(q.labels)) {
+#             pts[pts$Q == progs[i], 'Q'] <- names(q.labels)[i]
+#         }
+#         n <- names(sort(q.labels))
+#     }
+#     else {
+#         n <- sort(unique(pts$Q))
+#     }
+#     pts$Q <- factor(pts$Q, levels=n)
+#     pts <- pts[order(pts$Q),]
+#     ggplot(pts[pts$Q != 'untrimmed',], aes(x=MAPQ, y=Delta, colour=Q)) +
+#         geom_line() + geom_point() +
+#         labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
+# }
+# Old plot function
 # plot.data <- function(data, prog.labels) {
 #     pts <- data$pts
 #     progs <- data$progs
