@@ -16,35 +16,56 @@ pct_columns = (
 minvals = {}
 for d in datasets:
     for col0, col1 in columns + pct_columns:
-        minvals[(d, col0, col1)] = table.loc[d,:].sort_index(level=[col0, col1])[col0, col1][0]
+        minvals[(d, col0, col1)] = table.loc[d,:][col0, col1].sort_values()[0]
+import re
+esc = {
+    re.compile("\%") : "\\%"
+}
+def escape_latex(s):
+    for from_pat, to_val in esc.items():
+        s = from_pat.sub(to_val, s)
+    return s
 %>
 \begin{table}[!htbp]
 \centering
 \begin{tabular}{lrrrr|rrr}
 \sisetup{detect-weight=true,detect-inline-weight=math}
-    \hfill{} & \multicolumn{4}{C{8.2cm}}{Reads} & \multicolumn{3}{C{4cm}}{Bases} \\
+    \hfill{} & \multicolumn{4}{C{8.2cm}}{Reads} & \multicolumn{3}{C{4cm}}{Bases} \\\
     \cmidrule{2-8} 
-    Program & \multicolumn{1}{C{2cm}}{Wrongly Trimmed} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{2.2cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{1cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} \\
+    Program & \multicolumn{1}{C{2cm}}{Wrongly Trimmed} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{2.2cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{1cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} \\\
     
     % for dataset in datasets:
     \midrule
-    ${dataset} \\
+    Error rate ${dataset}\% \\\
         % for prog in progs:
-        ${prog} \\
+        ${prog}
             % for col0, col1 in columns:
-                <% val = table.loc[d, prog][col0, col1] %>
-                % if val == minvals[(dataset, col0, col1)]:
-                \hlcell{${val}}
-                % else:
-                ${val}
-                % endif
-                % if col0 == 'reads' and (dataset, 'pct', col1) in minvals:
-                (${table.loc[d, prog]['pct', col1]}\%)
-                % endif
+                <%
+                val = table.loc[dataset, prog][col0, col1]
+                is_min = val == minvals[(dataset, col0, col1)]
+                val2 = None
+                if col0 == 'reads':
+                    if col1 == 'Total Error':
+                        fmt = "{val:0.2%}"
+                    else:
+                        val = int(val)
+                        val2 = table.loc[dataset, prog]['pct', col1]
+                        fmt = "{val:,d} ({val2:0.2%})"
+                else:
+                    if col1 == 'Total Error':
+                        fmt = "{val:0.3%}"
+                    else:
+                        val = int(val)
+                        fmt = "{val:,d}"
+                fmt = escape_latex(fmt.format(val=val, val2=val2))
+                cell = "\hlcell{" + fmt + "}" if is_min else fmt
+                %>
+                & ${cell}
             % endfor
-            \\
+            \\\
         % endfor
     %endfor
+
 \end{tabular}
 \caption{\label{tab:${name}}${caption}}
 \end{table}

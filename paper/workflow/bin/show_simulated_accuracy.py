@@ -68,7 +68,7 @@ def main():
         textable["reads total error"] = textable.loc[:,adapter_cols].apply(sum, 1) / textable['retained reads']
         textable["bases total error"] = textable.loc[:,base_cols].apply(sum, 1) / textable['total ref bases']
         # Melt into tidy format
-        textable = textable.melt(id_vars=['dataset', 'program2'], value_vars=all_cols)
+        textable = textable.melt(id_vars=['dataset', 'program'], value_vars=all_cols)
         # Add the "level" - reads/read pct/bases
         def to_level(var):
             if 'pct' in var:
@@ -81,7 +81,7 @@ def main():
         # Replace the variable names with those we want in the final table
         textable = textable.replace({ 'variable' : col_map })
         # Finally, pivot the table into the grouped format we want to use in the latex template and sort
-        textable = textable.pivot_table(index=['dataset', 'program2'], columns=['datalevel', 'variable']).sort_index()
+        textable = textable.pivot_table(index=['dataset', 'program'], columns=['datalevel', 'variable']).sort_index()
         # Drop the unnecessary first column level
         textable.columns = textable.columns.droplevel(0)
         

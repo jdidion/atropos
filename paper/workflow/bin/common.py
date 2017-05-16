@@ -28,7 +28,10 @@ class fileopen(object):
         if self.close:
             self.fh.close()
 
-def parse_profile(profile):
+def parse_profile(profile, threads=None, dataset=None):
+    if profile == 'untrimmed':
+        return ('untrimmed', 'untrimmed', threads, dataset, 0)
+    
     profile = profile.split("_")
     
     if profile[0] == 'atropos':

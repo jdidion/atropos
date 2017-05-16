@@ -82,7 +82,7 @@ simReads.into {
  * output files.
  */
 process Atropos {
-  tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
+  tag { "atropos_${task.cpus}_${err}_q${qcut}_insert_${compression}" }
   cpus { threads }
   container "jdidion/atropos_paper"
 
@@ -106,13 +106,22 @@ process Atropos {
     zcat ${task.tag}.2.*.fq.gz | gzip > ${task.tag}.2.fq.gz
     """
   }
+  // Tune different parameters based on aligner. For adapter-match, minimum
+  // overlap is important to prevent over-trimming. For insert-match, the
+  // error rate is important to allow for mismatches between overlaps.
+  alignerArgs = null
+  if (aligner == 'insert') {
+    alignerArgs = "-O 7"
+  }
+  else {
+    alignerArgs = "--insert-match-error-rate 0.20"
+  }
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos trim \
-    -T $task.cpus --aligner $aligner --op-order GACQW \
-    -a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
-    -m $params.minLength --batch-size $params.batchSize \
+    --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
+    -e 0.10 --aligner $aligner $alignerArgs -q $qcut --trim-n \
+    -a $params.adapter1 -A $params.adapter2 -m $params.minLength \
     --no-default-adapters --no-cache-adapters --log-level DEBUG \
-    --insert-match-error-rate 0.20 -e 0.10 \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
     $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
@@ -133,7 +142,6 @@ process Skewer {
   input:
   set err, file(reads), file(alns) from skewerSimReads
   each threads from params.threadCounts
-  each err from params.errorRates
   each qcut from params.quals
 
   output:
@@ -165,7 +173,6 @@ process SeqPurge {
   input:
   set err, file(reads), file(alns) from seqPurgeSimReads
   each threads from params.threadCounts
-  each err from params.errorRates
   each qcut from params.quals
 
   output:
@@ -196,7 +203,6 @@ process AdapterRemoval {
   input:
   set err, file(reads), file(alns) from adapterRemovalSimReads
   each threads from params.threadCounts
-  each err from params.errorRates
   each qcut from params.quals
 
   output:

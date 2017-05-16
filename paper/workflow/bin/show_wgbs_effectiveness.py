@@ -33,10 +33,8 @@ def main():
         
         # Since neither threads nor compression change the outcome of trimming,
         # we don't need to worry about stratifying by those metric.
-        table = table[(table.threads==4) & (table.compression=='workercomp')]
-        table = table.drop(['threads', 'compression', 'dataset'])
-        
-        table.groupby('read_idx').apply(lambda x: all(x.read1_quality>=0))
+        table = table[(table.threads==4)]
+        table = table.drop(['prog2', 'threads', 'dataset'])
         
         # Extract MAPQ values
         quals = table.pivot(
