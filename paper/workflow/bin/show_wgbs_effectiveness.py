@@ -25,44 +25,40 @@ def main():
             pickle.dump(table, out)
     
     if 'svg' in args.formats:
-        # sort programs but put untrimmed first
-        progs = set(tab.prog)
-        progs.remove('untrimmed')
-        ['untrimmed'] + sorted(progs)
-        
         num_reads = max(tab.read_idx)
         
-        quals = table.pivot(index='read_idx', columns='prog', values='read1_quality').\
-            append(table.pivot(index='read_idx', columns='prog', values='read2_quality')).\
-            drop('')
+        quals = table.pivot(
+            index='read_idx', columns='prog', values='read1_quality')
+        quals = quals.append(table.pivot(
+            index='read_idx', columns='prog', values='read2_quality'))
         
         if args.exclude_discarded:
-            tab3.apply(lambda x: any(x==-1), 1)
-    
-        if (exclude.discarded) {
-            w <- apply(quals[,3:ncol(quals)], 1, function(x) any(x==-1))
-            quals <- quals[!w,]
-        }
-        quals$maxq <- apply(quals[,3:ncol(quals)], 1, max)
-        th_values <- c(1,seq(5,60,5))
-        pts <- melt(as.data.frame(t(sapply(th_values, function(th) {
-            c(
-                th=th,
-                x=sum(quals$maxq >= th),
-                sapply(progs, function(p) {
-                    sum(quals[,p] >= th)
-                })
-            )
-        }))), id.vars=c('th', 'x'), measure.vars=progs, variable.name='prog', value.name='y')
-        pts$delta <- NA
-        for (th in th_values) {
-            for (prog in progs) {
-                pts[pts$prog == prog & pts$th == th, 'delta'] <- pts[pts$prog == prog & pts$th == th, 'y'] - pts[pts$prog == 'untrimmed' & pts$th == th, 'y']
-            }
-        }
-        retval<-list(progs=progs, quals=quals, pts=pts)
-        retval
-    }
+            quals = quals[quals.apply(lambda x: all(x >= 0), 1)]
+        
+        maxq = quals.apply(max, 1)
+        q_thresholds = [1] + list(range(5, 60, 5))
+        progs = quals.columns.tolist()
+        above_thresholds = pd.DataFrame.from_records([
+            [q, sum(maxq >= q)] + quals.apply(lambda x: sum(x >= q), 0).tolist()
+            for q in q_thresholds
+        ], columns=['Q', 'MaxAboveThreshold'] + progs).melt(
+            id_vars=['Q', 'MaxAboveThreshold'], var_name="Program", 
+            value_name="AboveThreshold")
+        above_thresholds['delta'] = np.NaN
+        for q in q_thresholds:
+            for p in set(progs) - set(['untrimmed']):
+                above_thresholds.loc[
+                    above_thresholds.Q == q & above_thresholds.Program == prog,
+                    'delta'
+                ] = above_thresholds.loc[
+                    above_thresholds.Q == q & above_thresholds.Program == prog,
+                    'AboveThreshold'
+                ] - above_thresholds.loc[
+                    above_thresholds.Q == q & above_thresholds.Program == 'untrimmed',
+                    'AboveThreshold'
+                ]
+                    
+        
 
     plot.wgbs.data <- function(data, q.labels=NULL) {
         pts <- data$pts

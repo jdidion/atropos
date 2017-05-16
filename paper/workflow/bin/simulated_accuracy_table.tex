@@ -33,7 +33,7 @@ for d in datasets:
         ${prog} \\
             % for col0, col1 in columns:
                 <% val = table.loc[d, prog][col0, col1] %>
-                %if val == minvals[(dataset, col0, col1)]:
+                % if val == minvals[(dataset, col0, col1)]:
                 \hlcell{${val}}
                 % else:
                 ${val}

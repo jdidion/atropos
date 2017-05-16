@@ -262,18 +262,19 @@ process ComputeSimulatedAccuracy {
  */
 process ShowSimulatedAccuracy {
   container "jdidion/python_bash"
-  publishDir "$publishDir", mode: 'copy', overwrite: true
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
   
   input:
   val accuracyRows from tableFile.toList()
   
   output:
   file "accuracy.tex"
+  file "accuracy.pickle"
   
   script:
   data = accuracyRows.join("")
   """
-  echo '$data' | show_simulated_accuracy.py -n $task.ext.name -c $task.ext.caption -o accuracy
+  echo '$data' | show_simulated_accuracy.py -o accuracy -f tex pickle
   """
 }
 
@@ -317,7 +318,7 @@ process ParseSimualtedTiming {
  */
 process ShowSimulatedPerformance {
     container "jdidion/python_bash"
-    publishDir "$publishDir", mode: 'copy', overwrite: true
+    publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
     val parsedRows from timingParsed.toList()
@@ -325,18 +326,11 @@ process ShowSimulatedPerformance {
     output:
     file "performance.tex"
     file "performance.svg"
+    file "performance.pickle"
     
     script:
     data = parsedRows.join("")
-    if (workflow.profile == "local") {
-      name = task.ext.local_name
-      caption = task.ext.local_caption
-    } else {
-      name = task.ext.cluster_name
-      caption = task.ext.cluster_caption
-    }
-    
     """
-    echo '$data' | show_performance.py -n $name -c $caption -o performance
+    echo '$data' | show_performance.py -o performance -f tex svg pickle
     """
 }
