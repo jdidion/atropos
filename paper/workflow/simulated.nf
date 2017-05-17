@@ -18,11 +18,10 @@
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
  * 
- * The figure names and captions are also defined in the config file.
- *
  * Note: If Nextflow exits with error 137, this is due to insufficient
  * memory. There are a few things you can try to work around this:
- * - Ensure queueSize is set to 1
+ * - Set executor.cpus to the max value in params.threadCounts, so only one
+ *   process will run at a time
  * - Reduce params.batchSize
  * - If you have all of the software installed locally, you can disable
  *   Docker/Singularity by commenting out the 'container' directives.
@@ -47,7 +46,7 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
  * not support attaching volumes, we use a process to unpack the data from the 
  * container.
  */
-process Extract {
+process ExtractReads {
   container "jdidion/atropos_simulated"
   
   input:
@@ -82,7 +81,7 @@ simReads.into {
  * output files.
  */
 process Atropos {
-  tag { "atropos_${task.cpus}_${err}_q${qcut}_insert_${compression}" }
+  tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
   container "jdidion/atropos_paper"
 
@@ -111,17 +110,17 @@ process Atropos {
   // error rate is important to allow for mismatches between overlaps.
   alignerArgs = null
   if (aligner == 'insert') {
-    alignerArgs = "-O 7"
+    alignerArgs = "--insert-match-error-rate 0.20"
   }
   else {
-    alignerArgs = "--insert-match-error-rate 0.20"
+    alignerArgs = "-O 7"
   }
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos trim \
     --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
     -e 0.10 --aligner $aligner $alignerArgs -q $qcut --trim-n \
     -a $params.adapter1 -A $params.adapter2 -m $params.minLength \
-    --no-default-adapters --no-cache-adapters --log-level DEBUG \
+    --no-default-adapters --no-cache-adapters --log-level ERROR \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
     $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
@@ -261,6 +260,18 @@ process ComputeSimulatedAccuracy {
   """
 }
 
+/* Channel: display names for error rates
+ * --------------------------------------
+ */
+errorRates = Channel.fromPath(
+  "${workflow.projectDir}/../containers/data/simulated/art_profiles.txt")
+
+/* Channel: display names for tools
+ * --------------------------------
+ */
+toolNames = Channel.fromPath(
+  "${workflow.projectDir}/../containers/tools/tool-names.txt")
+
 /* Process: generate accuracy table
  * --------------------------------
  * Aggregate all the accuracy rows from each tool and pass it to stdin of
@@ -272,6 +283,8 @@ process ShowSimulatedAccuracy {
   
   input:
   val accuracyRows from tableFile.toList()
+  file errorRatesFile from errorRates
+  file toolNamesFile from toolNames
   
   output:
   file "accuracy.tex"
@@ -280,7 +293,8 @@ process ShowSimulatedAccuracy {
   script:
   data = accuracyRows.join("")
   """
-  echo '$data' | show_simulated_accuracy.py -o accuracy -f tex pickle
+  echo '$data' | show_simulated_accuracy.py -o accuracy -f txt tex pickle \
+    -e $errorRatesFile -t $toolNamesFile
   """
 }
 

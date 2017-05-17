@@ -37,63 +37,50 @@ def main():
         table = table.drop(['prog2', 'threads', 'dataset'])
         
         # Extract MAPQ values
-        quals = table.pivot(
-            index='read_idx', columns='prog', values='read1_quality')
-        quals = quals.append(table.pivot(
-            index='read_idx', columns='prog', values='read2_quality'))
-        
-        # Optionally remove rows where the read was discarded by any program
-        if args.exclude_discarded:
+        def table_to_quals(q):
+            quals = table[table.qcut.isin([None, q])].pivot(
+                index='read_idx', columns='prog', values='read1_quality'
+            ).append(table[table.qcut.isin([None, q])].pivot(
+                index='read_idx', columns='prog', values='read2_quality'))
+
+            # Optionally remove rows where the read was discarded by any program
             quals = quals[quals.apply(lambda x: all(x >= 0), 1)]
+
+            # Create a tidy table of the number of reads above each MAPQ threshold
+            # for each program, along with the delta versus untrimmed
+            max_mapq = quals.apply(max, 1)
+            mapq_thresholds = [1] + list(range(5, 60, 5))
+            progs = quals.columns.tolist()
+            above_thresholds = pd.DataFrame.from_records([
+                [mapq, int(q), sum(maxq >= mapq)] + quals.apply(lambda x: sum(x >= mapq), 0).tolist()
+                for mapq in mapq_thresholds
+            ], columns=['MAPQ', 'Q', 'MaxAboveThreshold'] + progs).melt(
+                id_vars=['MAPQ', 'Q', 'MaxAboveThreshold'], var_name="Program", 
+                value_name="AboveThreshold")
+            above_thresholds['Delta'] = np.NaN
+            for mapq in q_thresholds:
+                for p in set(progs) - set(['untrimmed']):
+                    above_thresholds.loc[
+                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == p),
+                        'Delta'
+                    ] = above_thresholds.loc[
+                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == p),
+                        'AboveThreshold'
+                    ].values[0] - above_thresholds.loc[
+                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == 'untrimmed'),
+                        'AboveThreshold'
+                    ].values[0]
+            return above_thresholds
         
-        # Create a tidy table of the number of reads above each MAPQ threshold
-        # for each program, along with the delta versus untrimmed
-        maxq = quals.apply(max, 1)
-        q_thresholds = [1] + list(range(5, 60, 5))
-        progs = quals.columns.tolist()
-        above_thresholds = pd.DataFrame.from_records([
-            [q, sum(maxq >= q)] + quals.apply(lambda x: sum(x >= q), 0).tolist()
-            for q in q_thresholds
-        ], columns=['MAPQ', 'MaxAboveThreshold'] + progs).melt(
-            id_vars=['MAPQ', 'MaxAboveThreshold'], var_name="Program", 
-            value_name="AboveThreshold")
-        above_thresholds['Delta'] = np.NaN
-        for q in q_thresholds:
-            for p in set(progs) - set(['untrimmed']):
-                above_thresholds.loc[
-                    (above_thresholds.MAPQ == q) & (above_thresholds.Program == p),
-                    'delta'
-                ] = above_thresholds.loc[
-                    (above_thresholds.MAPQ == q) & (above_thresholds.Program == p),
-                    'AboveThreshold'
-                ].values[0] - above_thresholds.loc[
-                    (above_thresholds.MAPQ == q) & (above_thresholds.Program == 'untrimmed'),
-                    'AboveThreshold'
-                ].values[0]
+        above_thresholds= pd.concat([table_to_quals(q) for q in ('0', '20')])
         
-        plot = sb.pointplot(
-            x='MAPQ', y='Delta', hue='Q',
+        plot = sb.factorplot(
+            x='MAPQ', y='Delta', hue='Program', col='Q',
             data=above_thresholds[above_thresholds.Program != 'untrimmed'])
-        
-        pts <- data$pts
-        progs <- data$progs
-        pts$prog <- as.character(pts$prog)
-        colnames(pts) <- c("MAPQ", "x", "Q", "y", "Delta")
-        if (!is.null(q.labels)) {
-            for (i in 1:length(q.labels)) {
-                pts[pts$Q == progs[i], 'Q'] <- names(q.labels)[i]
-            }
-            n <- names(sort(q.labels))
-        }
-        else {
-            n <- sort(unique(pts$Q))
-        }
-        pts$Q <- factor(pts$Q, levels=n)
-        pts <- pts[order(pts$Q),]
-        ggplot(pts[pts$Q != 'untrimmed',], aes(x=MAPQ, y=Delta, colour=Q)) +
-            geom_line() + geom_point() +
-            labs(x="Mapping Quality Score (MAPQ) Cutoff", y="Difference versus Untrimmed Reads")
-    }
+        plot.set_xlabels('Mapping Quality Score (MAPQ) Cutoff')
+        plot.set_ylabels('Difference versus Untrimmed Reads')
+        svg_file = args.output + ".svg"
+        plot.savefig(svg_file)
 
 if __name__ == "__main__":
     main()

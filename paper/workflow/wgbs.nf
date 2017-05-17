@@ -17,7 +17,13 @@
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
  * 
- * The figure names and captions are also defined in the config file.
+* Note: If Nextflow exits with error 137, this is due to insufficient
+ * memory. There are a few things you can try to work around this:
+ * - Set executor.cpus to the max value in params.threadCounts, so only one
+ *   process will run at a time
+ * - Reduce params.batchSize
+ * - If you have all of the software installed locally, you can disable
+ *   Docker/Singularity by commenting out the 'container' directives.e.
  */
 
 // variables for all tools
@@ -83,16 +89,34 @@ process Atropos {
   file "${task.tag}.report.txt"
   
   script:
+  mergeCmd = ''
+  if (compression == 'nowriter') {
+    mergeCmd = """
+    zcat ${task.tag}.1.*.fq.gz | gzip > ${task.tag}.1.fq.gz
+    zcat ${task.tag}.2.*.fq.gz | gzip > ${task.tag}.2.fq.gz
+    """
+  }
+  // Tune different parameters based on aligner. For adapter-match, minimum
+  // overlap is important to prevent over-trimming. For insert-match, the
+  // error rate is important to allow for mismatches between overlaps.
+  alignerArgs = null
+  if (aligner == 'insert') {
+    alignerArgs = "--insert-match-error-rate 0.30"
+  }
+  else {
+    alignerArgs = "-O 7"
+  }
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
-    -T $task.cpus --aligner $aligner --op-order GACQW \
-    -a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
-    -m $params.minLength --batch-size $params.batchSize \
-    --no-default-adapters --no-cache-adapters --log-level ERROR --quiet \
-    --insert-match-error-rate 0.3 -e 0.2 --correct-mismatches liberal \
-    -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
+    --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
+    -e 0.20 --aligner $aligner $alignerArgs -q $qcut --trim-n \
+    -a $params.adapter1 -A $params.adapter2  -m $params.minLength \
+    --no-default-adapters --no-cache-adapters --log-level ERROR \
+    --correct-mismatches liberal \
+    -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
     $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
+  $mergeCmd
   """
 }
 
@@ -151,8 +175,7 @@ process SeqPurge {
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
-    -out1 ${task.tag}-trimmed-pair1.pair1.fastq.gz \
-    -out2 ${task.tag}-trimmed-pair1.pair2.fastq.gz \
+    -out1 ${task.tag}.1.fastq.gz -out2 ${task.tag}.2.fastq.gz \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -threads $task.cpus -prefetch $params.batchSize \
@@ -186,6 +209,7 @@ process AdapterRemoval {
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut --mm 0.3 \
     --minlength $params.minLength --threads $task.cpus
+    > "${task.tag}.report.txt"
   """
 }
 
@@ -240,6 +264,18 @@ process BwamethAlign {
     -o ${name}_wgbs.name_sorted.bam ${name}_wgbs.bam
   """
 
+/* Channel: display names for error rates
+ * --------------------------------------
+ */
+errorRates = Channel.fromPath(
+  "${workflow.projectDir}/../containers/data/simulated/art_profiles.txt")
+
+/* Channel: display names for tools
+ * --------------------------------
+ */
+toolNames = Channel.fromPath(
+  "${workflow.projectDir}/../containers/tools/tool-names.txt")
+
 /* Process: Summarize trimming effectiveness
  * -----------------------------------------
  */
@@ -273,7 +309,9 @@ process ShowEffectiveness {
   
   script:
   """
-  show_wgbs_effectiveness.py -i $effData -o wgbs_effectiveness.svg
+  show_wgbs_effectiveness.py \
+    -i $effData -o wgbs_effectiveness.svg \
+    --exclude-discarded
   """
 }
 
@@ -325,19 +363,12 @@ process ShowTrimmingPerformance {
     output:
     file "trim_performance.tex"
     file "trim_performance.svg"
+    file "trim_performance.pickle"
     
     script:
     data = parsedRows.join("")
-    if (workflow.profile == "local") {
-      name = task.ext.trim_local_name
-      caption = task.ext.trim_local_caption
-    } else {
-      name = task.ext.trim_cluster_name
-      caption = task.ext.trim_cluster_caption
-    }
-    
     """
-    echo '$data' | show_performance.py -n $name -c $caption -o trim_performance
+    echo '$data' | show_performance.py -o trim_performance -f tex svg pickle
     """
 }
 

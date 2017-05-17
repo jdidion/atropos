@@ -36,7 +36,7 @@ def escape_latex(s):
     
     % for dataset in datasets:
     \midrule
-    Error rate ${dataset}\% \\\
+    Error rate ${escape_latex("{:0.1%}".format(float(dataset)))} \\\
         % for prog in progs:
         ${prog}
             % for col0, col1 in columns:

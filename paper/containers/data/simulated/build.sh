@@ -16,7 +16,7 @@ for err in 005 01
 do
   for mate in 1 2
   do
-    $R_CMD adjust_error_profiles.R -g art_profiles/HiSeq2500L125R${mate}_001.txt art_profiles/data/HiSeq2500L125R${mate}_${err}.txt 0.${err}
+    $R_CMD adjust_error_profiles.R -g -p art_profiles/HiSeq2500L125R${mate}_001.txt -o art_profiles/data/HiSeq2500L125R${mate}_${err}.txt -e 0.${err} -t art_profiles.txt
   done
 done
 

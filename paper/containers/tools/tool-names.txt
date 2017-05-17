@@ -1,0 +1,10 @@
+ProfileName	DisplayName
+adapterremoval	AdapterRemoval2
+atropos	Atropos
+atropos (adapter)	Atropos (adapter-match)
+atropos (insert)	Atropos (insert-match)
+seqpurge	SeqPurge
+skewer	Skewer
+bwa	BWA
+bwameth	bwa-meth
+star	STAR

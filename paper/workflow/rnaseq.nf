@@ -16,6 +16,14 @@
  * - aligners: Atropos aligner algorithms to test
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
+ *
+ * Note: If Nextflow exits with error 137, this is due to insufficient
+ * memory. There are a few things you can try to work around this:
+ * - Set executor.cpus to the max value in params.threadCounts, so only one
+ *   process will run at a time
+ * - Reduce params.batchSize
+ * - If you have all of the software installed locally, you can disable
+ *   Docker/Singularity by commenting out the 'container' directives.
  */
 
 // variables for all tools
@@ -74,6 +82,14 @@ process ExtractAnnotations {
 
 /* Process: Atropos adapter trimming
  * ---------------------------------
+ * One characteristic of the RNA-Seq data we're using (which we learned using
+ * the 'atropos error' subcommand) is that read 2 is of substantially worse
+ * quality than read 1. The way the Skewer algorithm works, read 2 essentially
+ * gets overwritten by read 1 during error correction, which improves the
+ * mapping quality. Atropos provides a specific option for this case ('-w') and
+ * we make use of it here. This is necessary to make Atropos comparable to
+ * Skewer, but gives it a perhaps unfair advantage over the other tools, which
+ * do not have such an option.
  */
 process Atropos {
   tag { "atropos_${task.cpus}_rnaseq_q${qcut}_${aligner}_${compression}" }
@@ -93,16 +109,34 @@ process Atropos {
   file "${task.tag}.report.txt"
   
   script:
+  mergeCmd = ''
+  if (compression == 'nowriter') {
+    mergeCmd = """
+    zcat ${task.tag}.1.*.fq.gz | gzip > ${task.tag}.1.fq.gz
+    zcat ${task.tag}.2.*.fq.gz | gzip > ${task.tag}.2.fq.gz
+    """
+  }
+  // Tune different parameters based on aligner. For adapter-match, minimum
+  // overlap is important to prevent over-trimming. For insert-match, the
+  // error rate is important to allow for mismatches between overlaps.
+  alignerArgs = null
+  if (aligner == 'insert') {
+    alignerArgs = "--insert-match-error-rate 0.30"
+  }
+  else {
+    alignerArgs = "-O 7"
+  }
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
-    -T $task.cpus --aligner $aligner --op-order GACQW \
-    -a $params.adapter1 -A $params.adapter2 -q $qcut --trim-n \
-    -m $params.minLength --batch-size $params.batchSize \
-    --no-default-adapters --no-cache-adapters --log-level ERROR --quiet \
-    --insert-match-error-rate 0.3 -e 0.2 --correct-mismatches liberal -w 15,30,25 \
+    --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
+    -e 0.20 --aligner $aligner $alignerArgs -q $qcut --trim-n \
+    -a $params.adapter1 -A $params.adapter2 -m $params.minLength \
+    --no-default-adapters --no-cache-adapters --log-level ERROR \
+    --correct-mismatches liberal -w 15,30,25 \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
     --report-file ${task.tag}.report.txt --quiet \
     $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
+  $mergeCmd
   """
 }
 

@@ -114,17 +114,44 @@ adjust.profile <- function(orig.path, new.path, target.err, rescale=TRUE) {
     close(out)
 }
 
-args <- commandArgs(trailingOnly=TRUE)
-if (args[1] == '-g') {
-    stopifnot(length(args) == 4)
-    # for some reason, the acutal error rate
-    # in simulated reads is about twice what
-    # is expected based on the empirical
-    # distribution of quality scores
-    error.rate <- as.numeric(args[4]) / 2
-    adjust.profile(args[2], args[3], error.rate)
-    print(paste("The acutal error rate of the new profile is", profile.error(args[3])))
-} else if (args[1] == '-e') {
-    stopifnot(length(args) == 2)
-    print(paste("The acutal error rate of the profile is", round(profile.error(args[2]), 4)))
+parser <- ArgumentParser()
+parser$add_argument(
+    "-g", "--generate", action="store_true", default=FALSE,
+    help="Generate new profile.")
+parser$add_argument(
+    "-c", "--calculate", action="store_true", default=FALSE,
+    help="Calculate error rate on existing profile.")
+parser$add_argument(
+    "-p", "--profile", help="The source ART error profile.")
+parser$add_argument(
+    "-e", "--error-rate", type="double", action="store_true", default=FALSE,
+    help="Calculate error rate of existing profile.")
+parser$add_argument(
+    "-o", "--output", default=NULL, 
+    help="New profile file.")
+parser$add_argument(
+    "-t", "--table", default=NULL, 
+    help="File where data will be written in tab-delimited format.")
+args <- parser$parse_args()
+
+if (args$generate) {
+    # for some reason, the acutal error rate in simulated reads is about twice 
+    # what is expected based on the empirical distribution of quality scores
+    error.rate <- as.numeric(args$error_rate) / 2
+    adjust.profile(args$profile, args$output, error.rate)
+    actual.error <- profile.error(args$output)
+    print(paste("The acutal error rate of the new profile is", actual.error))
+} else if (args$error) {
+    print(paste("The acutal error rate of the profile is", round(profile.error(args$profile), 4)))
+}
+
+if (args$table) {
+    if (!file.exists(args$table)) {
+        write(
+            paste("Profile", "RequestedErrorRate", "ActualErrorRate", sep="\t"),
+            file=args$table)
+    }
+    write(
+        paste(basename(args$profile), error.rate, actual.error, sep="\t"),
+        file=args$table, append=TRUE)
 }
