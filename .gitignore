@@ -46,3 +46,4 @@ hg3*.fa*
 .nextflow*
 **/work/
 .vscode*
+paper/workflow/results
