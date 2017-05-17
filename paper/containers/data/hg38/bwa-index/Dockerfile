@@ -7,9 +7,9 @@
 # Website:          https://github.com/lh3/bwa
 # Provides:         bwa
 # Base Image:       alpine:python
-# Build Cmd:        docker build -t jdidion/bwaindex:latest .
-# Pull Cmd:         docker pull jdidion/bwaindex
-# Run Cmd:          docker run --rm jdidion/bwaindex bwa
+# Build Cmd:        docker build -t jdidion/bwa_hg38index:latest .
+# Pull Cmd:         docker pull jdidion/bwa_hg38index
+# Run Cmd:          docker run --rm jdidion/bwa_hg38index bwa
 #################################################################
 # Using jdidion/bwabase as the base image
 FROM jdidion/bwabase

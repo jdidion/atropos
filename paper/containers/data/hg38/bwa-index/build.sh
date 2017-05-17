@@ -18,7 +18,7 @@ docker run \
     "cp /data/reference/hg38/hg38.fa /data/index/bwa/hg38 && \
      bwa mem index /data/index/bwa/hg38/hg38.fa" && \
 # create a new image that includes the index
-docker build -f Dockerfile -t jdidion/bwaindex . && \
+docker build -f Dockerfile -t jdidion/bwa_hg38index . && \
 # cleanup
 rm -Rf bwa*index
 

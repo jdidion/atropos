@@ -57,6 +57,7 @@ manuscript was created.
 # TODO
 
 * Update #3 with an estimate of the total disk space requirement.
+* Use [docker-builder](https://pypi.python.org/pypi/docker_builder) to auto-update containers when dependencies change.
 * These papers do a nice job of benchmarking trimmers. Consider adding some more benchmarks.
     * http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-16-S1-S2
     * https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-015-0454-y

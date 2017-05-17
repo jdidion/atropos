@@ -17,7 +17,7 @@ docker run \
     "cp /data/reference/hg37/hg37.fa /data/index/bwa/hg37 && \
      bwameth.py index /data/index/bwameth/hg37/hg37.fa" && \
 # create a new image that includes the index
-docker build -f Dockerfile -t jdidion/bwamethindex . && \
+docker build -f Dockerfile -t jdidion/bwameth_hg37index . && \
 # cleanup
 rm -Rf bwa*index
 

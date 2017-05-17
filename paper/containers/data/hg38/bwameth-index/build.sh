@@ -5,20 +5,17 @@
 # singularity run -H $(pwd) docker://jdidion/bwa /usr/local/bin bwameth.py index hg38.fa
 
 # create a data volume from the reference genome image
-docker create -v /data/reference/hg38 --name hg38 jdidion/hg38_reference && \
+#docker create -v /data/reference/hg38 --name hg38 jdidion/hg38_reference && \
 # build the bwa index
-mkdir index && \
-docker run \
-    # create a local volume to store the output
-    -v $(pwd)/index:/data/index/bwameth/hg38 \
-    # bind reference data volume
-    --volumes-from hg38 \
-    # run bwa mem from bwa image
-    --rm jdidion/bwabase bash -c \
-    "cp /data/reference/hg38/hg38.fa /data/index/bwa/hg38 && \
-     bwameth.py index /data/index/bwameth/hg38/hg38.fa" && \
+# create a local volume to store the output bind reference data volume
+# and run bwa mem from bwa image
 # create a new image that includes the index
-docker build -f Dockerfile -t jdidion/bwamethindex . && \
-# cleanup
-rm -Rf bwa*index
-
+mkdir index \
+&& docker run \
+    -v $(pwd)/index:/data/index/bwameth/hg38 \
+    --volumes-from hg38 \
+    --rm jdidion/bwabase bash -c \
+    "cp /data/reference/hg38/hg38.fa /data/index/bwameth/hg38 && \
+     bwameth.py index /data/index/bwameth/hg38/hg38.fa" \
+&& docker build -f Dockerfile -t jdidion/bwameth_hg38index . \
+&& rm -Rf index

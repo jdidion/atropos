@@ -7,9 +7,9 @@
 #                   https://github.com/brentp/bwa-meth
 # Provides:         bwa-meth.py
 # Base Image:       alpine:python
-# Build Cmd:        docker build -t jdidion/bwamethindex:latest .
-# Pull Cmd:         docker pull jdidion/bwamethindex
-# Run Cmd:          docker run --rm jdidion/bwaindex python bwa-meth.py
+# Build Cmd:        docker build -t jdidion/bwameth_hg37index:latest .
+# Pull Cmd:         docker pull jdidion/bwameth_hg37index
+# Run Cmd:          docker run --rm jdidion/bwameth_hg37index python bwa-meth.py
 #################################################################
 # Using jdidion/bwabase as the base image
 FROM jdidion/bwabase
