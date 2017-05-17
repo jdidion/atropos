@@ -38,21 +38,18 @@ params.batchSize = 5000
 params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
-process Extract {
-  container "jdidion/atropos_simulated"
-  
-  input:
-  each err from params.errorRates
+process ExtractReads {
+  container "jdidion/atropos_wgbs"
   
   output:
-  set err, "sim_${err}.{1,2}.fq", "sim_${err}.{1,2}.aln" into simReads
+  file("wgbs.{1,2}.fq") into wgbsReads
   
   script:
   """
-  head -40 /data/simulated/sim_${err}.1.fq > ./sim_${err}.1.fq && \
-  head -40 /data/simulated/sim_${err}.2.fq > ./sim_${err}.2.fq && \
-  head -400 /data/simulated/sim_${err}.1.aln > ./sim_${err}.1.aln && \
-  head -400 /data/simulated/sim_${err}.2.aln > ./sim_${err}.2.aln
+  cp \
+    zcat /data/wgbs/wgbs.1.fq.gz | head -40 > ./wgbs.1.fq \
+    zcat /data/wgbs/wgbs.2.fq.gz | head -40 > ./wgbs.2.fq \
+    .
   """
 }
 
@@ -63,25 +60,29 @@ process Atropos {
   container "jdidion/atropos_paper"
   
   input:
-  set err, file(reads), file(alns) from simReads
+  file(reads) from wgbsReads
   each threads from params.threadCounts
   //each qcut from params.quals
   //each aligner from params.aligners
   //each compression from params.compressionSchemes
   
   output:
-  set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
+  set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
   file "${task.tag}.report.txt"
   
   script:
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
-    -pe1 ${reads[0]} -pe2 ${reads[1]} \
+    --op-order GACQW -T 4 \
+    -e 0.20 --aligner insert --insert-match-error-rate 0.30 -q 0 --trim-n \
+    -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG \
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT \
+    -m 25 --no-default-adapters --no-cache-adapters --log-level ERROR \
+    --correct-mismatches liberal \
     -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz \
     --report-file ${task.tag}.report.txt --quiet \
-    -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
-    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT
+    -pe1 ${reads[0]} -pe2 ${reads[1]}
   """
 }
 
@@ -90,11 +91,34 @@ Channel
   .empty()
   .concat(trimmedAtropos)
   .set { trimmedMerged }
+
+process BwamethAlign {
+  container "jdidion/bwa_hg38index"
+  cpus { params.alignThreads }
+  
+  input:
+  set val(name), file(fastq) from trimmedMerged
+  
+  output:
+  file("${name}_wgbs.{bam,bam.bai}")
+  set val(name), file("${name}_wgbs.name_sorted.bam") into sorted
+  set val(name), file("${name}.bwameth.timing.txt") into timingBwameth
+  
+  script:
+  """
+  /usr/bin/time -v -o ${name}.star.timing.txt bwameth.py \
+    -z -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
+    --reference /data/index/bwameth/hg38/hg38
+    -o ${name}_wgbs.bam ${fastq[0]} ${fastq[1]} \
+  && samtools sort -n -O bam -@ ${params.alignThreads} \
+    -o ${name}_wgbs.name_sorted.bam ${name}_wgbs.bam
+  """
+}
+
 Channel
   .empty()
   .concat(timingAtropos)
   .set { timingMerged }
-
 
 process ParseTiming {
     container "jdidion/python_bash"
@@ -123,52 +147,7 @@ process ShowPerformance {
     
     script:
     data = timingRows.join("")
-    if (workflow.profile == "local") {
-      name = task.ext.local_name
-      caption = task.ext.local_caption
-    } else {
-      name = task.ext.cluster_name
-      caption = task.ext.cluster_caption
-    }
     """
-    echo '$data' | show_performance.py -n $name -c $caption -o timing -f tex svg pickle
+    echo '$data' | show_performance.py -o timing -f tex svg pickle
     """
-}
-
-process ComputeAccuracy {
-  container "jdidion/python_bash"
-  
-  input:
-  set val(name), val(err), file(alns), file(trimmed) from trimmedMerged
-  
-  output:
-  file "${name}.txt" into resultFile
-  file "${name}.summary.txt" into summaryFile
-  stdout tableFile
-
-  script:
-  """
-  compute_simulated_accuracy.py \
-    -a1 ${alns[0]} -a2 ${alns[1]} \
-    -r1 ${trimmed[0]} -r2 ${trimmed[1]} \
-    -p ${name} --no-progress \
-    -o ${name}.txt -s ${name}.summary.txt -t -
-  """
-}
-
-process ShowAccuracy {
-  echo true
-  container "jdidion/python_bash"
-  
-  input:
-  val accuracyRows from tableFile.toList()
-  
-  output:
-  file "accuracy.tex"
-  
-  script:
-  data = accuracyRows.join("")
-  """
-  echo '$data' | show_simulated_accuracy.py -n foo -c bar -o accuracy
-  """
 }

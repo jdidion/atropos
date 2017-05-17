@@ -8,18 +8,26 @@
 #                   https://github.com/brentp/bwa-meth
 # Provides:         bwa|bwa-meth.py|samtools
 # Base Image:       alpine:python
-# Build Cmd:        docker build -t jdidion/bwa:latest .
-# Pull Cmd:         docker pull jdidion/bwa
-# Run Cmd:          docker run --rm jdidion/bwa bwa
-#                   docker run --rm jdidion/bwa python bwa-meth.py
+# Build Cmd:        docker build -t jdidion/bwabase:latest .
+# Pull Cmd:         docker pull jdidion/bwabase
+# Run Cmd:          docker run --rm jdidion/bwabase bwa
+#                   docker run --rm jdidion/bwabase python bwa-meth.py
 #################################################################
 # python3 Alpine image with gcc
 FROM python:alpine
 WORKDIR /tmp
 
 RUN apk add --update --no-cache ncurses
-RUN apk add --virtual=deps --update --no-cache musl-dev zlib-dev bzip2-dev xz-dev make gcc git
-RUN apk add --update ca-certificates openssl && update-ca-certificates
+RUN apk add --virtual=deps --update --no-cache \
+    musl-dev \
+    zlib-dev \
+    bzip2-dev \
+    xz-dev \
+    make \
+    gcc \
+    git
+RUN apk add --update ca-certificates openssl bash && \
+    update-ca-certificates
 
 ### Install bwa
 ENV VERSION 0.7.15

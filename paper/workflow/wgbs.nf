@@ -244,10 +244,10 @@ Channel
  */
 process BwamethAlign {
   container "jdidion/bwa_hg38index"
+  cpus { params.alignThreads }
   
   input:
   set val(name), file(fastq) from trimmedMerged
-  val rg "@RG\tID:${name}\tSM:${name}\tLB:${name}\tPL:ILLUMINA"
   
   output:
   file("${name}_wgbs.{bam,bam.bai}")
@@ -257,12 +257,13 @@ process BwamethAlign {
   script:
   """
   /usr/bin/time -v -o ${name}.star.timing.txt bwameth.py \
-    -z -t $threads --read-group '${rg}' \
+    -z -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
     --reference /data/index/bwameth/hg38/hg38
     -o ${name}_wgbs.bam ${fastq[0]} ${fastq[1]} \
-  && samtools sort -n -O bam -@ $threads \
+  && samtools sort -n -O bam -@ ${params.alignThreads} \
     -o ${name}_wgbs.name_sorted.bam ${name}_wgbs.bam
   """
+}
 
 /* Channel: display names for error rates
  * --------------------------------------

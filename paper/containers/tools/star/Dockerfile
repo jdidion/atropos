@@ -15,8 +15,15 @@ FROM jedisct1/phusion-baseimage-latest
 WORKDIR /tmp
 
 # Install compiler and perl stuff
-RUN apt-get update && \
-    apt-get install --yes build-essential gcc-multilib apt-utils zlib1g-dev libbz2-dev liblzma-dev git wget
+RUN apt-get update && apt-get install --yes \
+    build-essential \
+    gcc-multilib \
+    apt-utils \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    git \
+    wget
 
 # STAR
 ENV VERSION 2.5.3a
