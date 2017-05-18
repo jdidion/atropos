@@ -11,7 +11,7 @@
 # Pull Cmd:         docker pull jdidion/starbase
 # Run Cmd:          docker run --rm jdidion/starbase STAR
 #################################################################
-FROM jedisct1/phusion-baseimage-latest
+FROM phusion/baseimage:latest
 WORKDIR /tmp
 
 # Install compiler and perl stuff

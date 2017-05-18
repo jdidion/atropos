@@ -13,7 +13,7 @@
 #################################################################
 FROM phusion/baseimage:latest
 WORKDIR /tmp
-ENV VERSION 1.1.4
+ENV VERSION 1.1.5
 ENV BUILD_PACKAGES \
     git
 ENV RUNTIME_PACKAGES \
