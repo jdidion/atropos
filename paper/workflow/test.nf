@@ -46,10 +46,8 @@ process ExtractReads {
   
   script:
   """
-  cp \
-    zcat /data/wgbs/wgbs.1.fq.gz | head -40 > ./wgbs.1.fq \
-    zcat /data/wgbs/wgbs.2.fq.gz | head -40 > ./wgbs.2.fq \
-    .
+  gunzip -c /data/wgbs/wgbs.1.fq.gz | head -40 > ./wgbs.1.fq
+  gunzip -c /data/wgbs/wgbs.2.fq.gz | head -40 > ./wgbs.2.fq
   """
 }
 

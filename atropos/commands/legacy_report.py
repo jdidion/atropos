@@ -306,10 +306,13 @@ def print_trim_report(summary, outfile):
         summary['trim'][key]
         for key in ('modifiers', 'filters', 'formatters'))
     adapter_cutter = None
+    error_corrector = None
     for modifier_dict in modifiers.values():
-        if 'adapters' in modifier_dict:
+        if adapter_cutter is None and 'adapters' in modifier_dict:
             adapter_cutter = modifier_dict
             break
+        if error_corrector is None and 'bp_corrected' in modifier_dict:
+            error_corrector = modifier_dict
     correction_enabled = summary["options"]["correct_mismatches"]
     corrected = None
     trimmers = []
@@ -391,8 +394,8 @@ def print_trim_report(summary, outfile):
     
     _print_bp("Total bp written (filtered):", formatters, 'bp_written')
     
-    if corrected:
-        _print_bp("Total bp corrected:", formatters, 'bp_corrected')
+    if error_corrector:
+        _print_bp("Total bp corrected:", error_corrector, 'bp_corrected')
     
     if adapter_cutter:
         _print()

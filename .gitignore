@@ -47,3 +47,4 @@ hg3*.fa*
 **/work/
 .vscode*
 paper/workflow/results
+*.ipynb

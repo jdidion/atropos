@@ -1,9 +1,10 @@
 # Changes
 
-v1.1.5 (dev)
-------------
+v1.1.5 (2017.05.18)
+-------------------
 * Major update to the documentation.
 * Fixed error messages in multi-threaded mode.
+* Fixed bug when generating reports for runs involving error correction.
 
 v1.1.4 (2017.05.02)
 -------------------
