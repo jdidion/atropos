@@ -250,18 +250,19 @@ process BwamethAlign {
   set val(name), file(fastq) from trimmedMerged
   
   output:
-  file("${name}_wgbs.{bam,bam.bai}")
+  file("${name}_wgbs.name_sorted.bam")
   set val(name), file("${name}_wgbs.name_sorted.bam") into sorted
   set val(name), file("${name}.bwameth.timing.txt") into timingBwameth
   
   script:
   """
   /usr/bin/time -v -o ${name}.star.timing.txt bwameth.py \
-    -z -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
+    -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
     --reference /data/index/bwameth/hg38/hg38
-    -o ${name}_wgbs.bam ${fastq[0]} ${fastq[1]} \
-  && samtools sort -n -O bam -@ ${params.alignThreads} \
-    -o ${name}_wgbs.name_sorted.bam ${name}_wgbs.bam
+    ${fastq[0]} ${fastq[1]} > ${name}_wgbs.sam \
+  && samtools view -Shb ${name}_wgbs.sam | \
+     samtools sort -n -O bam -@ ${params.alignThreads} \
+       -o ${name}_wgbs.name_sorted.bam -
   """
 }
 

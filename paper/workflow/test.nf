@@ -53,7 +53,7 @@ process ExtractReads {
 
 process Atropos {
   //tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
-  tag { "atropos_${task.cpus}_${err}_q0_insert_writer" }
+  tag { "atropos_${task.cpus}_wgbs_q0_insert_writer" }
   cpus { threads }
   container "jdidion/atropos_paper"
   
@@ -91,25 +91,26 @@ Channel
   .set { trimmedMerged }
 
 process BwamethAlign {
-  container "jdidion/bwa_hg38index"
+  container "jdidion/bwameth_hg38index"
   cpus { params.alignThreads }
   
   input:
   set val(name), file(fastq) from trimmedMerged
   
   output:
-  file("${name}_wgbs.{bam,bam.bai}")
+  file("${name}_wgbs.name_sorted.bam")
   set val(name), file("${name}_wgbs.name_sorted.bam") into sorted
   set val(name), file("${name}.bwameth.timing.txt") into timingBwameth
   
   script:
   """
-  /usr/bin/time -v -o ${name}.star.timing.txt bwameth.py \
-    -z -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
-    --reference /data/index/bwameth/hg38/hg38
-    -o ${name}_wgbs.bam ${fastq[0]} ${fastq[1]} \
-  && samtools sort -n -O bam -@ ${params.alignThreads} \
-    -o ${name}_wgbs.name_sorted.bam ${name}_wgbs.bam
+  /usr/bin/time -v -o ${name}.bwameth.timing.txt bwameth.py \
+    -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
+    --reference /data/index/bwameth/hg38/hg38.fa \
+    ${fastq[0]} ${fastq[1]} > ${name}_wgbs.sam \
+  && samtools view -Shb ${name}_wgbs.sam | \
+     samtools sort -n -O bam -@ ${params.alignThreads} \
+       -o ${name}_wgbs.name_sorted.bam -
   """
 }
 

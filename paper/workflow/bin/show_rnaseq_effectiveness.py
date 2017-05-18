@@ -1,6 +1,18 @@
 #!/usr/bin/env python
+import argparse
+import pandas as pd
+from compute_real_effectiveness import HEADER
 
 def main():
+    parser.add_argument("-i", "--input", default="-")
+    parser.add_argument("-o", "--output")
+    parser.add_argument(
+        "-f", "--formats", choices=('txt', 'svg', 'pickle'), nargs="+",
+        default=['tex'])
+    parser.add_argument("--exclude-discarded", action="store_true", default=False)
+    args = parser.parse_args()
+    
+    
     process.rna <- function(rna) {
         r1 <- rna[,c('prog','read1_in_region','read1_quality')]
         colnames(r1)[2:3] <- c('in_region', 'quality')
