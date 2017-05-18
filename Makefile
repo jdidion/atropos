@@ -3,7 +3,7 @@ module = atropos
 #pytestops = "--full-trace"
 #pytestops = "-v -s"
 repo = jdidion/$(module)
-desc = "Release $(version)"
+desc = Release $(version)
 
 BUILD = python setup.py build_ext -i && python setup.py install $(installargs)
 TEST = py.test $(pytestops) $(tests)
