@@ -34,6 +34,11 @@ def main():
         import seaborn as sb
         sb.set(style="whitegrid")
         
+        # Since neither threads nor compression change the outcome of trimming,
+        # we don't need to worry about stratifying by those metric.
+        table = table[(table.threads==4) | (table.prog == 'untrimmed')]
+        table = table.drop(['prog2', 'threads', 'dataset', 'qcut'], 1)
+        
         r1 = table[['prog','read1_in_region','read1_quality']]
         r1 = r1.rename(columns={ 
             'read1_in_region' : 'in_region',

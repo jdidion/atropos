@@ -33,12 +33,13 @@ def main():
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         import seaborn as sb
+        import numpy as np
         sb.set(style="whitegrid")
         
         # Since neither threads nor compression change the outcome of trimming,
         # we don't need to worry about stratifying by those metric.
-        table = table[(table.threads==4)]
-        table = table.drop(['prog2', 'threads', 'dataset'])
+        table = table[(table.threads==4) | (table.prog == 'untrimmed')]
+        table = table.drop(['prog2', 'threads', 'dataset'], 1)
         
         # Extract MAPQ values
         def table_to_quals(q):
@@ -56,13 +57,13 @@ def main():
             mapq_thresholds = [1] + list(range(5, 60, 5))
             progs = quals.columns.tolist()
             above_thresholds = pd.DataFrame.from_records([
-                [mapq, int(q), sum(maxq >= mapq)] + quals.apply(lambda x: sum(x >= mapq), 0).tolist()
+                [mapq, int(q), sum(max_mapq >= mapq)] + quals.apply(lambda x: sum(x >= mapq), 0).tolist()
                 for mapq in mapq_thresholds
             ], columns=['MAPQ', 'Q', 'MaxAboveThreshold'] + progs).melt(
                 id_vars=['MAPQ', 'Q', 'MaxAboveThreshold'], var_name="Program", 
                 value_name="AboveThreshold")
             above_thresholds['Delta'] = np.NaN
-            for mapq in q_thresholds:
+            for mapq in mapq_thresholds:
                 for p in set(progs) - set(['untrimmed']):
                     above_thresholds.loc[
                         (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == p),
@@ -76,7 +77,7 @@ def main():
                     ].values[0]
             return above_thresholds
         
-        above_thresholds= pd.concat([table_to_quals(q) for q in ('0', '20')])
+        above_thresholds= pd.concat([table_to_quals(q) for q in (0, 20)])
         
         # Replace tool names with display versions
         if args.tool_name_file:

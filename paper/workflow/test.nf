@@ -72,11 +72,13 @@ process Atropos {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineAtropos
   file "${task.tag}.report.txt"
   
   script:
   """
-  /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt \
+  && /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
     --op-order GACQW -T 4 \
     -e 0.20 --aligner insert --insert-match-error-rate 0.30 -q 0 --trim-n \
     -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG \
@@ -99,6 +101,7 @@ Channel
   .set { trimmedMerged }
 
 process BwamethAlign {
+  tag { "${name}.bwameth" }
   container "jdidion/bwameth_hg38index"
   cpus { params.alignThreads }
   
@@ -108,11 +111,13 @@ process BwamethAlign {
   output:
   file("${name}.sam")
   file("${name}.name_sorted.bam") into sortedBams
-  set val(name), file("${name}.bwameth.timing.txt") into timingBwameth
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineBwameth
+  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingBwameth
   
   script:
   """
-  /usr/bin/time -v -o ${name}.bwameth.timing.txt bwameth.py \
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt \
+  && /usr/bin/time -v -o ${name}.bwameth.timing.txt bwameth.py \
     -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
     --reference /data/index/bwameth/hg38/hg38.fa \
     ${fastq[0]} ${fastq[1]} > ${name}.sam \
@@ -200,5 +205,53 @@ process ShowEffectiveness {
   show_wgbs_effectiveness.py \
     -i $effData -o wgbs_effectiveness \
     -t $toolNamesFile --exclude-discarded -f svg pickle
+  """
+}
+
+/* Channel: merged machine info
+ * ----------------------------
+ * If you add a tool process, make sure to add the machine channel
+ * into the concat list here.
+ */
+Channel
+  .empty()
+  .concat(
+    machineAtropos,
+    machineBwameth
+  )
+  .set { machineMerged }
+
+/* Process: summarize machine info
+ * -------------------------------
+ */
+process SummarizeMachine {
+  container "jdidion/python_bash"
+    
+  input:
+  set val(name), file(machine) from machineMerged
+
+  output:
+  stdout machineParsed
+
+  script:
+  """
+  parse_machine.py -i $machine -p $name
+  """
+}
+
+process CreateMachineTable {
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedRows from machineParsed.toList()
+    
+  output:
+  file "machine_info.txt"
+  
+  script:
+  data = parsedRows.join("")
+  """
+  echo -e "prog\tprog2\tthreads\tdataset\tqcut\tcpus\tmemory\tcpu_details" > machine_info.txt
+  echo '$data' >> machine_info.txt
   """
 }

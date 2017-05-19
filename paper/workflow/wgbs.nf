@@ -17,7 +17,11 @@
  * - compressionSchemes: Atropos compression schemes to test
  * - adapter1, adapter2: Adapter sequence
  * 
-* Note: If Nextflow exits with error 137, this is due to insufficient
+ * Note: The use of /proc/cpuinfo and /proc/meminfo is linux-specific, which
+ * is fine when running in Docker/Singularity. If you disable containers,
+ * you'll need to change the command.
+ * 
+ * Note: If Nextflow exits with error 137, this is due to insufficient
  * memory. There are a few things you can try to work around this:
  * - Set executor.cpus to the max value in params.threadCounts, so only one
  *   process will run at a time
@@ -86,6 +90,7 @@ process Atropos {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineAtropos
   file "${task.tag}.report.txt"
   
   script:
@@ -107,6 +112,7 @@ process Atropos {
     alignerArgs = "-O 7"
   }
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
     --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
     -e 0.20 --aligner $aligner $alignerArgs -q $qcut --trim-n \
@@ -138,10 +144,12 @@ process Skewer {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSkewer
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineSkewer
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt skewer \
     -m pe -l $params.minLength -r 0.3 \
     -o $task.tag -z --quiet \
@@ -169,13 +177,15 @@ process SeqPurge {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSeqPurge
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineSeqPurge
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
-    -out1 ${task.tag}.1.fastq.gz -out2 ${task.tag}.2.fastq.gz \
+    -out1 ${task.tag}.1.fq.gz -out2 ${task.tag}.2.fq.gz \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -threads $task.cpus -prefetch $params.batchSize \
@@ -199,10 +209,12 @@ process AdapterRemoval {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAdapterRemoval
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineAdapterRemoval
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt AdapterRemoval \
     --file1 ${reads[0]} --file2 ${reads[1]} \
     --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
@@ -230,28 +242,31 @@ Channel
   )
   .set { trimmedMerged }
 
-/* Process: Align reads using STAR
- * -------------------------------
+/* Process: Align reads using bwa-meth
+ * -----------------------------------
  * Alignments are written to an unsorted BAM file and then name sorted by
  * samtools.
  */
 process BwamethAlign {
-  container "jdidion/bwa_hg38index"
+  tag { "${name}.bwameth" }
   cpus { params.alignThreads }
+  container "jdidion/bwameth_hg38index"
   
   input:
   set val(name), file(fastq) from trimmedMerged
   
   output:
   file("${name}.sam")
-  set val(name), file("${name}.name_sorted.bam") into sortedBams
-  set val(name), file("${name}.bwameth.timing.txt") into timingBwameth
+  file("${name}.name_sorted.bam") into sortedBams
+  set val(name), file("${task.tag}.timing.txt") into timingBwameth
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineBwameth
   
   script:
   """
-  /usr/bin/time -v -o ${name}.star.timing.txt bwameth.py \
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
+  /usr/bin/time -v -o ${task.tag}.timing.txt bwameth.py \
     -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
-    --reference /data/index/bwameth/hg38/hg38
+    --reference /data/index/bwameth/hg38/hg38.fa \
     ${fastq[0]} ${fastq[1]} > ${name}.sam \
   && samtools view -Shb ${name}.sam | \
      samtools sort -n -O bam -@ ${params.alignThreads} \
@@ -269,6 +284,8 @@ toolNames = Channel.fromPath(
  * -----------------------------------------
  */
 process ComputeEffectiveness {
+  container "jdidion/python_bash"
+  
   input:
   val bamFileList from sortedBams.toList()
   
@@ -288,12 +305,16 @@ process ComputeEffectiveness {
  * ----------------------
  */
 process ShowEffectiveness {
+  container "jdidion/python_bash"
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
   input:
   file effData from effectiveness
   file toolNamesFile from toolNames
   
   output:
   file "wgbs_effectiveness.svg"
+  file "wgbs_effectiveness.pickle"
   
   script:
   """
@@ -343,7 +364,7 @@ process ParseTrimmingTiming {
  */
 process ShowTrimmingPerformance {
     container "jdidion/python_bash"
-    publishDir "$publishDir", mode: 'copy', overwrite: true
+    publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
     val parsedRows from timingMergedParsed.toList()
@@ -360,8 +381,8 @@ process ShowTrimmingPerformance {
     """
 }
 
-/* Process: parse performance for STAR alignment
- * ---------------------------------------------
+/* Process: parse performance for bwa-meth alignment
+ * -------------------------------------------------
  */
 process ParseBwamethTiming {
     container "jdidion/python_bash"
@@ -378,24 +399,77 @@ process ParseBwamethTiming {
     """
 }
 
-/* Process: generate STAR alignment performance figure/table
- * ---------------------------------------------------------
+/* Process: generate bwa-meth alignment performance figure/table
+ * -------------------------------------------------------------
  * Aggregate all the parsed performance data and pass it to stdin of the
  * bin/show_performance.py script.
  */
 process ShowBwamethPerformance {
     container "jdidion/python_bash"
-    publishDir "$publishDir", mode: 'copy', overwrite: true
+    publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
-    val parsedRows from timingBwameth.toList()
+    val parsedRows from timingBwamethParsed.toList()
     
     output:
     file "bwameth_performance.tex"
     file "bwameth_performance.svg"
+    file "bwameth_performance.pickle"
     
     script:
+    data = parsedRows.join("")
     """
-    echo '$data' | show_performance.py -o bwameth_performance
+    echo '$data' | show_performance.py -o bwameth_performance -f tex svg pickle
     """
+}
+
+/* Channel: merged machine info
+ * ----------------------------
+ * If you add a tool process, make sure to add the machine channel
+ * into the concat list here.
+ */
+Channel
+  .empty()
+  .concat(
+    machineAtropos,
+    machineSkewer,
+    machineSeqPurge,
+    machineAdapterRemoval
+    machineBwameth
+  )
+  .set { machineMerged }
+
+/* Process: summarize machine info
+ * -------------------------------
+ */
+process SummarizeMachine {
+  container "jdidion/python_bash"
+    
+  input:
+  set val(name), file(machine) from machineMerged
+
+  output:
+  stdout machineParsed
+
+  script:
+  """
+  parse_machine.py -i $machine -p $name
+  """
+}
+
+process CreateMachineTable {
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedRows from machineParsed.toList()
+    
+  output:
+  file "machine_info.txt"
+  
+  script:
+  data = parsedRows.join("")
+  """
+  echo -e "prog\tprog2\tthreads\tdataset\tqcut\tcpus\tmemory\tcpu_details" > machine_info.txt
+  echo '$data' >> machine_info.txt
+  """
 }

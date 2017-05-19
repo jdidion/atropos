@@ -195,8 +195,7 @@ process SeqPurge {
   """
   /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
-    -out1 ${task.tag}-trimmed-pair1.pair1.fastq.gz \
-    -out2 ${task.tag}-trimmed-pair1.pair2.fastq.gz \
+    -out1 ${task.tag}.1.fq.gz -out2 ${task.tag}.2.fq.gz \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -threads $task.cpus -prefetch $params.batchSize \

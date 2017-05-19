@@ -12,10 +12,7 @@ and write a tab-delimited row to stdout with the following fields:
 """
 import argparse
 from common import fileopen, parse_profile
-import os
 import re
-import sys
-import fileinput
 
 def main():
     parser = argparse.ArgumentParser()

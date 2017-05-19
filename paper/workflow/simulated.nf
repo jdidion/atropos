@@ -95,6 +95,7 @@ process Atropos {
   output:
   set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineAtropos
   file "${task.tag}.report.txt"
   
   script:
@@ -116,6 +117,7 @@ process Atropos {
     alignerArgs = "-O 7"
   }
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos trim \
     --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
     -e 0.10 --aligner $aligner $alignerArgs -q $qcut --trim-n \
@@ -146,10 +148,12 @@ process Skewer {
   output:
   set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSkewer
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineSkewer
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt skewer \
     -m pe -l $params.minLength -r 0.2 \
     -o $task.tag -z --quiet \
@@ -177,10 +181,12 @@ process SeqPurge {
   output:
   set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSeqPurge
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineSeqPurge
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
     -out1 "${task.tag}.1.fq.gz" -out2 "${task.tag}.2.fq.gz" \
@@ -207,10 +213,12 @@ process AdapterRemoval {
   output:
   set val("${task.tag}"), val(err), file(alns), file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAdapterRemoval
+  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineAdapterRemoval
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt AdapterRemoval \
     --file1 ${reads[0]} --file2 ${reads[1]} \
     --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
@@ -353,4 +361,58 @@ process ShowSimulatedPerformance {
     """
     echo '$data' | show_performance.py -o performance -f tex svg pickle
     """
+}
+
+
+/* Channel: merged machine info
+ * ----------------------------
+ * If you add a tool process, make sure to add the machine channel
+ * into the concat list here.
+ */
+Channel
+  .empty()
+  .concat(
+    machineAtropos,
+    machineSkewer,
+    machineSeqPurge,
+    machineAdapterRemoval
+  )
+  .set { machineMerged }
+
+/* Process: summarize machine info
+ * -------------------------------
+ */
+process SummarizeMachine {
+  container "jdidion/python_bash"
+    
+  input:
+  set val(name), file(machine) from machineMerged
+
+  output:
+  stdout machineParsed
+
+  script:
+  """
+  parse_machine.py -i $timing -p $name
+  """
+}
+
+/* Process: print machine info table
+ * ---------------------------------
+ */
+process CreateMachineTable {
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedRows from machineMerged.toList()
+    
+  output:
+  file "machine_info.txt"
+  
+  script:
+  data = parsedRows.join("")
+  """
+  echo -e "prog\tprog2\tthreads\tdataset\tqcut\tcpus\tmemory\tcpu_details" > machine_info.txt
+  echo '$data' >> machine_info.txt
+  """
 }
