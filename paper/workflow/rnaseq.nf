@@ -312,6 +312,12 @@ process Bam2Bed {
   """
 }
 
+/* Channel: display names for tools
+ * --------------------------------
+ */
+toolNames = Channel.fromPath(
+  "${workflow.projectDir}/../containers/tools/tool-names.txt")
+
 /* Process: Summarize trimming effectiveness
  * -----------------------------------------
  */
@@ -340,13 +346,16 @@ process ComputeEffectiveness {
 process ShowEffectiveness {
   input:
   file effData from effectiveness
+  file toolNamesFile from toolNames
   
   output:
   file "rnaseq_effectiveness.svg"
   
   script:
   """
-  show_rnaseq_effectiveness.py -i $effData -o rnaseq_effectiveness.svg
+  show_rnaseq_effectiveness.py \
+    -i $effData -o rnaseq_effectiveness \
+    -t $toolNamesFile --exclude-discarded -f svg pickle
   """
 }
 

@@ -1,19 +1,23 @@
 #!/usr/bin/env python
 import argparse
 import pandas as pd
-from compute_real_effectiveness import HEADER
+from common import *
 
 def main():
+    parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", default="-")
     parser.add_argument("-o", "--output")
     parser.add_argument(
         "-f", "--formats", choices=('txt', 'svg', 'pickle'), nargs="+",
-        default=['tex'])
+        default=['svg'])
+    parser.add_argument(
+        "-t", "--tool-name-file",
+        help="File that maps profile names to display names for tools")
     parser.add_argument("--exclude-discarded", action="store_true", default=False)
     args = parser.parse_args()
     
     with fileopen(args.input, 'rt') as inp:
-        table = pd.read_csv(inp, sep="\t", names=HEADER)
+        table = pd.read_csv(inp, sep="\t")
     
     if 'txt' in args.formats:
         with fileopen(args.output + '.txt', 'wt') as out:
@@ -73,6 +77,13 @@ def main():
             return above_thresholds
         
         above_thresholds= pd.concat([table_to_quals(q) for q in ('0', '20')])
+        
+        # Replace tool names with display versions
+        if args.tool_name_file:
+            with open(args.tool_name_file, 'rt') as inp:
+                tool_name_table = pd.read_csv(inp, sep="\t", index_col='ProfileName')
+            above_thresholds.Program = above_thresholds.Program.map(
+                lambda x: tool_name_table.loc[x, 'DisplayName']).values
         
         plot = sb.factorplot(
             x='MAPQ', y='Delta', hue='Program', col='Q',

@@ -1,52 +1,100 @@
 #!/usr/bin/env python
 import argparse
 import pandas as pd
-from compute_real_effectiveness import HEADER
 
 def main():
+    parser = argparse.ArgumenetParser()
     parser.add_argument("-i", "--input", default="-")
     parser.add_argument("-o", "--output")
     parser.add_argument(
         "-f", "--formats", choices=('txt', 'svg', 'pickle'), nargs="+",
         default=['tex'])
+    parser.add_argument(
+        "-t", "--tool-name-file",
+        help="File that maps profile names to display names for tools")
     parser.add_argument("--exclude-discarded", action="store_true", default=False)
     args = parser.parse_args()
     
+    with fileopen(args.input, 'rt') as inp:
+        table = pd.read_csv(inp, sep="\t")
     
-    process.rna <- function(rna) {
-        r1 <- rna[,c('prog','read1_in_region','read1_quality')]
-        colnames(r1)[2:3] <- c('in_region', 'quality')
-        r2 <- rna[,c('prog','read2_in_region','read2_quality')]
-        colnames(r2)[2:3] <- c('in_region', 'quality')
-        rna.reads <- rbind(r1,r2)
-        rna.tab <- dlply(rna.reads, 'prog', table)
-        rna.tab.tidy <- lapply(rna.tab[1:3], melt)
-        rna.tab.tidy <- do.call(rbind, lapply(names(rna.tab.tidy), function(n) {
-            x<-rna.tab.tidy[[n]]
-            x$prog <- n
-            x
-        }))
-        for (i in 1:3) rna.tab.tidy[[i]] <- rna.tab.tidy[[i]][2:3, 2:5]
-        for (i in 1:3) rna.tab.tidy[[i]] <- (rna.tab.tidy[[i]][2,] - rna.tab.tidy[[4]][2,])
-        rna.tab.tidy <- melt(do.call(rbind, rna.tab.tidy[1:3]))
-        colnames(rna.tab.tidy) <- c('prog','MAPQ','delta')
-        rna.tab.tidy$MAPQ <- factor(rna.tab.tidy$MAPQ)
-        rna.tab.tidy
-    }
+    if 'txt' in args.formats:
+        with fileopen(args.output + '.txt', 'wt') as out:
+            table.to_csv(out, sep="\t", index=False)
+        
+    if 'pickle' in args.formats:
+        import pickle
+        with fileopen(args.output + '.pickle', 'wb') as out:
+            pickle.dump(table, out)
     
-    plot.rna.data <- function(rna.data) {
-        ggplot(rna.data, aes(x=MAPQ, y=log10(delta), col=Program, group=Program)) +
-            geom_line() +
-            geom_point() +
-            xlab('Mapping Quality Score (MAPQ) Cutoff') +
-            ylab('Log10(Difference versus\nUntrimmed Reads)')
-    }
-
-    rna <- read_tsv('rnaseq_results.txt')
-    rna.data <- process.rna(rna)
-    pdf('Figure3.pdf')
-    plot.rna.data(rna.data)
-    dev.off()
+    if 'svg' in args.formats:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import seaborn as sb
+        sb.set(style="whitegrid")
+        
+        r1 = table[['prog','read1_in_region','read1_quality']]
+        r1 = r1.rename(columns={ 
+            'read1_in_region' : 'in_region',
+            'read1_quality' : 'quality'
+        })
+        r2 = table[['prog','read2_in_region','read2_quality']]
+        r2 = r2.rename(columns={ 
+            'read2_in_region' : 'in_region',
+            'read2_quality' : 'quality'
+        })
+        rna_reads = (r1
+            .append(r2)
+            .groupby(['prog', 'quality', 'in_region'])
+            .size()
+            .reset_index())
+        rna_reads.in_region = rna_reads.in_region.map(bool)
+        rna_reads = rna_reads.rename(columns={
+            'prog' : 'Program',
+            'quality' : 'MAPQ',
+            'in_region' : 'In Region?',
+            0 : 'Count'
+        })
+        
+        # rna_reads['Delta'] = np.NaN
+        # for mapq in set(rna_reads.MAPQ.values):
+        #     for inregion in (True, False):
+        #         untrimmed_row = ((rna_reads['Program']==prog) & 
+        #             (rna_reads['MAPQ']==mapq) & 
+        #             (rna_reads['In Region?']==inregion))
+        #         for prog in set(rna_reads.Program.values):
+        #             prog_row = ((rna_reads['Program']==prog) &
+        #                 (rna_reads['MAPQ']==mapq) & 
+        #                 (rna_reads['In Region?']==inregion))
+        #             a = rna_reads[prog_row]['Count']
+        #             b = rna_reads[untrimmed_row]['Count']
+        #             b = 0 if b.size == 0 else b.values[0]
+        #             if a.size == 0:
+        #                 diff = -b
+        #                 new_rows.append([
+        #                     prog, mapq, inregion, 0, diff
+        #                 ])
+        #             else:
+        #                 diff = a.values[0] - b
+        #                 rna_reads.loc[prog_row, 'Delta'] = diff
+        
+        rna_reads = rna_reads.append(
+            pd.DataFrame(new_rows, columns=rna_reads.columns))
+        
+        # Replace tool names with display versions
+        if args.tool_name_file:
+            with open(args.tool_name_file, 'rt') as inp:
+                tool_name_table = pd.read_csv(inp, sep="\t", index_col='ProfileName')
+            rna_reads.Program = rna_reads.Program.map(
+                lambda x: tool_name_table.loc[x, 'DisplayName']).values
+        
+        plot = sb.factorplot(
+            x='MAPQ', y='Count', hue='Program', col='In Region?', data)
+        plot.set_xlabels('Mapping Quality Score (MAPQ) Cutoff')
+        plot.set_ylabels('Number of Aligned Reads')
+        svg_file = args.output + ".svg"
+        plot.savefig(svg_file)
 
 if __name__ == "__main__":
     main()

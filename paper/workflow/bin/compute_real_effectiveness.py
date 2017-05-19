@@ -8,8 +8,6 @@ from common import *
 import csv
 from glob import glob
 import os
-import tqdm
-from atropos.xopen import open_output
 
 # There is the option to compute edit distance between the untrimmed and 
 # trimmed reads. We did not use those metrics in the paper. If you want to 
@@ -308,7 +306,7 @@ class Hist(object):
     def __init__(self, prog, n_bases):
         # position base histograms
         self.prog = prog
-        self.prog_fields = parse_profile(prog)
+        self.prog_fields = list(parse_profile(prog))
         self.n_bases = n_bases
         self.hists = [
             [
@@ -341,9 +339,10 @@ def summarize(untrimmed, trimmed, ow, hw, mode=None, regions=None,
     itr = enumerate(untrimmed, 1)
     if progress:
         try:
+            import tqdm
             itr = tqdm.tqdm(itr)
         except:
-            pass
+            print("tqdm library not available; not showing progress bar")
     
     for i, (name, u1, u2) in itr:
         assert len(u1) > 0 and len(u2) > 0
@@ -404,7 +403,7 @@ def main():
     parser.set_defaults(command=None)
     parser.add_argument("-i", "--bam-files", nargs="+", default=None)
     parser.add_argument("-d", "--bam-dir")
-    parser.add_argument("-x", "--bam-extension", default=".sorted.bam")
+    parser.add_argument("-x", "--bam-extension", default=".name_sorted.bam")
     parser.add_argument("-p", "--bam-pattern", default=None)
     parser.add_argument("-u", "--untrimmed-name", default="untrimmed")
     parser.add_argument("-o", "--output", default="-")
@@ -476,13 +475,13 @@ def main():
         regions = Bed(args.bed, args.slop or 200)
     elif args.command == 'mrna':
         regions = Annotations(
-            args.bed_files, or args.bed_dir or args.bam_dir,
+            args.bed_files or args.bed_dir or args.bam_dir,
             args.bed_pattern,
             args.untrimmed_name,
             trimmed.keys())
     
     try:
-        with open_output(args.output) as o, open_output(args.hist) as h:
+        with fileopen(args.output, 'wt') as o, fileopen(args.hist, 'wt') as h:
             ow = csv.writer(o, delimiter="\t")
             ow.writerow(HEADER)
             hw = csv.writer(h, delimiter="\t")

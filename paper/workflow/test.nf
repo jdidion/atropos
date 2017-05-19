@@ -42,13 +42,18 @@ process ExtractReads {
   container "jdidion/atropos_wgbs"
   
   output:
-  file("wgbs.{1,2}.fq") into wgbsReads
+  set val("untrimmed"), file("wgbs.{1,2}.fq") into wgbsReads
   
   script:
   """
   gunzip -c /data/wgbs/wgbs.1.fq.gz | head -40 > ./wgbs.1.fq
   gunzip -c /data/wgbs/wgbs.2.fq.gz | head -40 > ./wgbs.2.fq
   """
+}
+
+wgbsReads.into {
+  untrimmedWgbsReads
+  atroposWgbsReads
 }
 
 process Atropos {
@@ -58,7 +63,7 @@ process Atropos {
   container "jdidion/atropos_paper"
   
   input:
-  file(reads) from wgbsReads
+  set val(_ignore_), file(reads) from atroposWgbsReads
   each threads from params.threadCounts
   //each qcut from params.quals
   //each aligner from params.aligners
@@ -87,7 +92,10 @@ process Atropos {
 // concatenate all of the timing results into a single channel
 Channel
   .empty()
-  .concat(trimmedAtropos)
+  .concat(
+    untrimmedWgbsReads,
+    trimmedAtropos
+  )
   .set { trimmedMerged }
 
 process BwamethAlign {
@@ -98,8 +106,8 @@ process BwamethAlign {
   set val(name), file(fastq) from trimmedMerged
   
   output:
-  file("${name}_wgbs.name_sorted.bam")
-  set val(name), file("${name}_wgbs.name_sorted.bam") into sorted
+  file("${name}.sam")
+  file("${name}.name_sorted.bam") into sortedBams
   set val(name), file("${name}.bwameth.timing.txt") into timingBwameth
   
   script:
@@ -107,10 +115,10 @@ process BwamethAlign {
   /usr/bin/time -v -o ${name}.bwameth.timing.txt bwameth.py \
     -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
     --reference /data/index/bwameth/hg38/hg38.fa \
-    ${fastq[0]} ${fastq[1]} > ${name}_wgbs.sam \
-  && samtools view -Shb ${name}_wgbs.sam | \
+    ${fastq[0]} ${fastq[1]} > ${name}.sam \
+  && samtools view -Shb ${name}.sam | \
      samtools sort -n -O bam -@ ${params.alignThreads} \
-       -o ${name}_wgbs.name_sorted.bam -
+       -o ${name}.name_sorted.bam -
   """
 }
 
@@ -134,6 +142,12 @@ process ParseTiming {
     """
 }
 
+/* Channel: display names for tools
+ * --------------------------------
+ */
+toolNames = Channel.fromPath(
+  "${workflow.projectDir}/../containers/tools/tool-names.txt")
+
 process ShowPerformance {
     container "jdidion/python_bash"
     
@@ -149,4 +163,42 @@ process ShowPerformance {
     """
     echo '$data' | show_performance.py -o timing -f tex svg pickle
     """
+}
+
+/* Process: Summarize trimming effectiveness
+ * -----------------------------------------
+ */
+process ComputeEffectiveness {
+  input:
+  val bamFileList from sortedBams.toList()
+  
+  output:
+  file "effectiveness.txt" into effectiveness
+  
+  script:
+  bamFiles = bamFileList.join(" ")
+  """
+  compute_real_effectiveness.py \
+    -i $bamFiles -o effectiveness.txt \
+    --no-edit-distance --no-progress
+  """
+}
+
+/* Process: Generate plot
+ * ----------------------
+ */
+process ShowEffectiveness {
+  input:
+  file effData from effectiveness
+  file toolNamesFile from toolNames
+  
+  output:
+  file "wgbs_effectiveness.svg"
+  
+  script:
+  """
+  show_wgbs_effectiveness.py \
+    -i $effData -o wgbs_effectiveness \
+    -t $toolNamesFile --exclude-discarded -f svg pickle
+  """
 }

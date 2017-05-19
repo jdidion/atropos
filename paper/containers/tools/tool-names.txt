@@ -8,3 +8,4 @@ skewer	Skewer
 bwa	BWA
 bwameth	bwa-meth
 star	STAR
+untrimmed	Untrimmed
