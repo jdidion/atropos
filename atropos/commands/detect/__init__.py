@@ -61,14 +61,21 @@ class CommandRunner(BaseCommandRunner):
                 "Detecting contaminants using the kmer-based algorithm")
             detector_class = KhmerDetector
         
+        summary_args = dict(
+            kmer_size=kmer_size, n_reads=n_reads, 
+            overrep_cutoff=overrep_cutoff, include=include)
         detector_args = dict(
-            kmer_size=kmer_size, n_reads=n_reads, overrep_cutoff=overrep_cutoff,
-            include=include, known_contaminants=known_contaminants)
+            known_contaminants=known_contaminants, **summary_args)
+        
         if self.paired:
             detector = PairedDetector(detector_class, **detector_args)
         else:
             detector = detector_class(**detector_args)
-        self.summary['detect'] = detector_args
+        
+        self.summary['detect'] = summary_args
+        if known_contaminants:
+            self.summary['detect']['known_contaminants'] = \
+                known_contaminants.summarize()
         
         logging.getLogger().info(
             "Detecting adapters and other potential contaminant "
@@ -100,7 +107,7 @@ class Match(object):
         else:
             self.seq = seq_or_contam
             self.count = count
-            self.names = names
+            self.names = tuple(names) if names else None
             self.known_seqs = None
         self.match_frac = match_frac
         self.match_frac2 = match_frac2
@@ -139,7 +146,7 @@ class Match(object):
     def set_known(self, names, seqs, match_frac, match_frac2=None):
         """Set the known contaminant.
         """
-        self.names = names
+        self.names = tuple(names) if names else None
         self.known_seqs = seqs
         self.match_frac = match_frac
         self.match_frac2 = match_frac2
@@ -166,6 +173,28 @@ class Match(object):
         self.abundance = sum(
             1 for read_seq in read_sequences
             if self.seq in read_seq)
+    
+    def summarize(self):
+        summary = dict(
+            longest_kmer=self.seq,
+            kmer_freq=self.count,
+            kmer_freq_type="frequency" if self.count_is_frequency else "count",
+            abundance=self.abundance,
+            is_known=self.is_known,
+            known_to_contaminant_match_frac=None,
+            contaminant_to_known_match_frac=None,
+            longest_match=None,
+            known_names=None,
+            known_seqs=None)
+        if self.longest_match:
+            summary.update(longest_match=self.longest_match[0])
+        if self.is_known:
+            summary.update(
+                known_to_contaminant_match_frac=self.match_frac,
+                contaminant_to_known_match_frac=self.match_frac2,
+                known_names=self.names,
+                known_seqs=self.known_seqs)
+        return summary
 
 class ContaminantMatcher(object):
     """Matches a known contaminant against other sequences.
@@ -358,7 +387,10 @@ class Detector(SingleEndPipelineMixin, Pipeline):
     
     def finish(self, summary, **kwargs):
         super().finish(summary)
-        summary['detect']['matches'] = (self.matches(**kwargs),)
+        summary['detect']['matches'] = ([
+            match.summarize()
+            for match in self.matches(**kwargs)
+        ],)
 
 class PairedDetector(PairedEndPipelineMixin, Pipeline):
     """Detector for paired-end reads.
@@ -385,9 +417,13 @@ class PairedDetector(PairedEndPipelineMixin, Pipeline):
     
     def finish(self, summary, **kwargs):
         super().finish(summary)
-        summary['detect']['matches'] = (
-            self.read1_detector.matches(**kwargs),
-            self.read2_detector.matches(**kwargs))
+        summary['detect']['matches'] = ([
+            match.summarize()
+            for match in self.read1_detector.matches(**kwargs)
+        ], [
+            match.summarize()
+            for match in self.read2_detector.matches(**kwargs)
+        ])
 
 class KnownContaminantDetector(Detector):
     """Test known contaminants against reads. This has linear complexity and is

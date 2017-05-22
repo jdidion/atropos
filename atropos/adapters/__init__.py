@@ -905,6 +905,15 @@ class AdapterCache(object):
             The name associated with the sequence.
         """
         return list(self.seq_to_name[seq])
+    
+    def summarize(self):
+        """Returns a summary dict. Does *not* add sequence info.
+        """
+        return dict(
+            path=self.path,
+            auto_reverse_complement=self.auto_reverse_complement,
+            num_adapter_names=len(self.name_to_seq),
+            num_adapter_seqs=len(self.seq_to_name))
 
 def parse_braces(sequence):
     """Replace all occurrences of ``x{n}`` (where x is any character) with n

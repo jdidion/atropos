@@ -21,8 +21,7 @@ you don't know what are the adapter sequences.
         parser = self.parser
         parser.set_defaults(
             max_reads=10000,
-            counter_magnitude="K",
-            report_formats=['txt'])
+            counter_magnitude="K")
         
         group = self.add_group("Adapter Detection")
         group.add_argument(
@@ -80,6 +79,28 @@ you don't know what are the adapter sequences.
             help="File in which to write the summary of detected adapters. "
                  "(stdout)")
         group.add_argument(
+            "-O",
+            "--output-formats",
+            nargs="*", choices=("txt", "fasta", "json", "yaml", "pickle"), 
+            default=None, metavar="FORMAT", dest="report_formats",
+            help="Report type(s) to generate. If multiple, '--output' "
+                 "is treated as a prefix and the appropriate extensions are "
+                 "appended. If unspecified, the format is guessed from the "
+                 "file extension. Supported formats are: txt, json, yaml, "
+                 "pickle, fasta. Additional arguments for fasta output are "
+                 "provided via the '--fasta' option. See the documentation "
+                 "for a full description of the structured output "
+                 "(json/yaml/pickle formats).")
+        group.add_argument(
+            "--fasta",
+            nargs="*", choices=("union", "perinput"), default=None, 
+            metavar="OPTIONS",
+            help="Additional arguments for fasta output. Adds 'fasta' to the "
+                 "list of output formats if not already specified. Options "
+                 "are: perinput=generate one output file per input file, "
+                 "union=generate a single output file with all sequences "
+                 "merged.")
+        group.add_argument(
             "-m",
             "--max-adapters",
             type=positive(), default=None,
@@ -88,3 +109,8 @@ you don't know what are the adapter sequences.
     
     def validate_command_options(self, options):
         options.report_file = options.output
+        if options.fasta:
+            if not options.report_formats:
+                options.report_formats = ['fasta']
+            elif 'fasta' not in options.report_formats:
+                options.report_formats = list(options.report_formats) + ['fasta']

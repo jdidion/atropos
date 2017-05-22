@@ -44,6 +44,16 @@ error rate."""
             type=writeable_file, default=STDOUT,
             help="File in which to write the summary of the estimated error "
                  "rates. (stdout)")
+        group.add_argument(
+            "--output_formats",
+            nargs="*", choices=("txt", "json", "yaml", "pickle"), 
+            default=None, metavar="FORMAT", dest="report_formats",
+            help="Report type(s) to generate. If multiple, '--output' "
+                 "is treated as a prefix and the appropriate extensions are "
+                 "appended. If unspecified, the format is guessed from the "
+                 "file extension. Supported formats are: txt, json, yaml, "
+                 "pickle. See the documentation for a  full description of "
+                 "the structured output (json/yaml/pickle formats).")
     
     def validate_command_options(self, options):
         options.report_file = options.output

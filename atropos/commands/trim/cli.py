@@ -389,7 +389,8 @@ standard output.
             help="Write report to file rather than stdout/stderr. (no)")
         group.add_argument(
             "--report-formats",
-            nargs="*", choices=("txt", "json"), default=None, metavar="FORMAT",
+            nargs="*", choices=("txt", "json", "yaml", "pickle"), default=None, 
+            metavar="FORMAT",
             help="Report type(s) to generate. If multiple, '--report-file' "
                  "is treated as a prefix and the appropriate extensions are "
                  "appended. If unspecified, the format is guessed from the "

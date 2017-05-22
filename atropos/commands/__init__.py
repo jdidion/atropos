@@ -70,8 +70,7 @@ class Command(object):
         if retcode == 0 and options.report_file:
             logging.getLogger().debug(
                 "Writing report to %s", options.report_file)
-            self.generate_reports(
-                summary, options.report_file, options.report_formats)
+            self.generate_reports(summary, options)
         else:
             logging.getLogger().debug("Not generating report file")
         return retcode, summary
@@ -140,16 +139,17 @@ class Command(object):
         mod = import_module(self.report_module)
         return mod.ReportGenerator
     
-    def generate_reports(self, summary, report_file, report_formats):
+    def generate_reports(self, summary, options):
         """Generate reports.
         
         Args:
             summary: The summary dict.
+            options: Command-line options.
             report_file: The report file name/prefix.
             report_formats: A list of formats.
         """
         generator_class = self.get_report_generator_class()
-        generator = generator_class(report_file, report_formats)
+        generator = generator_class(options)
         generator.generate_reports(summary)
 
 COMMANDS = dict(

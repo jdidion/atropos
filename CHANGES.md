@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.6 (dev)
+------------
+* Add FASTA output for detect command, and enable json, yaml, and pickle output for all commands.
+
 v1.1.5 (2017.05.18)
 -------------------
 * Major update to the documentation.

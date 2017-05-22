@@ -15,10 +15,11 @@ class BaseReportGenerator(object):
     """Base class for command report generators.
     
     Args:
-        report_file: Output file name/prefix.
-        report_formats: List of formats to generate.
+        options: Command-line options.
     """
-    def __init__(self, report_file, report_formats=None):
+    def __init__(self, options):
+        report_file = options.report_file
+        report_formats = options.report_formats
         if report_file in (STDOUT, STDERR):
             self.report_formats = report_formats or ('txt',)
             self.report_files = (report_file,) * len(self.report_formats)
@@ -33,8 +34,16 @@ class BaseReportGenerator(object):
                 self.report_files = (
                     '{}.{}'.format(report_file, fmt)
                     for fmt in self.report_formats)
+        self.report_args = tuple(
+            self.get_report_args(fmt, options)
+            for fmt in self.report_formats)
     
-    def generate_reports(self, summary, **kwargs):
+    def get_report_args(self, fmt, options):
+        """Returns report-specific options dict.
+        """
+        return {}
+    
+    def generate_reports(self, summary):
         """Generate report(s) from a summary.
         
         Args:
@@ -47,7 +56,8 @@ class BaseReportGenerator(object):
         """
         self.add_derived_data(summary)
         
-        for fmt, outfile in zip(self.report_formats, self.report_files):
+        for fmt, outfile, kwargs in zip(
+                self.report_formats, self.report_files, self.report_args):
             if fmt in SERIALIZERS:
                 mode = SERIALIZERS[fmt]
                 self.serialize(summary, fmt, mode, outfile, **kwargs)
