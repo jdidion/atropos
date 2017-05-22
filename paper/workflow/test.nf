@@ -72,7 +72,7 @@ process Atropos {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
-  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineAtropos
+  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineAtropos
   file "${task.tag}.report.txt"
   
   script:
@@ -111,7 +111,7 @@ process BwamethAlign {
   output:
   file("${name}.sam")
   file("${name}.name_sorted.bam") into sortedBams
-  set val("${task.tag}"), file("${task.tag}.machine_info.txt") into machineBwameth
+  set val("${name}"), val("bwameth"), file("${task.tag}.machine_info.txt") into machineBwameth
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingBwameth
   
   script:
@@ -228,14 +228,14 @@ process SummarizeMachine {
   container "jdidion/python_bash"
     
   input:
-  set val(name), file(machine) from machineMerged
+  set val(name), val(analysis), file(machine) from machineMerged
 
   output:
   stdout machineParsed
 
   script:
   """
-  parse_machine.py -i $machine -p $name
+  parse_machine.py -i $machine -p $name $analysis
   """
 }
 
@@ -251,7 +251,7 @@ process CreateMachineTable {
   script:
   data = parsedRows.join("")
   """
-  echo -e "prog\tprog2\tthreads\tdataset\tqcut\tcpus\tmemory\tcpu_details" > machine_info.txt
+  echo -e "prog\tprog2\tthreads\tdataset\tqcut\tanalysis\tcpus\tmemory\tcpu_details" > machine_info.txt
   echo '$data' >> machine_info.txt
   """
 }

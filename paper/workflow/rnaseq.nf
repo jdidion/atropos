@@ -48,7 +48,7 @@ process ExtractReads {
   container "jdidion/atropos_rnaseq"
   
   output:
-  file("rna.{1,2}.fq.gz") into rnaseqReads
+  set val("untrimmed"), file("rna.{1,2}.fq.gz") into rnaseqReads
   
   script:
   """
@@ -97,7 +97,7 @@ process Atropos {
   container "jdidion/atropos_paper"
 
   input:
-  file(reads) from atroposRnaseqReads
+  set val(_ignore_), file(reads) from atroposRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
   each aligner from params.aligners
@@ -106,6 +106,7 @@ process Atropos {
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
+  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineAtropos
   file "${task.tag}.report.txt"
   
   script:
@@ -127,6 +128,7 @@ process Atropos {
     alignerArgs = "-O 7"
   }
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
     --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
     -e 0.20 --aligner $aligner $alignerArgs -q $qcut --trim-n \
@@ -151,17 +153,19 @@ process Skewer {
   container "jdidion/skewer"
 
   input:
-  file(reads) from skewerRnaseqReads
+  set val(_ignore_), file(reads) from skewerRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
 
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSkewer
+  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineSkewer
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt skewer \
     -m pe -l $params.minLength -r 0.3 \
     -o $task.tag -z --quiet \
@@ -182,17 +186,19 @@ process SeqPurge {
   container "jdidion/seqpurge"
 
   input:
-  file(reads) from seqPurgeRnaseqReads
+  set val(_ignore_), file(reads) from seqPurgeRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
 
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSeqPurge
+  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineSeqPurge
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
     -out1 ${task.tag}.1.fq.gz -out2 ${task.tag}.2.fq.gz \
@@ -212,17 +218,19 @@ process AdapterRemoval {
   container "jdidion/adapterremoval"
 
   input:
-  file(reads) from adapterRemovalRnaseqReads
+  set val(_ignore_), file(reads) from adapterRemovalRnaseqReads
   each threads from params.threadCounts
   each qcut from params.quals
 
   output:
   set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
   set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAdapterRemoval
+  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineAdapterRemoval
   file "${task.tag}.report.txt"
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${task.tag}.timing.txt AdapterRemoval \
     --file1 ${reads[0]} --file2 ${reads[1]} \
     --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
@@ -231,13 +239,6 @@ process AdapterRemoval {
     --minlength $params.minLength --threads $task.cpus
   """
 }
-
-/* Channel: Untrimmed
- * ------------------
- * Need to create a set from the untrimmed reads so it can be merged with
- * the trimmed reads.
- */
-untrimmed = Channel.value(["untrimmed", untrimmedRnaseqReads])
 
 /* Channel: merged tool outputs
  * ----------------------------
@@ -248,7 +249,7 @@ untrimmed = Channel.value(["untrimmed", untrimmedRnaseqReads])
 Channel
   .empty()
   .concat(
-    untrimmed,
+    untrimmedRnaseqReads,
     trimmedAtropos,
     trimmedSkewer,
     trimmedSeqPurge,
@@ -262,6 +263,8 @@ Channel
  * samtools.
  */
 process StarAlign {
+  tag { "${name}.star" }
+  cpus { params.alignThreads }
   container "jdidion/star_hg38index"
   
   input:
@@ -269,19 +272,21 @@ process StarAlign {
   
   output:
   file("${name}_rnaseq_Aligned.{bam,bam.bai}")
-  set val(name), file("${name}_rnaseq.name_sorted.bam") into sorted
+  set val(name), file("${name}.name_sorted.bam") into sorted
   set val(name), file("${name}.star.timing.txt") into timingStar
+  set val("${name}"), val("star"), file("${task.tag}.machine_info.txt") into machineBwameth
   
   script:
   """
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${name}.star.timing.txt STAR \
     --runThreadN $threads --genomeDir /data/index/star/hg38 \
     --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
     --outMultimapperOrder Random --outFilterMultimapNmax 100000 \
     --outSAMmultNmax 1 --outSAMtype BAM Unsorted \
     --outSAMunmapped Within KeepPairs --outFileNamePrefix ${name}_rnaseq_ \
-  && samtools sort -n -O bam -@ $threads \
-    -o ${name}_rnaseq.name_sorted.bam ${name}_rnaseq_Aligned.bam
+  && samtools sort -n -O bam -@ ${params.alignThreads} \
+    -o ${name}.name_sorted.bam ${name}_rnaseq_Aligned.bam
   """
 
 // clone sorted bams
@@ -298,7 +303,7 @@ process Bam2Bed {
   
   input:
   set val(name), file(sortedBam) from sortedBam2Bed
-  file annotations
+  file annoFile from annotations
   
   output:
   file "${name}.overlap.txt" into overlap
@@ -306,7 +311,7 @@ process Bam2Bed {
   script:
   """
   bam2bed --all-reads --do-not-sort < $sortedBam \
-    | cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id - $annotations \
+    | cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id - $annoFile \
     > ${name}.overlap.txt
   """
 }
@@ -321,6 +326,8 @@ toolNames = Channel.fromPath(
  * -----------------------------------------
  */
 process ComputeEffectiveness {
+  container "jdidion/python_bash"
+  
   input:
   val bamFileList from sortedEffectiveness.toList()
   val bedFileList from overlap.toList()
@@ -343,12 +350,16 @@ process ComputeEffectiveness {
  * ----------------------
  */
 process ShowEffectiveness {
+  container "jdidion/python_bash"
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
   input:
   file effData from effectiveness
   file toolNamesFile from toolNames
   
   output:
   file "rnaseq_effectiveness.svg"
+  file "rnaseq_effectiveness.pickle"
   
   script:
   """
@@ -398,7 +409,7 @@ process ParseTrimmingTiming {
  */
 process ShowWgbsTrimmingPerformance {
     container "jdidion/python_bash"
-    publishDir "$publishDir", mode: 'copy', overwrite: true
+    publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
     val parsedRows from timingMergedParsed.toList()
@@ -406,11 +417,12 @@ process ShowWgbsTrimmingPerformance {
     output:
     file "trim_performance.tex"
     file "trim_performance.svg"
+    file "trim_performance.pickle"
     
     script:
     data = parsedRows.join("")
     """
-    echo '$data' | show_performance.py -o trim_performance
+    echo '$data' | show_performance.py -o trim_performance -f tex svg pickle
     """
 }
 
@@ -439,7 +451,7 @@ process ParseStarTiming {
  */
 process ShowStarPerformance {
     container "jdidion/python_bash"
-    publishDir "$publishDir", mode: 'copy', overwrite: true
+    publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
     val parsedRows from timingStar.toList()
@@ -447,10 +459,62 @@ process ShowStarPerformance {
     output:
     file "star_performance.tex"
     file "star_performance.svg"
+    file "bwameth_performance.pickle"
     
     script:
     data = parsedRows.join("")
     """
-    echo '$data' | show_performance.py -o star_performance
+    echo '$data' | show_performance.py -o star_performance -f tex svg pickle
     """
+}
+
+/* Channel: merged machine info
+ * ----------------------------
+ * If you add a tool process, make sure to add the machine channel
+ * into the concat list here.
+ */
+Channel
+  .empty()
+  .concat(
+    machineAtropos,
+    machineSkewer,
+    machineSeqPurge,
+    machineAdapterRemoval,
+    machineBwameth
+  )
+  .set { machineMerged }
+
+/* Process: summarize machine info
+ * -------------------------------
+ */
+process SummarizeMachine {
+  container "jdidion/python_bash"
+    
+  input:
+  set val(name), val(analysis), file(machine) from machineMerged
+
+  output:
+  stdout machineParsed
+
+  script:
+  """
+  parse_machine.py -i $machine -p $name $analysis
+  """
+}
+
+process CreateMachineTable {
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedRows from machineParsed.toList()
+    
+  output:
+  file "machine_info.txt"
+  
+  script:
+  data = parsedRows.join("")
+  """
+  echo -e "prog\tprog2\tthreads\tdataset\tqcut\tanalysis\tcpus\tmemory\tcpu_details" > machine_info.txt
+  echo '$data' >> machine_info.txt
+  """
 }

@@ -16,10 +16,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", default="-")
     parser.add_argument("-o", "--output", default="-")
-    parser.add_argument("-p", "--profile")
+    parser.add_argument("-p", "--profile", nargs='+')
     args = parser.parse_args()
-
-    profile = parse_profile(args.profile)
+    
+    profile = parse_profile(args.profile[0])
+    if len(args.profile) > 1:
+        profile.append(args.profile[1])
     
     with fileopen(args.input, 'rt') as i:
         lines = [line.strip() for line in i.readlines()]
@@ -45,7 +47,7 @@ def main():
     cpu_str = "; ".join("{} {}".format(count, cpu) for cpu, count in cpus.items())
     
     with fileopen(args.output, "wt") as out:
-        print(*profile, total_cpus, mem, cpu_str,s sep="\t", file=out)
+        print(*profile, total_cpus, mem, cpu_str, sep="\t", file=out)
 
 if __name__ == "__main__":
     main()
