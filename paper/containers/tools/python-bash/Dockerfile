@@ -41,7 +41,6 @@ RUN apt-get update && apt-get install --yes \
     && pip install pandas \
     && pip install matplotlib \
     && pip install seaborn \
-    && pip install python3-tk \
     && pip install mako \
     && pip install pysam \
     && pip uninstall --yes cython \
