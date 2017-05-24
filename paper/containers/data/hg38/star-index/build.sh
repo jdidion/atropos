@@ -4,6 +4,11 @@
 #
 # Note: If using Docker, don't forget to increase the memory allocation to
 # more than 16 GB for this command.
+#
+# Note: I find it most convenient to save the final image to a tar file that
+# I can then copy to the HPC environment, rather than having to build the
+# index twice. It's also nice to have a backup in case Docker or your computer
+# crashes.
 
 THREADS=$1
 GENCODE_VERSION=26

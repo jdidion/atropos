@@ -3,41 +3,48 @@
 #
 # Software:         python
 # Software Version: 3.6
-# Description:      Python 3.6 with bash
-# Website:          https://hub.docker.com/_/python/
+# Description:      Python 3.6 pandas, seaborn, and other libraries
 # Provides:         python
-# Base Image:       alpine
+# Base Image:       phusion/baseimage
 # Build Cmd:        docker build -f Dockerfile -t jdidion/python_bash .
 # Pull Cmd:         docker pull jdidion/python_bash
 # Run Cmd:          docker run --rm jdidion/python_bash python -h
 #################################################################
-FROM python:3-alpine
-RUN apk add --no-cache libstdc++ && \
-    apk add --no-cache \
-        --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community \
-        lapack-dev && \
-    apk add --no-cache --virtual=.build-dependencies \
-        pkgconfig     \
-        g++           \
-        gfortran      \
-        musl-dev      \
-        python3-dev   \
-        libpng-dev    \
-        freetype-dev && \
-    apk add --no-cache \
-        bash        \
-        libpng      \
-        freetype && \
-    ln -s locale.h /usr/include/xlocale.h && \
-    pip install --upgrade pip && \
-    pip install cython && \
-    pip install editdistance && \
-    pip install numpy && \
-    pip install pandas && \
-    pip install matplotlib && \
-    pip install seaborn && \
-    pip install mako && \
-    pip uninstall --yes cython && \
-    rm /usr/include/xlocale.h && \
-    rm -r /root/.cache && \
-    apk del .build-dependencies
+FROM phusion/baseimage:latest
+WORKDIR /tmp
+
+ENV BUILD_PACKAGES \
+    build-essential \
+    g++ \
+    gfortran \
+    libbz2-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    git
+ENV RUNTIME_PACKAGES \
+    libncurses5-dev \
+    libncursesw5-dev \
+    python3-pip \
+    time
+
+RUN apt-get update && apt-get install --yes \
+        $BUILD_PACKAGES \
+        $RUNTIME_PACKAGES \
+    && ln -s /usr/bin/python3 /usr/bin/python \
+    && ln -s /usr/bin/pip3 /usr/bin/pip \
+    && pip install --upgrade pip \
+    && pip install cython \
+    && pip install editdistance \
+    && pip install numpy \
+    && pip install pandas \
+    && pip install matplotlib \
+    && pip install seaborn \
+    && pip install python3-tk \
+    && pip install mako \
+    && pip install pysam \
+    && pip uninstall --yes cython \
+    && apt-get remove --purge -y $BUILD_PACKAGES \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/*

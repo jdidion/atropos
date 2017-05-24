@@ -13,7 +13,6 @@
 # Run Cmd:          docker run --rm jdidion/bwabase bwa
 #                   docker run --rm jdidion/bwabase python bwa-meth.py
 #################################################################
-# python3 Alpine image with gcc
 FROM phusion/baseimage:latest
 WORKDIR /tmp
 
