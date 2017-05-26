@@ -31,7 +31,7 @@
  */
 
 // variables for all tools
-params.publishDir = "results/${workflow.profile}/wgbs"
+params.publishDir = "${params.resultsDir}/${workflow.profile}/wgbs"
 params.quals = [ 0, 20 ]
 params.adapter1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG"
 params.adapter2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"

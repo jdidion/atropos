@@ -19,7 +19,7 @@ def main():
     parser.add_argument("-p", "--profile", nargs='+')
     args = parser.parse_args()
     
-    profile = parse_profile(args.profile[0])
+    profile = list(parse_profile(args.profile[0]))
     if len(args.profile) > 1:
         profile.append(args.profile[1])
     

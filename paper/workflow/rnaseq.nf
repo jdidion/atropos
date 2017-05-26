@@ -27,7 +27,7 @@
  */
 
 // variables for all tools
-params.publishDir = "results/${workflow.profile}/rnaseq"
+params.publishDir = "${params.resultsDir}/${workflow.profile}/rnaseq"
 params.quals = [ 0 ]
 params.adapter1 = "AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATATCGTATGCCGTCTTCTGCTTG"
 params.adapter2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"

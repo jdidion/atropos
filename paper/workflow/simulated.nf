@@ -28,7 +28,7 @@
  */
 
 // variables for all tools
-params.publishDir = "results/${workflow.profile}/simulated"
+params.publishDir = "${params.resultsDir}/${workflow.profile}/simulated"
 params.errorRates = [ '001', '005', '01' ]
 params.quals = [ 0 ]
 params.adapter1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG"
