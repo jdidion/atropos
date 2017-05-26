@@ -288,6 +288,7 @@ process StarAlign {
   && samtools sort -n -O bam -@ ${params.alignThreads} \
     -o ${name}.name_sorted.bam ${name}_rnaseq_Aligned.bam
   """
+}
 
 // clone sorted bams
 sorted.into {
@@ -407,7 +408,7 @@ process ParseTrimmingTiming {
  * Aggregate all the parsed performance data and pass it to stdin of the
  * bin/show_performance.py script.
  */
-process ShowWgbsTrimmingPerformance {
+process ShowRnaseqTrimmingPerformance {
     container "jdidion/python_bash"
     publishDir "$params.publishDir", mode: 'copy', overwrite: true
     

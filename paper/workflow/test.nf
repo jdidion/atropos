@@ -29,7 +29,7 @@
 // variables for all tools
 params.errorRates = [ '001', '005', '01' ]
 params.quals = [ 0 ]
-params.adapter1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG"
+params.adapter1 = "AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCGATATCGTATGCCGTCTTCTGCTTG"
 params.adapter2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
 params.minLength = 25
 params.batchSize = 5000
@@ -39,31 +39,43 @@ params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process ExtractReads {
-  container "jdidion/atropos_wgbs"
+  container "jdidion/atropos_rnaseq"
   
   output:
-  set val("untrimmed"), file("wgbs.{1,2}.fq") into wgbsReads
+  set val("untrimmed"), file("rna.{1,2}.fq.gz") into rnaseqReads
   
   script:
   """
-  gunzip -c /data/wgbs/wgbs.1.fq.gz | head -40 > ./wgbs.1.fq
-  gunzip -c /data/wgbs/wgbs.2.fq.gz | head -40 > ./wgbs.2.fq
+  gunzip -c /data/rna/rna.1.fq.gz | head -40 > ./rna.1.fq
+  gunzip -c /data/rna/rna.2.fq.gz | head -40 > ./rna.2.fq
   """
 }
 
-wgbsReads.into {
-  untrimmedWgbsReads
-  atroposWgbsReads
+rnaseqReads.into {
+  untrimmedRnaseqReads
+  atroposRnaseqReads
+}
+
+process ExtractAnnotations {
+  container "jdidion/hg38_reference"
+  
+  output:
+  file "gencode.v26.annotation.gtf" into annotations
+  
+  script:
+  """
+  cp /data/reference/hg38/gencode.v26.annotation.gtf .
+  """
 }
 
 process Atropos {
   //tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
-  tag { "atropos_${task.cpus}_wgbs_q0_insert_writer" }
+  tag { "atropos_${task.cpus}_rnaseq_q0_insert_writer" }
   cpus { threads }
   container "jdidion/atropos_paper"
   
   input:
-  set val(_ignore_), file(reads) from atroposWgbsReads
+  set val(_ignore_), file(reads) from atroposRnaseqReads
   each threads from params.threadCounts
   //each qcut from params.quals
   //each aligner from params.aligners
@@ -95,35 +107,63 @@ process Atropos {
 Channel
   .empty()
   .concat(
-    untrimmedWgbsReads,
+    untrimmedRnaseqReads,
     trimmedAtropos
   )
   .set { trimmedMerged }
 
-process BwamethAlign {
-  tag { "${name}.bwameth" }
-  container "jdidion/bwameth_hg38index"
+process StarAlign {
+  tag { "${name}.star" }
   cpus { params.alignThreads }
+  container "jdidion/star_hg38index"
   
   input:
   set val(name), file(fastq) from trimmedMerged
   
   output:
-  file("${name}.sam")
-  file("${name}.name_sorted.bam") into sortedBams
-  set val("${name}"), val("bwameth"), file("${task.tag}.machine_info.txt") into machineBwameth
-  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingBwameth
+  file("${name}_rnaseq_Aligned.{bam,bam.bai}")
+  set val(name), file("${name}.name_sorted.bam") into sorted
+  set val(name), file("${name}.star.timing.txt") into timingStar
+  set val("${name}"), val("star"), file("${task.tag}.machine_info.txt") into machineBwameth
   
   script:
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt \
-  && /usr/bin/time -v -o ${name}.bwameth.timing.txt bwameth.py \
-    -t ${params.alignThreads} --read-group '${task.ext.readGroup}' \
-    --reference /data/index/bwameth/hg38/hg38.fa \
-    ${fastq[0]} ${fastq[1]} > ${name}.sam \
-  && samtools view -Shb ${name}.sam | \
-     samtools sort -n -O bam -@ ${params.alignThreads} \
-       -o ${name}.name_sorted.bam -
+  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
+  /usr/bin/time -v -o ${name}.star.timing.txt STAR \
+    --runThreadN $threads --genomeDir /data/index/star/hg38 \
+    --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
+    --outMultimapperOrder Random --outFilterMultimapNmax 100000 \
+    --outSAMmultNmax 1 --outSAMtype BAM Unsorted \
+    --outSAMunmapped Within KeepPairs --outFileNamePrefix ${name}_rnaseq_ \
+  && samtools sort -n -O bam -@ ${params.alignThreads} \
+    -o ${name}.name_sorted.bam ${name}_rnaseq_Aligned.bam
+  """
+}
+
+// clone sorted bams
+sorted.into {
+  sortedBam2Bed
+  sortedEffectiveness
+}
+
+/* Process: Convert aligned reads into table format
+ * ------------------------------------------------
+ */
+process Bam2Bed {
+  container "jdidion/atropos_paper_analysis"
+  
+  input:
+  set val(name), file(sortedBam) from sortedBam2Bed
+  file annoFile from annotations
+  
+  output:
+  file "${name}.overlap.txt" into overlap
+  
+  script:
+  """
+  bam2bed --all-reads --do-not-sort < $sortedBam \
+    | cut -f 1-6 | bedmap --delim '\t' --echo --echo-map-id - $annoFile \
+    > ${name}.overlap.txt
   """
 }
 
@@ -198,12 +238,12 @@ process ShowEffectiveness {
   file toolNamesFile from toolNames
   
   output:
-  file "wgbs_effectiveness.svg"
+  file "rnaseq_effectiveness.svg"
   
   script:
   """
-  show_wgbs_effectiveness.py \
-    -i $effData -o wgbs_effectiveness \
+  show_rnaseq_effectiveness.py \
+    -i $effData -o rnaseq_effectiveness \
     -t $toolNamesFile --exclude-discarded -f svg pickle
   """
 }
