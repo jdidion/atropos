@@ -76,7 +76,7 @@ process ExtractAnnotations {
   
   script:
   """
-  cp /data/reference/hg38/gencode.v26.annotation.gtf .
+  cp /data/annotations/hg38/gencode.v26.annotation.gtf .
   """
 }
 
@@ -280,7 +280,7 @@ process StarAlign {
   """
   cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${name}.star.timing.txt STAR \
-    --runThreadN $threads --genomeDir /data/index/star/hg38 \
+    --runThreadN $params.alignThreads --genomeDir /data/index/star/hg38 \
     --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
     --outMultimapperOrder Random --outFilterMultimapNmax 100000 \
     --outSAMmultNmax 1 --outSAMtype BAM Unsorted \

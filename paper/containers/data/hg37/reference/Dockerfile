@@ -4,9 +4,8 @@
 # Provides:         /data/reference/hg37/hg37.fa|/data/reference/hg37/hg37.fa.fai
 # Base Image:       busybox
 #################################################################
-FROM progrium/busybox
-RUN opkg-install bash \
- && mkdir -p /data/reference/hg37 \
+FROM blang/busybox-bash
+RUN mkdir -p /data/reference/hg37 \
  && mkdir -p /data/annotations/hg37
 ADD hg37.fa /data/reference/hg37/hg37.fa
 ADD hg37.fa.fai /data/reference/hg37/hg37.fa.fai

@@ -46,8 +46,8 @@ process ExtractReads {
   
   script:
   """
-  gunzip -c /data/rna/rna.1.fq.gz | head -40 > ./rna.1.fq
-  gunzip -c /data/rna/rna.2.fq.gz | head -40 > ./rna.2.fq
+  gunzip -c /data/rna/rna.1.fq.gz | head -40 | gzip > ./rna.1.fq.gz
+  gunzip -c /data/rna/rna.2.fq.gz | head -40 | gzip > ./rna.2.fq.gz
   """
 }
 
@@ -64,7 +64,7 @@ process ExtractAnnotations {
   
   script:
   """
-  cp /data/reference/hg38/gencode.v26.annotation.gtf .
+  head /data/annotations/hg38/gencode.v26.annotation.gtf > ./gencode.v26.annotation.gtf
   """
 }
 
@@ -130,7 +130,7 @@ process StarAlign {
   """
   cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
   /usr/bin/time -v -o ${name}.star.timing.txt STAR \
-    --runThreadN $threads --genomeDir /data/index/star/hg38 \
+    --runThreadN $params.alignThreads --genomeDir /data/index/star/hg38 \
     --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
     --outMultimapperOrder Random --outFilterMultimapNmax 100000 \
     --outSAMmultNmax 1 --outSAMtype BAM Unsorted \
