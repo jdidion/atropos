@@ -128,8 +128,7 @@ process StarAlign {
   
   script:
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
+  touch ${task.tag}.machine_info.txt
   touch "${name}_rnaseq_Aligned.bam"
   touch "${name}_rnaseq_Aligned.bam.bai"
   touch "${name}.name_sorted.bam"
@@ -213,17 +212,23 @@ process ShowPerformance {
  */
 process ComputeEffectiveness {
   input:
-  val bamFileList from sortedBams.toList()
+  val bamFileList from sortedEffectiveness.toList()
+  val bedFileList from overlap.toList()
   
   output:
   file "effectiveness.txt" into effectiveness
   
   script:
-  bamFiles = bamFileList.join(" ")
+  bamMap = bamFileList.collectEntries()
+  bedMap = bedFileList.collectEntries()
+  names = bamMap.keySet().collect()
+  bamFiles = names.collect { name -> bamMap[name] }
+  bedFiles = names.collect { name -> bedMap[name] }
   """
   compute_real_effectiveness.py \
     -i $bamFiles -o effectiveness.txt \
-    --no-edit-distance --no-progress
+    --no-edit-distance --no-progress \
+    mrna -b $bedFiles
   """
 }
 
