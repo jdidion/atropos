@@ -115,7 +115,7 @@ Channel
 process StarAlign {
   tag { "${name}.star" }
   cpus { params.alignThreads }
-  container "jdidion/star_hg38index"
+  //container "jdidion/star_hg38index"
   
   input:
   set val(name), file(fastq) from trimmedMerged

@@ -307,7 +307,7 @@ process Bam2Bed {
   file annoFile from annotations
   
   output:
-  file "${name}.overlap.txt" into overlap
+  set val(name), file("${name}.overlap.txt") into overlap
   
   script:
   """
@@ -337,13 +337,16 @@ process ComputeEffectiveness {
   file "effectiveness.txt" into effectiveness
   
   script:
-  bamFiles = bamFileList.join(" ")
-  bedFiles = bedFileList.join(" ")
+  bamMap = bamFileList.collectEntries()
+  bedMap = bedFileList.collectEntries()
+  names = bamMap.keySet().collect()
+  bamFiles = names.collect { name -> bamMap[name] }
+  bedFiles = names.collect { name -> bedMap[name] }
   """
   compute_real_effectiveness.py \
-    -i $bamFileList -o effectiveness.txt \
+    -i $bamFiles -o effectiveness.txt \
     --no-edit-distance --no-progress \
-    mrna -b $bedFileList
+    mrna -b $bedFiles
   """
 }
 
