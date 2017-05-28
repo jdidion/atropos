@@ -14,8 +14,7 @@
 FROM phusion/baseimage:latest
 WORKDIR /tmp
 
-# Install compiler and perl stuff
-RUN apt-get update && apt-get install --yes \
+ENV BUILD_PACKAGES \
     build-essential \
     gcc-multilib \
     apt-utils \
@@ -24,26 +23,33 @@ RUN apt-get update && apt-get install --yes \
     liblzma-dev \
     git \
     wget
+ENV RUNTIME_PACKAGES \
+    time
 
 # STAR
-ENV VERSION 2.5.3a
-ENV URL "https://github.com/alexdobin/STAR/archive/${VERSION}.tar.gz"
-RUN wget -q -O - $URL | tar -zxv && \
-    cd STAR-${VERSION}/source && \
-    make STAR LDFLAGSextra=-flto CXXFLAGSextra="-flto -march=native" && \
-    cd .. && \
-    cp ./bin/Linux_x86_64_static/STAR /usr/local/bin/
+ENV STAR_VERSION 2.5.3a
+ENV STAR_URL "https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz"
 
 # Install samtools
-ENV VERSION 1.4
-ENV URL "https://github.com/samtools/samtools/releases/download/1.4/samtools-${VERSION}.tar.bz2"
-RUN wget -q -O - $URL | tar -jxv && \
-    cd samtools-${VERSION} && \
-    ./configure --prefix=/usr/local/ --without-curses && \
-    make && \
-    make install && \
-    rm -Rf /tmp/samtools-${VERSION}
+ENV SAMTOOLS_VERSION 1.4
+ENV SAMTOOLS_URL "https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2"
 
-RUN apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /tmp/*
+# Install compiler and perl stuff
+RUN apt-get update && apt-get install --yes \
+    $BUILD_PACKAGES \
+    $RUNTIME_PACKAGES \
+&& wget -q -O - $STAR_URL | tar -zxv \
+&& cd STAR-${STAR_VERSION}/source \
+&& make STAR LDFLAGSextra=-flto CXXFLAGSextra="-flto -march=native" \
+&& cd .. \
+&& cp ./bin/Linux_x86_64_static/STAR /usr/local/bin/ \
+&& cd .. \
+&& wget -q -O - $SAMTOOLS_URL | tar -jxv \
+&& cd samtools-${SAMTOOLS_VERSION} \
+&& ./configure --prefix=/usr/local/ --without-curses \
+&& make \
+&& make install \
+&& rm -Rf /tmp/samtools-${SAMTOOLS_VERSION} \
+&& apt-get remove --purge -y $BUILD_PACKAGES \
+&& rm -rf /var/lib/apt/lists/* \
+&& rm -rf /tmp/*
