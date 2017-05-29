@@ -67,3 +67,14 @@ release:
 		https://api.github.com/repos/$(repo)/releases \
 		-d '{"tag_name":"$(version)","target_commitish": "master","name": "$(version)","body": "$(desc)","draft": false,"prerelease": false}'
 	$(docker)
+
+# build a package with the files needed to run the workflows
+workflow:
+	mkdir -p dist
+	tar -C paper/workflow -czf dist/workflow.tgz \
+		simulated.nf \
+		rnaseq.nf \
+		wgbs.nf \
+		nextflow.config \
+		run-workflows.sh \
+		bin

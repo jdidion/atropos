@@ -8,13 +8,13 @@ Our workflows are written in [Nextflow](https://www.nextflow.io/index.html), pri
 
 Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or simulated DNA-Seq). We provide a configuration file with profiles we used for both the local and cluster executions. Our cluster runs SGE, so you may need to alter the cluster configuration files for your environment.
 
-## Containers and Computing Environments
+## Containers and Computing Environments: Promise vs Reality
 
 Unfortunately, the ideals of easily reproducible research don't yet match up with reality. On our HPC environment, network connections are only allowed from the head node, meaning we can't rely on Singularity/Udocker to automatically fetch the containers within scheduled jobs. Thus, we needed to export all of our Docker images (to .tar files), copy them to the cluster, and then call them via [TODO]. We expect, but can't guarantee, that this had minimal effect on the measurement of relative performance between the desktop and cluster.
 
 # 1. Install software
 
-* You will need a [Docker](https://www.docker.com/) engine if you want to build the containers yourself. If you only want to run the containers, you can use either Docker or [Singularity](http://singularity.lbl.gov/).
+* You will need a [Docker](https://www.docker.com/) engine if you want to build the containers yourself. If you only want to run the containers, you can use either Docker, [Singularity](http://singularity.lbl.gov/), or [Udocker](https://github.com/indigo-dc/udocker).
 * [Nextflow](https://www.nextflow.io/index.html), which requires Java 7+.
 
 # 2. Build containers

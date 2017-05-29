@@ -48,3 +48,4 @@ hg3*.fa*
 .vscode*
 paper/workflow/results
 *.ipynb
+*.tar
