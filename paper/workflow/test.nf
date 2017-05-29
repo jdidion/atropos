@@ -46,8 +46,8 @@ process ExtractReads {
   
   script:
   """
-  gunzip -c /data/rna/rna.1.fq.gz | head -40 | gzip > ./rna.1.fq.gz
-  gunzip -c /data/rna/rna.2.fq.gz | head -40 | gzip > ./rna.2.fq.gz
+  gunzip -c /data/rna/rna.1.fq.gz | head -40 | gzip > rna.1.fq.gz
+  gunzip -c /data/rna/rna.2.fq.gz | head -40 | gzip > rna.2.fq.gz
   """
 }
 

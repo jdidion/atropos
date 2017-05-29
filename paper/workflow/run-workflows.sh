@@ -23,6 +23,10 @@ shift $((OPTIND-1))
 
 [ "$1" = "--" ] && shift
 
+if [ $PROFILE="cluster" ]
+then
+  module load nextflow/0.23.3
+fi
 $NEXTFLOW run -c nextflow.config -profile $PROFILE simulated.nf
 $NEXTFLOW run -c nextflow.config -profile $PROFILE rnaseq.nf
 $NEXTFLOW run -c nextflow.config -profile $PROFILE wgbs.nf

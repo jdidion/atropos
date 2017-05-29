@@ -2,11 +2,15 @@
 
 The scripts in this directory will enable you to re-run the analyses in the Atropos paper. The workflows defined here run the benchmarks and generate the figures and tables shown in the paper.
 
-We have created [Docker](https://www.docker.com/) images for all of the software tools used, as well as data volumes containing all the raw data and resources. These images can be used directly on Mac, Windows, and some linux platforms using the Docker engine. On unsupported linux platforms (namely RedHat and derivatives, such as Scientific Linux), [Singularity](http://singularity.lbl.gov/) can be used to execute the containers directly from Docker Hub. The versions of the tools used in the paper are noted in the Dockerfile headers, and also in the supplementary data.
+We have created [Docker](https://www.docker.com/) images for all of the software tools used, as well as data volumes containing all the raw data and resources. These images can be used directly on Mac, Windows, and some linux platforms using the Docker engine. On unsupported linux platforms (namely RedHat and derivatives, such as Scientific Linux), [Singularity](http://singularity.lbl.gov/) or [Udocker](https://github.com/indigo-dc/udocker) can be used to execute the containers directly from Docker Hub. The versions of the tools used in the paper are noted in the Dockerfile headers, and also in the supplementary data.
 
-Our workflows are written in [Nextflow](https://www.nextflow.io/index.html), primarily because it supports both Docker and Singularity, which we need to run benchmarks on both desktop and RedHat-based HPC cluster. We also provide [CWL](http://www.commonwl.org/) tool definitions to simplify the development of alternate workflows.
+Our workflows are written in [Nextflow](https://www.nextflow.io/index.html), primarily because it supports Docker, Singularity, and Udocker, which we need to run benchmarks on both desktop and RedHat-based HPC cluster. We also provide [CWL](http://www.commonwl.org/) tool definitions to simplify the development of alternate workflows.
 
 Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or simulated DNA-Seq). We provide a configuration file with profiles we used for both the local and cluster executions. Our cluster runs SGE, so you may need to alter the cluster configuration files for your environment.
+
+## Containers and Computing Environments
+
+Unfortunately, the ideals of easily reproducible research don't yet match up with reality. On our HPC environment, network connections are only allowed from the head node, meaning we can't rely on Singularity/Udocker to automatically fetch the containers within scheduled jobs. Thus, we needed to export all of our Docker images (to .tar files), copy them to the cluster, and then call them via [TODO]. We expect, but can't guarantee, that this had minimal effect on the measurement of relative performance between the desktop and cluster.
 
 # 1. Install software
 
@@ -45,7 +49,7 @@ Clone the files in the 'workflow' directory, including the 'bin' subdirectory. I
 
 Where <env> is either 'local' or 'cluster'. Note that the first time you run this it will download several Docker images requiring ~[XX] GB of disk space.
 
-All results will be placed in the 'results' subdirectory.
+All results will be placed in the 'results' subdirectory (unless you change the path in nextflow.config).
 
 Note that when re-running the workflow and comparing the results to those shown in the manuscript, there will be some variability in the performance metrics, but the relative rankings of the tools should not change significantly -- please let us know if you find otherwise!
 
