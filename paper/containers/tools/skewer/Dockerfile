@@ -2,7 +2,7 @@
 # Dockerfile
 #
 # Software:         skewer
-# Software Version: latest
+# Software Version: 0.2.2
 # Description:      skewer image
 # Website:          https://github.com/relipmoc/skewer
 # Provides:         skewer
