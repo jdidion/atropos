@@ -27,6 +27,11 @@
  *   Docker/Singularity by commenting out the 'container' directives.
  */
 
+// An absolute path to the container image is required for Singularity but
+// not Docker
+params.containerPrefix = ""
+params.containerSuffix = ""
+
 // variables for all tools
 params.publishDir = "${params.resultsDir}/${workflow.profile}/simulated"
 params.errorRates = [ '001', '005', '01' ]
@@ -47,7 +52,9 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
  * container.
  */
 process ExtractReads {
-  container "jdidion/atropos_simulated"
+  container { 
+    "${params.containerPrefix}jdidion/atropos_simulated${params.containerSuffix}"
+  }
   
   input:
   each err from params.errorRates
@@ -83,7 +90,9 @@ simReads.into {
 process Atropos {
   tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
-  container "jdidion/atropos_paper"
+  container {
+    "${params.containerPrefix}jdidion/atropos_paper${params.containerSuffix}"
+  }
 
   input:
   set err, file(reads), file(alns) from atroposSimReads
@@ -138,7 +147,9 @@ process Atropos {
 process Skewer {
   tag { "skewer_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
-  container "jdidion/skewer"
+  container {
+    "${params.containerPrefix}jdidion/skewer${params.containerSuffix}"
+  }
 
   input:
   set err, file(reads), file(alns) from skewerSimReads
@@ -171,7 +182,9 @@ process Skewer {
 process SeqPurge {
   tag { "seqpurge_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
-  container "jdidion/seqpurge"
+  container {
+    "${params.containerPrefix}jdidion/seqpurge${params.containerSuffix}"
+  }
 
   input:
   set err, file(reads), file(alns) from seqPurgeSimReads
@@ -203,7 +216,9 @@ process SeqPurge {
 process AdapterRemoval {
   tag { "adapterremoval_${task.cpus}_${err}_q${qcut}" }
   cpus { threads }
-  container "jdidion/adapterremoval"
+  container {
+    "${params.containerPrefix}jdidion/adapterremoval${params.containerSuffix}"
+  }
 
   input:
   set err, file(reads), file(alns) from adapterRemovalSimReads
@@ -248,7 +263,9 @@ Channel
  * ---------------------------------------
  */
 process ComputeSimulatedAccuracy {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
   
   input:
   set val(name), val(err), file(alns), file(trimmed) from trimmedMerged
@@ -286,7 +303,9 @@ toolNames = Channel.fromPath(
  * bin/show_simulated_accuracy.py.
  */
 process ShowSimulatedAccuracy {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
   publishDir "$params.publishDir", mode: 'copy', overwrite: true
   
   input:
@@ -325,18 +344,20 @@ Channel
  * ---------------------------------------------
  */
 process ParseSimualtedTiming {
-    container "jdidion/python_bash"
-    
-    input:
-    set val(item), file(timing) from timingMerged
-    
-    output:
-    stdout timingParsed
-    
-    script:
-    """
-    parse_gtime.py -i $timing -p $item
-    """
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
+  
+  input:
+  set val(item), file(timing) from timingMerged
+  
+  output:
+  stdout timingParsed
+  
+  script:
+  """
+  parse_gtime.py -i $timing -p $item
+  """
 }
 
 /* Process: generate performance figure/table
@@ -345,22 +366,24 @@ process ParseSimualtedTiming {
  * bin/show_performance.py script.
  */
 process ShowSimulatedPerformance {
-    container "jdidion/python_bash"
-    publishDir "$params.publishDir", mode: 'copy', overwrite: true
-    
-    input:
-    val parsedRows from timingParsed.toList()
-    
-    output:
-    file "performance.tex"
-    file "performance.svg"
-    file "performance.pickle"
-    
-    script:
-    data = parsedRows.join("")
-    """
-    echo '$data' | show_performance.py -o performance -f tex svg pickle
-    """
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedRows from timingParsed.toList()
+  
+  output:
+  file "performance.tex"
+  file "performance.svg"
+  file "performance.pickle"
+  
+  script:
+  data = parsedRows.join("")
+  """
+  echo '$data' | show_performance.py -o performance -f tex svg pickle
+  """
 }
 
 
@@ -383,7 +406,9 @@ Channel
  * -------------------------------
  */
 process SummarizeMachine {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
   input:
   set val(name), file(machine) from machineMerged

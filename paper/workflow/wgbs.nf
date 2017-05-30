@@ -30,6 +30,11 @@
  *   Docker/Singularity by commenting out the 'container' directives.e.
  */
 
+// An absolute path to the container image is required for Singularity but
+// not Docker
+params.containerPrefix = ""
+params.containerSuffix = ""
+
 // variables for all tools
 params.publishDir = "${params.resultsDir}/${workflow.profile}/wgbs"
 params.quals = [ 0, 20 ]
@@ -49,7 +54,9 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
  * container.
  */
 process ExtractReads {
-  container "jdidion/atropos_wgbs"
+  container {
+    "${params.containerPrefix}jdidion/atropos_wgbs${params.containerSuffix}"
+  }
   
   output:
   set val("untrimmed"), file("wgbs.{1,2}.fq.gz") into wgbsReads
@@ -78,7 +85,9 @@ wgbsReads.into {
 process Atropos {
   tag { "atropos_${task.cpus}_wgbs_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
-  container "jdidion/atropos_paper"
+  container {
+    "${params.containerPrefix}jdidion/atropos_paper${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from atroposWgbsReads
@@ -134,7 +143,9 @@ process Atropos {
 process Skewer {
   tag { "skewer_${task.cpus}_wgbs_q${qcut}" }
   cpus { threads }
-  container "jdidion/skewer"
+  container {
+    "${params.containerPrefix}jdidion/skewer${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from skewerWgbsReads
@@ -167,7 +178,9 @@ process Skewer {
 process SeqPurge {
   tag { "seqpurge_${task.cpus}_wgbs_q${qcut}" }
   cpus { threads }
-  container "jdidion/seqpurge"
+  container {
+    "${params.containerPrefix}jdidion/seqpurge${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from seqPurgeWgbsReads
@@ -199,7 +212,9 @@ process SeqPurge {
 process AdapterRemoval {
   tag { "adapterremoval_${task.cpus}_wgbs_q${qcut}" }
   cpus { threads }
-  container "jdidion/adapterremoval"
+  container {
+    "${params.containerPrefix}jdidion/adapterremoval${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from adapterRemovalWgbsReads
@@ -250,7 +265,9 @@ Channel
 process BwamethAlign {
   tag { "${name}.bwameth" }
   cpus { params.alignThreads }
-  container "jdidion/bwameth_hg38index"
+  container {
+    "${params.containerPrefix}jdidion/bwameth_hg38index${params.containerSuffix}"
+  }
   
   input:
   set val(name), file(fastq) from trimmedMerged
@@ -284,7 +301,9 @@ toolNames = Channel.fromPath(
  * -----------------------------------------
  */
 process ComputeEffectiveness {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
   
   input:
   val bamFileList from sortedBams.toList()
@@ -305,7 +324,9 @@ process ComputeEffectiveness {
  * ----------------------
  */
 process ShowEffectiveness {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
   publishDir "$params.publishDir", mode: 'copy', overwrite: true
   
   input:
@@ -343,7 +364,9 @@ Channel
  * ---------------------------------------------
  */
 process ParseTrimmingTiming {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
     input:
     set val(name), file(timing) from timingMerged
@@ -363,7 +386,9 @@ process ParseTrimmingTiming {
  * bin/show_performance.py script.
  */
 process ShowTrimmingPerformance {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
@@ -385,7 +410,9 @@ process ShowTrimmingPerformance {
  * -------------------------------------------------
  */
 process ParseBwamethTiming {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
     input:
     set val(name), file(timing) from timingBwameth
@@ -405,7 +432,9 @@ process ParseBwamethTiming {
  * bin/show_performance.py script.
  */
 process ShowBwamethPerformance {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
@@ -443,7 +472,9 @@ Channel
  * -------------------------------
  */
 process SummarizeMachine {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
   input:
   set val(name), val(analysis), file(machine) from machineMerged

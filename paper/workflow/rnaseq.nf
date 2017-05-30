@@ -45,7 +45,9 @@ params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
  * container.
  */
 process ExtractReads {
-  container "jdidion/atropos_rnaseq"
+  container {
+    "${params.containerPrefix}jdidion/atropos_rnaseq${params.containerSuffix}"
+  }
   
   output:
   set val("untrimmed"), file("rna.{1,2}.fq.gz") into rnaseqReads
@@ -69,7 +71,9 @@ rnaseqReads.into {
 }
 
 process ExtractAnnotations {
-  container "jdidion/hg38_reference"
+  container {
+    "${params.containerPrefix}jdidion/hg38_reference${params.containerSuffix}"
+  }
   
   output:
   file "gencode.v26.annotation.gtf" into annotations
@@ -94,7 +98,9 @@ process ExtractAnnotations {
 process Atropos {
   tag { "atropos_${task.cpus}_rnaseq_q${qcut}_${aligner}_${compression}" }
   cpus { threads }
-  container "jdidion/atropos_paper"
+  container {
+    "${params.containerPrefix}jdidion/atropos_paper${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from atroposRnaseqReads
@@ -150,7 +156,9 @@ process Atropos {
 process Skewer {
   tag { "skewer_${task.cpus}_rnaseq_q${qcut}" }
   cpus { threads }
-  container "jdidion/skewer"
+  container {
+    "${params.containerPrefix}jdidion/skewer${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from skewerRnaseqReads
@@ -183,7 +191,9 @@ process Skewer {
 process SeqPurge {
   tag { "seqpurge_${task.cpus}_rnaseq_q${qcut}" }
   cpus { threads }
-  container "jdidion/seqpurge"
+  container {
+    "${params.containerPrefix}jdidion/seqpurge${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from seqPurgeRnaseqReads
@@ -215,7 +225,9 @@ process SeqPurge {
 process AdapterRemoval {
   tag { "adapterremoval_${task.cpus}_rnaseq_q${qcut}" }
   cpus { threads }
-  container "jdidion/adapterremoval"
+  container {
+    "${params.containerPrefix}jdidion/adapterremoval${params.containerSuffix}"
+  }
 
   input:
   set val(_ignore_), file(reads) from adapterRemovalRnaseqReads
@@ -265,7 +277,9 @@ Channel
 process StarAlign {
   tag { "${name}.star" }
   cpus { params.alignThreads }
-  container "jdidion/star_hg38index"
+  container {
+    "${params.containerPrefix}jdidion/star_hg38index${params.containerSuffix}"
+  }
   
   input:
   set val(name), file(fastq) from trimmedMerged
@@ -300,7 +314,9 @@ sorted.into {
  * ------------------------------------------------
  */
 process Bam2Bed {
-  container "jdidion/atropos_paper_analysis"
+  container {
+    "${params.containerPrefix}jdidion/atropos_paper_analysis${params.containerSuffix}"
+  }
   
   input:
   set val(name), file(sortedBam) from sortedBam2Bed
@@ -327,7 +343,9 @@ toolNames = Channel.fromPath(
  * -----------------------------------------
  */
 process ComputeEffectiveness {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
   
   input:
   val bamFileList from sortedEffectiveness.toList()
@@ -354,7 +372,9 @@ process ComputeEffectiveness {
  * ----------------------
  */
 process ShowEffectiveness {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
   publishDir "$params.publishDir", mode: 'copy', overwrite: true
   
   input:
@@ -392,7 +412,9 @@ Channel
  * ---------------------------------------------
  */
 process ParseTrimmingTiming {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
     input:
     set val(name), file(timing) from timingMerged
@@ -412,7 +434,9 @@ process ParseTrimmingTiming {
  * bin/show_performance.py script.
  */
 process ShowRnaseqTrimmingPerformance {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
@@ -434,7 +458,9 @@ process ShowRnaseqTrimmingPerformance {
  * ---------------------------------------------
  */
 process ParseStarTiming {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
     input:
     set val(name), file(timing) from timingStar
@@ -454,7 +480,9 @@ process ParseStarTiming {
  * bin/show_performance.py script.
  */
 process ShowStarPerformance {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
@@ -492,7 +520,9 @@ Channel
  * -------------------------------
  */
 process SummarizeMachine {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
   input:
   set val(name), val(analysis), file(machine) from machineMerged

@@ -26,6 +26,11 @@
  * - adapter1, adapter2: Adapter sequence
  */
 
+// An absolute path to the container image is required for Singularity but
+// not Docker
+params.containerPrefix = ""
+params.containerSuffix = ""
+
 // variables for all tools
 params.errorRates = [ '001', '005', '01' ]
 params.quals = [ 0 ]
@@ -39,7 +44,9 @@ params.aligners = [ 'insert', 'adapter' ]
 params.compressionSchemes = [ 'worker', 'writer', 'nowriter' ]
 
 process ExtractReads {
-  container "jdidion/atropos_rnaseq"
+  container {
+    "${params.containerPrefix}jdidion/atropos_rnaseq${params.containerSuffix}"
+  }
   
   output:
   set val("untrimmed"), file("rna.{1,2}.fq.gz") into rnaseqReads
@@ -57,7 +64,9 @@ rnaseqReads.into {
 }
 
 process ExtractAnnotations {
-  container "jdidion/hg38_reference"
+  container {
+    "${params.containerPrefix}jdidion/hg38_reference${params.containerSuffix}"
+  }
   
   output:
   file "gencode.v26.annotation.gtf" into annotations
@@ -72,7 +81,9 @@ process Atropos {
   //tag { "atropos_${task.cpus}_${err}_q${qcut}_${aligner}_${compression}" }
   tag { "atropos_${task.cpus}_rnaseq_q0_insert_writer" }
   cpus { threads }
-  container "jdidion/atropos_paper"
+  container {
+    "${params.containerPrefix}jdidion/atropos_paper${params.containerSuffix}"
+  }
   
   input:
   set val(_ignore_), file(reads) from atroposRnaseqReads
@@ -115,7 +126,6 @@ Channel
 process StarAlign {
   tag { "${name}.star" }
   cpus { params.alignThreads }
-  //container "jdidion/star_hg38index"
   
   input:
   set val(name), file(fastq) from trimmedMerged
@@ -147,7 +157,9 @@ sorted.into {
  * ------------------------------------------------
  */
 process Bam2Bed {
-  container "jdidion/atropos_paper_analysis"
+  container {
+    "${params.containerPrefix}jdidion/atropos_paper_analysis${params.containerSuffix}"
+  }
   
   input:
   set val(name), file(sortedBam) from sortedBam2Bed
@@ -170,7 +182,9 @@ Channel
   .set { timingMerged }
 
 process ParseTiming {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
     input:
     set val(item), file(timing) from timingMerged
@@ -191,7 +205,9 @@ toolNames = Channel.fromPath(
   "${workflow.projectDir}/../containers/tools/tool-names.txt")
 
 process ShowPerformance {
-    container "jdidion/python_bash"
+    container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
     input:
     val timingRows from timingParsed.toList()
@@ -268,7 +284,9 @@ Channel
  * -------------------------------
  */
 process SummarizeMachine {
-  container "jdidion/python_bash"
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
     
   input:
   set val(name), val(analysis), file(machine) from machineMerged
@@ -283,8 +301,6 @@ process SummarizeMachine {
 }
 
 process CreateMachineTable {
-  publishDir "$params.publishDir", mode: 'copy', overwrite: true
-  
   input:
   val parsedRows from machineParsed.toList()
     
