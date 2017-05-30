@@ -25,7 +25,12 @@ shift $((OPTIND-1))
 
 if [ $PROFILE="cluster" ]
 then
+  # These statements are required on our cluster; YMMV
+  ## Load the Nextflow module
   module load nextflow/0.23.3
+  ## Unset the Singularity bindpath, which interferes with paths
+  ## in our data containers.
+  export SINGULARITY_BINDPATH=
 fi
 $NEXTFLOW run -c nextflow.config -profile $PROFILE simulated.nf
 $NEXTFLOW run -c nextflow.config -profile $PROFILE rnaseq.nf

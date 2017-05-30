@@ -26,6 +26,11 @@
  *   Docker/Singularity by commenting out the 'container' directives.
  */
 
+// An absolute path to the container image is required for Singularity but
+// not Docker
+params.containerPrefix = ""
+params.containerSuffix = ""
+
 // variables for all tools
 params.publishDir = "${params.resultsDir}/${workflow.profile}/rnaseq"
 params.quals = [ 0 ]

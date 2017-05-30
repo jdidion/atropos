@@ -429,7 +429,7 @@ process CreateMachineTable {
   publishDir "$params.publishDir", mode: 'copy', overwrite: true
   
   input:
-  val parsedRows from machineMerged.toList()
+  val parsedRows from machineParsed.toList()
     
   output:
   file "machine_info.txt"
