@@ -8,10 +8,6 @@ Our workflows are written in [Nextflow](https://www.nextflow.io/index.html), pri
 
 Each workflow (.nf file) runs the analysis for one data type (RNA-Seq, WGBS, or simulated DNA-Seq). We provide a configuration file with profiles we used for both the local and cluster executions. Our cluster runs SGE, so you may need to alter the cluster configuration files for your environment.
 
-## Containers and Computing Environments: Promise vs Reality
-
-Unfortunately, the ideals of easily reproducible research don't yet match up with reality. On our HPC environment, network connections are only allowed from the head node, meaning we can't rely on Singularity/Udocker to automatically fetch the containers within scheduled jobs. Thus, we needed to export all of our Docker images (to .tar files), copy them to the cluster, and then call them via [TODO]. We expect, but can't guarantee, that this had minimal effect on the measurement of relative performance between the desktop and cluster.
-
 # 1. Install software
 
 * You will need a [Docker](https://www.docker.com/) engine if you want to build the containers yourself. If you only want to run the containers, you can use either Docker, [Singularity](http://singularity.lbl.gov/), or [Udocker](https://github.com/indigo-dc/udocker).
@@ -52,6 +48,34 @@ Where <env> is either 'local' or 'cluster'. Note that the first time you run thi
 All results will be placed in the 'results' subdirectory (unless you change the path in nextflow.config).
 
 Note that when re-running the workflow and comparing the results to those shown in the manuscript, there will be some variability in the performance metrics, but the relative rankings of the tools should not change significantly -- please let us know if you find otherwise!
+
+# Non-Docker Systems
+
+Unfortunately, the ideals of easily reproducible research don't yet match up with reality. Ideally, if you wanted to run this workflow on a system that doesn't support Docker (which includes any RedHat-based Linux system and most HPC environments), you could use our workflow transparently with Singularity. In reality, Nextflow doesn't support Singularity's ability to automatically pull and convert containers from a Docker Hub. Even if it did it would be problematic as Singularity does not use a daemon or other caching system, and would thus fetch a separate copy of every container for every process instance. This will be addressed in Singularity v2.3, but for now you need to manually convert all the Docker containers to Singularity on a computer running Docker, then copy them to the HPC environment. We expect, but can't guarantee, that this had minimal effect on the measurement of relative performance between the desktop and cluster.
+
+## 1. Fix docker2singularity bug and build container
+
+First you need to clone the docker2singularity repository (https://github.com/singularityware/docker2singularity) and edit the docker2singularity.sh file to change the 'if' statement on/around line 178 to:
+
+```
+buildname=$(head -n 1 /etc/issue)
+if [[ $buildname =~ Buildroot|Alpine ]] ; then
+```
+
+Now build the container:
+
+```
+docker build -f Dockerfile -t <docker2singulariy container_name> .
+```
+
+## 2. Convert and transfer images
+
+From the workflow/extra directory, run:
+
+```
+./docker2singularity.sh \
+  <docker2singulariy container_name> <remote host> <remote dir>
+```
 
 # Manuscript
 
