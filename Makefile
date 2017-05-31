@@ -71,7 +71,7 @@ release:
 # build a package with the files needed to run the workflows
 workflow:
 	mkdir -p dist
-	tar -C paper/workflow -czf dist/workflow.tgz \
+	tar -C paper/workflow -czf dist/atropos-paper-workflow.tgz \
 		simulated.nf \
 		rnaseq.nf \
 		wgbs.nf \

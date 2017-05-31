@@ -410,20 +410,20 @@ process ShowTrimmingPerformance {
  * -------------------------------------------------
  */
 process ParseBwamethTiming {
-    container {
+  container {
     "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
   }
-    
-    input:
-    set val(name), file(timing) from timingBwameth
-    
-    output:
-    stdout timingBwamethParsed
-    
-    script:
-    """
-    parse_gtime.py -i $timing -p $name
-    """
+  
+  input:
+  set val(name), file(timing) from timingBwameth
+  
+  output:
+  stdout timingBwamethParsed
+  
+  script:
+  """
+  parse_gtime.py -i $timing -p $name
+  """
 }
 
 /* Process: generate bwa-meth alignment performance figure/table
@@ -432,24 +432,25 @@ process ParseBwamethTiming {
  * bin/show_performance.py script.
  */
 process ShowBwamethPerformance {
-    container {
+  container {
     "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
   }
-    publishDir "$params.publishDir", mode: 'copy', overwrite: true
-    
-    input:
-    val parsedRows from timingBwamethParsed.toList()
-    
-    output:
-    file "bwameth_performance.tex"
-    file "bwameth_performance.svg"
-    file "bwameth_performance.pickle"
-    
-    script:
-    data = parsedRows.join("")
-    """
-    echo '$data' | show_performance.py -o bwameth_performance -f tex svg pickle
-    """
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedRows from timingBwamethParsed.toList()
+  
+  output:
+  file "bwameth_performance.tex"
+  file "bwameth_performance.svg"
+  file "bwameth_performance.pickle"
+  
+  script:
+  data = parsedRows.join("")
+  """
+  echo '$data' | show_performance.py -t $params.alignThreads \
+    -o bwameth_performance -f tex svg pickle
+  """
 }
 
 /* Channel: merged machine info

@@ -14,6 +14,9 @@ def main():
     parser.add_argument("-n", "--name", default="table")
     parser.add_argument("-c", "--caption", default="")
     parser.add_argument(
+        "-t", "--threads", type=int, default=None,
+        help="Set all rows to have the same value for the Threads column.")
+    parser.add_argument(
         "-f", "--formats", choices=('txt', 'tex', 'svg', 'pickle'), nargs='*',
         default=['tex', 'svg'])
     args = parser.parse_args()
@@ -25,7 +28,10 @@ def main():
                 'Program', 'Program2', 'Threads', 'Dataset', 'Quality', 
                 'DurationSecs', 'CPUPct', 'MemoryMB'),
             dtype={ 'Program' : 'category', 'Dataset' : 'category'})
-
+    
+    if args.threads:
+        table.Threads = args.threads
+    
     # save table (useful if input was stdin)
 
     if 'txt' in args.formats:
