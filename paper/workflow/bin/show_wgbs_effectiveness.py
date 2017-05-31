@@ -69,19 +69,29 @@ def main():
             above_thresholds['Delta'] = np.NaN
             for mapq in mapq_thresholds:
                 for p in set(progs) - set(['untrimmed']):
+                    prog_above_threshold = above_thresholds.loc[
+                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == p),
+                        'AboveThreshold'
+                    ].values
+                    untrimmed_above_threshold = above_thresholds.loc[
+                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == 'untrimmed'),
+                        'AboveThreshold'
+                    ].values
+                    if prog_above_threshold and untrimmed_above_threshold:
+                        diff = prog_above_threshold - untrimmed_above_threshold
+                    elif prog_above_threshold:
+                        diff = prog_above_threshold
+                    elif untrimmed_above_threshold:
+                        diff = -untrimmed_above_threshold
+                    else:
+                        diff = 0
                     above_thresholds.loc[
                         (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == p),
                         'Delta'
-                    ] = above_thresholds.loc[
-                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == p),
-                        'AboveThreshold'
-                    ].values[0] - above_thresholds.loc[
-                        (above_thresholds.MAPQ == mapq) & (above_thresholds.Program == 'untrimmed'),
-                        'AboveThreshold'
-                    ].values[0]
+                    ] = diff
             return above_thresholds
         
-        above_thresholds= pd.concat([table_to_quals(q) for q in (0, 20)])
+        above_thresholds = pd.concat([table_to_quals(q) for q in (0, 20)])
         
         # Replace tool names with display versions
         if args.tool_name_file:
