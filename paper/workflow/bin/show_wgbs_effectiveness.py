@@ -38,7 +38,11 @@ def main():
         
         # Since neither threads nor compression change the outcome of trimming,
         # we don't need to worry about stratifying by those metric.
-        table = table[(table.threads==4) | (table.prog == 'untrimmed')]
+        table = table[
+            (table.prog == 'untrimmed') | (
+                (table.threads==4) & 
+                (table.prog2 != 'atropos (insert + writer)') &
+                (table.prog2 != 'atropos (insert + nowriter)'))]
         table = table.drop(['prog2', 'threads', 'dataset'], 1)
         
         # Extract MAPQ values

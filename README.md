@@ -97,6 +97,7 @@ We welcome any contributions via GitHub issues and pull requests. See the  [docu
 * Accept multiple input files.
 * Support SAM output.
 * Expand the list of contaminants that are detected by default.
+* Direct streaming and trimming of reads from SRA using [srastream](https://github.com/jdidion/srastream).
 * Accessibility:
     * Create recipe for homebrew.
     * Automatically update conda and homebrew recipes for each release.

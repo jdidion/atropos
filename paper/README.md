@@ -43,9 +43,11 @@ On a technical note, we use Phusion (https://hub.docker.com/r/phusion/baseimage/
 
 # 3. Run the workflows
 
-Clone the files in the 'workflow' directory, including the 'bin' subdirectory. In the 'workflow' directory, first edit the nextflow.config file and customize it to your own computing environment. 
+Clone the files in the 'workflow' directory, including the 'bin' subdirectory. In the 'workflow' directory, first edit the nextflow.config file and customize it to your own computing environment.
 
-If you are running on a desktop environment, you'll need to increase the number of CPUs and memory limit to match what you've configured. This can be found in the Docker preferences on the "Advanced" tab.
+On our cluster, we run the scripts from a subdirectory under /scratch. At runtime, /scratch is replaced with /spin1/scratch, hence the beforeScript command to cd back to /scratch to avoid confusing Nextflow.
+
+If you are running Docker, you'll likely need to increase the number of CPUs and memory limit to match what you've configured. This can be found in the Docker preferences on the "Advanced" tab.
 
 Now run:
 
