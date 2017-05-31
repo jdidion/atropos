@@ -85,8 +85,13 @@ def generate_fasta(outfile, summary, union=False, perinput=False):
     fasta_format = FastaFormat()
     if union:
         union_records = []
-    if perinput and outfile.endswith('.fasta'):
-        name_prefix = outfile[:-6]
+    if perinput:
+        if outfile.endswith('.fasta'):
+            name_prefix = outfile[:-6]
+        elif outfile.endswith('.fa'):
+            name_prefix = outfile[:-3]
+        else:
+            name_prefix = outfile
     
     def format_match(idx, match, records):
         name2 = [
@@ -116,7 +121,7 @@ def generate_fasta(outfile, summary, union=False, perinput=False):
                     match['known_seqs'][0]))
         else:
             records.append(fasta_format.format_entry(
-                "{} {}".format(idx, ";".join(name2 + name3)), 
+                "{} {}".format(idx, ";".join(name2)), 
                 match['longest_kmer']))
     
     for i, (name, matches) in enumerate(zip(names, summary['detect']['matches'])):
@@ -126,9 +131,9 @@ def generate_fasta(outfile, summary, union=False, perinput=False):
         if union:
             union_records.extend(records)
         if perinput:
-            with open("{}.{}.fasta".format(name_prefix, i), 'wt') as out:
+            with open_output("{}.{}.fasta".format(name_prefix, i), 'wt') as out:
                 out.write("".join(records))
     
     if union:
-        with open(outfile, 'wt') as union_out:
+        with open_output(outfile, 'wt') as union_out:
             union_out.write("".join(union_records))
