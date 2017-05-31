@@ -8,7 +8,7 @@ jdidion/adapterremoval
 jdidion/hg38_reference
 # Tools with references/indexes
 jdidion/bwameth_hg38index
-#jdidion/star_hg38index
+jdidion/star_hg38index
 # Support
 jdidion/python_bash
 jdidion/atropos_paper_analysis
