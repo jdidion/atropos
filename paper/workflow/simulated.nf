@@ -418,7 +418,7 @@ process SummarizeMachine {
 
   script:
   """
-  parse_machine.py -i $timing -p $name
+  parse_machine.py -i $machine -p $name
   """
 }
 
