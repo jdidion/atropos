@@ -7,8 +7,10 @@ import os
 from pytest import raises
 import sys
 from atropos.commands import execute_cli, get_command
+from unittest import skipIf
 from .utils import (
-    run, files_equal, datapath, cutpath, redirect_stderr, temporary_path)
+    run, files_equal, datapath, cutpath, redirect_stderr, temporary_path,
+    no_internet)
 
 def test_example():
     run('-N -b ADAPTER', 'example.fa', 'example.fa')
@@ -391,3 +393,7 @@ def test_custom_bisulfite_3():
     run('-b TTAGACATATCTCCGTCG -q 0,0 --bisulfite 2,2,1,0', 'small_mincut2.fastq', 'small.fastq')
 def test_custom_bisulfite_4():
     run('-b TTAGACATATCTCCGTCG -q 0,0 --bisulfite 2,2,0,0', 'small_mincut3.fastq', 'small.fastq')
+
+@skipIf(no_internet("https://ncbi.nlm.nih.gov"), "No internet connection")
+def test_sra():
+    pass

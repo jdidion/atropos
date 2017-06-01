@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import os
 import sys
 import traceback
+import urllib.request
 from atropos.commands import get_command
 
 @contextmanager
@@ -83,3 +84,12 @@ def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input
 
 def approx_equal(a, b, tol):
     return abs(a-b) <= tol
+
+def no_internet(url="https://github.com"):
+    """Test whether there's no internet connection available.
+    """
+    try:
+        urllib.request.urlopen(url).info()
+        return False
+    except:
+        return True
