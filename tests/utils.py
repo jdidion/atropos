@@ -1,5 +1,6 @@
 # coding: utf-8
 from contextlib import contextmanager
+from importlib import import_module
 import os
 import sys
 import traceback
@@ -48,11 +49,15 @@ def files_equal(path1, path2):
         return False
 
 
-def run(params, expected, inpath, inpath2=None, qualfile=None, interleaved_input=False, interleaved_output=False):
+def run(
+        params, expected, inpath=None, inpath2=None, qualfile=None, 
+        interleaved_input=False, interleaved_output=False, sra_accn=None):
     if type(params) is str:
         params = params.split()
     with temporary_path(expected) as tmp_fastaq:
-        if interleaved_input:
+        if sra_accn:
+            params += ['-sra', sra_accn]
+        elif interleaved_input:
             params += ['-l', inpath]
         elif inpath2:
             params += ['-pe1', datapath(inpath)]
@@ -91,5 +96,14 @@ def no_internet(url="https://github.com"):
     try:
         urllib.request.urlopen(url).info()
         return False
+    except:
+        return True
+
+def no_import(lib):
+    """Test whether a library is importable.
+    """
+    try:
+        mod = import_module(lib)
+        return mod is None
     except:
         return True

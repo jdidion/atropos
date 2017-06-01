@@ -10,7 +10,7 @@ from atropos.commands import execute_cli, get_command
 from unittest import skipIf
 from .utils import (
     run, files_equal, datapath, cutpath, redirect_stderr, temporary_path,
-    no_internet)
+    no_internet, no_import)
 
 def test_example():
     run('-N -b ADAPTER', 'example.fa', 'example.fa')
@@ -394,6 +394,9 @@ def test_custom_bisulfite_3():
 def test_custom_bisulfite_4():
     run('-b TTAGACATATCTCCGTCG -q 0,0 --bisulfite 2,2,0,0', 'small_mincut3.fastq', 'small.fastq')
 
-@skipIf(no_internet("https://ncbi.nlm.nih.gov"), "No internet connection")
+@skipIf(
+    no_internet("https://ncbi.nlm.nih.gov") or no_import('srastream'), 
+    "No internet connection or srastream not importable")
 def test_sra():
-    pass
+    run('-b CTGGAGTTCAGACGTGTGCTCT --max-reads 100', 
+        'SRR2040662_trimmed.fq', sra_accn='SRR2040662')
