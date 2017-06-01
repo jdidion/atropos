@@ -36,6 +36,15 @@ you don't know what are the adapter sequences.
             type=positive(), default=12,
             help="Size of k-mer used to scan reads for adapter sequences. (12)")
         group.add_argument(
+            "-e",
+            "--past-end-bases", nargs="*", default=('A',),
+            help="On Illumina, long runs of A (and sometimes other bases) "
+                 "can signify that the sequencer has read past the end of a "
+                 "fragment that is shorter than the read length + adapter "
+                 "length. Those bases will be removed from any sequencers "
+                 "before looking for matching contaminants. Can also be a "
+                 "regular expression.")
+        group.add_argument(
             "-i",
             "--include-contaminants",
             choices=('all','known','unknown'), default='all',

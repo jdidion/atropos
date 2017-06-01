@@ -53,16 +53,20 @@ def test_append():
 def test_xopen_text():
     for name in files:
         f = xopen(name, 'rt')
-        lines = list(f)
-        assert len(lines) == 12
-        assert lines[5] == 'AGCCGCTANGACGGGTTGGCCCTTAGACGTATCT\n', name
-        f.close()
+        try:
+            lines = list(f)
+            assert len(lines) == 12
+            assert lines[5] == 'AGCCGCTANGACGGGTTGGCCCTTAGACGTATCT\n', name
+        finally:
+            f.close()
 
 
 def test_xopen_binary():
     for name in files:
         f = xopen(name, 'rb')
-        lines = list(f)
-        assert len(lines) == 12
-        assert lines[5] == b'AGCCGCTANGACGGGTTGGCCCTTAGACGTATCT\n', name
-        f.close()
+        try:
+            lines = list(f)
+            assert len(lines) == 12
+            assert lines[5] == b'AGCCGCTANGACGGGTTGGCCCTTAGACGTATCT\n', name
+        finally:
+            f.close()

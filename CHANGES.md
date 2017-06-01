@@ -3,6 +3,8 @@
 v1.1.7 (dev)
 ------------
 * Direct trimming of reads from an SRA accession (experimental)
+* Add detect option to specify the bases that signify when the sequencer has
+  read past the end of a fragment.
 
 v1.1.6 (2017.05.30)
 -------------------

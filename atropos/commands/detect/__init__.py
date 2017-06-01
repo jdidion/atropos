@@ -63,7 +63,8 @@ class CommandRunner(BaseCommandRunner):
         
         summary_args = dict(
             kmer_size=kmer_size, n_reads=n_reads, 
-            overrep_cutoff=overrep_cutoff, include=include)
+            overrep_cutoff=overrep_cutoff, include=include,
+            past_end_bases=self.past_end_bases)
         detector_args = dict(
             known_contaminants=known_contaminants, **summary_args)
         
@@ -268,8 +269,6 @@ def create_contaminant_matchers(contaminants, kmer_size):
         for seq, names in contaminants.iter_sequences()
     ]
 
-POLY_A = re.compile('A{8,}.*|A{2,}$')
-
 class Detector(SingleEndPipelineMixin, Pipeline):
     """Base class for contaminant detectors.
     
@@ -279,10 +278,15 @@ class Detector(SingleEndPipelineMixin, Pipeline):
         overrep_cutoff: Degree of overrepresentation required for a kmer to be
             considered as a contaminant.
         known_contaminant: :class:`ContaminantMatcher`s to match against.
+        past_end_bases: On Illumina, long runs of A (and sometimes other bases)
+            can signify that the sequencer has read past the end of a fragment
+            that is shorter than the read length + adapter length. Those
+            bases will be removed from any sequencers before looking for 
+            matching contaminants.
     """
     def __init__(
             self, kmer_size=12, n_reads=10000, overrep_cutoff=100,
-            include='all', known_contaminants=None):
+            include='all', known_contaminants=None, past_end_bases=('A',)):
         super().__init__()
         self.kmer_size = kmer_size
         self.n_reads = n_reads
@@ -292,6 +296,14 @@ class Detector(SingleEndPipelineMixin, Pipeline):
         self._read_length = None
         self._read_sequences = set()
         self._matches = None
+        self._past_end_regexp = None
+        if past_end_bases:
+            if len(past_end_bases[0]) > 1:
+                self._past_end_regexp = re.compile(past_end_bases[0])
+            else:
+                self._past_end_regexp = re.compile('|'.join(
+                    base + '{8,}.*|' + base + '{2,}$' 
+                    for base in past_end_bases))
     
     @property
     def min_report_freq(self):
@@ -319,9 +331,10 @@ class Detector(SingleEndPipelineMixin, Pipeline):
     def _filter_seq(self, seq):
         if sequence_complexity(seq) <= 1.0:
             return None
-        match = POLY_A.search(seq)
-        if match:
-            seq = seq[:match.start()]
+        if self._past_end_regexp:
+            match = self._past_end_regexp.search(seq)
+            if match:
+                seq = seq[:match.start()]
         if len(seq) < self.kmer_size:
             return None
         return seq
