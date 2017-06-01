@@ -263,7 +263,8 @@ def print_summary_report(summary, outfile):
     _print("Input format: {}".format(summary['derived']['input_format']))
     _print("Input files:")
     for infile in summary['input']['input_names']:
-        _print(infile, indent=INDENT)
+        if infile is not None:
+            _print(infile, indent=INDENT)
     _print()
     
     timing = summary['timing']

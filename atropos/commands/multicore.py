@@ -287,7 +287,7 @@ class ParallelPipelineRunner(object):
         self.worker_processes = launch_workers(self.threads - 1, worker_args)
         
         self.num_batches = enqueue_all(
-            self.command_runner, self.input_queue, self.timeout,
+            self.command_runner.iterator(), self.input_queue, self.timeout,
             self.ensure_alive)
         
         logging.getLogger().debug(
