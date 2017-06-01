@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.7 (dev)
+------------
+* Direct trimming of reads from an SRA accession (experimental)
+
 v1.1.6 (2017.05.30)
 -------------------
 * Add FASTA output for detect command, and enable json, yaml, and pickle output for all commands.

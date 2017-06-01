@@ -138,7 +138,8 @@ setup(
         'tqdm' : ['tqdm'],
         'khmer' : ['khmer'],
         'pysam' : ['pysam'],
-        'jinja' : ['jinja2']
+        'jinja' : ['jinja2'],
+        'sra' : ['srastream']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

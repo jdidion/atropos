@@ -16,7 +16,8 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 8. The ability to merge overlapping reads (this is experimental and the functionality is limited).
 9. The ability to write the summary report and log messages to separate files.
 10. The ability to read SAM/BAM files and read/write interleaved FASTQ files.
-11. A progress bar, and other minor usability enhancements.
+11. Direct trimming of reads from an SRA accession.
+12. A progress bar, and other minor usability enhancements.
 
 ## Manual installation
 
@@ -33,6 +34,7 @@ First install dependencies:
     * pysam (SAM/BAM input)
     * khmer 2.0+ (`pip install khmer`) (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
+    * [ngs](https://github.com/ncbi/ngs) (for SRA streaming)
 
 Then run:
 

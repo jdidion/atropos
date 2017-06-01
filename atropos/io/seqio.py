@@ -744,8 +744,9 @@ def paired_to_read2(reader):
         yield read2
 
 def open_reader(
-        file1, file2=None, qualfile=None, quality_base=None, colorspace=False,
-        file_format=None, interleaved=False, input_read=None):
+        file1=None, file2=None, qualfile=None, quality_base=None, 
+        colorspace=False, file_format=None, interleaved=False, 
+        input_read=None):
     """Open sequence files in FASTA or FASTQ format for reading. This is
     a factory that returns an instance of one of the ...Reader
     classes also defined in this module.

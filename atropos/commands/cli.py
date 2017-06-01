@@ -101,7 +101,8 @@ class BaseCommandParser(object):
             report_file=None,
             report_formats=None,
             batch_size=1000,
-            counter_magnitude="M")
+            counter_magnitude="M",
+            sra_reader=None)
         self.parser.add_argument(
             "--debug",
             action='store_true', default=False,
@@ -156,6 +157,12 @@ class BaseCommandParser(object):
             "--single-quals",
             type=readable_file, default=None, metavar="FILE",
             help="A single-end qual file.")
+        group.add_argument(
+            "-sra",
+            "--sra-accession",
+            default=None, metavar="ACCN",
+            help="Accesstion to stream from SRA (requires optional NGS "
+                 "dependency to be installed).")
         group.add_argument(
             "-f",
             "--format",
@@ -241,7 +248,20 @@ class BaseCommandParser(object):
         parser = self.parser
         
         # Find out which 'mode' we need to use.
-        if options.single_input:
+        if options.sra_accession:
+            try:
+                from srastream import SraReader
+                options.sra_reader = SraReader(
+                    options.sra_accession, batch_size=options.batch_size)
+                options.sra_reader.start()
+                options.paired = (sra_reader.frag_count == 2)
+            except Exception as err:
+                logger.getLogger().error(
+                    "Error while fetching accession {} from SRA".format(
+                        options.sra_accession, exc_info=err))
+                parser.error("Unable to read from accession {}".format(
+                    options.sra_accession))
+        elif options.single_input:
             if options.input1 or options.input2 or options.interleaved_input:
                 parser.error("Cannot use -se together with -pe1, -pe2, or -l")
             options.paired = False

@@ -176,20 +176,22 @@ class BaseCommandRunner(object):
         self.done = False
         self._empty_batch = [None] * self.size
         self._progress_options = None
-
+        
+        input1 = input2 = qualfile = None
+        interleaved = False
+        
         interleaved = bool(options.interleaved_input)
         input1 = options.interleaved_input if interleaved else options.input1
-        input2 = None
-        qualfile = None
         if options.paired and not interleaved:
             input2 = options.input2
         else:
             qualfile = options.input2
         
         self.reader = reader = open_reader(
-            input1, file2=input2, file_format=options.format, qualfile=qualfile,
-            quality_base=options.quality_base, colorspace=options.colorspace,
-            interleaved=interleaved, input_read=options.input_read)
+            file1=input1, file2=input2, file_format=options.format, 
+            qualfile=qualfile, quality_base=options.quality_base, 
+            colorspace=options.colorspace, interleaved=interleaved, 
+            input_read=options.input_read)
         
         # Wrap reader in subsampler
         if options.subsample:
