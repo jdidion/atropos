@@ -248,17 +248,24 @@ class BaseCommandParser(object):
         parser = self.parser
         
         # Find out which 'mode' we need to use.
+        # TODO: unit tests for SRA streaming
+        # TODO: add srastream to pypi
         if options.sra_accession:
+            if options.format not in ('fastq', 'sam', 'bam', None):
+                raise ValueError(
+                    "Invalid file format for SRA accession: {}".format(
+                        options.format))
+            options.format = 'fastq'
             try:
                 from srastream import SraReader
                 options.sra_reader = SraReader(
                     options.sra_accession, batch_size=options.batch_size)
                 options.sra_reader.start()
-                options.paired = (sra_reader.frag_count == 2)
-            except Exception as err:
-                logger.getLogger().error(
+                options.paired = options.sra_reader.paired
+            except Exception:
+                logging.getLogger().exception(
                     "Error while fetching accession {} from SRA".format(
-                        options.sra_accession, exc_info=err))
+                        options.sra_accession))
                 parser.error("Unable to read from accession {}".format(
                     options.sra_accession))
         elif options.single_input:
@@ -284,19 +291,22 @@ class BaseCommandParser(object):
         
         # Set sample ID from the input file name(s)
         if options.sample_id is None:
-            fname = os.path.basename(
-                options.input1 or options.interleaved_input)
-            name = splitext_compressed(fname)[0]
-            if options.input2:
-                name2 = splitext_compressed(os.path.basename(options.input2))[0]
-                if name != name2:
-                    for i in range(min(len(name), len(name2))):
-                        if name[i] != name2[i]:
-                            name = name[:i]
-                            break
-            if name.endswith('.'):
-                name = name[:-1]
-            options.sample_id = name
+            if options.sra_reader:
+                options.sample_id = options.sra_reader.name
+            else:
+                fname = os.path.basename(
+                    options.input1 or options.interleaved_input)
+                name = splitext_compressed(fname)[0]
+                if options.input2:
+                    name2 = splitext_compressed(os.path.basename(options.input2))[0]
+                    if name != name2:
+                        for i in range(min(len(name), len(name2))):
+                            if name[i] != name2[i]:
+                                name = name[:i]
+                                break
+                if name.endswith('.'):
+                    name = name[:-1]
+                options.sample_id = name
         
         if options.quiet:
             options.progress = None

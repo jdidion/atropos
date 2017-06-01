@@ -6,7 +6,7 @@ import platform
 import sys
 from atropos import __version__
 from atropos.adapters import AdapterCache
-from atropos.io.seqio import open_reader
+from atropos.io.seqio import open_reader, sra_reader
 from atropos.util import MergingDict, Const, Summarizable, Timing
 
 class Pipeline(object):
@@ -177,23 +177,23 @@ class BaseCommandRunner(object):
         self._empty_batch = [None] * self.size
         self._progress_options = None
         
-        input1 = input2 = qualfile = None
         if options.sra_reader:
-            interleaved = True
-            input1 = options.sra_reader
+            self.reader = reader = sra_reader(
+                reader=options.sra_reader, quality_base=options.quality_base, 
+                colorspace=options.colorspace, input_read=options.input_read)
         else:
             interleaved = bool(options.interleaved_input)
             input1 = options.interleaved_input if interleaved else options.input1
+            input2 = qualfile = None
             if options.paired and not interleaved:
                 input2 = options.input2
             else:
                 qualfile = options.input2
-        
-        self.reader = reader = open_reader(
-            file1=input1, file2=input2, file_format=options.format, 
-            qualfile=qualfile, quality_base=options.quality_base, 
-            colorspace=options.colorspace, interleaved=interleaved, 
-            input_read=options.input_read)
+            self.reader = reader = open_reader(
+                file1=input1, file2=input2, file_format=options.format, 
+                qualfile=qualfile, quality_base=options.quality_base, 
+                colorspace=options.colorspace, interleaved=interleaved, 
+                input_read=options.input_read)
         
         # Wrap reader in subsampler
         if options.subsample:

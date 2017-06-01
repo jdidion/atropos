@@ -64,9 +64,9 @@ class SequenceReader(SequenceReaderBase):
     _close_on_exit = False
     
     def __init__(self, path, mode='r', quality_base=None):
+        self.quality_base = quality_base
         if isinstance(path, str):
             self.name = path
-            self.quality_base = quality_base
             self._file = xopen(path, mode)
             self._close_on_exit = True
         else:
@@ -155,6 +155,39 @@ class ColorspaceSequence(Sequence):
             self.insert_overlap,
             self.merged,
             self.corrected)
+
+class SraSequenceReader(SequenceReader):
+    delivers_qualities = True
+    file_format = "fastq"
+    
+    def __init__(self, reader, quality_base=None, sequence_class=Sequence):
+        super().__init__(reader, quality_base=quality_base)
+        self.input_read = PAIRED if reader.paired else SINGLE
+        self.sequence_class = sequence_class
+    
+    def __iter__(self):
+        if self.input_read == PAIRED:
+            for read in self._file:
+                yield tuple(self._as_sequence(frag) for frag in read[:2])
+        else:
+            for read in self._file:
+                yield self._as_sequence(read[0])
+    
+    def _as_sequence(self, frag):
+        return self.sequence_class(*frag)
+    
+    def close(self):
+        self._file.finish()
+
+class SraColorspaceSequenceReader(SraSequenceReader):
+    """Reads colorspace sequences from an SRA accession.
+    """
+    colorspace = True
+    
+    def __init__(self, reader, quality_base=33):
+        super().__init__(
+            reader, quality_base=quality_base, 
+            sequence_class=ColorspaceSequence)
 
 class FileWithPrependedLine(object):
     """A file-like object that allows to "prepend" a single line to an already
@@ -846,6 +879,34 @@ def open_reader(
     raise UnknownFileType(
         "File format {0!r} is unknown (expected 'sra-fastq' (only for "
         "colorspace), 'fasta', 'fastq', 'sam', or 'bam').".format(file_format))
+
+def sra_reader(reader, quality_base=None, colorspace=False, input_read=None):
+    """Wrap an existing SraReader. The reader must 1) have a 'paired' property,
+    and 2) be iterable. Furthermore, each value yielded by the iterator must
+    be a list of N tuples, where N = 2 if paired else 1, and where each tuple
+    is (name, sequence, qualities).
+    
+    Args:
+        reader: An existing reader.
+        quality_base: Base for quality values.
+        colorspace: If True, instances of the Colorspace... classes
+            are returned.
+        input_read: When file1 is a paired-end interleaved or SAM/BAM
+            file, this specifies whether to only use the first or second read
+            (1 or 2) or to use both reads (None).
+    """
+    if colorspace:
+        wrapped = SraColorspaceSequenceReader(reader, quality_base)
+    else:
+        wrapped = SraSequenceReader(reader, quality_base)
+    
+    if not reader.paired or input_read == PAIRED:
+        return wrapped
+    
+    if input_read == READ1:
+        return paired_to_read1(wrapped)
+    else:
+        return paired_to_read2(wrapped)
 
 def guess_format_from_name(path, raise_on_failure=False):
     """Detect file format based on the file name.

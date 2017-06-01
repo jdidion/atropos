@@ -139,7 +139,7 @@ setup(
         'khmer' : ['khmer'],
         'pysam' : ['pysam'],
         'jinja' : ['jinja2'],
-        'sra' : ['srastream']
+        'sra' : ['srastream>=0.1.3']
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",
