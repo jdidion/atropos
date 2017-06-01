@@ -178,14 +178,16 @@ class BaseCommandRunner(object):
         self._progress_options = None
         
         input1 = input2 = qualfile = None
-        interleaved = False
-        
-        interleaved = bool(options.interleaved_input)
-        input1 = options.interleaved_input if interleaved else options.input1
-        if options.paired and not interleaved:
-            input2 = options.input2
+        if options.sra_reader:
+            interleaved = True
+            input1 = options.sra_reader
         else:
-            qualfile = options.input2
+            interleaved = bool(options.interleaved_input)
+            input1 = options.interleaved_input if interleaved else options.input1
+            if options.paired and not interleaved:
+                input2 = options.input2
+            else:
+                qualfile = options.input2
         
         self.reader = reader = open_reader(
             file1=input1, file2=input2, file_format=options.format, 
