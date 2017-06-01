@@ -259,7 +259,8 @@ class BaseCommandParser(object):
             try:
                 from srastream import SraReader
                 options.sra_reader = SraReader(
-                    options.sra_accession, batch_size=options.batch_size)
+                    options.sra_accession, 
+                    batch_size=options.batch_size or 1000)
                 options.sra_reader.start()
                 options.paired = options.sra_reader.paired
             except Exception:
