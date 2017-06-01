@@ -71,10 +71,12 @@ release:
 # build a package with the files needed to run the workflows
 workflow:
 	mkdir -p dist
-	tar -C paper/workflow -czf dist/atropos-paper-workflow.tgz \
-		simulated.nf \
-		rnaseq.nf \
-		wgbs.nf \
-		nextflow.config \
-		run-workflows.sh \
-		bin
+	tar -C paper -czf dist/atropos-paper-workflow.tgz \
+		workflow/simulated.nf \
+		workflow/rnaseq.nf \
+		workflow/wgbs.nf \
+		workflow/nextflow.config \
+		workflow/run-workflows.sh \
+		workflow/bin \
+		containers/data/simulated/art_profiles.txt \
+		containers/tools/tool-names.txt

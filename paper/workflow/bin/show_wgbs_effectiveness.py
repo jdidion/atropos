@@ -47,9 +47,9 @@ def main():
         
         # Extract MAPQ values
         def table_to_quals(q):
-            quals = table[table.qcut.isin([None, q])].pivot(
+            quals = table[table.qcut.isin([None, q]) | (table.prog == 'untrimmed')].pivot(
                 index='read_idx', columns='prog', values='read1_quality'
-            ).append(table[table.qcut.isin([None, q])].pivot(
+            ).append(table[table.qcut.isin([None, q]) | (table.prog == 'untrimmed')].pivot(
                 index='read_idx', columns='prog', values='read2_quality'))
 
             # Optionally remove rows where the read was discarded by any program
