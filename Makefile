@@ -61,12 +61,15 @@ release:
 	twine register dist/$(module)-$(version).tar.gz
 	twine upload dist/$(module)-$(version).tar.gz
 	git push origin --tags
+	$(github_release)
+	$(docker)
+
+github_release:
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \
 		-H "Authorization: token $(token)" \
 		https://api.github.com/repos/$(repo)/releases \
 		-d '{"tag_name":"$(version)","target_commitish": "master","name": "$(version)","body": "$(desc)","draft": false,"prerelease": false}'
-	$(docker)
 
 # build a package with the files needed to run the workflows
 workflow:
