@@ -4,7 +4,8 @@ progs = table.index.levels[1]
 minvals = {}
 for t in threads:
     for var in ('DurationSecs', 'MemoryMB', 'CPUPct'):
-        minvals[(t,var)] = table.loc[t, :, var].sort_index(level=['value', 'min'])['value', 'min'][0]
+        vals = sorted(table.loc[4, :, 'DurationSecs'].reset_index()['min'].tolist())
+        minvals[(t,var)] = vals[0]
 %>
 \begin{table}[ht]
 \centering
@@ -20,13 +21,13 @@ for t in threads:
     % for p in progs:
         ${p}
         % for t in threads:
-        <% minval = table.loc[t, p, 'DurationSecs']['value', 'min'] %>
+        <% minval = table.loc[t, p, 'DurationSecs']['min'] %>
         % if minval == minvals[(t, 'DurationSecs')]:
         \hlcell{${minval}}
         % else:
         ${minval}
         % endif
-        & ${table.loc[t, p, 'DurationSecs']['value', 'max']}
+        & ${table.loc[t, p, 'DurationSecs']['max']}
         
         % endfor 
         \\\\
@@ -41,13 +42,13 @@ for t in threads:
     % for p in progs:
         ${p}
         % for t in threads:
-        <% minval = table.loc[t, p, 'MemoryMB']['value', 'min'] %>
+        <% minval = table.loc[t, p, 'MemoryMB']['min'] %>
         % if minval == minvals[(t, 'MemoryMB')]:
         \hlcell{${minval}}
         % else:
         ${minval}
         % endif
-        & ${table.loc[t, p, 'MemoryMB']['value', 'max']}
+        & ${table.loc[t, p, 'MemoryMB']['max']}
         
         % endfor
         \\\\
@@ -63,13 +64,13 @@ for t in threads:
     
         ${p}
         % for t in threads:
-        <% minval = table.loc[t, p, 'CPUPct']['value', 'min'] %>
+        <% minval = table.loc[t, p, 'CPUPct']['min'] %>
         % if minval == minvals[(t, 'CPUPct')]:
         \hlcell{${minval}}
         % else:
         ${minval}
         % endif
-        & ${table.loc[t, p, 'CPUPct']['value', 'max']}
+        & ${table.loc[t, p, 'CPUPct']['max']}
         
         % endfor
         \\\\

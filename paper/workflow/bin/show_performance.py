@@ -48,17 +48,18 @@ def main():
         texdat = table.melt(
             id_vars=['Program2', 'Threads', 'Dataset', 'Quality'], 
             value_vars=['DurationSecs','CPUPct','MemoryMB'])
+        texdat = (texdat.
+            groupby(['Threads', 'Program2', 'variable']).
+            agg({ 'value' : [min, max] }).
+            sort_index())
+        texdat.columns = texdat.columns.droplevel()
         from mako.template import Template
         table_template = Template(filename=os.path.join(
             os.path.dirname(__file__), "performance_table.tex"))
         tex_file = args.output + ".tex"
         with fileopen(tex_file, "wt") as o:
             o.write(table_template.render(
-                name=args.name, caption=args.caption,
-                table=texdat.
-                    groupby(['Threads', 'Program2', 'variable']).
-                    agg({ 'value' : [min, max] }).
-                    sort_index()))
+                name=args.name, caption=args.caption, table=texdat))
 
     # generate figure
     if 'svg' in args.formats:
