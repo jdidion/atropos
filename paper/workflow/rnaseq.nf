@@ -101,7 +101,7 @@ process ExtractAnnotations {
  * do not have such an option.
  */
 process Atropos {
-  tag { "atropos_${task.cpus}_rnaseq_q${qcut}_${aligner}_${compression}" }
+  tag { taskId }
   cpus { threads }
   container {
     "${params.containerPrefix}jdidion/atropos_paper${params.containerSuffix}"
@@ -115,17 +115,19 @@ process Atropos {
   each compression from params.compressionSchemes
   
   output:
-  set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAtropos
-  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAtropos
-  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineAtropos
-  file "${task.tag}.report.txt"
+  val(taskId) as atroposTaskId
+  set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedAtropos
+  set val("${taskId}"), file("${taskId}.timing.txt") into timingAtropos
+  set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineAtropos
+  file "${taskId}.report.txt"
   
   script:
+  taskId = "atropos_${task.cpus}_rnaseq_q${qcut}_${aligner}_${compression}"
   mergeCmd = ''
   if (compression == 'nowriter') {
     mergeCmd = """
-    zcat ${task.tag}.1.*.fq.gz | gzip > ${task.tag}.1.fq.gz
-    zcat ${task.tag}.2.*.fq.gz | gzip > ${task.tag}.2.fq.gz
+    zcat ${taskId}.1.*.fq.gz | gzip > ${taskId}.1.fq.gz
+    zcat ${taskId}.2.*.fq.gz | gzip > ${taskId}.2.fq.gz
     """
   }
   // Tune different parameters based on aligner. For adapter-match, minimum
@@ -139,15 +141,15 @@ process Atropos {
     alignerArgs = "-O 7"
   }
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
-  /usr/bin/time -v -o ${task.tag}.timing.txt atropos \
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
+  /usr/bin/time -v -o ${taskId}.timing.txt atropos \
     --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
     -e 0.20 --aligner $aligner $alignerArgs -q $qcut --trim-n \
     -a $params.adapter1 -A $params.adapter2 -m $params.minLength \
     --no-default-adapters --no-cache-adapters --log-level ERROR \
     --correct-mismatches liberal -w 15,30,25 \
-    -o ${task.tag}.1.fq.gz -p ${task.tag}.2.fq.gz  \
-    --report-file ${task.tag}.report.txt --quiet \
+    -o ${taskId}.1.fq.gz -p ${taskId}.2.fq.gz  \
+    --report-file ${taskId}.report.txt --quiet \
     $task.ext.compressionArg -pe1 ${reads[0]} -pe2 ${reads[1]}
   $mergeCmd
   """
@@ -159,7 +161,7 @@ process Atropos {
  * consistent with the other tools.
  */
 process Skewer {
-  tag { "skewer_${task.cpus}_rnaseq_q${qcut}" }
+  tag { taskId }
   cpus { threads }
   container {
     "${params.containerPrefix}jdidion/skewer${params.containerSuffix}"
@@ -171,22 +173,24 @@ process Skewer {
   each qcut from params.quals
 
   output:
-  set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedSkewer
-  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSkewer
-  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineSkewer
-  file "${task.tag}.report.txt"
+  val(taskId) as skewerTaskId
+  set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedSkewer
+  set val("${taskId}"), file("${taskId}.timing.txt") into timingSkewer
+  set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineSkewer
+  file "${taskId}.report.txt"
   
   script:
+  taskId = "skewer_${task.cpus}_rnaseq_q${qcut}"
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
-  /usr/bin/time -v -o ${task.tag}.timing.txt skewer \
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
+  /usr/bin/time -v -o ${taskId}.timing.txt skewer \
     -m pe -l $params.minLength -r 0.3 \
     -o $task.tag -z --quiet \
     -x $params.adapter1 -y $params.adapter2 -t $task.cpus \
     -q $qcut -n ${reads[0]} ${reads[1]} \
-    > ${task.tag}.report.txt && \
-  mv ${task.tag}-trimmed-pair1.fastq.gz ${task.tag}.1.fq.gz && \
-  mv ${task.tag}-trimmed-pair2.fastq.gz ${task.tag}.2.fq.gz
+    > ${taskId}.report.txt && \
+  mv ${taskId}-trimmed-pair1.fastq.gz ${taskId}.1.fq.gz && \
+  mv ${taskId}-trimmed-pair2.fastq.gz ${taskId}.2.fq.gz
   """
 }
 
@@ -194,7 +198,7 @@ process Skewer {
  * ----------------------------------
  */
 process SeqPurge {
-  tag { "seqpurge_${task.cpus}_rnaseq_q${qcut}" }
+  tag { taskId }
   cpus { threads }
   container {
     "${params.containerPrefix}jdidion/seqpurge${params.containerSuffix}"
@@ -206,21 +210,23 @@ process SeqPurge {
   each qcut from params.quals
 
   output:
-  set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedSeqPurge
-  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingSeqPurge
-  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineSeqPurge
-  file "${task.tag}.report.txt"
+  val(taskId) as seqPurgeTaskId
+  set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedSeqPurge
+  set val("${taskId}"), file("${taskId}.timing.txt") into timingSeqPurge
+  set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineSeqPurge
+  file "${taskId}.report.txt"
   
   script:
+  taskId = "seqpurge_${task.cpus}_rnaseq_q${qcut}"
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
-  /usr/bin/time -v -o ${task.tag}.timing.txt SeqPurge \
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
+  /usr/bin/time -v -o ${taskId}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
-    -out1 ${task.tag}.1.fq.gz -out2 ${task.tag}.2.fq.gz \
+    -out1 ${taskId}.1.fq.gz -out2 ${taskId}.2.fq.gz \
     -a1 $params.adapter1 -a2 $params.adapter2 \
     -qcut $qcut -min_len $params.minLength \
     -threads $task.cpus -prefetch $params.batchSize \
-    -ec -match_perc 70 -summary ${task.tag}.report.txt
+    -ec -match_perc 70 -summary ${taskId}.report.txt
   """
 }
 
@@ -228,7 +234,7 @@ process SeqPurge {
  * -----------------------------------------
  */
 process AdapterRemoval {
-  tag { "adapterremoval_${task.cpus}_rnaseq_q${qcut}" }
+  tag { taskId }
   cpus { threads }
   container {
     "${params.containerPrefix}jdidion/adapterremoval${params.containerSuffix}"
@@ -240,17 +246,19 @@ process AdapterRemoval {
   each qcut from params.quals
 
   output:
-  set val("${task.tag}"), file("${task.tag}.{1,2}.fq.gz") into trimmedAdapterRemoval
-  set val("${task.tag}"), file("${task.tag}.timing.txt") into timingAdapterRemoval
-  set val("${task.tag}"), val("trim"), file("${task.tag}.machine_info.txt") into machineAdapterRemoval
-  file "${task.tag}.report.txt"
+  val(taskId) as adapterRemovalTaskId
+  set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedAdapterRemoval
+  set val("${taskId}"), file("${taskId}.timing.txt") into timingAdapterRemoval
+  set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineAdapterRemoval
+  file "${taskId}.report.txt"
   
   script:
+  taskId = "adapterremoval_${task.cpus}_rnaseq_q${qcut}"
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
-  /usr/bin/time -v -o ${task.tag}.timing.txt AdapterRemoval \
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
+  /usr/bin/time -v -o ${taskId}.timing.txt AdapterRemoval \
     --file1 ${reads[0]} --file2 ${reads[1]} \
-    --output1 ${task.tag}.1.fq.gz --output2 ${task.tag}.2.fq.gz --gzip \
+    --output1 ${taskId}.1.fq.gz --output2 ${taskId}.2.fq.gz --gzip \
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut --mm 0.3 \
     --minlength $params.minLength --threads $task.cpus
@@ -280,7 +288,7 @@ Channel
  * samtools.
  */
 process StarAlign {
-  tag { "${name}.star" }
+  tag { taskId }
   cpus { params.alignThreads }
   container {
     "${params.containerPrefix}jdidion/star_hg38index${params.containerSuffix}"
@@ -290,14 +298,16 @@ process StarAlign {
   set val(name), file(fastq) from trimmedMerged
   
   output:
+  val(taskId) as starTaskId
   file("${name}_rnaseq_Aligned.{bam,bam.bai}")
   set val(name), file("${name}.name_sorted.bam") into sorted
   set val(name), file("${name}.star.timing.txt") into timingStar
-  set val("${name}"), val("star"), file("${task.tag}.machine_info.txt") into machineBwameth
+  set val("${name}"), val("star"), file("${taskId}.machine_info.txt") into machineBwameth
   
   script:
+  taskId = "${name}.star"
   """
-  cat /proc/cpuinfo /proc/meminfo > ${task.tag}.machine_info.txt
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${name}.star.timing.txt STAR \
     --runThreadN $params.alignThreads --genomeDir /data/index/star/hg38 \
     --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
