@@ -2,10 +2,12 @@
 
 v1.1.8 (dev)
 ------------
+* Add --config option for specifying options in a config file.
 
 v1.1.7 (2017.06.01)
 -------------------
-* Stream reads directly from an SRA accession for any atropos command.
+* Stream reads directly from an SRA accession for any atropos command using the
+  -sra option.
 * Add detect option to specify the bases that signify when the sequencer has
   read past the end of a fragment.
 

@@ -1,14 +1,15 @@
 """
 Atropos version {}
 
-usage: atropos <command> [options]
+usage: atropos [--config <config file>] <command> [options]
 
 commands
 --------
 {}
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help                show this help message and exit
+  --config <config file>    provide options in a config file
 
 Use "atropos <command> --help" to see all options for a specific command.
 See http://atropos.readthedocs.org/ for full documentation.
@@ -188,11 +189,28 @@ def execute_cli(args=()):
         print_subcommands()
         return 2
     
-    if args[0][0] == '-':
-        command_name = "trim"
+    config_args = None
+    
+    if args[0] == '--config':
+        with open(args[1], 'rt') as config_file:
+            config_args = list(
+                token
+                for line in config_file
+                for token in line.rstrip().split())
+        args = args[2:]
+    
+    def parse_command(args):
+        if not args or args[0][0] == '-':
+            return ('trim', args)
+        else:
+            return (args[0], args[1:])
+    
+    if len(args) == 0:
+        command_name, args = parse_command(config_args)
     else:
-        command_name = args[0]
-        del args[0]
+        command_name, args = parse_command(args)
+        if config_args:
+            args = config_args + args
     
     try:
         command = get_command(command_name)

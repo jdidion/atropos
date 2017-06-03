@@ -70,7 +70,7 @@ def run(
             params += ['-L', tmp_fastaq]
         else:
             params += ['-o', tmp_fastaq] # TODO not parallelizable
-        print(params)
+        #print(params)
         command = get_command('trim')
         retcode, summary = command.execute(params)
         assert summary is not None
