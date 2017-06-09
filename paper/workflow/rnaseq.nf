@@ -115,7 +115,7 @@ process Atropos {
   each compression from params.compressionSchemes
   
   output:
-  val(taskId) as atroposTaskId
+  val(taskId) into atroposTaskId
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedAtropos
   set val("${taskId}"), file("${taskId}.timing.txt") into timingAtropos
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineAtropos
@@ -173,7 +173,7 @@ process Skewer {
   each qcut from params.quals
 
   output:
-  val(taskId) as skewerTaskId
+  val(taskId) into skewerTaskId
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedSkewer
   set val("${taskId}"), file("${taskId}.timing.txt") into timingSkewer
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineSkewer
@@ -210,7 +210,7 @@ process SeqPurge {
   each qcut from params.quals
 
   output:
-  val(taskId) as seqPurgeTaskId
+  val(taskId) into seqPurgeTaskId
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedSeqPurge
   set val("${taskId}"), file("${taskId}.timing.txt") into timingSeqPurge
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineSeqPurge
@@ -246,7 +246,7 @@ process AdapterRemoval {
   each qcut from params.quals
 
   output:
-  val(taskId) as adapterRemovalTaskId
+  val(taskId) into adapterRemovalTaskId
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedAdapterRemoval
   set val("${taskId}"), file("${taskId}.timing.txt") into timingAdapterRemoval
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineAdapterRemoval
@@ -298,7 +298,7 @@ process StarAlign {
   set val(name), file(fastq) from trimmedMerged
   
   output:
-  val(taskId) as starTaskId
+  val(taskId) into starTaskId
   file("${name}_rnaseq_Aligned.{bam,bam.bai}")
   set val(name), file("${name}.name_sorted.bam") into sorted
   set val(name), file("${name}.star.timing.txt") into timingStar
