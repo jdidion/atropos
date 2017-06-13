@@ -293,6 +293,7 @@ process StarAlign {
   container {
     "${params.containerPrefix}jdidion/star_hg38index${params.containerSuffix}"
   }
+  memory "64 GB"
   
   input:
   set val(name), file(fastq) from trimmedMerged
@@ -391,6 +392,7 @@ process ShowEffectiveness {
     "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
   }
   publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  memory "32 GB"
   
   input:
   file effData from effectiveness

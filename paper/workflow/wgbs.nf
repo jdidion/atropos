@@ -338,6 +338,7 @@ process ShowEffectiveness {
     "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
   }
   publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  memory "32 GB"
   
   input:
   file effData from effectiveness

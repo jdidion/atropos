@@ -4,7 +4,7 @@ progs = table.index.levels[1]
 minvals = {}
 for t in threads:
     for var in ('DurationSecs', 'MemoryMB', 'CPUPct'):
-        vals = sorted(table.loc[4, :, 'DurationSecs'].reset_index()['min'].tolist())
+        vals = sorted(table.loc[t, :, 'DurationSecs'].reset_index()['min'].tolist())
         minvals[(t,var)] = vals[0]
 %>
 \begin{table}[ht]

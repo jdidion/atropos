@@ -33,7 +33,7 @@ def main():
     if 'pickle' in args.formats:
         import pickle
         with fileopen(args.output + '.pickle', 'wb') as out:
-            pickle.dump(table, out)
+            pickle.dump(table, out, protocol=pickle.HIGHEST_PROTOCOL)
     
     if 'tex' in args.formats:
         import numpy as np
