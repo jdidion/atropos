@@ -513,7 +513,8 @@ process ShowStarPerformance {
     script:
     data = parsedRows.join("")
     """
-    echo '$data' | show_performance.py -o star_performance -f tex svg pickle
+    echo '$data' | show_performance.py -t $params.alignThreads \
+      -o star_performance -f tex svg pickle
     """
 }
 

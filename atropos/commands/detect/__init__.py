@@ -16,7 +16,20 @@ from atropos.util import (
 # Also, offer an option of whether to test the reverse complement, with
 # the default being false.
 
-# TODO: Look at CountTable in khmer 2.1. Otherwise move to pymer.
+# TODO: I'm not sure that the use of tags in the KhmerDetector is the correct
+# strategy, mostly because I don't fully understand what tags are (they are not
+# documented and only mentioned briefly in the PNAS paper). An alternate
+# strategy is to use CountTable and, upon each kmer addition, test whether its
+# count exceeds some threshold (perhaps by maintaining a running distribution of
+# all kmer counts). These high-abundance kmers could then be profiled using a
+# second pass. Another strategy is to compute summary metrics for reads based on 
+# kmer abundance, as per 
+# http://khmer-recipes.readthedocs.io/en/latest/001-extract-reads-by-coverage/index.html
+# Then take reads in the furthest-right peak and extract common sequences from
+# those.
+
+# TODO: Check out AdapterRemoval2's detection strategy.
+
 # pymer https://github.com/kdmurray91/pymer/tree/master/pymer
 
 # TODO: In KnownContaminantDetector, accept template sequences with wildcards
