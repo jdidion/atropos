@@ -303,7 +303,7 @@ process StarAlign {
   file("${name}_rnaseq_Aligned.out.bam")
   set val(name), file("${name}.name_sorted.bam") into sorted
   set val(name), file("${name}.star.timing.txt") into timingStar
-  set val("${name}"), val("star"), file("${taskId}.machine_info.txt") into machineBwameth
+  set val("${name}"), val("star"), file("${taskId}.machine_info.txt") into machineStar
   
   script:
   taskId = "${name}.star"
@@ -508,7 +508,7 @@ process ShowStarPerformance {
     output:
     file "star_performance.tex"
     file "star_performance.svg"
-    file "bwameth_performance.pickle"
+    file "star_performance.pickle"
     
     script:
     data = parsedRows.join("")
@@ -530,7 +530,7 @@ Channel
     machineSkewer,
     machineSeqPurge,
     machineAdapterRemoval,
-    machineBwameth
+    machineStar
   )
   .set { machineMerged }
 
