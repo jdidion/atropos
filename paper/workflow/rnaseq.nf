@@ -374,8 +374,10 @@ process ComputeEffectiveness {
   bamMap = bamFileList.collectEntries()
   bedMap = bedFileList.collectEntries()
   names = bamMap.keySet().collect()
-  bamFiles = names.collect { name -> bamMap[name] }
-  bedFiles = names.collect { name -> bedMap[name] }
+  bamFilesList = names.collect { name -> bamMap[name] }
+  bamFiles = bamFilesList.join(" ")
+  bedFilesList = names.collect { name -> bedMap[name] }
+  bedFiles = bedFilesList.join(" ")
   """
   compute_real_effectiveness.py \
     -i $bamFiles -o effectiveness.txt \
