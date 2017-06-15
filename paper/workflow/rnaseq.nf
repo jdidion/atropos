@@ -300,7 +300,7 @@ process StarAlign {
   
   output:
   val(taskId) into starTaskId
-  file("${name}_rnaseq_Aligned.{bam,bam.bai}")
+  file("${name}_rnaseq_Aligned.out.bam")
   set val(name), file("${name}.name_sorted.bam") into sorted
   set val(name), file("${name}.star.timing.txt") into timingStar
   set val("${name}"), val("star"), file("${taskId}.machine_info.txt") into machineBwameth
@@ -311,12 +311,12 @@ process StarAlign {
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${name}.star.timing.txt STAR \
     --runThreadN $params.alignThreads --genomeDir /data/index/star/hg38 \
-    --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat
+    --readFilesIn ${fastq[0]} ${fastq[1]} --readFilesCommand zcat \
     --outMultimapperOrder Random --outFilterMultimapNmax 100000 \
     --outSAMmultNmax 1 --outSAMtype BAM Unsorted \
     --outSAMunmapped Within KeepPairs --outFileNamePrefix ${name}_rnaseq_ \
   && samtools sort -n -O bam -@ ${params.alignThreads} \
-    -o ${name}.name_sorted.bam ${name}_rnaseq_Aligned.bam
+    -o ${name}.name_sorted.bam ${name}_rnaseq_Aligned.out.bam
   """
 }
 
@@ -503,7 +503,7 @@ process ShowStarPerformance {
     publishDir "$params.publishDir", mode: 'copy', overwrite: true
     
     input:
-    val parsedRows from timingStar.toList()
+    val parsedRows from timingStarParsed.toList()
     
     output:
     file "star_performance.tex"
