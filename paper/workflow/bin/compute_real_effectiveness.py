@@ -229,8 +229,12 @@ class Annotations(object):
                 self.add(name)
         else:
             for path in bed_files_or_dir:
+                basename = os.path.basename(path)
+                if basename.startswith(untrimmed_name):
+                    self.add(untrimmed_name, path)
+                    continue
                 for name in trimmed_names:
-                    if os.path.basename(path).startswith(name):
+                    if basename.startswith(name):
                         self.add(name, path)
                         break
                 else:

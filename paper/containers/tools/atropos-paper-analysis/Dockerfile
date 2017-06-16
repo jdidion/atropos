@@ -22,11 +22,16 @@ ENV GENCODE_37_FILE "gencode.v${GENCODE_VERSION}lift37.annotation.gtf.gz"
 ENV GENCODE_38_FILE "gencode.v${GENCODE_VERSION}.annotation.gtf.gz"
 ENV BEDOPS_VERSION 2.4.26
 ENV BEDOPS_URL "https://github.com/bedops/bedops/archive/v${BEDOPS_VERSION}.tar.gz"
+ENV SAMTOOLS_VERSION 1.4
+ENV SAMTOOLS_URL "https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2"
 ENV SRA_VERSION 2.8.2-1
 ENV SRA_URL "https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${SRA_VERSION}/sratoolkit.${SRA_VERSION}-ubuntu64.tar.gz"
 ENV BUILD_PACKAGES \
     libc6-dev \
     build-essential \
+    libbz2-dev \
+    zlib1g-dev \
+    liblzma-dev \
     tcsh \
     devscripts \
     debhelper \
@@ -51,6 +56,13 @@ RUN apt-get update \
     && make install \
     && cp bin/* /usr/local/bin \
     && cd .. \
+    && wget -q -O - $SAMTOOLS_URL | tar -jxv \
+    && cd samtools-${SAMTOOLS_VERSION} \
+    && ./configure --prefix=/usr/local/ --without-curses \
+    && make \
+    && make install \
+    && cd .. \
+    && rm -Rf /tmp/samtools-${SAMTOOLS_VERSION} \
     && wget -q -O - $SRA_URL | tar -zxv \
     && mkdir /opt/fastq-dump/ \
     && mv sratoolkit.${SRA_VERSION}-ubuntu64 /opt/fastq-dump/ \
