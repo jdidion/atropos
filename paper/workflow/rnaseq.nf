@@ -119,6 +119,7 @@ process Atropos {
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedAtropos
   set val("${taskId}"), file("${taskId}.timing.txt") into timingAtropos
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineAtropos
+  set val("${taskId}"), file(".jobid") into jobAtropos
   file "${taskId}.report.txt"
   
   script:
@@ -177,6 +178,7 @@ process Skewer {
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedSkewer
   set val("${taskId}"), file("${taskId}.timing.txt") into timingSkewer
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineSkewer
+  set val("${taskId}"), file(".jobid") into jobSkewer
   file "${taskId}.report.txt"
   
   script:
@@ -214,6 +216,7 @@ process SeqPurge {
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedSeqPurge
   set val("${taskId}"), file("${taskId}.timing.txt") into timingSeqPurge
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineSeqPurge
+  set val("${taskId}"), file(".jobid") into jobSeqPurge
   file "${taskId}.report.txt"
   
   script:
@@ -250,6 +253,7 @@ process AdapterRemoval {
   set val("${taskId}"), file("${taskId}.{1,2}.fq.gz") into trimmedAdapterRemoval
   set val("${taskId}"), file("${taskId}.timing.txt") into timingAdapterRemoval
   set val("${taskId}"), val("trim"), file("${taskId}.machine_info.txt") into machineAdapterRemoval
+  set val("${taskId}"), file(".jobid") into jobAdapterRemoval
   file "${taskId}.report.txt"
   
   script:
@@ -262,6 +266,7 @@ process AdapterRemoval {
     --adapter1 $params.adapter1 --adapter2 $params.adapter2 \
     --trimns --trimqualities --minquality $qcut --mm 0.3 \
     --minlength $params.minLength --threads $task.cpus
+    > "${taskId}.report.txt"
   """
 }
 
@@ -357,11 +362,13 @@ toolNames = Channel.fromPath(
 
 /* Process: Summarize trimming effectiveness
  * -----------------------------------------
+ * This can take a long time to run, so we explicitly specify a time limit.
  */
 process ComputeEffectiveness {
   container {
     "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
   }
+  time '24h'
   
   input:
   val bamFileList from sortedEffectiveness.toList()
@@ -407,8 +414,7 @@ process ShowEffectiveness {
   script:
   """
   show_rnaseq_effectiveness.py \
-    -i $effData -o rnaseq_effectiveness \
-    -t $toolNamesFile --exclude-discarded -f svg pickle
+    -i $effData -o rnaseq_effectiveness -t $toolNamesFile
   """
 }
 
@@ -570,5 +576,89 @@ process CreateMachineTable {
   """
   echo -e "prog\tprog2\tthreads\tdataset\tqcut\tanalysis\tcpus\tmemory\tcpu_details" > machine_info.txt
   echo '$data' >> machine_info.txt
+  """
+}
+
+/* Channel: merged job outputs
+ * ---------------------------
+ * If you add a tool process, make sure to add the trimmedXXX channel
+ * into the concat list here.
+ */
+Channel
+  .empty()
+  .concat(
+    jobAtropos,
+    jobSkewer,
+    jobSeqPurge,
+    jobAdapterRemoval
+  )
+  .set { jobMerged }
+
+/* Process: summarize job info
+ * ---------------------------
+ * Generates a summary of each job using a job scheduler-specific
+ * script. We have to run this outside the container to access the job 
+ * scheduler.
+ */
+process SummarizeJob {
+  input:
+  set val(name), file(jobid) from jobMerged
+  
+  when:
+  workflow.profile == 'cluster'
+  
+  output:
+  set val(name), file("${name}.jobSummary.txt") into jobSummary
+
+  script:
+  """
+  $params.summarizeJobScript $jobid > ${name}.jobSummary.txt
+  """
+}
+
+/* Process: parse job info
+ * -----------------------
+ * Parses each job summary using a job scheduler-specific script.
+ */
+process ParseJob {
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
+  
+  input:
+  set val(name), file(jobSummaryFile) from jobSummary
+  
+  output:
+  stdout jobParsed
+  
+  script:
+  """
+  $params.parseJobScript -i $jobSummaryFile -p $name
+  """
+}
+
+/* Process: show job memory usage
+ * ------------------------------
+ * Generates memory usage table/figure from job summaries.
+ */
+process ShowJobMemoryUsage {
+  container {
+    "${params.containerPrefix}jdidion/python_bash${params.containerSuffix}"
+  }
+  publishDir "$params.publishDir", mode: 'copy', overwrite: true
+  
+  input:
+  val parsedJobs from jobParsed.toList()
+  
+  output:
+  file "job.mem.tex"
+  file "job.mem.pickle"
+  file "job.mem.svg"
+  
+  script:
+  data = parsedJobs.join("")
+  """
+  echo '$data' | show_job_info.py -o job \
+    -m mem=${params.jobMemoryMetric} -f tex pickle svg
   """
 }

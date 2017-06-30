@@ -53,7 +53,8 @@ def main():
                 index='read_idx', columns='prog', values='read2_quality'))
 
             # Optionally remove rows where the read was discarded by any program
-            quals = quals[quals.apply(lambda x: all(x >= 0), 1)]
+            if args.exclude_discarded:
+                quals = quals[quals.apply(lambda x: all(x >= 0), 1)]
 
             # Create a tidy table of the number of reads above each MAPQ threshold
             # for each program, along with the delta versus untrimmed

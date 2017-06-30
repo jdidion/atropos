@@ -11,7 +11,7 @@ do
 && docker run \
    -v /var/run/docker.sock:/var/run/docker.sock \
    -v $(pwd):/output --privileged -t --rm $D2S $container \
-&& mv *.img $file \
-&& scp $file ${REMOTE_HOST}:${REMOTE_DIR} \
-&& rm -Rf $file
+&& mv *${name}*.img $file \
+&& echo "scp $file ${REMOTE_HOST}:${REMOTE_DIR}" \
+&& scp $file ${REMOTE_HOST}:${REMOTE_DIR} 
 done < <(grep -v -P "^#" ../../containers/paper_containers.txt)
