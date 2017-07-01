@@ -525,14 +525,14 @@ process ShowJobMemoryUsage {
   val parsedJobs from jobParsed.toList()
   
   output:
-  file "job.mem.tex"
   file "job.mem.pickle"
+  file "job.mem.tex"
   file "job.mem.svg"
   
   script:
   data = parsedJobs.join("")
   """
   echo '$data' | show_job_info.py -o job \
-    -m mem=${params.jobMemoryMetric} -f tex pickle svg
+    -m mem=${params.jobMemoryMetric} -f pickle tex svg
   """
 }

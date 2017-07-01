@@ -28,6 +28,21 @@ class fileopen(object):
         if self.close:
             self.fh.close()
 
+MAGNITUDE = dict(
+    k=1000,
+    m=1000000,
+    g=1000000000
+)
+
+def parse_size(sizestr):
+    if not sizestr:
+        return -1
+    mag = MAGNITUDE.get(sizestr.lower()[-1], None)
+    if mag:
+        return int(sizestr[0:-1]) * mag
+    else:
+        return int(sizestr)
+
 def parse_profile(profile, threads=None, dataset=None):
     if profile == 'untrimmed':
         return ('untrimmed', 'untrimmed', threads, dataset, 0)

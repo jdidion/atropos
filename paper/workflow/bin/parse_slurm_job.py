@@ -3,24 +3,9 @@
 job info row with the largest MaxRSS value.
 """
 import argparse
-from common import fileopen, parse_profile
+from common import fileopen, parse_profile, parse_size
 import csv
 from subprocess import check_output
-
-MAGNITUDE = dict(
-    k=1000,
-    m=1000000,
-    g=1000000000
-)
-
-def parse_size(sizestr):
-    if not sizestr:
-        return -1
-    mag = MAGNITUDE.get(sizestr.lower()[-1], None)
-    if mag:
-        return int(sizestr[0:-1]) * mag
-    else:
-        return int(sizestr)
 
 def main():
     parser = argparse.ArgumentParser()

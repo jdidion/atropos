@@ -409,7 +409,7 @@ process ShowEffectiveness {
   
   output:
   file "rnaseq_effectiveness.svg"
-  file "rnaseq_effectiveness.pickle"
+  file "rnaseq_effectiveness.txt"
   
   script:
   """

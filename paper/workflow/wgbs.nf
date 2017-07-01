@@ -350,13 +350,12 @@ process ShowEffectiveness {
   
   output:
   file "wgbs_effectiveness.svg"
-  file "wgbs_effectiveness.pickle"
   
   script:
   """
   show_wgbs_effectiveness.py \
     -i $effData -o wgbs_effectiveness \
-    -t $toolNamesFile --exclude-discarded -f svg pickle
+    -t $toolNamesFile --exclude-discarded -f svg
   """
 }
 

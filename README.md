@@ -120,7 +120,8 @@ We welcome any contributions via GitHub issues and pull requests. See the  [docu
 ### 1.5
 
 * Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
-* Support for paired-end demultiplexing (i.e. when barcodes are used in both paired-end adapters): https://github.com/marcelm/cutadapt/issues/118.
+* Support for paired-end demultiplexing
+* Demultiplexing based on barcodes: https://github.com/marcelm/cutadapt/issues/118.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 * Consider supporting different error rates for read1 vs read2.
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).

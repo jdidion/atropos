@@ -5,7 +5,9 @@ one header row and one metrics row. The first 5 columns are expected to be the
 task profile information.
 """
 import argparse
-from common import fileopen
+from common import fileopen, parse_size
+import csv
+import os
 import pandas as pd
 
 class Metrics():
@@ -24,7 +26,7 @@ class Metrics():
             outfile = "{}.{}".format(prefix, fmt)
             if fmt == 'txt':
                 table.to_csv(outfile, sep="\t", index=False)
-            elif fmt == 'pickle'
+            elif fmt == 'pickle':
                 import pickle
                 with fileopen(outfile, 'wb') as out:
                     pickle.dump(table, out)
@@ -34,16 +36,18 @@ class Metrics():
         
     def mem_tex(self, table, column, outfile, name=None, caption=None):
         texdat = (table.
-            groupby(['Dataset', 'Threads', 'Program2']).
-            agg({ column : max }))
-        texdat = texdat.rename(columns={ 
-            'Program2' : 'Program',
-            column : 'Memory'
-        })
-        texdat.columns = texdat.columns.droplevel()
+            drop('Program', 1).
+            rename(columns={
+                'Program2' : 'Program',
+                column : 'Memory'
+            }).
+            groupby(['Dataset', 'Threads', 'Program']).
+            agg({ 'Memory' : max }))
+        texdat = texdat.assign(MemoryMB=texdat['Memory'] / 1000000)
+        
         from mako.template import Template
         table_template = Template(filename=os.path.join(
-            self.template_path, "job_memory.tex"))
+            self.template_path, "job_memory_table.tex"))
         with fileopen(outfile, "wt") as o:
             o.write(table_template.render(
                 name=name, caption=caption, table=texdat))
@@ -52,32 +56,39 @@ class Metrics():
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
-        import numpy as np
         import seaborn as sb
         sb.set(style="whitegrid")
         
-        table.assign(log10_mem_mb=np.log10(table[column] / 1000000))
-        
+        svgdat = (table.
+            rename(columns={ column : 'Memory' }).
+            groupby(['Dataset', 'Threads', 'Program']).
+            agg({ 'Memory' : max }).
+            reset_index())
+        svgdat = svgdat.assign(MemoryMB=svgdat['Memory'] / 1000000)
+        svgdat['Threads'] = pd.to_numeric(svgdat['Threads'])
         threads = svgdat.Threads.unique()
+        svgdat['Dataset'] = pd.Categorical(svgdat['Dataset'])
+        svgdat['Program'] = pd.Categorical(svgdat['Program'])
+
         if len(threads) == 1:
             plot = sb.factorplot(
-                x='Program', y='log10_mem_mb', col="Dataset", 
-                data=table, kind="bar", ci=None, sharey=True,
-                estimator=max)
+                x='Program', y='MemoryMB', col="Dataset", 
+                data=svgdat, kind="bar", ci=None, sharey=True)
         else:
             plot = sb.factorplot(
-                x='Threads', y='log10_mem_mb', col="Dataset", hue="Program", 
-                data=table, kind="bar", ci=None, sharey=True,
-                estimator=max)
-        plot.set_xlabels('')
-        plot.set_ylabels('Log10(Mb)')
+                x='Threads', y='MemoryMB', col="Dataset", hue="Program", 
+                data=svgdat, kind="bar", ci=None, sharey=True)
+
+        if len(threads) == 1:
+            plot = plot.set_titles('')
+
+        plot = plot.set_xlabels('Threads')
+        plot = plot.set_ylabels('Memory (MB)')
+        plot = plot.set_xticklabels(rotation=90)
         plot.fig.subplots_adjust(wspace=0.35)
-        plot.set_titles('')
-        plot.set_xticklabels(rotation=90)
-        plot = plot.add_legend()
         plot.savefig(outfile)
     
-    def _get_table(self, column):
+    def _get_table(self, column, is_size=True):
         cols = list(range(5))
         cols.append(self.header.index(column))
         header = [self.header[c] for c in cols]
@@ -85,7 +96,18 @@ class Metrics():
             [row[c] for c in cols]
             for row in self.rows
         ]
-        return pd.from_records(rows, columns=header)
+        if is_size:
+            for row in rows:
+                row[5] = parse_size(row[5])
+        table = pd.DataFrame.from_records(rows, columns=header)
+        new_colnames = { 
+            'prog' : 'Program',
+            'prog2' : 'Program2',
+            'threads' : 'Threads',
+            'dataset' : 'Dataset',
+            'qcut' : 'Quality',
+        }
+        return table.rename(columns=new_colnames)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -105,7 +127,10 @@ def main():
             if i == 0:
                 header = line
             elif i % 2 == 0:
-                assert header == line
+                if len(line) == 0:
+                    break
+                else:
+                    assert header == line
             else:
                 rows.append(line)
     
@@ -113,7 +138,7 @@ def main():
         header, rows, args.output, args.formats, os.path.dirname(__file__))
     
     for metric in args.metric:
-        name, key = metric.split('=')
+        name, column = metric.split('=')
         metrics.show(name, column)
 
 if __name__ == '__main__':
