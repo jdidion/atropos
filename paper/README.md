@@ -86,7 +86,7 @@ Make sure you've manually built the star index container as described in #2 abov
 docker images
 ```
 
-From the workflow/extra directory, run:
+From the 'containers' directory, run:
 
 ```
 ./docker2singularity.sh \

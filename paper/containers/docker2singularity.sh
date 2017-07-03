@@ -14,4 +14,4 @@ do
 && mv *${name}*.img $file \
 && echo "scp $file ${REMOTE_HOST}:${REMOTE_DIR}" \
 && scp $file ${REMOTE_HOST}:${REMOTE_DIR} 
-done < <(grep -v -P "^#" ../../containers/paper_containers.txt)
+done < <(grep -v -P "^#" paper_containers.txt)
