@@ -96,7 +96,6 @@ def main():
         plot.set_titles('')
         plot.set_xticklabels(rotation=90)
         svg_file = args.output + ".svg"
-        plot = plot.add_legend()
         plot.savefig(svg_file)
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sb
+import numpy as np
 sb.set(style="whitegrid")
         
 def main():
@@ -52,7 +53,7 @@ def main():
                     else:
                         entry = (
                             "{}.{}".format(read_name, read), prog, q,
-                            bool(row['read{}_in_region'.format(read)]))
+                            bool(int(row['read{}_in_region'.format(read)])))
                         if prog in read_dict:
                             assert read_dict[prog] == entry
                         else:
@@ -89,34 +90,30 @@ def main():
         .reset_index())
     table = table.rename(columns={ 0 : 'Count' })
     
-    # rna_reads['Delta'] = np.NaN
-    # for mapq in set(rna_reads.MAPQ.values):
-    #     for inregion in (True, False):
-    #         untrimmed_row = ((rna_reads['Program']==prog) & 
-    #             (rna_reads['MAPQ']==mapq) & 
-    #             (rna_reads['In Region?']==inregion))
-    #         for prog in set(rna_reads.Program.values):
-    #             prog_row = ((rna_reads['Program']==prog) &
-    #                 (rna_reads['MAPQ']==mapq) & 
-    #                 (rna_reads['In Region?']==inregion))
-    #             a = rna_reads[prog_row]['Count']
-    #             b = rna_reads[untrimmed_row]['Count']
-    #             b = 0 if b.size == 0 else b.values[0]
-    #             if a.size == 0:
-    #                 diff = -b
-    #                 new_rows.append([
-    #                     prog, mapq, inregion, 0, diff
-    #                 ])
-    #             else:
-    #                 diff = a.values[0] - b
-    #                 rna_reads.loc[prog_row, 'Delta'] = diff
-    # rna_reads = rna_reads.append(
-    #     pd.DataFrame(new_rows, columns=rna_reads.columns))
+    untrimmed = table[
+        (table.Program == 'untrimmed') & 
+        (table.MAPQ >= 0) & 
+        (table['In Region?'] == True)]
+    trimmed = table[
+        (table.Program != 'untrimmed') & 
+        (table.MAPQ >= 0) & (table['In Region?'] == True)].copy()
+    trimmed.Delta = np.NaN
+    for MAPQ in trimmed.MAPQ.unique():
+            u = untrimmed.loc[untrimmed.MAPQ==MAPQ, 'Count'].values
+            for prog in trimmed.Program.unique():
+                t = trimmed.loc[
+                    (trimmed.Program==prog) & (trimmed.MAPQ==MAPQ), 
+                    'Count'].values
+                if len(t) > 0:
+                    trimmed.loc[
+                        (trimmed.Program==prog) & (trimmed.MAPQ==MAPQ) , 
+                        'Delta'] = t[0] - u[0]
     
     plot = sb.factorplot(
-        x='MAPQ', y='Count', hue='Program', col='In Region?', data=table)
+        x='MAPQ', y='Delta', hue='Program', col='In Region?', 
+        data=trimmed, kind="bar", ci=None, sharey=True)
     plot.set_xlabels('Mapping Quality Score (MAPQ) Cutoff')
-    plot.set_ylabels('Number of Aligned Reads')
+    plot.set_ylabels('Difference versus Untrimmed Reads')
     svg_file = args.output + ".svg"
     plot.savefig(svg_file)
 
