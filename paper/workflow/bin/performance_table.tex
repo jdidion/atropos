@@ -23,9 +23,9 @@ for t in threads:
         % for t in threads:
         <% minval = table.loc[t, p, 'DurationSecs']['min'] %>
         % if minval == minvals[(t, 'DurationSecs')]:
-        \hlcell{${minval}}
+        & \hlcell{${minval}}
         % else:
-        ${minval}
+        & ${minval}
         % endif
         & ${table.loc[t, p, 'DurationSecs']['max']}
         
@@ -40,13 +40,13 @@ for t in threads:
     \hfill{} & \multicolumn{${len(threads)*2}}{c}{Memory Usage (Min$|$Max MB)} \\\hline
     % endif
     % for p in progs:
-        ${p}
+        ${p} &
         % for t in threads:
         <% minval = table.loc[t, p, 'MemoryMB']['min'] %>
         % if minval == minvals[(t, 'MemoryMB')]:
-        \hlcell{${minval}}
+        & \hlcell{${minval}}
         % else:
-        ${minval}
+        & ${minval}
         % endif
         & ${table.loc[t, p, 'MemoryMB']['max']}
         
@@ -62,13 +62,13 @@ for t in threads:
     % endif
     % for p in progs:
     
-        ${p}
+        ${p} &
         % for t in threads:
         <% minval = table.loc[t, p, 'CPUPct']['min'] %>
         % if minval == minvals[(t, 'CPUPct')]:
-        \hlcell{${minval}}
+        & \hlcell{${minval}}
         % else:
-        ${minval}
+        & ${minval}
         % endif
         & ${table.loc[t, p, 'CPUPct']['max']}
         

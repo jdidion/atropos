@@ -5,7 +5,7 @@ progs = table.index.levels[2]
 minvals = {}
 for d in datasets:
     for t in threads:
-        vals = sorted(table.loc[d, t, :]['Memory'].tolist())
+        vals = sorted(table.loc[d, t, :]['MemoryMB'].tolist())
         minvals[(d,t)] = vals[0]
 %>
 \begin{table}[ht]
@@ -13,7 +13,7 @@ for d in datasets:
 \begin{tabular}{l${'r' * len(threads)}}
 \sisetup{detect-weight=true,detect-inline-weight=math}
     % if len(threads) == 1:
-    Program & \multicolumn{1}{c}{Memory usage (Mb)} \\\hline
+    Program & \multicolumn{1}{c}{Memory usage (MB)} \\\hline
     % else:
     Program & ${" & ".join("\multicolumn{{1}}{{c}}{{{} Threads}}".format(t) for t in threads)} \\\hline
     % endif
@@ -22,11 +22,11 @@ for d in datasets:
         % for p in progs:
             ${p}
             % for t in threads:
-            <% val = table.loc[d, t, p]['Memory'] %>
+            <% val = table.loc[d, t, p]['MemoryMB'] %>
             % if val == minvals[(d, t)]:
-            \hlcell{${val}}
+            & \hlcell{${val}}
             % else:
-            ${val}
+            & ${val}
             % endif
             
             % endfor 

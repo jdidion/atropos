@@ -43,7 +43,7 @@ class Metrics():
             }).
             groupby(['Dataset', 'Threads', 'Program']).
             agg({ 'Memory' : max }))
-        texdat = texdat.assign(MemoryMB=texdat['Memory'] / 1000000)
+        texdat = texdat.assign(MemoryMB=round(texdat['Memory'] / 1000000, 1))
         
         from mako.template import Template
         table_template = Template(filename=os.path.join(
@@ -65,11 +65,8 @@ class Metrics():
             agg({ 'Memory' : max }).
             reset_index())
         svgdat = svgdat.assign(MemoryMB=svgdat['Memory'] / 1000000)
-        svgdat['Threads'] = pd.to_numeric(svgdat['Threads'])
+        
         threads = svgdat.Threads.unique()
-        svgdat['Dataset'] = pd.Categorical(svgdat['Dataset'])
-        svgdat['Program'] = pd.Categorical(svgdat['Program'])
-
         if len(threads) == 1:
             plot = sb.factorplot(
                 x='Program', y='MemoryMB', col="Dataset", 
@@ -100,14 +97,18 @@ class Metrics():
             for row in rows:
                 row[5] = parse_size(row[5])
         table = pd.DataFrame.from_records(rows, columns=header)
-        new_colnames = { 
+        table = table.rename(columns={ 
             'prog' : 'Program',
             'prog2' : 'Program2',
             'threads' : 'Threads',
             'dataset' : 'Dataset',
             'qcut' : 'Quality',
-        }
-        return table.rename(columns=new_colnames)
+        })
+        table['Threads'] = pd.to_numeric(table['Threads'])
+        table['Dataset'] = pd.Categorical(table['Dataset'])
+        table['Program'] = pd.Categorical(table['Program'])
+        table['Program2'] = pd.Categorical(table['Program2'])
+        return table
 
 def main():
     parser = argparse.ArgumentParser()
