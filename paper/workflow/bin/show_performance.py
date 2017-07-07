@@ -68,33 +68,38 @@ def main():
         import matplotlib.pyplot as plt
         import seaborn as sb
         sb.set(style="whitegrid")
+        import numpy as np
+        
+        progs = list(zip(
+            ('adapterremoval', 'atropos (adapter)', 'atropos (insert)', 'seqpurge', 'skewer'),
+            ('AdatperRemoval', 'Atropos (adapter)', 'Atropos (insert)', 'SeqPurge', 'Skewer'),
+            sb.color_palette(n_colors=5)
+        ))
+        pal = dict((p[1], p[2]) for p in progs)
         
         svgdat = table.melt(
             id_vars=['Program', 'Threads', 'Dataset', 'Quality'], 
             value_vars=['DurationSecs','CPUPct','MemoryMB'])
+        svgdat['Program'] = svgdat['Program'].map(dict((p[0], p[1]) for p in progs))
         svgdat['Program'] = svgdat['Program'].astype('category')
         svgdat['Dataset'] = svgdat['Dataset'].astype('category')
         svgdat['variable'] = pd.Categorical(
             svgdat['variable'], categories=['DurationSecs', 'MemoryMB', 'CPUPct'])
         
         threads = svgdat.Threads.unique()
+        plot = sb.factorplot(
+            x='Threads', y="value", col="variable", hue="Program", 
+            data=svgdat, kind="bar", sharey=False, estimator=np.mean)
         if len(threads) == 1:
-            plot = sb.factorplot(
-                x='Program', y="value", col="variable", 
-                data=svgdat, kind="bar", ci=None, sharey=False,
-                estimator=min)
+            plot.set_xticklabels('')
+            plot.set_xlabels('')
         else:
-            plot = sb.factorplot(
-                x='Threads', y="value", col="variable", hue="Program", 
-                data=svgdat, kind="bar", ci=None, sharey=False,
-                estimator=min)
-        plot.set_xlabels('')
+            plot.set_xlabels('Threads')
         plot.axes[0,0].set_ylabel('Runtime (sec)')
         plot.axes[0,1].set_ylabel('Memory (Mb)')
         plot.axes[0,2].set_ylabel('CPU (%)')
         plot.fig.subplots_adjust(wspace=0.35)
         plot.set_titles('')
-        plot.set_xticklabels(rotation=90)
         svg_file = args.output + ".svg"
         plot.savefig(svg_file)
 
