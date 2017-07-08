@@ -72,7 +72,7 @@ def main():
         
         progs = list(zip(
             ('adapterremoval', 'atropos (adapter)', 'atropos (insert)', 'seqpurge', 'skewer'),
-            ('AdatperRemoval', 'Atropos (adapter)', 'Atropos (insert)', 'SeqPurge', 'Skewer'),
+            ('AdapterRemoval', 'Atropos (adapter)', 'Atropos (insert)', 'SeqPurge', 'Skewer'),
             sb.color_palette(n_colors=5)
         ))
         pal = dict((p[1], p[2]) for p in progs)
