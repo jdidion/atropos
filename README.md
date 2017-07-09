@@ -80,15 +80,13 @@ See the [Documentation](https://atropos.readthedocs.org/) for more complete usag
 
 A [preprint](https://peerj.com/preprints/2452/) is available and the submitted paper is currently under review. The results in the paper can be fully reproduced using the workflow defined in the [paper](paper/README.md) directory.
 
-## Developers
-
-We welcome any contributions via GitHub issues and pull requests. See the  [documentation](https://atropos.readthedocs.org/) for style guidelines and best practices. We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.
-
 ## Links
 
 * [Documentation](https://atropos.readthedocs.org/)
 * [Source code](https://github.com/jdidion/atropos/)
 * [Report an issue](https://github.com/jdidion/atropos/issues)
+* [Code of conduct](https://github.com/jdidion/atropos/CODE_OF_CONDUCT.md)
+* [Contributing](https://github.com/jdidion/atropos/CONTRIUBTING.md)
 
 ## Roadmap
 
