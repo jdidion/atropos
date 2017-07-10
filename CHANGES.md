@@ -1,7 +1,10 @@
 # Changes
 
-v1.1.8 (dev)
+v1.1.9 (dev)
 ------------
+
+v1.1.8 (2017.07.10)
+-------------------
 * Add --config option for specifying options in a config file.
 * Fix : allow paired-end quality and N trimming without adapter trimming.
 
