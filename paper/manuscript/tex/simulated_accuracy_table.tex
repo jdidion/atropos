@@ -1,0 +1,240 @@
+
+\begin{table}[!htbp]
+\centering
+\begin{tabular}{lrrrr|rrr}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+    \hfill{} & \multicolumn{4}{C{8.2cm}}{Reads} & \multicolumn{3}{C{4cm}}{Bases} \\    \cmidrule{2-8} 
+    Program & \multicolumn{1}{C{2cm}}{Wrongly Trimmed} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{2.2cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} & \multicolumn{1}{C{1cm}}{Over-trimmed} & \multicolumn{1}{C{1cm}}{Under-trimmed} & \multicolumn{1}{C{1cm}}{Total Error} \\    
+    \midrule
+    Error rate 0.2\% \\        AdapterRemoval
+                
+                & 664 (0.09\%)
+                
+                & 29 (0.00\%)
+                
+                & 65 (0.01\%)
+                
+                & 0.10\%
+                
+                & 6,043
+                
+                & 2,511
+                
+                & 0.005\%
+            \\        Atropos (adapter)
+                
+                & 51 (0.01\%)
+                
+                & \hlcell{1 (0.00\%)}
+                
+                & 28,991 (3.77\%)
+                
+                & 3.78\%
+                
+                & 490
+                
+                & 102,133
+                
+                & 0.057\%
+            \\        Atropos (insert)
+                
+                & 60 (0.01\%)
+                
+                & 24 (0.00\%)
+                
+                & \hlcell{31 (0.00\%)}
+                
+                & \hlcell{0.01\%}
+                
+                & 186
+                
+                & \hlcell{94}
+                
+                & \hlcell{0.000\%}
+            \\        SeqPurge
+                
+                & 94 (0.01\%)
+                
+                & 24 (0.00\%)
+                
+                & \hlcell{31 (0.00\%)}
+                
+                & 0.02\%
+                
+                & 1,574
+                
+                & \hlcell{94}
+                
+                & 0.001\%
+            \\        Skewer
+                
+                & \hlcell{18 (0.00\%)}
+                
+                & 13 (0.00\%)
+                
+                & 146 (0.02\%)
+                
+                & 0.02\%
+                
+                & \hlcell{39}
+                
+                & 8,309
+                
+                & 0.005\%
+            \\    \midrule
+    Error rate 0.6\% \\        AdapterRemoval
+                
+                & 666 (0.09\%)
+                
+                & 19 (0.00\%)
+                
+                & 69 (0.01\%)
+                
+                & 0.10\%
+                
+                & 5,547
+                
+                & 2,032
+                
+                & 0.004\%
+            \\        Atropos (adapter)
+                
+                & 72 (0.01\%)
+                
+                & \hlcell{6 (0.00\%)}
+                
+                & 28,843 (3.76\%)
+                
+                & 3.77\%
+                
+                & 733
+                
+                & 101,839
+                
+                & 0.057\%
+            \\        Atropos (insert)
+                
+                & 52 (0.01\%)
+                
+                & 15 (0.00\%)
+                
+                & 42 (0.01\%)
+                
+                & \hlcell{0.01\%}
+                
+                & 151
+                
+                & 146
+                
+                & \hlcell{0.000\%}
+            \\        SeqPurge
+                
+                & 78 (0.01\%)
+                
+                & 16 (0.00\%)
+                
+                & \hlcell{41 (0.01\%)}
+                
+                & 0.02\%
+                
+                & 822
+                
+                & \hlcell{145}
+                
+                & 0.001\%
+            \\        Skewer
+                
+                & \hlcell{8 (0.00\%)}
+                
+                & 8 (0.00\%)
+                
+                & 180 (0.02\%)
+                
+                & 0.03\%
+                
+                & \hlcell{16}
+                
+                & 11,732
+                
+                & 0.007\%
+            \\    \midrule
+    Error rate 1.2\% \\        AdapterRemoval
+                
+                & 680 (0.09\%)
+                
+                & 16 (0.00\%)
+                
+                & 65 (0.01\%)
+                
+                & 0.10\%
+                
+                & 5,795
+                
+                & 2,667
+                
+                & 0.005\%
+            \\        Atropos (adapter)
+                
+                & 76 (0.01\%)
+                
+                & \hlcell{5 (0.00\%)}
+                
+                & 30,152 (3.92\%)
+                
+                & 3.94\%
+                
+                & 721
+                
+                & 117,027
+                
+                & 0.065\%
+            \\        Atropos (insert)
+                
+                & 49 (0.01\%)
+                
+                & 13 (0.00\%)
+                
+                & \hlcell{35 (0.00\%)}
+                
+                & \hlcell{0.01\%}
+                
+                & 111
+                
+                & \hlcell{85}
+                
+                & \hlcell{0.000\%}
+            \\        SeqPurge
+                
+                & 71 (0.01\%)
+                
+                & 13 (0.00\%)
+                
+                & \hlcell{35 (0.00\%)}
+                
+                & 0.02\%
+                
+                & 1,524
+                
+                & \hlcell{85}
+                
+                & 0.001\%
+            \\        Skewer
+                
+                & \hlcell{11 (0.00\%)}
+                
+                & 8 (0.00\%)
+                
+                & 182 (0.02\%)
+                
+                & 0.03\%
+                
+                & \hlcell{19}
+                
+                & 14,261
+                
+                & 0.008\%
+            \\
+\end{tabular}
+\caption{Trimming accuracy on simulated data with three different base-call error rates. Wrongly trimmed: reads that do not contain adapters but were trimmed anyway; Over-trimmed: reads that contain adapters but from which too many bases were removed; Under-trimmed: reads that contain adapters but from which too few bases were removed. Both read-level and base-level error rates are shown. Fractions of total reads/bases are in parentheses. The best tool(s) in each category is highlighted.\label{simulated-accuracy}}
+\end{table}
+

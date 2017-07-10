@@ -1,0 +1,13 @@
+\begin{table}[htbp]
+  \centering
+    \begin{tabular}{lccrrr}
+    Data Set & Error Rate* & Read Length & \multicolumn{1}{l}{Total Read Pairs} & \multicolumn{1}{c}{Reads w/ Adapters**} & \multicolumn{1}{c}{Adapter Bases**} \\
+    \midrule
+    Simulated 1 & 0.20\% & 125   & 781,923 & 325,982 & 12,447,262 \\
+    Simulated 2 & 0.60\% & 125   & 780,899 & 325,105 & 12,416,861 \\
+    Simulated 3 & 1.20\% & 125   & 782,237 & 325,860 & 12,464,235 \\
+    GM12878 WGBS & 2.79\% & 125 & 1,000,000 & 57,130 & 3,082,003 \\
+    K562 mRNA-seq & 4.31\% & 75 & 6,100,265 & 14,384 & 749,451 \\
+    \end{tabular}%
+    \caption{Description of data sets. For the real data sets, * actual error rates are unknown -- we estimate error rates from base qualities over a sample of 10,000 read pairs; and ** total adapter content is unknown -- we provide the number of reads containing exact matches for the first 35 adapter bases, and the number of adapter bases present.}\label{datasets}%
+\end{table}%

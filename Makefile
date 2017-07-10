@@ -58,7 +58,6 @@ release:
 	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
-	twine register dist/$(module)-$(version).tar.gz
 	twine upload dist/$(module)-$(version).tar.gz
 	git push origin --tags
 	$(github_release)
