@@ -626,6 +626,7 @@ standard output.
             # Any of these options switch off legacy mode
             if (options.adapters2 or options.front2 or options.anywhere2 or
                     options.cut2 or options.cut_min2 or
+                    options.quality_cutoff or options.trim_n or
                     options.interleaved_input or options.pair_filter or
                     options.too_short_paired_output or
                     options.too_long_paired_output or

@@ -256,6 +256,9 @@ class BaseCommandParser(object):
                     "Invalid file format for SRA accession: {}".format(
                         options.format))
             options.format = 'fastq'
+            logging.getLogger().debug(
+                "Opening reader for SRA Accession {}".format(
+                    options.sra_accession))
             try:
                 from srastream import SraReader
                 options.sra_reader = SraReader(

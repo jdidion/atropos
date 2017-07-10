@@ -69,10 +69,9 @@ def test_paired_separate():
 
 def test_paired_end_legacy():
     '''--paired-output, not using -A/-B/-G'''
-    # the -m 14 filters out one read, which should then also be filtered out in the second output file
-    # -q 10 should not change anything: qualities in file 1 are high enough,
-    # qualities in file 2 should not be inspected.
-    run_paired('-a TTAGACATAT -m 14 -q 10',
+    # The -m 14 filters out one read, which should then also be filtered out in 
+    # the second output file.
+    run_paired('-a TTAGACATAT -m 14',
         in1='paired.1.fastq', in2='paired.2.fastq',
         expected1='paired.m14.1.fastq', expected2='paired.m14.2.fastq'
     )

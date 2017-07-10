@@ -574,7 +574,7 @@ class CommandRunner(BaseCommandRunner):
                     len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
                     options.quality_cutoff)):
             logger.warning('\n'.join(textwrap.wrap(
-                'WARNING: Requested read modifications are applied only to the '
+                'Requested read modifications are applied only to the '
                 'first read since backwards compatibility mode is enabled. '
                 'To modify both reads, also use any of the -A/-B/-G/-U '
                 'options. Use a dummy adapter sequence when necessary: '
