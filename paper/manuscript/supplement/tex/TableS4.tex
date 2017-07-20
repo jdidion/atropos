@@ -1,0 +1,283 @@
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lr|rr|rr|r}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+    Program & \multicolumn{1}{c}{16 Threads} & \multicolumn{1}{c}{4 Threads} & \multicolumn{1}{c}{8 Threads} \\
+    \midrule
+        Error rate 0.2\% \\\            AdapterRemoval &
+            
+            1401.3 &
+            
+            
+            \hlcell{589.1} &
+            
+            
+            \hlcell{854.6} &
+            
+            \\\            Atropos (adapter + nowriter) &
+            
+            \hlcell{359.7} &
+            
+            
+            2282.8 &
+            
+            
+            1676.2 &
+            
+            \\\            Atropos (adapter + worker) &
+            
+            3893.3 &
+            
+            
+            3001.0 &
+            
+            
+            3241.2 &
+            
+            \\\            Atropos (adapter + writer) &
+            
+            4015.4 &
+            
+            
+            2166.4 &
+            
+            
+            2231.8 &
+            
+            \\\            Atropos (insert + nowriter) &
+            
+            1997.9 &
+            
+            
+            2532.0 &
+            
+            
+            1564.3 &
+            
+            \\\            Atropos (insert + worker) &
+            
+            4078.1 &
+            
+            
+            3050.9 &
+            
+            
+            3366.3 &
+            
+            \\\            Atropos (insert + writer) &
+            
+            4028.8 &
+            
+            
+            2538.4 &
+            
+            
+            2769.1 &
+            
+            \\\            SeqPurge &
+            
+            1530.6 &
+            
+            
+            719.6 &
+            
+            
+            989.9 &
+            
+            \\\            Skewer &
+            
+            1407.0 &
+            
+            
+            595.0 &
+            
+            
+            865.7 &
+            
+            \\\midrule       Error rate 0.6 \% \\\            AdapterRemoval &
+            
+            \hlcell{1397.6} &
+            
+            
+            \hlcell{584.8} &
+            
+            
+            \hlcell{857.5} &
+            
+            \\\            Atropos (adapter + nowriter) &
+            
+            4526.3 &
+            
+            
+            2395.9 &
+            
+            
+            2302.3 &
+            
+            \\\            atropos (adapter + worker) &
+            
+            3702.2 &
+            
+            
+            2964.3 &
+            
+            
+            3282.6 &
+            
+            \\\            Atropos (adapter + writer) &
+            
+            4013.4 &
+            
+            
+            2059.2 &
+            
+            
+            2211.6 &
+            
+            \\\            Atropos (insert + nowriter) &
+            
+            3856.3 &
+            
+            
+            2383.7 &
+            
+            
+            2626.6 &
+            
+            \\\            Atropos (insert + worker) &
+            
+            3847.8 &
+            
+            
+            3087.6 &
+            
+            
+            3413.9 &
+            
+            \\\            Atropos (insert + writer) &
+            
+            4035.8 &
+            
+            
+            2557.0 &
+            
+            
+            2742.6 &
+            
+            \\\            SeqPurge &
+            
+            1530.6 &
+            
+            
+            719.6 &
+            
+            
+            989.9 &
+            
+            \\\            Skewer &
+            
+            1406.8 &
+            
+            
+            595.0 &
+            
+            
+            865.5 &
+            
+            \\\midrule        Error rate 1.2\% \\\            AdapterRemoval &
+            
+            \hlcell{1397.6} &
+            
+            
+            \hlcell{583.6} &
+            
+            
+            \hlcell{856.4} &
+            
+            \\\            Atropos (adapter + nowriter) &
+            
+            1998.0 &
+            
+            
+            2079.2 &
+            
+            
+            1234.5 &
+            
+            \\\            Atropos (adapter + worker) &
+            
+            3785.6 &
+            
+            
+            3014.0 &
+            
+            
+            3362.4 &
+            
+            \\\            Atropos (adapter + writer) &
+            
+            4011.3 &
+            
+            
+            2263.4 &
+            
+            
+            2227.9 &
+            
+            \\\            Atropos (insert + nowriter) &
+            
+            1890.0 &
+            
+            
+            2343.2 &
+            
+            
+            1976.3 &
+            
+            \\\            Atropos (insert + worker) &
+            
+            3530.3 &
+            
+            
+            3130.2 &
+            
+            
+            3405.0 &
+            
+            \\\            Atropos (insert + writer) &
+            
+            4072.1 &
+            
+            
+            2487.2 &
+            
+            
+            2216.1 &
+            
+            \\\            SeqPurge &
+            
+            1530.6 &
+            
+            
+            719.6 &
+            
+            
+            989.9 &
+            
+            \\\            Skewer &
+            
+            1407.2 &
+            
+            
+            595.2 &
+            
+            
+            865.8
+            
+            \\\
+        
+        \end{tabular}
+\caption{Memory usage of jobs run on cluster for trimming simulated datasets.\label{tab:memory}}
+\end{table}
+

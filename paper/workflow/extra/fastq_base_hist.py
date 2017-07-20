@@ -3,7 +3,7 @@
 import argparse
 from common import *
 import csv
-from atropos.xopen import xopen, open_output
+from xphyle import xopen
 import tqdm
 
 nuc = ('A','C','G','T','N')
@@ -40,7 +40,7 @@ def main():
     with xopen(args.fastq1) as fq1, xopen(args.fastq2) as fq2:
         hists = make_hists(fq1, fq2)
     
-    with open_output(args.output) as o:
+    with xopen(args.output, 'w') as o:
         w = csv.writer(o, delimiter="\t")
         w.writerow(('read', 'side', 'pos', 'base', 'count'))
         for i, h in enumerate(hists, 1):

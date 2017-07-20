@@ -1,0 +1,176 @@
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lr|rr|rr|r}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+    \hfill{} & \multicolumn{2}{c}{4 Threads} & \multicolumn{2}{c}{8 Threads} & \multicolumn{2}{c}{16 Threads} \\\hline
+    Program & \multicolumn{6}{c}{Execution Time (Min$|$Max sec.)} \\\hline
+        AdapterRemoval &
+        
+        \hlcell{30.79}
+        & 31.99 &
+        
+        
+        \hlcell{22.0}
+        & 23.14 &
+        
+        
+        \hlcell{23.19}
+        & 23.47
+        
+        \\\        Atropos (insert + nowriter) &
+        
+        93.13
+        & 97.77 &
+        
+        
+        39.81
+        & 40.18 &
+        
+        
+        24.57
+        & 24.65
+        
+        \\\        Atropos (insert + worker) &
+        
+        172.34
+        & 174.27 &
+        
+        
+        71.12
+        & 71.61 &
+        
+        
+        39.01
+        & 39.31
+        
+        \\\        Atropos (insert + writer) &
+        
+        100.11
+        & 102.49 &
+        
+        
+        51.25
+        & 53.69 &
+        
+        
+        45.98
+        & 46.5
+        
+        \\\        SeqPurge &
+        
+        60.09
+        & 60.77 &
+        
+        
+        37.07
+        & 37.76 &
+        
+        
+        30.24
+        & 31.18
+        
+        \\\        Skewer &
+        
+        56.97
+        & 58.27 &
+        
+        
+        32.64
+        & 33.1 &
+        
+        
+        29.2
+        & 32.11
+        
+        \\\hline
+    
+    \hfill{} & \multicolumn{6}{c}{CPU Usage (Min$|$Max \%)} \\\hline
+    
+        AdapterRemoval &
+        
+        263
+        & 274 &
+        
+        
+        267
+        & 270 &
+        
+        
+        264
+        & 264
+        
+        \\\    
+        Atropos (insert + nowriter) &
+        
+        372
+        & 377 &
+        
+        
+        688
+        & 698 &
+        
+        
+        1003
+        & 1035
+        
+        \\\    
+        Atropos (insert + worker) &
+        
+        382
+        & 383 &
+        
+        
+        713
+        & 721 &
+        
+        
+        1299
+        & 1311
+        
+        \\\    
+        Atropos (insert + writer) &
+        
+        336
+        & 340 &
+        
+        
+        504
+        & 544 &
+        
+        
+        487
+        & 512
+        
+        \\\    
+        SeqPurge &
+        
+        306
+        & 312 &
+        
+        
+        456
+        & 471 &
+        
+        
+        578
+        & 601
+        
+        \\\    
+        Skewer &
+        
+        356
+        & 360 &
+        
+        
+        699
+        & 700 &
+        
+        
+        745
+        & 794
+        
+        \\\    
+\end{tabular}
+\caption{Min/max execution time and average CPU usage for trimming of WGBS data on a cluster node with 4, 8, or 16 parallel threads.\label{tab:real-performance-wgbs}}
+\end{table}

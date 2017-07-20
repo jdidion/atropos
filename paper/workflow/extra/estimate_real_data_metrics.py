@@ -1,7 +1,7 @@
 import argparse
 from common import *
 import re
-from atropos.xopen import xopen, open_output
+from xphyle import xopen
 import tqdm
 
 ADAPTER1 = "GATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG" # TruSeq index 7
@@ -49,7 +49,7 @@ def main():
     with xopen(args.fastq1) as fq1, xopen(args.fastq2) as fq2:
         metrics = estimate_metrics(fq1, fq2, args.adapter1, args.adapter2)
     
-    with open_output(args.output) as o:
+    with xopen(args.output, 'w') as o:
         print("Avg error prob: {}".format(metrics[0]), file=o)
         print("Read 1 with full-length adapters: {}".format(metrics[1]), file=o)
         print("Read 1 full-length adapter bases: {}".format(metrics[2]), file=o)

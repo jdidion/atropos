@@ -1,0 +1,112 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{lr|r}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+\hfill{} & \multicolumn{2}{c}{Execution Time (sec.)} \\
+    Program & Min & Max \\\hline
+        AdapterRemoval &
+        
+        \hlcell{20.31}
+        & 20.54
+        
+        \\\        Atropos (adapter + nowriter) &
+        
+        32.72
+        & 43.45
+        
+        \\\        Atropos (adapter + worker) &
+        
+        79.69
+        & 82.14
+        
+        \\\        Atropos (adapter + writer) &
+        
+        47.54
+        & 52.34
+
+        \\\        Atropos (insert + nowriter) &
+        
+        42.21
+        & 49.19
+        
+        \\\        Atropos (insert + worker) &
+        
+        90.11
+        & 96.02
+        
+        \\\        Atropos (insert + writer) &
+        
+        49.7
+        & 55.01
+        
+        \\\        SeqPurge &
+        
+        22.02
+        & 22.73
+        
+        \\\        Skewer &
+        
+        39.03
+        & 43.28
+        
+        \\\hline
+    
+    \hfill{} & \multicolumn{2}{c}{CPU Usage (\%)} \\\hline
+    
+        AdapterRemoval &
+        
+        236
+        & 238
+        
+        \\\    
+        Atropos (adapter + nowriter) &
+        
+        322
+        & 332
+        
+        \\\    
+        Atropos (adapter + worker) &
+        
+        365
+        & 366
+        
+        \\\    
+        Atropos (adapter + writer) &
+        
+        223
+        & 239
+        
+        \\\    
+        Atropos (insert + nowriter) &
+        
+        338
+        & 360
+        
+        \\\    
+        Atropos (insert + worker) &
+        
+        371
+        & 372
+        
+        \\\    
+        Atropos (insert + writer) &
+        
+        291
+        & 294
+        
+        \\\    
+        SeqPurge &
+        
+        175
+        & 178
+        
+        \\\    
+        Skewer &
+        
+        250
+        & 259
+        
+        \\\    
+\end{tabular}
+\caption{Min/max execution time and average CPU usage for trimming of simulated datasets on a desktop with 4 parallel threads.\label{tab:simulated-performance-local}}
+\end{table}

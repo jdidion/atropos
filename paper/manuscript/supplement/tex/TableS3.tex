@@ -1,0 +1,257 @@
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lr|rr|rr|r}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+    \hfill{} & \multicolumn{2}{c}{4 Threads} & \multicolumn{2}{c}{8 Threads} & \multicolumn{2}{c}{16 Threads} \\\hline
+    Program & \multicolumn{6}{c}{Execution Time (Min$|$Max sec.)} \\\hline
+        AdapterRemoval &
+        
+        \hlcell{24.05}
+        & 25.68 &
+        
+        
+        24.45
+        & 26.7 &
+        
+        
+        23.75
+        & 25.69
+        
+        \\\        Atropos (adapter + nowriter) &
+        
+        39.15
+        & 49.45 &
+        
+        
+        \hlcell{22.03}
+        & 31.71 &
+        
+        
+        \hlcell{16.78}
+        & 23.9
+        
+        \\\        Atropos (adapter + worker) &
+        
+        105.79
+        & 107.07 &
+        
+        
+        58.26
+        & 71.39 &
+        
+        
+        31.72
+        & 32.33
+        
+        \\\        Atropos (adapter + writer) &
+        
+        54.93
+        & 56.59 &
+        
+        
+        49.59
+        & 56.82 &
+        
+        
+        44.61
+        & 58.79
+        
+        \\\        Atropos (insert + nowriter) &
+        
+        53.17
+        & 60.92 &
+        
+        
+        31.72
+        & 40.2 &
+        
+        
+        19.7
+        & 30.59
+        
+        \\\        Atropos (insert + worker) &
+        
+        120.15
+        & 154.89 &
+        
+        
+        63.5
+        & 81.31 &
+        
+        
+        35.3
+        & 36.22
+        
+        \\\        Atropos (insert + writer) &
+        
+        61.4
+        & 78.8 &
+        
+        
+        51.71
+        & 61.7 &
+        
+        
+        45.56
+        & 50.66
+        
+        \\\        SeqPurge &
+        
+        37.86
+        & 42.06 &
+        
+        
+        27.12
+        & 27.83 &
+        
+        
+        22.13
+        & 22.54
+        
+        \\\        Skewer &
+        
+        34.37
+        & 65.44 &
+        
+        
+        29.44
+        & 32.52 &
+        
+        
+        29.66
+        & 31.69
+        
+        \\\hline
+    
+    \hfill{} & \multicolumn{6}{c}{CPU Usage (Min$|$Max \%)} \\\hline
+    
+        AdapterRemoval &
+        
+        241
+        & 244 &
+        
+        
+        213
+        & 238 &
+        
+        
+        233
+        & 240
+        
+        \\\    
+        Atropos (adapter + nowriter) &
+        
+        301
+        & 360 &
+        
+        
+        420
+        & 634 &
+        
+        
+        486
+        & 641
+        
+        \\\    
+        Atropos (adapter + worker) &
+        
+        372
+        & 375 &
+        
+        
+        665
+        & 709 &
+        
+        
+        1212
+        & 1228
+        
+        \\\    
+        Atropos (adapter + writer) &
+        
+        239
+        & 245 &
+        
+        
+        228
+        & 237 &
+        
+        
+        209
+        & 217
+        
+        \\\    
+        Atropos (insert + nowriter) &
+        
+        324
+        & 374 &
+        
+        
+        506
+        & 708 &
+        
+        
+        571
+        & 921
+        
+        \\\    
+        Atropos (insert + worker) &
+        
+        373
+        & 378 &
+        
+        
+        705
+        & 715 &
+        
+        
+        1229
+        & 1257
+        
+        \\\    
+        Atropos (insert + writer) &
+        
+        317
+        & 329 &
+        
+        
+        338
+        & 362 &
+        
+        
+        284
+        & 316
+        
+        \\\    
+        SeqPurge &
+        
+        252
+        & 277 &
+        
+        
+        382
+        & 390 &
+        
+        
+        473
+        & 478
+        
+        \\\    
+        Skewer &
+        
+        197
+        & 368 &
+        
+        
+        500
+        & 526 &
+        
+        
+        496
+        & 521
+        
+        \\\    
+\end{tabular}
+\caption{Min/max execution time and average CPU usage for trimming of simulated datasets on a cluster node with 4, 8, or 16 parallel threads.\label{tab:simulated-performance-cluster}}
+\end{table}

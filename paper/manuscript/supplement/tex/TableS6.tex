@@ -1,0 +1,140 @@
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\sisetup{detect-weight=true,detect-inline-weight=math}
+    \hfill{} & \multicolumn{1}{c}{4 Threads} & \multicolumn{1}{c}{8 Threads} & \multicolumn{1}{c}{16 Threads} \\\hline
+    Program & \multicolumn{3}{c}{Execution Time (sec.)} \\\hline
+        AdapterRemoval &
+        
+        \hlcell{102.0} &
+        
+        
+        \hlcell{98.91} &
+        
+        
+        \hlcell{99.71}
+        
+        \\\        Atropos (insert + nowriter) &
+        
+        362.12 &
+        
+        
+        173.54 &
+        
+        
+        155.11
+        
+        \\\        Atropos (insert + worker) &
+        
+        593.21 &
+        
+        
+        248.34 &
+        
+        
+        145.78
+        
+        \\\        Atropos (insert + writer) &
+        
+        399.53 &
+        
+        
+        178.98 &
+        
+        
+        156.22
+        
+        \\\        SeqPurge &
+        
+        232.65 &
+        
+        
+        178.67 &
+        
+        
+        140.44
+        
+        \\\        Skewer &
+        
+        203.81 &
+        
+        
+        153.39 &
+        
+        
+        129.91
+        
+        \\\hline
+    
+    \hfill{} & \multicolumn{3}{c}{CPU Usage (\%)} \\\hline
+    
+        AdapterRemoval &
+        
+        287 &
+        
+        
+        268 &
+        
+        
+        269
+        
+        \\\    
+        Atropos (insert + nowriter) &
+        
+        340 &
+        
+        
+        744 &
+        
+        
+        862
+        
+        \\\    
+        Atropos (insert + worker) &
+        
+        326 &
+        
+        
+        709 &
+        
+        
+        1183
+        
+        \\\    
+        Atropos (insert + writer) &
+        
+        290 &
+        
+        
+        738 &
+        
+        
+        820
+        
+        \\\    
+        SeqPurge &
+        
+        272 &
+        
+        
+        371 &
+        
+        
+        453
+        
+        \\\    
+        Skewer &
+        
+        365 &
+        
+        
+        630 &
+        
+        
+        712
+        
+        \\\    
+\end{tabular}
+\caption{Min/max execution time and average CPU usage for trimming of mRNA-Seq data on a cluster node with 4, 8, or 16 parallel threads.\label{tab:real-performance-rnaseq}}
+\end{table}
