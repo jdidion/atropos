@@ -2,11 +2,11 @@
 """
 import logging
 import sys
+from xphyle import STDOUT, STDERR, FORMATS
 from atropos.commands.cli import (
     BaseCommandParser, configure_threads, parse_stat_args, readable_file,
     readwriteable_file, writeable_file, positive, probability, CharList,
     Delimited, int_or_str)
-from atropos.io import STDOUT, STDERR
 
 class CommandParser(BaseCommandParser):
     name = 'trim'
@@ -37,7 +37,8 @@ standard output.
             zero_cap=None,
             action='trim',
             batch_size=None,
-            known_adapter=None)
+            known_adapter=None,
+            can_use_system_compression=False)
         
         group = self.add_group(
             "Adapters",
@@ -76,9 +77,9 @@ standard output.
                  "end (paired data: of the first read). Both types of matches "
                  "as described under -a und -g are allowed. If the first base "
                  "of the read is part of the match, the behavior is as with "
-                 "-g, otherwise as with -a. This option is mostly for rescuing "
-                 "failed library preparations - do not use if you know which "
-                 "end your adapter was ligated to! (none)")
+                 "-g, otherwise as with -a. This option is mostly for "
+                 "rescuing failed library preparations - do not use if you "
+                 "know which end your adapter was ligated to! (none)")
         group.add_argument(
             "-F",
             "--known-adapters-file",
@@ -191,8 +192,8 @@ standard output.
             "--insert-match-adapter-error-rate",
             type=probability, default=None,
             help="Maximum allowed error rate for matching adapters after "
-                 "successful insert match (no. of errors divided by the length "
-                 "of the matching region). (0.2)")
+                 "successful insert match (no. of errors divided by the "
+                 "length of the matching region). (0.2)")
         
         # Arguments for merging and error correction
         # TODO: add RMP parameter for MergeOverlap
@@ -219,13 +220,14 @@ standard output.
             "--correct-mismatches",
             choices=("liberal", "conservative", "N"), default=None,
             help="How to handle mismatches while aligning/merging. 'Liberal' "
-                 "and 'conservative' error correction both involve setting the "
-                 "base to the one with the best quality. They differ only when "
-                 "the qualities are equal -- liberal means set it to the base "
-                 "from the read with the overall best median base quality, "
-                 "while conservative means to leave it unchanged. 'N' means to "
-                 "set the base to N. If exactly one base is ambiguous, the "
-                 "non-ambiguous base is always used. (no error correction)")
+                 "and 'conservative' error correction both involve setting "
+                 "the base to the one with the best quality. They differ only "
+                 "when the qualities are equal -- liberal means set it to the "
+                 "base from the read with the overall best median base "
+                 "quality, while conservative means to leave it unchanged. "
+                 "'N' means to set the base to N. If exactly one base is "
+                 "ambiguous, the non-ambiguous base is always used. (no "
+                 "error correction)")
         
         group = self.add_group(
             "Modifications", title="Additional read modifications")
@@ -234,11 +236,11 @@ standard output.
             type=CharList(choices=('A','C','G','Q','W')), default="CGQAW",
             help="The order in which trimming operations are be applied. This "
                  "is a string of 1-5 of the following characters: A = adapter "
-                 "trimming; C = cutting (unconditional); G = NextSeq trimming; "
-                 "Q = quality trimming; W = overwrite poor quality reads. The "
-                 "default is 'WCGQA' to maintain compatibility with "
-                 "Cutadapt; however, this is likely to change to 'GAWCQ' in "
-                 "the near future.")
+                 "trimming; C = cutting (unconditional); G = NextSeq "
+                 "trimming; Q = quality trimming; W = overwrite poor quality "
+                 "reads. The  default is 'WCGQA' to maintain compatibility "
+                 "with Cutadapt; however, this is likely to change to 'GAWCQ' "
+                 "in the near future.")
         group.add_argument(
             "-u",
             "--cut",
@@ -250,7 +252,8 @@ standard output.
         group.add_argument(
             "-q",
             "--quality-cutoff",
-            type=Delimited(data_type=positive(int, True), min_len=1, max_len=2),
+            type=Delimited(
+                data_type=positive(int, True), min_len=1, max_len=2),
             default=None, metavar="[5'CUTOFF,]3'CUTOFF",
             help="Trim low-quality bases from 5' and/or 3' ends of each read "
                  "before adapter removal. Applied to both reads if data is "
@@ -279,13 +282,14 @@ standard output.
             "-x",
             "--prefix",
             default='',
-            help="Add this prefix to read names. Use {name} to insert the name "
-                 "of the matching adapter. (no)")
+            help="Add this prefix to read names. Use {name} to insert the "
+                 "name of the matching adapter. (no)")
         group.add_argument(
             "-y",
             "--suffix",
             default='',
-            help="Add this suffix to read names; can also include {name}. (no)")
+            help="Add this suffix to read names; can also include {name}. "
+                 "(no)")
         group.add_argument(
             "--strip-suffix",
             action='append', default=[],
@@ -330,20 +334,30 @@ standard output.
         group.add_argument(
             "--max-n",
             type=positive(float, True), default=None, metavar="COUNT",
-            help="Discard reads with too many N bases. If COUNT is an integer, "
-                 "it is treated as the absolute number of N bases. If it is "
-                 "between 0 and 1, it is treated as the proportion of N's "
-                 "allowed in a read. (no)")
+            help="Discard reads with too many N bases. If COUNT is an "
+                 "integer, it is treated as the absolute number of N bases. "
+                 "If it is between 0 and 1, it is treated as the proportion "
+                 "of N's allowed in a read. (no)")
         
         group = self.add_group("Output")
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file, metavar="FILE",
-            help="Write trimmed reads to FILE. FASTQ or FASTA format is chosen "
-                 "depending on input. The summary report is sent to standard "
-                 "output. Use '{name}' in FILE to demultiplex reads into "
-                 "multiple files. (write to standard output)")
+            type=writeable_file, metavar="FILE", default=None,
+            help="Write trimmed reads to FILE. FASTQ or FASTA format is "
+                 "chosen depending on input. Use '{name}' in FILE to "
+                 "demultiplex reads into multiple files. Use '-' to denote "
+                 "stdout. Unless writing to stdout, the summary report goes "
+                 "to stdout by default. (write to standard output)")
+        group.add_argument(
+            "-C",
+            "--compression-format",
+            metavar="FORMAT", default=None,
+            choices=sorted(FORMATS.list_compression_formats()),
+            help="Force output to be compressed using the specified format, "
+                 "otherwise the format is guessed from the  file extension. "
+                 "This is option is required in order to have compressed "
+                 "output written to stdout/stderr. (None)")
         group.add_argument(
             "--info-file",
             type=writeable_file, metavar="FILE",
@@ -371,8 +385,9 @@ standard output.
         group.add_argument(
             "--too-long-output",
             type=writeable_file, metavar="FILE",
-            help="Write reads that are too long (according to length specified "
-                 "by -M) to FILE. (no - too long reads are discarded)")
+            help="Write reads that are too long (according to length "
+                 "specified by -M) to FILE. (no - too long reads are "
+                 "discarded)")
         group.add_argument(
             "--untrimmed-output",
             type=writeable_file, default=None, metavar="FILE",
@@ -385,7 +400,7 @@ standard output.
                  "reads are discarded)")
         group.add_argument(
             "--report-file",
-            type=writeable_file, default="-", metavar="FILE",
+            type=writeable_file, default=None, metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)")
         group.add_argument(
             "--report-formats",
@@ -403,8 +418,8 @@ standard output.
             nargs="*", default=None,
             help="Which read-level statistics to compute. Can be 'none' "
                  "(default), 'pre': only compute pre-trimming stats; 'post': "
-                 "only compute post-trimming stats; or 'both'. The keyword can "
-                 "be followed by ':' and then additional configuration "
+                 "only compute post-trimming stats; or 'both'. The keyword "
+                 "can be followed by ':' and then additional configuration "
                  "parameters. E.g. 'pre:tiles' means to also collect "
                  "tile-level statistics (Illumina data only), and "
                  "'pre:tiles=<regexp>' means to use the specified regular "
@@ -481,11 +496,12 @@ standard output.
         group.add_argument(
             "-w",
             "--overwrite-low-quality",
-            type=Delimited(data_type=positive(int, True), min_len=3, max_len=3),
+            type=Delimited(
+                data_type=positive(int, True), min_len=3, max_len=3),
             default=None, metavar="LOWQ,HIGHQ,WINDOW",
-            help="When one read has mean quality < LOWQ and the other read has "
-                 "mean quality >= HIGHQ over the first WINDOW bases, overwrite "
-                 "the worse read with the better read.")
+            help="When one read has mean quality < LOWQ and the other read "
+                 "has mean quality >= HIGHQ over the first WINDOW bases, "
+                 "overwrite the worse read with the better read.")
         group.add_argument(
             "-p",
             "--paired-output",
@@ -514,8 +530,8 @@ standard output.
             "--too-short-paired-output",
             type=writeable_file, default=None, metavar="FILE",
             help="Write second read in a pair to this file if pair is too "
-                 "short. Use together with --too-short-output. (no - too short "
-                 "reads are discarded)")
+                 "short. Use together with --too-short-output. (no - too "
+                 "short reads are discarded)")
         group.add_argument(
             "--too-long-paired-output",
             type=writeable_file, default=None, metavar="FILE",
@@ -578,7 +594,7 @@ standard output.
             help="Size of queue for batches of results to be written. "
                  "(THREADS * 100)")
         group.add_argument(
-            "--compression",
+            "--compression-mode",
             choices=("worker", "writer"), default=None,
             help="Where data compression should be performed. Defaults to "
                  "'writer' if system-level compression can be used and "
@@ -589,15 +605,13 @@ standard output.
         paired = options.paired
         
         if not paired:
-            if not options.output:
-                parser.error("An output file is required")
             if options.untrimmed_paired_output:
                 parser.error(
                     "Option --untrimmed-paired-output can only be used when "
                     "trimming paired-end reads (with option -p).")
         else:
             if not options.interleaved_output:
-                if not options.output:
+                if options.output is None:
                     parser.error(
                         "When you use -p or --paired-output, you must also "
                         "use the -o option.")
@@ -615,8 +629,9 @@ standard output.
                 if (options.too_short_output and
                         not options.too_short_paired_output):
                     parser.error(
-                        "When using --too-short-output with ""paired-end "
-                        "reads, you also need to use --too-short-paired-output")
+                        "When using --too-short-output with paired-end "
+                        "reads, you also need to use "
+                        "--too-short-paired-output")
                 if (options.too_long_output and
                         not options.too_long_paired_output):
                     parser.error(
@@ -632,20 +647,26 @@ standard output.
                     options.too_long_paired_output or
                     options.overwrite_low_quality):
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
-                # Read modifications (such as quality trimming) are applied also
-                # to second read.
+                # Read modifications (such as quality trimming) are applied 
+                # also to second read.
                 paired = 'both'
             else:
-                # Modify first read only, keep second in sync (-p given, but not
-                # -A/-G/-B/-U). This exists for backwards compatibility
+                # Modify first read only, keep second in sync (-p given, but 
+                # not -A/-G/-B/-U). This exists for backwards compatibility
                 # ('legacy mode').
                 paired = 'first'
             
             options.paired = paired
         
         # Send report to stderr if main output will be going to stdout
-        if options.output is None and options.report_file == STDOUT:
-            options.report_file = STDERR
+        if options.output == options.report_file:
+            if options.output is None:
+                options.report_file = STDERR
+            else:
+                parser.error("'output' and 'report_file' must be different.")
+        elif options.report_file is None:
+            options.report_file = (
+                STDERR if options.output is STDOUT else STDOUT)
         
         # If the user specifies a max rmp, that is used for determining the
         # minimum overlap and -O is set to 1, otherwise -O is set to the old
@@ -665,8 +686,8 @@ standard output.
                 parser.error("Insert aligner only works with paired-end reads")
                 # TODO: should also be checking that there is exactly one 3'
                 # adapter for each read
-                # TODO: have the aligner tell us whether it can be used based on
-                # options?
+                # TODO: have the aligner tell us whether it can be used based 
+                # on options?
             if options.indels and options.indel_cost is None:
                 options.indel_cost = 3
             if options.overlap is None:
@@ -682,7 +703,8 @@ standard output.
         if options.merge_overlapping:
             if options.merged_output is None:
                 logging.getLogger().warning(
-                    "--merge-output is not set; merged reads will be discarded")
+                    "--merge-output is not set; merged reads will be "
+                    "discarded")
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
         
@@ -738,7 +760,8 @@ standard output.
         if options.overwrite_low_quality:
             if not paired:
                 parser.error(
-                    "--overwrite-low-quality is not valid for single-end reads")
+                    "--overwrite-low-quality is not valid for single-end "
+                    "reads")
             if (options.overwrite_low_quality[0] >
                     options.overwrite_low_quality[1]):
                 parser.error(
@@ -759,13 +782,28 @@ standard output.
                 "Only one of the --discard-trimmed, --discard-untrimmed "
                 "and --untrimmed-output options can be used at the same time.")
         
-        if options.output is not None and '{name}' in options.output:
-            if options.discard_trimmed:
-                parser.error(
-                    "Do not use --discard-trimmed when demultiplexing.")
-            if paired:
-                parser.error(
-                    "Demultiplexing not supported for paired-end files, yet.")
+        compression_format = options.compression_format 
+        
+        if options.output is not None:
+            # Guess compression format from filename
+            if compression_format is None:
+                compression_format = FORMATS.guess_compression_format(
+                    options.output)
+            
+            # Multiplexed output
+            if '{name}' in options.output:
+                if options.discard_trimmed:
+                    parser.error(
+                        "Do not use --discard-trimmed when demultiplexing.")
+                if paired:
+                    parser.error(
+                        "Demultiplexing not yet supported for paired-end "
+                        "files.")
+        
+        if compression_format is not None:
+            options.can_use_system_compression = (FORMATS.
+                get_compression_format(compression_format).
+                can_use_system_compression())
         
         if options.maq:
             options.colorspace = True
@@ -800,29 +838,39 @@ standard output.
         
         if options.cut:
             if len(options.cut) > 2:
-                parser.error("You cannot remove bases from more than two ends.")
+                parser.error(
+                    "You cannot remove bases from more than two ends.")
             if len(options.cut) == 2 and options.cut[0] * options.cut[1] > 0:
-                parser.error("You cannot remove bases from the same end twice.")
+                parser.error(
+                    "You cannot remove bases from the same end twice.")
         
         if options.cut_min:
             if len(options.cut_min) > 2:
-                parser.error("You cannot remove bases from more than two ends.")
+                parser.error(
+                    "You cannot remove bases from more than two ends.")
             if (len(options.cut_min) == 2 and
                     options.cut_min[0] * options.cut_min[1] > 0):
-                parser.error("You cannot remove bases from the same end twice.")
+                parser.error(
+                    "You cannot remove bases from the same end twice.")
         
         if paired == 'both' and options.cut2:
             if len(options.cut2) > 2:
-                parser.error("You cannot remove bases from more than two ends.")
-            if len(options.cut2) == 2 and options.cut2[0] * options.cut2[1] > 0:
-                parser.error("You cannot remove bases from the same end twice.")
+                parser.error(
+                    "You cannot remove bases from more than two ends.")
+            if (
+                    len(options.cut2) == 2 and 
+                    options.cut2[0] * options.cut2[1] > 0):
+                parser.error(
+                    "You cannot remove bases from the same end twice.")
         
         if paired == 'both' and options.cut_min2:
             if len(options.cut_min2) > 2:
-                parser.error("You cannot remove bases from more than two ends.")
+                parser.error(
+                    "You cannot remove bases from more than two ends.")
             if (len(options.cut_min2) == 2 and
                     options.cut_min2[0] * options.cut_min2[1] > 0):
-                parser.error("You cannot remove bases from the same end twice.")
+                parser.error(
+                    "You cannot remove bases from the same end twice.")
         
         if not options.stats or options.stats == 'none':
             options.stats = None
@@ -841,18 +889,17 @@ standard output.
         if options.threads is not None:
             threads = configure_threads(options, parser)
             
-            if options.compression is None:
-                # Our tests show that with 8 or more threads, worker compression
-                # is more efficient.
+            if options.compression_mode is None:
+                # Our tests show that with 8 or more threads, worker 
+                # compression is more efficient.
                 if options.writer_process and 2 < threads < 8:
-                    from atropos.io import compression
-                    if compression.can_use_system_compression():
-                        options.compression = "writer"
+                    if options.can_use_system_compression:
+                        options.compression_mode = "writer"
                     else:
-                        options.compression = "worker"
+                        options.compression_mode = "worker"
                 else:
-                    options.compression = "worker"
-            elif options.compression == "writer":
+                    options.compression_mode = "worker"
+            elif options.compression_mode == "writer":
                 if not options.writer_process:
                     parser.error(
                         "Writer compression and --no-writer-process are "
@@ -861,14 +908,15 @@ standard output.
                     logging.getLogger().warning(
                         "Writer compression requires > 2 threads; using "
                         "worker compression instead")
-                    options.compression = "worker"
+                    options.compression_mode = "worker"
             
             # Set queue sizes if necessary.
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
             if options.read_queue_size is None:
                 options.read_queue_size = (
-                    threads * (100 if options.compression == "writer" else 500))
+                    threads * 
+                    (100 if options.compression_mode == "writer" else 500))
             elif (
                     options.read_queue_size > 0 and
                     options.read_queue_size < threads):
@@ -876,13 +924,15 @@ standard output.
             
             if options.result_queue_size is None:
                 options.result_queue_size = (
-                    threads * (100 if options.compression == "worker" else 500))
+                    threads * 
+                    (100 if options.compression_mode == "worker" else 500))
             elif (
                     options.result_queue_size > 0 and
                     options.result_queue_size < threads):
                 parser.error("Result queue size must be >= 'threads'")
             
-            max_queue_size = options.read_queue_size + options.result_queue_size
+            max_queue_size = (
+                options.read_queue_size + options.result_queue_size)
             if options.batch_size is None:
                 options.batch_size = max(1000, max_queue_size / 10e6)
             elif options.batch_size * max_queue_size > 10e6:

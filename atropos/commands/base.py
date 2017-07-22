@@ -6,7 +6,7 @@ import platform
 import sys
 from atropos import __version__
 from atropos.adapters import AdapterCache
-from atropos.io.seqio import open_reader, sra_reader
+from atropos.io import open_reader, sra_reader
 from atropos.util import MergingDict, Const, Summarizable, Timing
 
 class Pipeline(object):
@@ -238,7 +238,7 @@ class BaseCommandRunner(object):
         """
         if self._progress_options:
             # Wrap iterator in progress bar
-            from atropos.io.progress import create_progress_reader
+            from atropos.util.progress import create_progress_reader
             itr = create_progress_reader(self, *self._progress_options)
             # itr may be none if there are no progress bar libraries available
             if itr is not None:

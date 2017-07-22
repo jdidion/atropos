@@ -12,7 +12,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 from atropos import align
 from atropos.align import Match
-from atropos.io.seqio import ColorspaceSequence, FastaReader
+from atropos.io import ColorspaceSequence, FastaReader
 from atropos.util import (
     IUPAC_BASES, GC_BASES, MergingDict, NestedDict, CountingDict, Const, 
     reverse_complement)

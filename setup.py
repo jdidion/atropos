@@ -132,6 +132,7 @@ setup(
         'adapters/*.fa',
         'commands/**/templates/*'
     ] },
+    install_requires = ['xphyle>=3.0.5'],
     tests_require = ['pytest'], #, 'jinja2', 'pysam'],
     extras_require = {
         'progressbar' : ['progressbar2'],

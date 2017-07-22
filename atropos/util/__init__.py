@@ -7,8 +7,10 @@ import functools
 import logging
 import math
 from numbers import Number
+import os
 import time
 from atropos import AtroposError
+from xphyle.formats import FORMATS
 
 def build_iso_nucleotide_table():
     """Generate a dict mapping ISO nucleotide characters to their complements,
@@ -654,6 +656,27 @@ def truncate_string(string, max_len=100):
     if len(string) > max_len:
         string = string[:max_len-3] + '...'
     return string
+
+def splitext_compressed(name):
+    """Split the filename and extensions of a file that potentially has two
+    extensions - one for the file type (e.g. 'fq') and one for the compression
+    type (e.g. 'gz').
+    
+    Args:
+        name: The filename.
+    
+    Returns:
+        A tuple (name, ext1, ext2), where ext1 is the filetype extension and
+        ext2 is the compression type extension, or None.
+    """
+    ext1 = ext2 = None
+    for ext in FORMATS.list_extensions(with_sep=True):
+        if name.endswith(ext):
+            ext2 = ext
+            name = name[:-len(ext)]
+            break
+    name, ext1 = os.path.splitext(name)
+    return (name, ext1, ext2)
 
 def run_interruptible(func, *args, **kwargs):
     """Run a function, gracefully handling keyboard interrupts.

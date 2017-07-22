@@ -5,8 +5,8 @@ import csv
 import re
 from atropos import AtroposError
 from atropos.commands.base import (
-    BaseCommandRunner, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin)
-from atropos.io import open_output
+    BaseCommandRunner, Pipeline, SingleEndPipelineMixin, 
+    PairedEndPipelineMixin)
 from atropos.util import qual2prob, run_interruptible
 
 class CommandRunner(BaseCommandRunner):

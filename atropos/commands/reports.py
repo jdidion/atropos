@@ -2,8 +2,8 @@
 """
 import importlib
 import os
-from atropos.io import STDOUT, STDERR, open_output
-from atropos.io.seqio import PAIRED
+from xphyle import STDOUT, STDERR, xopen
+from atropos.io import PAIRED
 
 SERIALIZERS = dict(
     json='t',
@@ -101,7 +101,7 @@ class BaseReportGenerator(object):
             kwargs: Additional arguments to pass to the `dump` method.
         """
         mod = importlib.import_module(fmt)
-        with open_output(outfile, 'w' + mode) as stream:
+        with xopen(outfile, 'w' + mode) as stream:
             mod.dump(obj, stream, **kwargs)
     
     def generate_text_report(self, fmt, summary, outfile, **kwargs):

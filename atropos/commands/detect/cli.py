@@ -1,6 +1,6 @@
 """Command-line interface for the detect command.
 """
-from atropos.io import STDOUT, STDERR
+from xphyle import STDOUT, STDERR
 from atropos.commands.cli import (
     BaseCommandParser, positive, readable_url, writeable_file,
     readwriteable_file)

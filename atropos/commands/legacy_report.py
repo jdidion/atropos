@@ -5,7 +5,7 @@ and MultiQC reports.
 """
 import math
 import textwrap
-from atropos.io import open_output
+from xphyle import open_
 from atropos.util import truncate_string, weighted_median
 from .reports import BaseReportGenerator
 
@@ -221,7 +221,7 @@ class RowPrinter(Printer):
 class LegacyReportGenerator(BaseReportGenerator):
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            with open_output(outfile, context_wrapper=True) as out:
+            with open_(outfile, 'wt') as out:
                 generate_report(summary, out)
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)

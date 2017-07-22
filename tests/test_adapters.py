@@ -2,7 +2,7 @@
 from pytest import raises
 from atropos.adapters import (
     Adapter, Match, ColorspaceAdapter, FRONT, BACK, parse_braces, LinkedAdapter)
-from atropos.io.seqio import Sequence
+from atropos.io import Sequence
 
 def test_issue_52():
     adapter = Adapter(

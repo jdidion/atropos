@@ -12,11 +12,11 @@ import re
 import sys
 import textwrap
 import urllib
+from xphyle.paths import (
+    STDOUT, STDERR, check_writable_file, resolve_path, check_path)
 from atropos import __version__
-from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
-from atropos.io.compression import splitext_compressed
-from atropos.io.seqio import SINGLE, PAIRED
-from atropos.util import MAGNITUDE
+from atropos.io import SINGLE, PAIRED
+from atropos.util import MAGNITUDE, splitext_compressed
 
 class BaseCommandParser(object):
     """Base class for Atropos sub-commands.
@@ -414,15 +414,6 @@ class Delimited(TypeWithArgs):
         
         return vals
 
-ACCESS = dict(
-    r=os.R_OK,
-    rU=os.R_OK,
-    rb=os.R_OK,
-    w=os.W_OK,
-    wb=os.W_OK,
-    x=os.X_OK
-)
-
 class AccessiblePath(TypeWithArgs):
     """Test that a path is accessible.
     """
@@ -430,9 +421,9 @@ class AccessiblePath(TypeWithArgs):
         if type_ == 'f' and path in (STDOUT, STDERR):
             return path
         if 'w' in mode:
-            return check_writeable(path, type_)
+            return check_writable_file(path, type_)
         else:
-            return check_path(path, type_, ACCESS[mode])
+            return check_path(path, type_, mode)
 
 class ReadwriteableFile(object):
     """Validator for a file argument that must be both readable and writeable.

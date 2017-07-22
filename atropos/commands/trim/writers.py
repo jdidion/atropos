@@ -1,9 +1,9 @@
 """Classes for formatting and writing trimmed reads to output.
 """
 import sys
-from atropos.io import STDOUT, xopen, open_output
-from atropos.io.compression import splitext_compressed
-from atropos.io.seqio import create_seq_formatter
+from xphyle import STDOUT, xopen
+from atropos.io import create_seq_formatter
+from atropos.util import splitext_compressed
 from .filters import NoFilter
 
 class Writers(object):
@@ -12,10 +12,11 @@ class Writers(object):
     Args:
         force_create: Whether empty output files should be created.
     """
-    def __init__(self, force_create):
+    def __init__(self, force_create, compression_format=None):
         self.writers = {}
         self.force_create = force_create
         self.suffix = None
+        self.compression_format = compression_format
     
     def get_writer(self, file_desc, compressed=False):
         """Create the writer for a file descriptor if it does not already
@@ -41,9 +42,10 @@ class Writers(object):
                 real_path = path
             # TODO: test whether O_NONBLOCK allows non-blocking write to NFS
             if compressed:
-                self.writers[path] = open_output(real_path, mode)
+                self.writers[path] = xopen(real_path, mode)
             else:
-                self.writers[path] = xopen(real_path, "w")
+                self.writers[path] = xopen(
+                    real_path, "w", compression=self.compression_format)
         
         return self.writers[path]
     
@@ -76,7 +78,7 @@ class Writers(object):
         """
         for path in self.force_create:
             if path not in self.writers and path != STDOUT:
-                with open_output(path, "w"):
+                with xopen(path, "w"):
                     pass
         for writer in self.writers.values():
             if writer not in (sys.stdout, sys.stderr):

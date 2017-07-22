@@ -1,10 +1,10 @@
 """Report generator for the detect command.
 """
 from itertools import repeat
+from xphyle import open_
 from atropos.commands.reports import BaseReportGenerator
 from atropos.commands.legacy_report import Printer, TitlePrinter
-from atropos.io import open_output
-from atropos.io.seqio import FastaFormat
+from atropos.io import FastaFormat
 
 class ReportGenerator(BaseReportGenerator):
     def get_report_args(self, fmt, options):
@@ -17,7 +17,7 @@ class ReportGenerator(BaseReportGenerator):
     
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            with open_output(outfile, context_wrapper=True) as out:
+            with open_(outfile, 'w') as out:
                 generate_reports(out, summary, **kwargs)
         elif fmt == 'fasta':
             generate_fasta(outfile, summary, **kwargs)
@@ -131,9 +131,9 @@ def generate_fasta(outfile, summary, union=False, perinput=False):
         if union:
             union_records.extend(records)
         if perinput:
-            with open_output("{}.{}.fasta".format(name_prefix, i), 'wt') as out:
+            with xopen("{}.{}.fasta".format(name_prefix, i), 'wt') as out:
                 out.write("".join(records))
     
     if union:
-        with open_output(outfile, 'wt') as union_out:
+        with xopen(outfile, 'wt') as union_out:
             union_out.write("".join(union_records))

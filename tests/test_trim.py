@@ -1,7 +1,7 @@
 # coding: utf-8
 from atropos.adapters import Adapter, ColorspaceAdapter, PREFIX, BACK
 from atropos.commands.trim.modifiers import AdapterCutter
-from atropos.io.seqio import ColorspaceSequence, Sequence
+from atropos.io import ColorspaceSequence, Sequence
 
 def test_cs_5p():
     read = ColorspaceSequence("name", "0123", "DEFG", "T")

@@ -1,8 +1,8 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 import copy
-from atropos.io import xopen
-from atropos.io.seqio import FormatError, SequenceReader
+from xphyle import xopen
+from atropos.io import FormatError, SequenceReader
 from atropos.util import reverse_complement, truncate_string
 
 cdef class Sequence(object):

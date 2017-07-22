@@ -3,14 +3,14 @@
 TODO: move reporting functionality out of the ErrorEstimator class.
 """
 from itertools import repeat
+from xphyle import open_
 from atropos.commands.reports import BaseReportGenerator
-from atropos.io import open_output
 from atropos.commands.legacy_report import Printer, TitlePrinter
 
 class ReportGenerator(BaseReportGenerator):
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            with open_output(outfile, context_wrapper=True) as out:
+            with open_(outfile, 'wt') as out:
                 generate_reports(out, summary)
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)

@@ -2,6 +2,10 @@
 
 v1.1.9 (dev)
 ------------
+* Minor breaking change: the --compression argument has been renamed to --compression-mode
+* Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
+* Transitioned all file management to xphyle.
+* Enabled use of stdout by default with single-end and interleaved reads.
 
 v1.1.8 (2017.07.10)
 -------------------

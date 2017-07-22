@@ -1,5 +1,6 @@
 # coding: utf-8
 from pytest import raises
+from unittest import skipIf
 from collections import defaultdict
 import random
 import sys
@@ -8,8 +9,8 @@ from io import StringIO
 import shutil
 from textwrap import dedent
 from tempfile import mkdtemp
-from atropos.io import xopen, open_output
-from atropos.io.seqio import (Sequence, ColorspaceSequence, FormatError,
+from xphyle import xopen
+from atropos.io import (Sequence, ColorspaceSequence, FormatError,
     FastaReader, FastqReader, FastaQualReader, InterleavedSequenceReader,
     FastaFormat, FastqFormat, InterleavedFormatter, get_format,
     open_reader as openseq, sequence_names_match)
@@ -19,7 +20,7 @@ from .utils import temporary_path
 simple_fastq = [
     Sequence("first_sequence", "SEQUENCE1", ":6;;8<=:<"),
     Sequence("second_sequence", "SEQUENCE2", "83<??:(61")
-    ]
+]
 
 simple_fasta = [ Sequence(x.name, x.sequence, None) for x in simple_fastq ]
 
@@ -186,7 +187,7 @@ class TestSeqioOpen:
         path = os.path.join(self._tmpdir, 'tmp.fasta')
         fmt = get_format(path)
         assert isinstance(fmt, FastaFormat)
-        with open_output(path, "w") as f:
+        with xopen(path, "w") as f:
             for seq in simple_fasta:
                 f.write(fmt.format(seq))
         assert list(openseq(path)) == simple_fasta
@@ -195,7 +196,7 @@ class TestSeqioOpen:
         path = os.path.join(self._tmpdir, 'tmp.fasta')
         fmt = get_format(path, qualities=True)
         assert isinstance(fmt, FastaFormat)
-        with open_output(path, "w") as f:
+        with xopen(path, "w") as f:
             for seq in simple_fastq:
                 f.write(fmt.format(seq))
         assert list(openseq(path)) == simple_fasta
@@ -203,7 +204,7 @@ class TestSeqioOpen:
     def test_autodetect_fastq_format(self):
         path = os.path.join(self._tmpdir, 'tmp.fastq')
         fmt = get_format(path)
-        with open_output(path, "w") as f:
+        with xopen(path, "w") as f:
             for seq in simple_fastq:
                 f.write(fmt.format(seq))
         assert list(openseq(path)) == simple_fastq
@@ -252,7 +253,7 @@ class TestFastaWriter:
 
     def test(self):
         fmt = FastaFormat()
-        with open_output(self.path, "w") as fw:
+        with xopen(self.path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA"))
             fw.write(fmt.format_entry("name2", "HELLO"))
         with open(self.path) as t:
@@ -260,7 +261,7 @@ class TestFastaWriter:
 
     def test_linelength(self):
         fmt = FastaFormat(line_length=3)
-        with open_output(self.path, "w") as fw:
+        with xopen(self.path, "w") as fw:
             fw.write(fmt.format_entry("r1", "ACG"))
             fw.write(fmt.format_entry("r2", "CCAT"))
             fw.write(fmt.format_entry("r3", "TACCAG"))
@@ -271,7 +272,7 @@ class TestFastaWriter:
 
     def test_write_sequence_object(self):
         fmt = FastaFormat()
-        with open_output(self.path, "w") as fw:
+        with xopen(self.path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA")))
             fw.write(fmt.format(Sequence("name2", "HELLO")))
         with open(self.path) as t:
@@ -293,7 +294,7 @@ class TestFastqWriter:
 
     def test(self):
         fmt = FastqFormat()
-        with open_output(self.path, "w") as fw:
+        with xopen(self.path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA", "!#!#!"))
             fw.write(fmt.format_entry("name2", "HELLO", "&&&!&&"))
         with open(self.path) as t:
@@ -301,7 +302,7 @@ class TestFastqWriter:
 
     def test_twoheaders(self):
         fmt = FastqFormat()
-        with open_output(self.path, "w") as fw:
+        with xopen(self.path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA", "!#!#!", name2="name")))
             fw.write(fmt.format(Sequence("name2", "HELLO", "&&&!&", name2="name2")))
         with open(self.path) as t:
@@ -338,32 +339,3 @@ class TestPairedSequenceReader:
         assert match('abc.1', 'abc.2')
         assert match('abc1', 'abc2')
         assert not match('abc', 'xyz')
-
-
-def create_truncated_file(path):
-    # Random text
-    text = ''.join(random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ') for _ in range(200))
-    f = xopen(path, 'w')
-    f.write(text)
-    f.close()
-    f = open(path, 'a')
-    f.truncate(os.stat(path).st_size - 10)
-    f.close()
-
-# Disable these tests in Python 3.2 and 3.3
-if not ((3, 2) <= sys.version_info[:2] <= (3, 3)):
-    def test_truncated_gz():
-        with raises(EOFError), temporary_path('truncated.gz') as path:
-            create_truncated_file(path)
-            f = xopen(path, 'r')
-            f.read()
-            f.close()
-
-
-    def test_truncated_gz_iter():
-        with raises(EOFError), temporary_path('truncated.gz') as path:
-            create_truncated_file(path)
-            f = xopen(path, 'r', use_system=False) # work around bug in py3.4
-            for line in f:
-                pass
-            f.close()

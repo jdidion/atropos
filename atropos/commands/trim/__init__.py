@@ -5,13 +5,13 @@ import logging
 import os
 import sys
 import textwrap
+from xphyle import STDOUT
 from atropos.commands.base import (
     BaseCommandRunner, Summary, Pipeline, SingleEndPipelineMixin,
     PairedEndPipelineMixin)
 from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
-from atropos.io import STDOUT
 from atropos.util import RandomMatchProbability, Const, run_interruptible
 from .modifiers import (
     AdapterCutter, DoubleEncoder, InsertAdapterCutter, LengthTagModifier,
@@ -550,7 +550,9 @@ class CommandRunner(BaseCommandRunner):
             mixin_class = PairedEndPipelineMixin
         else:
             mixin_class = SingleEndPipelineMixin
-        writers = Writers(force_create)
+        
+        writers = Writers(force_create, options.compression_format)
+        
         record_handler = RecordHandler(modifiers, filters, formatters)
         if options.stats:
             record_handler = StatsRecordHandlerWrapper(
@@ -657,12 +659,11 @@ class CommandRunner(BaseCommandRunner):
         # run_parallel method to avoid extra work if only running in serial
         # mode.
         from multiprocessing import Process, Queue
+        from xphyle.formats import FORMATS
         from atropos.commands.multicore import (
             Control, PendingQueue, ParallelPipelineMixin,
             ParallelPipelineRunner, MulticoreError, wait_on_process, enqueue,
             dequeue, kill, RETRY_INTERVAL, CONTROL_ACTIVE, CONTROL_ERROR)
-        from atropos.io.compression import (
-            get_compressor, can_use_system_compression)
         
         class Done(MulticoreError):
             """Raised when process exits normally.
@@ -678,7 +679,8 @@ class CommandRunner(BaseCommandRunner):
             """ParallelPipelineRunner for a TrimPipeline.
             """
             def __init__(
-                    self, command_runner, pipeline, threads, writer_manager=None):
+                    self, command_runner, pipeline, threads, 
+                    writer_manager=None):
                 super().__init__(command_runner, pipeline, threads)
                 self.writer_manager = writer_manager
             
@@ -725,8 +727,9 @@ class CommandRunner(BaseCommandRunner):
         class CompressingWorkerResultHandler(WorkerResultHandler):
             """Wraps a ResultHandler and compresses results prior to writing.
             """
-            def __init__(self, *args, **kwargs):
+            def __init__(self, *args, compression_format=None, **kwargs):
                 super().__init__(*args, **kwargs)
+                self.compression_format = compression_format
                 self.file_compressors = None
             
             def start(self, worker):
@@ -745,7 +748,13 @@ class CommandRunner(BaseCommandRunner):
                 """Returns the file compressor based on the file extension.
                 """
                 if filename not in self.file_compressors:
-                    self.file_compressors[filename] = get_compressor(filename)
+                    fmt_name = (
+                        self.compression_format or 
+                        FORMATS.guess_compression_format(filename))
+                    fmt = None
+                    if fmt_name is not None:
+                        fmt = FORMATS.get_compression_format(fmt_name)
+                    self.file_compressors[filename] = fmt
                 return self.file_compressors[filename]
         
         class OrderPreservingWriterResultHandler(WriterResultHandler):
@@ -877,15 +886,15 @@ class CommandRunner(BaseCommandRunner):
             """Manager for a writer process and control variable.
             """
             def __init__(
-                    self, writers, compression, preserve_order, result_queue,
-                    timeout):
+                    self, writers, compression_mode, preserve_order, 
+                    result_queue, timeout):
                 # result handler
                 if preserve_order:
                     writer_result_handler = OrderPreservingWriterResultHandler(
-                        writers, compressed=compression == "worker")
+                        writers, compressed=compression_mode == "worker")
                 else:
                     writer_result_handler = WriterResultHandler(
-                        writers, compressed=compression == "worker")
+                        writers, compressed=compression_mode == "worker")
                 
                 self.timeout = timeout
                 # Shared variable for communicating with writer thread
@@ -933,12 +942,12 @@ class CommandRunner(BaseCommandRunner):
         
         # Reserve a thread for the writer process if it will be doing the
         # compression and if one is available.
-        compression = self.compression
-        if compression is None:
-            compression = "worker"
-            if self.writer_process and can_use_system_compression():
-                compression = "writer"
-        if compression == "writer" and threads > 2:
+        compression_mode = self.compression_mode
+        if compression_mode is None:
+            compression_mode = "worker"
+            if self.writer_process and self.can_use_system_compression:
+                compression_mode = "writer"
+        if compression_mode == "writer" and threads > 2:
             threads -= 1
         
         # Queue by which results are sent from the worker processes to the
@@ -947,14 +956,15 @@ class CommandRunner(BaseCommandRunner):
         writer_manager = None
         
         if self.writer_process:
-            if compression == "writer":
+            if compression_mode == "writer":
                 worker_result_handler = WorkerResultHandler(
                     QueueResultHandler(result_queue))
             else:
                 worker_result_handler = CompressingWorkerResultHandler(
-                    QueueResultHandler(result_queue))
+                    QueueResultHandler(result_queue),
+                    compression_format=self.compression_format)
             writer_manager = WriterManager(
-                writers, compression, self.preserve_order, result_queue,
+                writers, compression_mode, self.preserve_order, result_queue,
                 timeout)
         else:
             worker_result_handler = WorkerResultHandler(
