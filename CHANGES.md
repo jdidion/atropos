@@ -1,11 +1,12 @@
 # Changes
 
-v1.1.9 (dev)
+v1.2.0 (dev)
 ------------
-* Minor breaking change: the --compression argument has been renamed to --compression-mode
+* *Minor breaking change:* the --compression argument has been renamed to --compression-mode, to avoid confusion with the new --compression-format option (see below).
 * Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
 * Transitioned all file management to xphyle.
 * Enabled use of stdout by default with single-end and interleaved reads.
+* Temporarily removed 3.7-dev support because the Cython installation fails on Travis.
 
 v1.1.8 (2017.07.10)
 -------------------

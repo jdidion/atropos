@@ -92,12 +92,11 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 ### 1.2
 
-* Migrate to xphyle (https://github.com/jdidion/xphyle) for file management.
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
 * Support SAM output.
 * Expand the list of contaminants that are detected by default.
-* Direct streaming and trimming of reads from SRA using [srastream](https://github.com/jdidion/srastream).
+* Migrate srastream dependency to ngstream.
 * Accessibility:
     * Create recipe for homebrew.
     * Automatically update conda and homebrew recipes for each release.

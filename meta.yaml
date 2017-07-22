@@ -25,6 +25,7 @@ requirements:
     - tqdm
     - pysam
     - jinja2
+    - srastream
 
 test:
   commands:
