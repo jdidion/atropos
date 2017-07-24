@@ -605,15 +605,19 @@ standard output.
         parser = self.parser
         paired = options.paired
         
+        # Any of these options imply paired-end and disable legacy mode
+        paired_both = (
+            options.adapters2 or options.front2 or options.anywhere2 or
+            options.cut2 or options.cut_min2 or
+            options.interleaved_output or options.pair_filter or 
+            options.overwrite_low_quality or
+            options.too_short_paired_output or
+            options.too_long_paired_output)
+        
         # If any of the options in the "paired" group are set, we implicitly
         # expect paired-end input
         paired_implicit = (
-            options.adapters2 or options.front2 or options.anywhere2 or
-            options.cut2 or options.cut_min2 or
-            options.paired_output or options.interleaved_output or 
-            options.pair_filter or options.overwrite_low_quality or
-            options.too_short_paired_output or
-            options.too_long_paired_output or
+            paired_both or options.paired_output or 
             options.untrimmed_paired_output)
         
         if paired or paired_implicit:
@@ -659,7 +663,7 @@ standard output.
                             "reads, you also need to use "
                             "--too-long-paired-output")
             
-            if paired_implicit or options.quality_cutoff or options.trim_n:
+            if paired_both or options.quality_cutoff or options.trim_n:
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
                 # Read modifications (such as quality trimming) are applied 
                 # also to second read.

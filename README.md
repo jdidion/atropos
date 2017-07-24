@@ -95,7 +95,6 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 * More unit tests for compressed file handling, including
     * new --compression-format option
-    * Default use of stdout with single-end and interleaved input
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
 * Support SAM output.
