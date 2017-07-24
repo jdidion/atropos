@@ -38,6 +38,7 @@ standard output.
             action='trim',
             batch_size=None,
             known_adapter=None,
+            use_interleaved_output=False,
             can_use_system_compression=False)
         
         group = self.add_group(
@@ -604,48 +605,61 @@ standard output.
         parser = self.parser
         paired = options.paired
         
-        if not paired:
-            if options.untrimmed_paired_output:
-                parser.error(
-                    "Option --untrimmed-paired-output can only be used when "
-                    "trimming paired-end reads (with option -p).")
-        else:
-            if not options.interleaved_output:
-                if options.output is None:
-                    parser.error(
-                        "When you use -p or --paired-output, you must also "
-                        "use the -o option.")
-                if not options.paired_output:
-                    parser.error(
-                        "When paired-end trimming is enabled via -A/-G/-B/-U, "
-                        "a second output file needs to be specified via -p "
-                        "(--paired-output).")
-                if (bool(options.untrimmed_output) !=
-                        bool(options.untrimmed_paired_output)):
-                    parser.error(
-                        "When trimming paired-end reads, you must use either "
-                        "none or both of the --untrimmed-output/"
-                        "--untrimmed-paired-output options.")
-                if (options.too_short_output and
-                        not options.too_short_paired_output):
-                    parser.error(
-                        "When using --too-short-output with paired-end "
-                        "reads, you also need to use "
-                        "--too-short-paired-output")
-                if (options.too_long_output and
-                        not options.too_long_paired_output):
-                    parser.error(
-                        "When using --too-long-output with paired-end "
-                        "reads, you also need to use --too-long-paired-output")
+        # If any of the options in the "paired" group are set, we implicitly
+        # expect paired-end input
+        paired_implicit = (
+            options.adapters2 or options.front2 or options.anywhere2 or
+            options.cut2 or options.cut_min2 or
+            options.paired_output or options.interleaved_output or 
+            options.pair_filter or options.overwrite_low_quality or
+            options.too_short_paired_output or
+            options.too_long_paired_output or
+            options.untrimmed_paired_output)
+        
+        if paired or paired_implicit:
+            if options.interleaved_output:
+                options.use_interleaved_output = True
+            else:
+                if options.output is None and options.paired_output is None:
+                    # If no output files are specified, write interleaved 
+                    # output to stdout by default.
+                    options.use_interleaved_output = True
+                else:
+                    if options.output is None:
+                        parser.error(
+                            "When you use -p or --paired-output, you must "
+                            "also use the -o option.")
+                    elif options.paired_output is None:
+                        parser.error(
+                            "When paired-end trimming is enabled, a second "
+                            "output file needs to be specified via -p "
+                            "(--paired-output).")
+                    
+                    if (
+                            bool(options.untrimmed_output) !=
+                            bool(options.untrimmed_paired_output)):
+                        parser.error(
+                            "When trimming paired-end reads, you must use "
+                            "either none or both of the --untrimmed-output/"
+                            "--untrimmed-paired-output options.")
+                    
+                    if (
+                            bool(options.too_short_output) !=
+                            bool(options.too_short_paired_output)):
+                        parser.error(
+                            "When using --too-short-output with paired-end "
+                            "reads, you also need to use "
+                            "--too-short-paired-output")
+                    
+                    if (
+                            bool(options.too_long_output) !=
+                            bool(options.too_long_paired_output)):
+                        parser.error(
+                            "When using --too-long-output with paired-end "
+                            "reads, you also need to use "
+                            "--too-long-paired-output")
             
-            # Any of these options switch off legacy mode
-            if (options.adapters2 or options.front2 or options.anywhere2 or
-                    options.cut2 or options.cut_min2 or
-                    options.quality_cutoff or options.trim_n or
-                    options.interleaved_input or options.pair_filter or
-                    options.too_short_paired_output or
-                    options.too_long_paired_output or
-                    options.overwrite_low_quality):
+            if paired_implicit or options.quality_cutoff or options.trim_n:
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
                 # Read modifications (such as quality trimming) are applied 
                 # also to second read.
@@ -657,6 +671,11 @@ standard output.
                 paired = 'first'
             
             options.paired = paired
+        
+        elif options.untrimmed_paired_output:
+            parser.error(
+                "Option --untrimmed-paired-output can only be used when "
+                "trimming paired-end reads (with option -p).")
         
         # Send report to stderr if main output will be going to stdout
         if options.output == options.report_file:
@@ -890,9 +909,12 @@ standard output.
             threads = configure_threads(options, parser)
             
             if options.compression_mode is None:
-                # Our tests show that with 8 or more threads, worker 
-                # compression is more efficient.
-                if options.writer_process and 2 < threads < 8:
+                if options.output is None or options.output in (STDOUT, STDERR):
+                    # We must use a writer process to write to stdout/stderr
+                    options.compression_mode = "writer"
+                elif options.writer_process and 2 < threads < 8:
+                    # Our tests show that with 8 or more threads, worker 
+                    # compression is more efficient.
                     if options.can_use_system_compression:
                         options.compression_mode = "writer"
                     else:

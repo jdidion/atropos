@@ -4,7 +4,8 @@ import os
 import shutil
 from atropos.commands import execute_cli, get_command
 from .utils import (
-    run, files_equal, datapath, cutpath, redirect_stderr, temporary_path)
+    run, files_equal, datapath, cutpath, redirect_stderr, temporary_path,
+    intercept_stdout)
 
 BACK_ALIGNERS = ('adapter', 'insert')
 
@@ -35,15 +36,25 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                 if callback:
                     callback(aligner, infiles, (p1, p2), result)
 
-def run_interleaved(params, inpath, expected, aligners=('adapter',)):
+def run_interleaved(params, inpath, expected, aligners=('adapter',), stdout=False):
     if type(params) is str:
         params = params.split()
     for aligner in aligners:
         with temporary_path(expected.format(aligner=aligner)) as tmp:
-            p = params.copy()
-            p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner)), '-L', tmp]
             command = get_command('trim')
-            result = command.execute(p)
+            p = params.copy()
+            p += ['--aligner', aligner, '-l', datapath(inpath.format(aligner=aligner))]
+            if stdout:
+                # Output is going to stdout, so we need to redirect it to the
+                # temp file
+                with intercept_stdout() as stdout:
+                    #print(params)
+                    result = command.execute(p)
+                    with open(tmp, 'wt') as out:
+                        out.write(stdout.getvalue())
+            else:
+                p.extend(['-L', tmp])
+                result = command.execute(p)
             assert isinstance(result, tuple)
             assert len(result) == 2
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
@@ -232,6 +243,13 @@ def test_interleaved():
     run_interleaved('-q 20 -a TTAGACATAT -A CAGTGGAGTA -m 14 -M 90',
         inpath='interleaved.fastq', expected='interleaved.fastq',
         aligners=BACK_ALIGNERS
+    )
+
+def test_interleaved_stdout():
+    '''single-pass interleaved paired-end with -q and -m'''
+    run_interleaved('-q 20 -a TTAGACATAT -A CAGTGGAGTA -m 14 -M 90',
+        inpath='interleaved.fastq', expected='interleaved.fastq',
+        aligners=BACK_ALIGNERS, stdout=True
     )
 
 def test_interleaved_no_paired_output():

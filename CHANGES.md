@@ -2,11 +2,12 @@
 
 v1.2.0 (dev)
 ------------
-* *Minor breaking change:* the --compression argument has been renamed to --compression-mode, to avoid confusion with the new --compression-format option (see below).
+* *Breaking change:* We dropped support for python 3.3 in order to migrate to xphyle for file management.
+* *Breaking change:* The --compression argument has been renamed to --compression-mode, to avoid confusion with the new --compression-format option (see below).
 * Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
 * Transitioned all file management to xphyle.
-* Enabled use of stdout by default with single-end and interleaved reads.
-* Temporarily removed 3.7-dev support because the Cython installation fails on Travis.
+* Enabled output to stdout by default with single-end and interleaved reads.
+* Temporarily removed python 3.7-dev support because the Cython installation fails on Travis.
 
 v1.1.8 (2017.07.10)
 -------------------

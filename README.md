@@ -26,13 +26,14 @@ Atropos is available from [pypi](https://pypi.python.org/pypi/atropos) and can b
 First install dependencies:
 
 * Required
-    * Python 3.3+ (python 2.x is NOT supported) - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
-    * Cython 0.25.2+ (`pip install Cython`)
+    * Python 3.4+ (python 2.x is NOT supported) - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3. If you encounter this bug, we recommend upgrading to a newer python version.
+    * Cython 0.25.2+
+    * xphyle 3.0.6+
 * Optional
     * pytest (for running unit tests)
-    * progressbar2 or tqdm (progressbar support)
-    * pysam (SAM/BAM input)
-    * khmer 2.0+ (`pip install khmer`) (for detecting low-frequency adapter contamination)
+    * progressbar2 or tqdm (for progressbar support)
+    * pysam (for SAM/BAM input)
+    * khmer 2.0+ (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
     * [ngs](https://github.com/ncbi/ngs) (for SRA streaming)
 
@@ -92,6 +93,9 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 ### 1.2
 
+* More unit tests for compressed file handling, including
+    * new --compression-format option
+    * Default use of stdout with single-end and interleaved input
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
 * Support SAM output.

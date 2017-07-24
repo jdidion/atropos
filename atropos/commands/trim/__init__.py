@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 import textwrap
-from xphyle import STDOUT
+from xphyle import STDOUT, STDERR
 from atropos.commands.base import (
     BaseCommandRunner, Summary, Pipeline, SingleEndPipelineMixin,
     PairedEndPipelineMixin)
@@ -470,10 +470,9 @@ class CommandRunner(BaseCommandRunner):
         filters = Filters(FilterFactory(options.paired, min_affected))
         
         output1 = output2 = None
-        interleaved = False
-        if options.interleaved_output:
+        interleaved = options.use_interleaved_output
+        if interleaved:
             output1 = options.interleaved_output
-            interleaved = True
         else:
             output1 = options.output
             output2 = options.paired_output
@@ -521,7 +520,9 @@ class CommandRunner(BaseCommandRunner):
                         force_create.append(output2)
             elif not (options.discard_trimmed and options.untrimmed_output):
                 formatters.add_seq_formatter(NoFilter, options.default_outfile)
-                if options.default_outfile != STDOUT and options.writer_process:
+                if (
+                        options.default_outfile not in (STDOUT, STDERR) and 
+                        options.writer_process):
                     force_create.append(options.default_outfile)
         
         if options.discard_untrimmed or options.untrimmed_output:
@@ -940,13 +941,19 @@ class CommandRunner(BaseCommandRunner):
         if threads < 2:
             raise ValueError("'threads' must be >= 2")
         
-        # Reserve a thread for the writer process if it will be doing the
-        # compression and if one is available.
+        # TODO: This code block is probably redundant now that we handle this
+        # in the cli module.
         compression_mode = self.compression_mode
         if compression_mode is None:
-            compression_mode = "worker"
-            if self.writer_process and self.can_use_system_compression:
+            if (
+                    self.output is None or 
+                    (self.writer_process and self.can_use_system_compression)):
                 compression_mode = "writer"
+            else:
+                compression_mode = "worker"
+        
+        # Reserve a thread for the writer process if it will be doing the
+        # compression and if one is available.
         if compression_mode == "writer" and threads > 2:
             threads -= 1
         

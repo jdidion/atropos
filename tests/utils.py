@@ -1,9 +1,11 @@
 # coding: utf-8
 from contextlib import contextmanager
 from importlib import import_module
+from io import BytesIO, TextIOWrapper
 import os
 import sys
 import traceback
+from unittest.mock import patch
 import urllib.request
 from atropos.commands import get_command
 
@@ -15,7 +17,6 @@ def redirect_stderr():
     yield
     sys.stderr = old_stderr
 
-
 @contextmanager
 def temporary_path(name):
     directory = os.path.join(os.path.dirname(__file__), 'testtmp')
@@ -26,14 +27,11 @@ def temporary_path(name):
     if os.path.exists(path):
         os.remove(path)
 
-
 def datapath(path):
     return os.path.join(os.path.dirname(__file__), 'data', path)
 
-
 def cutpath(path):
     return os.path.join(os.path.dirname(__file__), 'cut', path)
-
 
 def files_equal(path1, path2):
     #return os.system("diff -u {0} {1}".format(path1, path2)) == 0
@@ -48,10 +46,10 @@ def files_equal(path1, path2):
         print("Diff: <{}>".format(e.output.decode("utf-8")))
         return False
 
-
 def run(
         params, expected, inpath=None, inpath2=None, qualfile=None, 
-        interleaved_input=False, interleaved_output=False, sra_accn=None):
+        interleaved_input=False, interleaved_output=False, sra_accn=None,
+        stdout=False):
     if type(params) is str:
         params = params.split()
     with temporary_path(expected) as tmp_fastaq:
@@ -66,13 +64,22 @@ def run(
             params += ['-se', datapath(inpath)]
             if qualfile:
                 params += ['-sq', datapath(qualfile)]
-        if interleaved_output:
-            params += ['-L', tmp_fastaq]
-        else:
-            params += ['-o', tmp_fastaq] # TODO not parallelizable
-        #print(params)
         command = get_command('trim')
-        retcode, summary = command.execute(params)
+        if stdout:
+            # Output is going to stdout, so we need to redirect it to the
+            # temp file
+            with intercept_stdout() as stdout:
+                #print(params)
+                retcode, summary = command.execute(params)
+                with open(tmp_fastaq, 'wt') as out:
+                    out.write(stdout.getvalue())
+        else:
+            if interleaved_output:
+                params += ['-L', tmp_fastaq]
+            else:
+                params += ['-o', tmp_fastaq] # TODO not parallelizable
+            #print(params)
+            retcode, summary = command.execute(params)
         assert summary is not None
         assert isinstance(summary, dict)
         if 'exception' in summary and summary['exception'] is not None:
@@ -107,3 +114,30 @@ def no_import(lib):
         return mod is None
     except:
         return True
+
+class MockStdout(object):
+    def __init__(self, name, as_bytes):
+        self.bytes_io = BytesIO()
+        object.__setattr__(self.bytes_io, 'name', name)
+        self.wrapper = TextIOWrapper(self.bytes_io)
+        self.wrapper.mode = 'w'
+        self.as_bytes = as_bytes
+    
+    def getvalue(self):
+        self.wrapper.flush()
+        val = self.bytes_io.getvalue()
+        if not self.as_bytes:
+            val = val.decode()
+        return val
+
+@contextmanager
+def intercept_stdout(as_bytes=False):
+    i = MockStdout('<stdout>', as_bytes)
+    with patch('sys.stdout', i.wrapper):
+        yield i
+
+@contextmanager
+def intercept_stderr(as_bytes=False):
+    i = MockStdout('<stderr>', as_bytes)
+    with patch('sys.stderr', i.wrapper):
+        yield i

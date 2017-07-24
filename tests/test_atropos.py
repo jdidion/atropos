@@ -15,6 +15,9 @@ from .utils import (
 def test_example():
     run('-N -b ADAPTER', 'example.fa', 'example.fa')
 
+def test_example_stdout():
+    run('-N -b ADAPTER', 'example.fa', 'example.fa', stdout=True)
+
 def test_small():
     run('-b TTAGACATATCTCCGTCG', 'small.fastq', 'small.fastq')
 
