@@ -1,7 +1,7 @@
 # Changes
 
-v1.1.9 (dev)
-------------
+v1.1.9 (2017.08.01)
+-------------------
 * Fix #30: failure when using --preserve-order option
 
 v1.1.8 (2017.07.10)
