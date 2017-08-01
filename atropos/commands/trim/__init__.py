@@ -758,7 +758,7 @@ class CommandRunner(BaseCommandRunner):
                 self.cur_batch = None
             
             def start(self, worker):
-                super().__init__(worker)
+                super().start(worker)
                 self.pending = PendingQueue()
                 self.cur_batch = 1
             
@@ -778,7 +778,7 @@ class CommandRunner(BaseCommandRunner):
                             "OrderPreservingWriterResultHandler finishing "
                             "without having seen {} batches".format(
                                 total_batches))
-                self.writers.close()
+                super().finish(total_batches=total_batches)
             
             def consume_pending(self):
                 """Consume any remaining items in the queue.
