@@ -9,6 +9,10 @@ v1.2.0 (dev)
 * Enabled output to stdout by default with single-end and interleaved reads.
 * Temporarily removed python 3.7-dev support because the Cython installation fails on Travis.
 
+v1.1.9 (2017.08.01)
+-------------------
+* Fix #30: failure when using --preserve-order option
+
 v1.1.8 (2017.07.10)
 -------------------
 * Add --config option for specifying options in a config file.
