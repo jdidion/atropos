@@ -1,6 +1,0 @@
-PWD /Users/didionjp/projects/atropos/paper/manuscript/main/tex
-INPUT /usr/local/texlive/2017/texmf.cnf
-INPUT /usr/local/texlive/2017/texmf-dist/web2c/texmf.cnf
-INPUT /usr/local/texlive/2017/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT /Users/didionjp/projects/atropos/paper/manuscript/main/tex/main.tex
-OUTPUT main.log
