@@ -131,7 +131,7 @@ def test_solid5p_prefix_fastq():
 
 def test_sra_fastq():
     '''test SRA-formatted colorspace FASTQ'''
-    run("-c -e 0.1 --format sra-fastq -a CGCCTTGGCCGTACAGCAG", "sra.fastq", "sra.fastq")
+    run("-c -e 0.1 --input-format sra-fastq -a CGCCTTGGCCGTACAGCAG", "sra.fastq", "sra.fastq")
 
 
 def test_no_zero_cap():

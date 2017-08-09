@@ -7,6 +7,7 @@ from atropos.commands.cli import (
     BaseCommandParser, configure_threads, parse_stat_args, readable_file,
     readwriteable_file, writeable_file, positive, probability, CharList,
     Delimited, int_or_str)
+from atropos.io import guess_format_from_name
 
 class CommandParser(BaseCommandParser):
     name = 'trim'
@@ -351,6 +352,12 @@ standard output.
                  "stdout. Unless writing to stdout, the summary report goes "
                  "to stdout by default. (write to standard output)")
         group.add_argument(
+            "--output-format",
+            choices=('fasta', 'fastq', 'sam'), metavar="FORMAT", default=None,
+            help="The format of the output file. If not specified, the output "
+                 "format is determined from the filename. Defaults to FASTQ "
+                 "when writing to stdout. (autodetect)")
+        group.add_argument(
             "-C",
             "--compression-format",
             metavar="FORMAT", default=None,
@@ -620,48 +627,64 @@ standard output.
             paired_both or options.paired_output or 
             options.untrimmed_paired_output)
         
+        if options.output_format is None and options.output is not None:
+            options.output_format = guess_format_from_name(
+                options.output, raise_on_failure=True)
+        
         if paired or paired_implicit:
+            any_output = options.output or options.paired_output
+            
             if options.interleaved_output:
+                if any_output:
+                    parser.error(
+                        "Cannot specify both interleaved and paired output.")
                 options.use_interleaved_output = True
+            
+            elif options.output_format == 'sam':
+                if any_output:
+                    parser.error(
+                        "SAM output must be specified using the -l option")
+                options.use_interleaved_output = True
+            
+            elif not any_output or options.output in (STDOUT, STDERR):
+                # If no output files are specified, write interleaved 
+                # output to stdout by default.
+                options.use_interleaved_output = True
+            
             else:
-                if options.output is None and options.paired_output is None:
-                    # If no output files are specified, write interleaved 
-                    # output to stdout by default.
-                    options.use_interleaved_output = True
-                else:
-                    if options.output is None:
-                        parser.error(
-                            "When you use -p or --paired-output, you must "
-                            "also use the -o option.")
-                    elif options.paired_output is None:
-                        parser.error(
-                            "When paired-end trimming is enabled, a second "
-                            "output file needs to be specified via -p "
-                            "(--paired-output).")
-                    
-                    if (
-                            bool(options.untrimmed_output) !=
-                            bool(options.untrimmed_paired_output)):
-                        parser.error(
-                            "When trimming paired-end reads, you must use "
-                            "either none or both of the --untrimmed-output/"
-                            "--untrimmed-paired-output options.")
-                    
-                    if (
-                            bool(options.too_short_output) !=
-                            bool(options.too_short_paired_output)):
-                        parser.error(
-                            "When using --too-short-output with paired-end "
-                            "reads, you also need to use "
-                            "--too-short-paired-output")
-                    
-                    if (
-                            bool(options.too_long_output) !=
-                            bool(options.too_long_paired_output)):
-                        parser.error(
-                            "When using --too-long-output with paired-end "
-                            "reads, you also need to use "
-                            "--too-long-paired-output")
+                if options.output is None:
+                    parser.error(
+                        "When you use -p or --paired-output, you must "
+                        "also use the -o option.")
+                elif options.paired_output is None:
+                    parser.error(
+                        "When paired-end trimming is enabled, a second "
+                        "output file needs to be specified via -p "
+                        "(--paired-output).")
+                
+                if (
+                        bool(options.untrimmed_output) !=
+                        bool(options.untrimmed_paired_output)):
+                    parser.error(
+                        "When trimming paired-end reads, you must use "
+                        "either none or both of the --untrimmed-output/"
+                        "--untrimmed-paired-output options.")
+                
+                if (
+                        bool(options.too_short_output) !=
+                        bool(options.too_short_paired_output)):
+                    parser.error(
+                        "When using --too-short-output with paired-end "
+                        "reads, you also need to use "
+                        "--too-short-paired-output")
+                
+                if (
+                        bool(options.too_long_output) !=
+                        bool(options.too_long_paired_output)):
+                    parser.error(
+                        "When using --too-long-output with paired-end "
+                        "reads, you also need to use "
+                        "--too-long-paired-output")
             
             if paired_both or options.quality_cutoff or options.trim_n:
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
@@ -799,7 +822,8 @@ standard output.
         if options.pair_filter is None:
             options.pair_filter = 'any'
         
-        if ((options.discard_trimmed or options.discard_untrimmed) and
+        if (
+                (options.discard_trimmed or options.discard_untrimmed) and
                 (options.untrimmed_output is not None)):
             parser.error(
                 "Only one of the --discard-trimmed, --discard-untrimmed "

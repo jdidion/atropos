@@ -477,12 +477,17 @@ class CommandRunner(BaseCommandRunner):
             output1 = options.output
             output2 = options.paired_output
         
-        seq_formatter_args = dict(
+        if options.output_format is None:
+            if self.delivers_qualities:
+                options.output_format = 'fastq'
+            else:
+                options.output_format = 'fasta'
+        
+        formatters = Formatters(output1, dict(
+            file_format=options.output_format,
             qualities=self.delivers_qualities,
             colorspace=options.colorspace,
-            interleaved=interleaved
-        )
-        formatters = Formatters(output1, seq_formatter_args)
+            interleaved=interleaved))
         force_create = []
             
         if options.merge_overlapping:

@@ -107,7 +107,7 @@ def test_explicit_format_with_paired():
         with temporary_path("paired.2.txt") as txt2:
             shutil.copyfile(datapath("paired.1.fastq"), txt1)
             shutil.copyfile(datapath("paired.2.fastq"), txt2)
-            run_paired('--format=fastq -a TTAGACATAT -m 14',
+            run_paired('--input-format=fastq -a TTAGACATAT -m 14',
                 in1=txt1, in2=txt2,
                 expected1='paired.m14.1.fastq',
                 expected2='paired.m14.2.fastq'

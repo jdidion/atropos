@@ -165,7 +165,7 @@ class BaseCommandParser(object):
                  "dependency to be installed).")
         group.add_argument(
             "-f",
-            "--format",
+            "--input-format",
             choices=('fasta','fastq','sra-fastq','sam','bam'), default=None,
             help="Input file format. Ignored when reading csfasta/qual files. "
                  "(auto-detect from file name extension)")
@@ -251,11 +251,11 @@ class BaseCommandParser(object):
         # TODO: unit tests for SRA streaming
         # TODO: add srastream to pypi
         if options.sra_accession:
-            if options.format not in ('fastq', 'sam', 'bam', None):
+            if options.input_format not in ('fastq', 'sam', 'bam', None):
                 raise ValueError(
                     "Invalid file format for SRA accession: {}".format(
-                        options.format))
-            options.format = 'fastq'
+                        options.input_format))
+            options.input_format = 'fastq'
             logging.getLogger().debug(
                 "Opening reader for SRA Accession {}".format(
                     options.sra_accession))

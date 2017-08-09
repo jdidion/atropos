@@ -12,7 +12,8 @@ from tempfile import mkdtemp
 from xphyle import xopen
 from atropos.io import (Sequence, ColorspaceSequence, FormatError,
     FastaReader, FastqReader, FastaQualReader, InterleavedSequenceReader,
-    FastaFormat, FastqFormat, InterleavedFormatter, get_format,
+    SingleEndFormatter, InterleavedFormatter, FastaFormat, FastqFormat, 
+    SingleEndSAMFormatter, PairedEndSAMFormatter, create_seq_formatter,
     open_reader as openseq, sequence_names_match)
 from .utils import temporary_path
 
@@ -185,35 +186,40 @@ class TestSeqioOpen:
 
     def test_autodetect_fasta_format(self):
         path = os.path.join(self._tmpdir, 'tmp.fasta')
-        fmt = get_format(path)
-        assert isinstance(fmt, FastaFormat)
-        with xopen(path, "w") as f:
-            for seq in simple_fasta:
-                f.write(fmt.format(seq))
+        fmt = create_seq_formatter(path)
+        assert isinstance(fmt, SingleEndFormatter)
+        assert isinstance(fmt.seq_format, FastaFormat)
+        write_seq_output(simple_fasta, fmt)
         assert list(openseq(path)) == simple_fasta
 
     def test_write_qualities_to_fasta(self):
         path = os.path.join(self._tmpdir, 'tmp.fasta')
-        fmt = get_format(path, qualities=True)
-        assert isinstance(fmt, FastaFormat)
-        with xopen(path, "w") as f:
-            for seq in simple_fastq:
-                f.write(fmt.format(seq))
+        fmt = create_seq_formatter(path, qualities=True)
+        assert isinstance(fmt, SingleEndFormatter)
+        assert isinstance(fmt.seq_format, FastaFormat)
+        write_seq_output(simple_fasta, fmt)
         assert list(openseq(path)) == simple_fasta
 
     def test_autodetect_fastq_format(self):
         path = os.path.join(self._tmpdir, 'tmp.fastq')
-        fmt = get_format(path)
-        with xopen(path, "w") as f:
-            for seq in simple_fastq:
-                f.write(fmt.format(seq))
+        fmt = create_seq_formatter(path)
+        assert isinstance(fmt, SingleEndFormatter)
+        assert isinstance(fmt.seq_format, FastqFormat)
+        write_seq_output(simple_fastq, fmt)
         assert list(openseq(path)) == simple_fastq
 
     def test_fastq_qualities_missing(self):
         with raises(ValueError):
             path = os.path.join(self._tmpdir, 'tmp.fastq')
-            get_format(path, qualities=False)
+            create_seq_formatter(path, qualities=False)
 
+def write_seq_output(reads, fmt):
+    result = defaultdict(list)
+    for read in reads:
+        fmt.format(result, read)
+    for path, seqs in result.items():
+        with xopen(path, "w") as f:
+            f.write("".join(seqs))
 
 class TestInterleavedReader:
     def test(self):
@@ -317,7 +323,7 @@ class TestInterleavedWriter:
             (Sequence('B/1', 'CC', 'HH'),
             Sequence('B/2', 'TG', '#H'))
         ]
-        fmt = InterleavedFormatter(FastqFormat(), "foo")
+        fmt = InterleavedFormatter("foo", FastqFormat())
         result = defaultdict(lambda: [])
         for read1, read2 in reads:
             fmt.format(result, read1, read2)
@@ -327,6 +333,45 @@ class TestInterleavedWriter:
         assert "foo" in result
         assert "".join(result["foo"]) == '@A/1 comment\nTTA\n+\n##H\n@A/2 comment\nGCT\n+\nHH#\n@B/1\nCC\n+\nHH\n@B/2\nTG\n+\n#H\n'
 
+class TestSAMWriter:
+    def test_single_end(self):
+        reads = [
+            Sequence('A/1', 'TTA', '##H'),
+            Sequence('B/1', 'CC', 'HH')
+        ]
+        fmt = SingleEndSAMFormatter("foo")
+        result = defaultdict(lambda: [])
+        for read in reads:
+            fmt.format(result, read)
+        assert fmt.written == 2
+        assert fmt.read1_bp == 5
+        assert fmt.read2_bp == 0
+        assert "foo" in result
+        result_str = "".join(result["foo"])
+        expected = 'A/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n'
+        print(result_str)
+        print(expected)
+        assert result_str == expected
+    
+    def test_paired_end(self):
+        reads = [
+            (Sequence('A/1', 'TTA', '##H'),
+            Sequence('A/2', 'GCT', 'HH#')),
+            (Sequence('B/1', 'CC', 'HH'),
+            Sequence('B/2', 'TG', '#H'))
+        ]
+        fmt = PairedEndSAMFormatter("foo")
+        result = defaultdict(lambda: [])
+        for read1, read2 in reads:
+            fmt.format(result, read1, read2)
+        assert fmt.written == 2
+        assert fmt.read1_bp == 5
+        assert fmt.read2_bp == 5
+        assert "foo" in result
+        result_str = "".join(result["foo"])
+        expected = 'A/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n'
+        assert result_str == expected
+        
 class TestPairedSequenceReader:
     def test_sequence_names_match(self):
         def match(name1, name2):
