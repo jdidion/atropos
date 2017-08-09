@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.10 (2017.08.09)
+--------------------
+* Improve debugging messages
+
 v1.1.9 (2017.08.01)
 -------------------
 * Fix #30: failure when using --preserve-order option

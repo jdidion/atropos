@@ -4,7 +4,7 @@ from collections import Sequence
 import copy
 import platform
 import sys
-from atropos import __version__
+from atropos import __version__, AtroposError
 from atropos.adapters import AdapterCache
 from atropos.io.seqio import open_reader, sra_reader
 from atropos.util import MergingDict, Const, Summarizable, Timing
@@ -69,8 +69,13 @@ class Pipeline(object):
             context: The pipeline context (dict).
             records: The sequence of records.
         """
-        for record in records:
-            self.handle_record(context, record)
+        for idx, record in enumerate(records):
+            try:
+                self.handle_record(context, record)
+            except Exception as err:
+                raise AtroposError(
+                    "An error occurred at record {} of batch {}".format(
+                    idx, context['index'])) from err
     
     def handle_record(self, context, record):
         """Handle a single record.
