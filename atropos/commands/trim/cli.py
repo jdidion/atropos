@@ -644,6 +644,10 @@ standard output.
                 if any_output:
                     parser.error(
                         "SAM output must be specified using the -l option")
+                if options.no_writer_process:
+                    parser.warn(
+                        "Note: output SAM files cannot be concatenated; "
+                        "use 'samtools merge' instead.")
                 options.use_interleaved_output = True
             
             elif not any_output or options.output in (STDOUT, STDERR):

@@ -27,7 +27,6 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                 assert len(result) == 2
                 if error_on_rc:
                     err = result[1]['exception'] if result[1] and 'exception' in result[1] else None
-                    from traceback import format_exception
                     if result[0] != 0:
                         raise AssertionError("Return code {} != 0".format(result[0])) from err['details'][1]
                 if assert_files_equal:
@@ -36,7 +35,9 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                 if callback:
                     callback(aligner, infiles, (p1, p2), result)
 
-def run_interleaved(params, inpath, expected, aligners=('adapter',), stdout=False):
+def run_interleaved(
+        params, inpath, expected, aligners=('adapter',), stdout=False,
+        error_on_rc=True):
     if type(params) is str:
         params = params.split()
     for aligner in aligners:
@@ -57,6 +58,10 @@ def run_interleaved(params, inpath, expected, aligners=('adapter',), stdout=Fals
                 result = command.execute(p)
             assert isinstance(result, tuple)
             assert len(result) == 2
+            if error_on_rc:
+                err = result[1]['exception'] if result[1] and 'exception' in result[1] else None
+                if result[0] != 0:
+                    raise AssertionError("Return code {} != 0".format(result[0])) from err['details'][1]
             assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
 # def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
@@ -403,4 +408,10 @@ def test_summary():
         expected1='out.1.fastq', expected2='out.2.fastq',
         aligners=BACK_ALIGNERS, assert_files_equal=False,
         callback=check_summary
+    )
+
+def test_sam():
+    run_interleaved('-a TTAGACATAT -A CAGTGGAGTA -m 14 --output-format sam',
+        'paired.sam', 'paired_insert.sam',
+        aligners=['insert']
     )
