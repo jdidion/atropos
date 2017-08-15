@@ -95,9 +95,9 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 * More unit tests for compressed file handling, including
     * new --compression-format option
+* Improve documentation
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Accept multiple input files.
-* Expand the list of contaminants that are detected by default.
 * Migrate srastream dependency to ngstream.
 * Accessibility:
     * Create recipe for homebrew.
