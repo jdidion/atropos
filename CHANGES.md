@@ -1,7 +1,7 @@
 # Changes
 
-v1.1.12 (dev)
--------------
+v1.1.12 (2017.08.15)
+--------------------
 * Expose --min-frequency and --min-contaminant-match-frac options to 'detect -d heuristic' command.
 * Expose --min-kmer-match-frac option to 'detect -d known' command.
 * Fixed #35: using incorrect metric to determine match fraction in 'detect -d known' command.
