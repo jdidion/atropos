@@ -348,7 +348,7 @@ class TestSAMWriter:
         assert fmt.read2_bp == 0
         assert "foo" in result
         result_str = "".join(result["foo"])
-        expected = 'A/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n'
+        expected = '@HD\tVN:1.5\tSO:unsorted\nA/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n'
         print(result_str)
         print(expected)
         assert result_str == expected
@@ -369,7 +369,7 @@ class TestSAMWriter:
         assert fmt.read2_bp == 5
         assert "foo" in result
         result_str = "".join(result["foo"])
-        expected = 'A/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n'
+        expected = '@HD\tVN:1.5\tSO:unsorted\nA/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n'
         assert result_str == expected
         
 class TestPairedSequenceReader:

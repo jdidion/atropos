@@ -1,6 +1,6 @@
 """Implementation of the 'trim' command.
 """
-from collections import Sequence, defaultdict
+from collections import Sequence
 import logging
 import os
 import sys
@@ -42,7 +42,7 @@ class TrimPipeline(Pipeline):
         self.result_handler.start(worker)
     
     def add_to_context(self, context):
-        context['results'] = defaultdict(lambda: [])
+        context['results'] = {}
     
     def handle_records(self, context, records):
         super().handle_records(context, records)

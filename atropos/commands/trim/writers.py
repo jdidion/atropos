@@ -171,7 +171,7 @@ class Formatters(object):
                 sum(f.read2_bp for f in seq_formatters)
             ])
 
-class DelimFormatter(object):
+class DelimFormatter():
     """Base class for formatters that write to a delimited file.
     
     Args:
@@ -188,6 +188,8 @@ class DelimFormatter(object):
         raise NotImplementedError()
     
     def _format(self, result, fields):
+        if self.path not in result:
+            result[self.path] = []
         result[self.path].append("".join((
             self.delim.join(str(f) for f in fields),
             "\n")))
