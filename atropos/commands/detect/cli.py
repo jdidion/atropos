@@ -80,14 +80,19 @@ you don't know what are the adapter sequences.
             help="Don't cache contaminant list as '.contaminants' in the "
                  "working directory.")
         
-        group = self.add_group("Heuristic Algorithm Arguments")
+        group = self.add_group("Known Detector Options")
         group.add_argument(
-            "-y",
+            "--min-kmer-match-frac",
+            type=probability, default=0.5,
+            help="Minimum fraction of contaminant kmers that must be found "
+                 "in a read sequence to be considered a match.")
+        
+        group = self.add_group("Heuristic Detector Options")
+        group.add_argument(
             "--min-frequency",
             type=probability, default=0.001,
             help="Minimum frequency required to retain a k-mer.")
         group.add_argument(
-            "-M",
             "--min-contaminant-match-frac",
             type=probability, default=0.9,
             help="Minimum fraction of nucleotides that must align for a "
