@@ -120,7 +120,7 @@ class Match(object):
             match_frac2=None, abundance=None, reads=None):
         if isinstance(seq_or_contam, ContaminantMatcher):
             self.seq = seq_or_contam.seq
-            self.count = seq_or_contam.matches
+            self.count = int(seq_or_contam.matches)
             self.names = tuple(seq_or_contam.names)
             self.known_seqs = [seq_or_contam.seq]
         else:
