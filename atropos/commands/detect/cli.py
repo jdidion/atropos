@@ -3,7 +3,7 @@
 from atropos.io import STDOUT, STDERR
 from atropos.commands.cli import (
     BaseCommandParser, positive, readable_url, writeable_file,
-    readwriteable_file)
+    readwriteable_file, probability)
 
 class CommandParser(BaseCommandParser):
     name = 'detect'
@@ -79,6 +79,19 @@ you don't know what are the adapter sequences.
             action="store_false", dest="cache_adapters", default=True,
             help="Don't cache contaminant list as '.contaminants' in the "
                  "working directory.")
+        
+        group = self.add_group("Heuristic Algorithm Arguments")
+        group.add_argument(
+            "-y",
+            "--min-frequency",
+            type=probability, default=0.001,
+            help="Minimum frequency required to retain a k-mer.")
+        group.add_argument(
+            "-M",
+            "--min-contaminant-match-frac",
+            type=probability, default=0.9,
+            help="Minimum fraction of nucleotides that must align for a "
+                 "detected contaminant to match a known adapter sequence.")
         
         group = self.add_group("Output")
         group.add_argument(

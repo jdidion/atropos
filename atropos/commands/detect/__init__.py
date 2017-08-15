@@ -61,6 +61,8 @@ class CommandRunner(BaseCommandRunner):
             else:
                 detector = 'khmer'
         
+        detector_args = dict(known_contaminants=known_contaminants)
+            
         if detector == 'known':
             logging.getLogger().debug(
                 "Detecting contaminants using the known-only algorithm")
@@ -69,6 +71,9 @@ class CommandRunner(BaseCommandRunner):
             logging.getLogger().debug(
                 "Detecting contaminants using the heuristic algorithm")
             detector_class = HeuristicDetector
+            detector_args['min_frequency'] = self.min_frequency
+            detector_args['min_contaminant_match_frac'] = \
+                self.min_contaminant_match_frac
         elif detector == 'khmer':
             logging.getLogger().debug(
                 "Detecting contaminants using the kmer-based algorithm")
@@ -78,8 +83,7 @@ class CommandRunner(BaseCommandRunner):
             kmer_size=kmer_size, n_reads=n_reads, 
             overrep_cutoff=overrep_cutoff, include=include,
             past_end_bases=self.past_end_bases)
-        detector_args = dict(
-            known_contaminants=known_contaminants, **summary_args)
+        detector_args.update(summary_args)
         
         if self.paired:
             detector = PairedDetector(detector_class, **detector_args)
@@ -508,9 +512,10 @@ class HeuristicDetector(Detector):
     and becomes too slow/memory-intenstive when n_reads > 50k.
     """
     def __init__(
-            self, min_freq=0.001, min_contaminant_match_frac=0.9, **kwargs):
+            self, min_frequency=0.001, min_contaminant_match_frac=0.9, 
+            **kwargs):
         super(HeuristicDetector, self).__init__(**kwargs)
-        self.min_freq = min_freq
+        self.min_frequency = min_frequency
         self.min_contaminant_match_frac = min_contaminant_match_frac
     
     @property
@@ -520,7 +525,7 @@ class HeuristicDetector(Detector):
     def _get_contaminants(self):
         def _min_count(kmer_size):
             return math.ceil(self.n_reads * max(
-                self.min_freq,
+                self.min_frequency,
                 (self._read_length - kmer_size + 1) * self.overrep_cutoff /
                 float(4**kmer_size)))
         

@@ -1,5 +1,13 @@
 # Changes
 
+v1.1.12 (dev)
+-------------
+* Expose --min-frequency and --min-contaminant-match-frac options to 'detect' command.
+
+v1.1.11 (2017.08.15)
+--------------------
+* Fixed #34: JSON report output not working with SRA streaming.
+
 v1.1.10 (2017.08.09)
 --------------------
 * Improve debugging messages
