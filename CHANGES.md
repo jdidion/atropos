@@ -8,6 +8,7 @@ v1.2.0 (dev)
     * The --format option has been renamed to --input-format, to avoid confusion with the new --output-format option (see below).
 * Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
 * Added --output-format option to manually specify output format instead of determining the format from the output file name.
+* Added support for SAM output.
 * Transitioned all file management to xphyle.
 * Enabled output to stdout by default with single-end and interleaved reads.
 * Temporarily removed python 3.7-dev support because the Cython installation fails on Travis.
