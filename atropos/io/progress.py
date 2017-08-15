@@ -38,7 +38,7 @@ class ProgressMessageReader(object):
     def __next__(self):
         value = next(self.iterable)
         if value:
-            self.ctr += value[0]
+            self.ctr += value[0]['size']
             if self.ctr % self.interval < self.batch_size:
                 duration = Timestamp() - self.start
                 ctr = self.ctr
@@ -72,6 +72,7 @@ def create_progress_reader(
             messages; bar = use a ProgressBar (from the progressbar library)
             or tqdm.
         max_items: Max number of items, if known in advance.
+        counter_magnitude:
         mag_format: Function that formats an integer as a string with magnitude
             (e.g. 1000000 => 1M).
         batch_size: The number of records in each iterable item (iterable is
@@ -92,12 +93,13 @@ def create_progress_reader(
             
     try:
         return create_progressbar_reader(
-            reader, max_items, mag_format, **kwargs)
+            reader, batch_size, max_items, mag_format)
     except:
         pass
     
     try:
-        return create_tqdm_reader(reader, max_items, **kwargs)
+        return create_tqdm_reader(
+            reader, batch_size, max_items, **kwargs)
     except:
         pass
     
@@ -115,7 +117,8 @@ def magnitude_formatter(magnitude):
         suffix = magnitude
     return lambda val: "{:.1f} {}".format(val / div, suffix)
 
-def create_progressbar_reader(reader, max_reads=None, mag_format=None):
+def create_progressbar_reader(
+        reader, batch_size=1, max_reads=None, mag_format=None):
     """Wrap an iterable in a ProgressBar.
     
     Args:
@@ -130,10 +133,11 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
         """Extension of ProgressBar that supports starting and stopping the
         BatchReader.
         """
-        def __init__(self, iterable, widgets, max_value=None):
+        def __init__(self, iterable, widgets, batch_size=1, max_value=None):
             super(ProgressBarReader, self).__init__(
                 widgets=widgets,
                 max_value=max_value or progressbar.UnknownLength)
+            self.batch_size = batch_size
             self._iterable = iterable
             self.done = False
         
@@ -142,7 +146,7 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
                 value = next(self._iterable)
                 if self.start_time is None:
                     self.start()
-                self.update(self.value + value[0]["size"])
+                self.update(self.value + (value[0] * self.batch_size))
                 return value
             except StopIteration:
                 self.close()
@@ -174,16 +178,16 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
             MagCounter(mag_format), " Reads (", progressbar.Percentage(), ") ",
             progressbar.Timer(), " ", progressbar.Bar(),
             progressbar.AdaptiveETA()
-        ], max_reads)
+        ], batch_size, max_reads)
     else:
         reader = ProgressBarReader(reader, [
             MagCounter(mag_format), " Reads", progressbar.Timer(),
             progressbar.AnimatedMarker()
-        ])
+        ], batch_size)
     
     return reader
 
-def create_tqdm_reader(reader, max_reads=None):
+def create_tqdm_reader(reader, batch_size=1, max_reads=None, **kwargs):
     """Wrap an iterable in a tqdm progress bar.
     
     Args:
@@ -194,4 +198,18 @@ def create_tqdm_reader(reader, max_reads=None):
         The wrapped iterable.
     """
     import tqdm
-    return tqdm.tqdm(reader, total=max_reads)
+    if batch_size == 1:
+        return tqdm.tqdm(reader, total=max_reads)
+    else:
+        class TqdmReader:
+            def __init__(self, reader, batch_size, max_reads):
+                self.reader = reader
+                self.batch_size = batch_size
+                self.progress = tqdm.tqdm(total=max_reads)
+            
+            def __iter__(self):
+                for value in self.reader:
+                    yield value
+                    self.progress.update(self.batch_size)
+        
+        return TqdmReader(reader, batch_size, max_reads)
