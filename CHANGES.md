@@ -13,6 +13,7 @@ v1.2.0 (dev)
 * Transitioned all file management to xphyle.
 * Enabled output to stdout by default with single-end and interleaved reads.
 * Temporarily removed python 3.7-dev support because the Cython installation fails on Travis.
+* Fix #36: Progress bars don't increment correctly when batch size > 1 used.
 
 v1.1.12 (2017.08.15)
 --------------------
