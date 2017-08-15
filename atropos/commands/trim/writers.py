@@ -42,7 +42,8 @@ class Writers(object):
                 real_path = path
             # TODO: test whether O_NONBLOCK allows non-blocking write to NFS
             if compressed:
-                self.writers[path] = xopen(real_path, mode)
+                self.writers[path] = xopen(
+                    real_path, mode, compression=False)
             else:
                 self.writers[path] = xopen(
                     real_path, "w", compression=self.compression_format)
