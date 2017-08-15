@@ -1,5 +1,5 @@
 [![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=master)](https://travis-ci.org/jdidion/atropos])
-[![PyPi](https://img.shields.io/pypi/v/atropos.svg?branch=master)](https://pypi.python.org/pypi/atropos)
+[![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
 
 # Atropos
@@ -106,6 +106,7 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 ### 1.3
 
+* Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).

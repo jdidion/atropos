@@ -1,5 +1,6 @@
 # Changes
 
+
 v1.2.0 (dev)
 ------------
 * *Breaking changes:* 
@@ -12,6 +13,20 @@ v1.2.0 (dev)
 * Transitioned all file management to xphyle.
 * Enabled output to stdout by default with single-end and interleaved reads.
 * Temporarily removed python 3.7-dev support because the Cython installation fails on Travis.
+
+v1.1.12 (2017.08.15)
+--------------------
+* Expose --min-frequency and --min-contaminant-match-frac options to 'detect -d heuristic' command.
+* Expose --min-kmer-match-frac option to 'detect -d known' command.
+* Fixed #35: using incorrect metric to determine match fraction in 'detect -d known' command.
+
+v1.1.11 (2017.08.15)
+--------------------
+* Fixed #34: JSON report output not working with SRA streaming.
+
+v1.1.10 (2017.08.09)
+--------------------
+* Improve debugging messages
 
 v1.1.9 (2017.08.01)
 -------------------
