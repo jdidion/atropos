@@ -184,8 +184,11 @@ class BaseCommandRunner(object):
         
         if options.sra_reader:
             self.reader = reader = sra_reader(
-                reader=options.sra_reader, quality_base=options.quality_base, 
-                colorspace=options.colorspace, input_read=options.input_read)
+                reader=options.sra_reader, 
+                quality_base=options.quality_base, 
+                colorspace=options.colorspace, 
+                input_read=options.input_read)
+            options.sra_reader = None
         else:
             interleaved = bool(options.interleaved_input)
             input1 = options.interleaved_input if interleaved else options.input1
