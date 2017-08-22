@@ -200,6 +200,9 @@ MatchInfo = namedtuple("MatchInfo", (
 # 6. Phred-adjusted ML for error probability: 
 # https://biosails.github.io/pheniqs/glossary.html#phred_adjusted_maximum_likelihood_decoding
 # 7. Adaptive banded alignment: https://github.com/ocxtal/libgaba
+# 8. Heng Li's review of pairwise alignment references several fast implementations,
+# including Parasail and BitPal: file:///Users/didionjp/Downloads/alndp.pdf
+#
 # Also think about different sequence encodings that might enable faster alignment
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
 

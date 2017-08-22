@@ -91,8 +91,12 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 ## Roadmap
 
-### 1.2
+### 1.2.x
 
+* Adapter detection:
+    * Parallelize adapter detection for multiple input files.
+    * Implement new detector for paired-end data that detects adapter sequences based on overhangs of aligned inserts.
+* Implement new trimming mode that blindly trims overhangs of aligned inserts.
 * More unit tests for compressed file handling, including
     * new --compression-format option
 * Improve documentation
@@ -104,20 +108,20 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
     * Automatically update conda and homebrew recipes for each release.
     * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
 
-### 1.3
+### 1.3.x
 
 * Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
 
-### 1.4
+### 1.4.x
 
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
 * General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
 
-### 1.5
+### 1.5.x
 
 * Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
 * Support for paired-end demultiplexing
@@ -127,12 +131,12 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
 * Add option to InsertAdapter to trim overhangs without adapter matching.
 
-### 1.6
+### 1.6.x
 
 * Implement a public plugin API.
 * Add more logging and convert log messages from old-style to new-style format strings.
 
-### 2.0
+### 2.0+
 
 * Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
 * Consider adding additional report formats
