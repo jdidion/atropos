@@ -31,6 +31,7 @@ from atropos.util import (
 # TODO: Check out AdapterRemoval2's detection strategy.
 
 # pymer https://github.com/kdmurray91/pymer/tree/master/pymer
+# ntCard https://github.com/bcgsc/ntCard
 
 # TODO: In KnownContaminantDetector, accept template sequences with wildcards
 # to match against.

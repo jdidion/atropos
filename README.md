@@ -109,6 +109,10 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
+* Look at some new trimming/qc programs
+    * https://github.com/OpenGene/AfterQC
+    * http://tagcleaner.sourceforge.net/
+    * https://github.com/mdshw5/fastqp/blob/master/README.md
 
 ### 1.4
 
