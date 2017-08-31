@@ -93,14 +93,15 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 ### 1.2.x
 
-* Adapter detection:
-    * Parallelize adapter detection for multiple input files.
-    * Implement new detector for paired-end data that detects adapter sequences based on overhangs of aligned inserts.
-* Implement new trimming mode that blindly trims overhangs of aligned inserts.
 * More unit tests for compressed file handling, including
     * new --compression-format option
 * Improve documentation
+* Implement new trimming mode that blindly trims overhangs of aligned inserts.
+* Adapter detection:
+    * Parallelize adapter detection for multiple input files.
+    * Implement new detector for paired-end data that detects adapter sequences based on overhangs of aligned inserts.
 * Provide option for RNA-seq data that will trim polyA sequence.
+    * https://github.com/ibest/seqyclean
 * Accept multiple input files.
 * Migrate srastream dependency to ngstream.
 * Accessibility:
