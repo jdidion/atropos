@@ -225,7 +225,9 @@ class Timing(Summarizable):
         """
         if not self.cur_time:
             self.update()
-        assert self.start_time is not None
+        if self.start_time is None:
+            raise AtroposError(
+                'Timing instance must be started before it can be summarized')
         summary = dict(start=self.start_time.isoformat())
         summary.update(self.cur_time - self.start_time)
         return summary
@@ -323,8 +325,8 @@ class NestedDict(dict, Mergeable, Summarizable):
         """Returns a flattened version of the nested dict.
         
         Returns:
-            When `shape=='long'`, a list of (key1, key2, value) tuples.
-            When `shape=='wide'`, a dict of
+            When `self.shape=='long'`, a list of (key1, key2, value) tuples.
+            When `self.shape=='wide'`, a dict of
                 {columns:keys2, rows: {key1, values}}, where `keys2` is the set
                 of keys in the child dicts.
         """
@@ -370,9 +372,9 @@ def merge_dicts(dest, src):
         if dest.get(key, None) is None:
             dest[key] = v_src
         elif v_src is not None:
-            dest[key] = merge_values(dest[key], v_src)
+            dest[key] = merge_values(key, dest[key], v_src)
 
-def merge_values(v_dest, v_src):
+def merge_values(key, v_dest, v_src):
     """Merge two values based on their types, as follows:
     
     - Mergeable: merging is done by the dest object's merge function.
@@ -393,10 +395,16 @@ def merge_values(v_dest, v_src):
     if isinstance(v_dest, Mergeable):
         v_dest = v_dest.merge(v_src)
     elif isinstance(v_dest, dict):
-        assert isinstance(v_src, dict)
+        if not isinstance(v_src, dict):
+            raise TypeError(
+                "When merging {}, source had type {} while dest had type "
+                "dict".format(key, v_src.__class__))
         merge_dicts(v_dest, v_src)
     elif isinstance(v_dest, str):
-        assert v_dest == v_src
+        if v_dest != v_src:
+            raise ValueError(
+                "When merging, strings must be equal; {} != {}".format(
+                    v_src, v_dest))
     elif isinstance(v_dest, Number):
         v_dest += v_src
     elif isinstance(v_dest, Iterable):
@@ -405,9 +413,12 @@ def merge_values(v_dest, v_src):
         if len(i_dest) == 0:
             v_dest = i_src
         elif len(i_src) > 0:
-            v_dest = [merge_values(d, s) for d, s in zip(i_dest, i_src)]
+            v_dest = [merge_values(key, d, s) for d, s in zip(i_dest, i_src)]
     else:
-        assert v_dest == v_src
+        if v_dest != v_src:
+            raise ValueError(
+                "When merging, objects of type {} must be equal; "
+                "{} != {}".format(v_src.__class__, v_src, v_dest))
     return v_dest
 
 def ordered_dict(iterable):

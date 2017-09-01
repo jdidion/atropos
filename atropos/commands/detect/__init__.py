@@ -34,6 +34,8 @@ from atropos.util import (
 # ntCard https://github.com/bcgsc/ntCard
 # https://github.com/TGAC/KAT
 # https://arxiv.org/pdf/1707.01743.pdf
+# Reimplement AMUSED (https://github.com/Carldeboer/AMUSED) in python, use to
+# detect enriched kmers.
 
 # TODO: In KnownContaminantDetector, accept template sequences with wildcards
 # to match against.

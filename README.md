@@ -1,6 +1,7 @@
 [![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=master)](https://travis-ci.org/jdidion/atropos])
 [![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
+[![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
 
 # Atropos
 
@@ -170,10 +171,8 @@ If you would like to suggest additional enhancements, you can submit issues and/
 
 ## Citations
 
+Didion JP, Martin M, Collins FS. (2017) Atropos: specific, sensitive, and speedy trimming of sequencing reads. PeerJ 5:e3720 https://doi.org/10.7717/peerj.3720
+
 The citation for the original Cutadapt paper is:
  
 > Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
-
-Atropos is currently published as a pre-print on PeerJ, and will be submitted for peer review shortly. For now, you can cite it as:
-
-> John P Didion, Marcel Martin, and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/

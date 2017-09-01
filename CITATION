@@ -1,8 +1,11 @@
-John P Didion, Marcel Martin, and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." In preparation.
+Didion JP, Martin M, Collins FS. (2017) Atropos: specific, sensitive, and speedy trimming of sequencing reads. PeerJ 5:e3720 https://doi.org/10.7717/peerj.3720
 
 @ARTICLE{Didion2016Cutadapt,
   author = {Didion JP, Martin M, and Collins FS},
   title = {Atropos: specific, sensitive, and speedy trimming of sequencing reads.},
-  journal = {submitted},
+  journal = {PeerJ},
+  volume = {5},
+  pages = {e3720},
+  doi = {10.7717/peerj.3720}
   year = 2017
 }
