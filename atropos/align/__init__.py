@@ -199,7 +199,9 @@ MatchInfo = namedtuple("MatchInfo", (
 #    https://github.com/Martinsos/edlib
 # 6. Phred-adjusted ML for error probability: 
 # https://biosails.github.io/pheniqs/glossary.html#phred_adjusted_maximum_likelihood_decoding
-# 7. Adaptive banded alignment: https://github.com/ocxtal/libgaba
+# 7. Adaptive banded alignment:
+#     * https://github.com/ocxtal/libgaba
+#     * https://github.com/ocxtal/adaptivebandbench
 # 8. Heng Li's review of pairwise alignment references several fast implementations,
 # including Parasail and BitPal: file:///Users/didionjp/Downloads/alndp.pdf
 #
