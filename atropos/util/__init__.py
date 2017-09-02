@@ -558,7 +558,7 @@ def stdev(values, mu0=None):
         return 0
     if mu0 is None:
         mu0 = mean(values)
-    return math.sqrt(sum((val - mu0) ** 2 for val in values) / len(values))
+    return math.sqrt(sum((val - mu0) ** 2 for val in values) / (len(values) - 1))
 
 def weighted_stdev(values, counts, mu0=None):
     """Returns standard deviation of values having the specified mean weighted

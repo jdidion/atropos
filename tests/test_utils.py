@@ -54,12 +54,12 @@ class UtilTests(TestCase):
             ))
         
         nd1.shape = 'long'
-        assert nd1.summarize() == (
+        assert set(nd1.summarize()) == set((
             ('a', 'x', 2),
             ('a', 'y', 1),
             ('a', 'z', 1),
             ('b', 'y', 1)
-        )
+        ))
 
     def test_MergingDict(self):
         obj = object()
@@ -137,5 +137,6 @@ class UtilTests(TestCase):
             stdev([])
         assert stdev((1,)) == 0
         assert stdev((1,2,3)) == 1
+        assert stdev((1,3,5)) == 2
     
     
