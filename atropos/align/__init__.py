@@ -207,6 +207,7 @@ MatchInfo = namedtuple("MatchInfo", (
 #
 # Also think about different sequence encodings that might enable faster alignment
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
+# 8. https://github.com/yamada-kd/nepal
 
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.

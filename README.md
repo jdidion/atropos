@@ -1,6 +1,7 @@
 [![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=master)](https://travis-ci.org/jdidion/atropos])
 [![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
+[![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
 
 # Atropos
 
@@ -115,6 +116,10 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
+* Look at some new trimming/qc programs
+    * https://github.com/OpenGene/AfterQC
+    * http://tagcleaner.sourceforge.net/
+    * https://github.com/mdshw5/fastqp/blob/master/README.md
 
 ### 1.4.x
 
@@ -166,10 +171,8 @@ If you would like to suggest additional enhancements, you can submit issues and/
 
 ## Citations
 
+Didion JP, Martin M, Collins FS. (2017) Atropos: specific, sensitive, and speedy trimming of sequencing reads. PeerJ 5:e3720 https://doi.org/10.7717/peerj.3720
+
 The citation for the original Cutadapt paper is:
  
 > Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
-
-Atropos is currently published as a pre-print on PeerJ, and will be submitted for peer review shortly. For now, you can cite it as:
-
-> John P Didion, Marcel Martin, and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/
