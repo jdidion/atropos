@@ -577,7 +577,7 @@ def weighted_stdev(values, counts, mu0=None):
         sum(
             ((val - mu0) ** 2) * count 
             for val, count in zip(values, counts)) / 
-        sum(counts))
+        (sum(counts) - 1))
 
 def median(values):
     """Median function borrowed from python statistics module, and sped up by

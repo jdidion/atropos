@@ -132,6 +132,13 @@ class UtilTests(TestCase):
             mean([])
         assert mean(range(10)) == 4.5
     
+    def test_weighted_mean(self):
+        with self.assertRaises(ValueError):
+            weighted_mean([], [])
+        with self.assertRaises(ValueError):
+            weighted_mean([1,2], [1,2,3])
+        
+    
     def test_stdev(self):
         with self.assertRaises(ValueError):
             stdev([])
@@ -139,4 +146,10 @@ class UtilTests(TestCase):
         assert stdev((1,2,3)) == 1
         assert stdev((1,3,5)) == 2
     
-    
+    def test_weighted_stdev(self):
+        with self.assertRaises(ValueError):
+            weighted_stdev([], [])
+        with self.assertRaises(ValueError):
+            weighted_stdev([1,2], [1,2,3])
+        assert weighted_stdev([1], [10]) == 0
+        assert round(weighted_stdev([1,2,3], [1,2,3]), 4) == 0.8165
