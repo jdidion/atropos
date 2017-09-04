@@ -592,9 +592,7 @@ def median(values):
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the median of an empty sequence")
-    
-    values.sort()
-    
+    values = sorted(values)
     idx = datalen // 2
     if datalen % 2 == 1:
         return values[idx]

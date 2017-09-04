@@ -1,7 +1,20 @@
+from atropos import AtroposError
 from atropos.util import *
+import time
 from unittest import TestCase
 
 class UtilTests(TestCase):
+    def test_timing(self):
+        t = Timing()
+        with self.assertRaises(AtroposError):
+            t.summarize()
+        
+        with Timing() as t:
+            time.sleep(1)
+        summary = t.summarize()
+        assert summary['start'] == t.start_time.isoformat()
+        assert summary['wallclock'] >= 1
+    
     def test_CountingDict(self):
         cd = CountingDict(keys=('a', 'b'), sort_by=1)
         assert cd['a'] == cd['b'] == 1
@@ -153,3 +166,65 @@ class UtilTests(TestCase):
             weighted_stdev([1,2], [1,2,3])
         assert weighted_stdev([1], [10]) == 0
         assert round(weighted_stdev([1,2,3], [1,2,3]), 4) == 0.8165
+    
+    def test_median(self):
+        with self.assertRaises(ValueError):
+            median([])
+        assert median((1,2,3)) == 2
+        assert median((1,2,3,4)) == 2.5
+    
+    def test_weighted_median(self):
+        with self.assertRaises(ValueError):
+            weighted_median([], [])
+        with self.assertRaises(ValueError):
+            weighted_median([1,2], [1,2,3])
+        assert weighted_median([1], [0]) == None
+        assert weighted_median([1,2,3],[2,2,2]) == 2
+        assert weighted_median([1,2,3,4],[2,2,2,2]) == 2.5
+        assert weighted_median([1,2,3],[2,1,2]) == 2
+        assert weighted_median([1,2,3],[1,2,3]) == 2.5
+    
+    def test_modes(self):
+        with self.assertRaises(ValueError):
+            modes([])
+        assert modes([1]) == [1]
+        assert modes([1,2]) == [1,2]
+        assert modes([1,1,2]) == [1]
+    
+    def test_weighted_modes(self):
+        with self.assertRaises(ValueError):
+            weighted_modes([], [])
+        with self.assertRaises(ValueError):
+            weighted_modes([1,2], [1,2,3])
+        assert weighted_modes([1], [1]) == [1]
+        assert weighted_modes([1,2,3], [1,2,3]) == [3]
+        assert weighted_modes([1,2,3], [1,1,1]) == [1,2,3]
+    
+    def test_truncate_string(self):
+        assert truncate_string(None) is None
+        assert truncate_string('a' * 100) == ('a' * 100)
+        assert truncate_string('a' * 101) == ('a' * 97) + '...'
+    
+    def test_run_interruptible(self):
+        def raise_interrupted(x=False):
+            if x is True:
+                raise KeyboardInterrupt()
+        assert run_interruptible(raise_interrupted, False) == 0
+        assert run_interruptible(raise_interrupted, True) == 130
+        
+        import errno
+        def raise_io_error(x=False, y=errno.EPIPE):
+            if x is True:
+                err = IOError()
+                err.errno = y
+                raise err
+        assert run_interruptible(raise_io_error, False) == 0
+        assert run_interruptible(raise_io_error, True) == 1
+        with self.assertRaises(IOError):
+            run_interruptible(raise_io_error, True, 5)
+        
+        def raises_exception(x):
+            if x is True:
+                raise Exception()
+        assert run_interruptible(raises_exception, False) == 0
+        assert run_interruptible(raises_exception, True) == 1
