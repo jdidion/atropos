@@ -1,6 +1,6 @@
 # coding: utf-8
 from pytest import raises
-from unittest import skipIf
+from unittest import skipIf, TestCase
 from collections import defaultdict
 import random
 import sys
@@ -40,8 +40,12 @@ class TestSequence:
             ColorspaceSequence(name="name", sequence="K0123", qualities="####")
 
 
-class TestFastaReader:
+class TestFastaReader(TestCase):
     def test(self):
+        with self.assertRaises(ValueError):
+            with FastaReader(None) as f:
+                pass
+            
         with FastaReader("tests/data/simple.fasta") as f:
             reads = list(f)
         assert reads == simple_fasta
@@ -384,3 +388,6 @@ class TestPairedSequenceReader:
         assert match('abc.1', 'abc.2')
         assert match('abc1', 'abc2')
         assert not match('abc', 'xyz')
+
+class TestSraReader(TestCase):
+    pass

@@ -99,7 +99,7 @@ class SequenceReader(SequenceReaderBase):
 
 try:
     from ._seqio import Sequence, FastqReader
-except ImportError:
+except ImportError: # pragma: no cover
     pass
 
 class ColorspaceSequence(Sequence):
