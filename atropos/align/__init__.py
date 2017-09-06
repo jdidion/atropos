@@ -204,10 +204,11 @@ MatchInfo = namedtuple("MatchInfo", (
 #     * https://github.com/ocxtal/adaptivebandbench
 # 8. Heng Li's review of pairwise alignment references several fast implementations,
 # including Parasail and BitPal: file:///Users/didionjp/Downloads/alndp.pdf
-#
-# Also think about different sequence encodings that might enable faster alignment
+#     * Heng's dynamic programming algorithm 
+#       https://github.com/jts/nanopolish/tree/master/src/thirdparty
+# 9. Also think about different sequence encodings that might enable faster alignment
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
-# 8. https://github.com/yamada-kd/nepal
+# 10. https://github.com/yamada-kd/nepal
 
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.
