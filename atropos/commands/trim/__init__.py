@@ -788,10 +788,11 @@ class CommandRunner(BaseCommandRunner):
             def finish(self, total_batches=None):
                 if total_batches is not None:
                     self.consume_pending()
-                    if self.cur_batch != total_batches:
+                    if self.cur_batch != total_batches + 1:
                         raise MulticoreError(
                             "OrderPreservingWriterResultHandler finishing "
-                            "without having seen {} batches".format(
+                            "without having seen {} of {} batches".format(
+                                total_batches + 1 - self.cur_batch,
                                 total_batches))
                 super().finish(total_batches=total_batches)
             
