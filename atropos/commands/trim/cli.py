@@ -759,8 +759,7 @@ standard output.
                 options.merge_error_rate = options.error_rate or 0.2
         
         if options.mirna:
-            if (options.adapter is None and options.front is None and
-                    options.anywhere is None):
+            if not (options.adapters or options.front or options.anywhere):
                 options.adapter = ['TGGAATTCTCGG'] # illumina small RNA adapter
             if options.quality_cutoff is None:
                 options.quality_cutoff = (20, 20)
