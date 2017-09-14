@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.13 (2017.08.xx)
+--------------------
+* Fix for #38: Atropos fails with MultiCore error when using OrderPreservingWriterResultsHandler (thanks to @cshenanigans)
+
 v1.1.12 (2017.08.15)
 --------------------
 * Expose --min-frequency and --min-contaminant-match-frac options to 'detect -d heuristic' command.

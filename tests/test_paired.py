@@ -28,7 +28,10 @@ def run_paired(params, in1, in2, expected1, expected2, aligners=('adapter',),
                     err = result[1]['exception'] if result[1] and 'exception' in result[1] else None
                     from traceback import format_exception
                     if result[0] != 0:
-                        raise AssertionError("Return code {} != 0".format(result[0])) from err['details'][1]
+                        if err is None:
+                            raise AssertionError("Return code {} != 0".format(result[0]))
+                        else:
+                            raise AssertionError("Return code {} != 0".format(result[0])) from err['details'][1]
                 if assert_files_equal:
                     assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
                     assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)

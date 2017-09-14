@@ -12,7 +12,7 @@ class Writers(object):
     Args:
         force_create: Whether empty output files should be created.
     """
-    def __init__(self, force_create):
+    def __init__(self, force_create=[]):
         self.writers = {}
         self.force_create = force_create
         self.suffix = None
