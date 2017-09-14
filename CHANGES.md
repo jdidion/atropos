@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.14 (dev)
+-------------
+* Fix for #39: miRNA option error (thanks to @mottodora)
+
 v1.1.13 (2017.08.xx)
 --------------------
 * Fix for #38: Atropos fails with MultiCore error when using OrderPreservingWriterResultsHandler (thanks to @cshenanigans)
