@@ -3,6 +3,7 @@
 v1.1.14 (dev)
 -------------
 * Fix for #39: miRNA option error (thanks to @mottodora)
+* Fix for #37: fixes overflow error when computing RandomMatchProbability on long reads (>150 bp)
 
 v1.1.13 (2017.08.xx)
 --------------------

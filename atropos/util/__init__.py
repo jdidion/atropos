@@ -86,15 +86,16 @@ class RandomMatchProbability(object):
         else:
             nfac = self.factorial(size)
             prob = 0.0
+            
             for i in range(matches, size+1):
                 j = size - i
-                prob += (
-                    (mismatch_prob ** j) *
-                    (match_prob ** i) *
-                    nfac /
-                    self.factorial(i) /
-                    self.factorial(j)
-                )
+                # use integer division in the case that the numbers are too
+                # large for floating point division
+                try:
+                    div = nfac / self.factorial(i) / self.factorial(j)
+                except OverflowError:
+                    div = nfac // self.factorial(i) // self.factorial(j)
+                prob += (mismatch_prob ** j) * (match_prob ** i) * div
         
         self.cache[key] = prob
         return prob

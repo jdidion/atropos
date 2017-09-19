@@ -527,11 +527,11 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
                 warnbase = base_label
         if total >= 20 and warnbase is not None:
             _print('WARNING:')
-            _print(INDENTED.wrap(
+            _print("\n".join(INDENTED.wrap(
                 'The adapter is preceded by "{0}" extremely often. The '
                 'provided adapter sequence may be incomplete. To fix the '
                 'problem, add "{0}" to the beginning of the adapter '
-                'sequence.'.format(warnbase)))
+                'sequence.'.format(warnbase))))
             _print()
             return True
         _print()
@@ -637,9 +637,9 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
     
     if warning:
         _print('WARNING:')
-        _print(INDENTED.wrap(
+        _print("\n".join(INDENTED.wrap(
             'One or more of your adapter sequences may be incomplete. '
-            'Please see the detailed output above.'))
+            'Please see the detailed output above.')))
 
 def print_pre_trim_report(summary, outfile):
     """Print pre-trimming stats.
