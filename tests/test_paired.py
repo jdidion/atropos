@@ -415,3 +415,9 @@ def test_sam():
         'paired.sam', 'paired_insert.sam',
         aligners=['insert']
     )
+
+def test_long_reads():
+    run_paired(''
+        in1='long.1.fq', in2='long.2.fq',
+        expected1=, expected2=,
+        aligners=BACK_ALIGNERS)

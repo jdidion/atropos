@@ -4,6 +4,18 @@ import time
 from unittest import TestCase
 
 class UtilTests(TestCase):
+    def test_factorial(self):
+        f = RandomMatchProbability()
+        # simple test
+        assert f.factorial(0) == 1
+        assert f.factorial(1) == 1
+        assert f.factorial(3) == 6
+        assert int(f.factorial(27)) == int(math.factorial(27))
+        # test big number
+        assert int(f.factorial(150)) == int(math.factorial(150))
+        # test really big number
+        assert f.factorial(10000) is not None
+        
     def test_timing(self):
         t = Timing()
         with self.assertRaises(AtroposError):

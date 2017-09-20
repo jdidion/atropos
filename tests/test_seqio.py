@@ -389,5 +389,15 @@ class TestPairedSequenceReader:
         assert match('abc1', 'abc2')
         assert not match('abc', 'xyz')
 
+try:
+    import ngstream
+    ngs_available = True
+except:
+    ngs_available = False
+
+@skipIf(not ngs_available, "ngstream library not available")
 class TestSraReader(TestCase):
-    pass
+    def test_sra_reader(self):
+        with ngstream.sra.SraReader(item_limit=10) as ngs_reader:
+            atropos_reader = sra_reader(reader)
+            
