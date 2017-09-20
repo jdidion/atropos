@@ -15,6 +15,14 @@ v1.2.0 (dev)
 * Temporarily removed python 3.7-dev support because the Cython installation fails on Travis.
 * Fix #36: Progress bars don't increment correctly when batch size > 1 used.
 
+v1.1.14 (dev)
+-------------
+* Fix for #39: miRNA option error (thanks to mottodora).
+
+v1.1.13 (2017.08.14)
+--------------------
+* Fix for #38: Atropos fails with MultiCore error when using OrderPreservingWriterResultsHandler (thanks to @cshenanigans).
+
 v1.1.12 (2017.08.15)
 --------------------
 * Expose --min-frequency and --min-contaminant-match-frac options to 'detect -d heuristic' command.
