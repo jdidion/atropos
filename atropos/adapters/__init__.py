@@ -442,7 +442,7 @@ class Adapter(object):
             seq = self.sequence
         
         #matches = 0
-        base_probs = (self.gc_content, (1 - self.gc_content) / 2.0)
+        base_probs = (self.gc_content / 2.0, (1 - self.gc_content) / 2.0)
         probabilities = [1.0] + ([0] * len(seq))
         c_bases = frozenset(GC_BASES if self.adapter_wildcards else 'GC')
         
