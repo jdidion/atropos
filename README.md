@@ -119,6 +119,11 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
 * General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
+* CPU and memory profiling. Try out:
+    * https://github.com/nvdv/vprof
+    * https://github.com/what-studio/profiling
+    * https://github.com/fabianp/memory_profiler
+    * https://github.com/rkern/line_profiler#line-profiler
 
 ### 1.5
 
