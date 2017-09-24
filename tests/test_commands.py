@@ -3,16 +3,17 @@
 from pytest import raises
 from atropos.commands.trim.multicore import OrderPreservingWriterResultHandler
 from atropos.commands.trim.writers import Writers
-from xphyle.paths import TempDir
+import tempfile
+import os
 
 def test_order_preserving_writer():
-    with TempDir() as temp:
+    path = tempfile.mkstemp()[1]
+    try:
         writers = Writers()
         handler = OrderPreservingWriterResultHandler(writers)
         handler.start(None)
         
         # write three batches out of order
-        path = temp.make_file()
         result2 = "result2"
         handler.write_result(2, { path : result2 })
         result3 = "result3"
@@ -24,4 +25,6 @@ def test_order_preserving_writer():
         # check that the results are in the right order
         with open(path, 'rt') as inp:
             assert inp.read() == (result1 + result2 + result3)
+    finally:
+        os.remove(path)
 
