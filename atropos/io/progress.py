@@ -142,7 +142,7 @@ def create_progressbar_reader(reader, max_reads=None, mag_format=None):
                 value = next(self._iterable)
                 if self.start_time is None:
                     self.start()
-                self.update(self.value + value[0])
+                self.update(self.value + value[0]["size"])
                 return value
             except StopIteration:
                 self.close()
