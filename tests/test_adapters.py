@@ -95,3 +95,13 @@ def test_linked_adapter():
     trimmed = linked_adapter.trimmed(match)
     assert trimmed.name == 'seq'
     assert trimmed.sequence == 'CCCCC'
+
+
+def test_random_match_probabilities():
+    a = Adapter('A', BACK)
+    rmp = a.random_match_probabilities()
+    assert rmp == [1.0, 0.25]
+    
+    a = Adapter('AC', BACK, gc_content=0.4)
+    rmp = a.random_match_probabilities()
+    assert rmp == [1.0, 0.3, 0.06]
