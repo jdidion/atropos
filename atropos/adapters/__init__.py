@@ -15,7 +15,7 @@ from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
 from atropos.util import (
     IUPAC_BASES, GC_BASES, MergingDict, NestedDict, CountingDict, Const, 
-    reverse_complement)
+    reverse_complement, ALPHABETS)
 from atropos.util import colorspace as cs
 
 class AdapterType(object):
@@ -124,6 +124,7 @@ class AdapterParser(object):
         if cmdline_type not in ADAPTER_TYPES:
             raise ValueError(
                 'cmdline_type cannot be {0!r}'.format(cmdline_type))
+        orig_spec = spec
         where = ADAPTER_TYPES[cmdline_type].flags
         
         if name is None and spec is None:
@@ -153,6 +154,7 @@ class AdapterParser(object):
             back_anchored = True
         
         sequence1, middle, sequence2 = spec.partition('...')
+        
         if where == ANYWHERE:
             if front_anchored or back_anchored:
                 raise ValueError("'anywhere' (-b) adapters may not be anchored")
@@ -252,16 +254,32 @@ class Adapter(object):
         max_rmp: Maximum random-match probability below which a match is
             considered genuine.
         gc_content: Expected GC content of sequences.
+        alphabet: The Alphabet to use to validate the adapter sequence.
     """
     def __init__(
             self, sequence, where, max_error_rate=0.1, min_overlap=3,
             read_wildcards=False, adapter_wildcards=True, name=None,
             indels=True, indel_cost=1, match_probability=None, max_rmp=None,
-            gc_content=0.5):
+            gc_content=0.5, alphabet=None):
+        if len(sequence) == 0:
+            raise ValueError("Empty adapter sequence")
+        # TODO: all of this validation code should be wrapped up in Alphabet
+        sequence = parse_braces(sequence.upper().replace('U', 'T'))
+        seq_set = set(sequence)
+        if seq_set <= set('ACGT'):
+            adapter_wildcards = False
+        if adapter_wildcards and not seq_set <= IUPAC_BASES:
+            raise ValueError(
+                "Invalid character(s) in adapter sequence: {}".format(
+                    ','.join(seq_set - IUPAC_BASES)))
+        if alphabet:
+            if isinstance(alphabet, str):
+                alphabet = ALPHABETS[alphabet]
+            alphabet.validate_string(sequence)
+        
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
-        self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
-        assert len(self.sequence) > 0
+        self.sequence = sequence
         self.where = where
         self.max_error_rate = max_error_rate
         self.min_overlap = min(min_overlap, len(self.sequence))
@@ -269,13 +287,7 @@ class Adapter(object):
         self.max_rmp = max_rmp
         self.gc_content = gc_content
         self.indels = indels
-        seq_set = set(self.sequence)
-        self.adapter_wildcards = (
-            adapter_wildcards and not seq_set <= set('ACGT'))
-        if self.adapter_wildcards and not seq_set <= IUPAC_BASES:
-            raise ValueError(
-                'Invalid character(s) in adapter sequence: {}'.format(
-                    ','.join(seq_set - IUPAC_BASES)))
+        self.adapter_wildcards = adapter_wildcards
         self.read_wildcards = read_wildcards
         # redirect trimmed() to appropriate function depending on adapter type
         trimmers = {
@@ -504,7 +516,7 @@ class ColorspaceAdapter(Adapter):
         if kwargs.get('adapter_wildcards', False):
             raise ValueError("Wildcards not supported for colorspace adapters")
         kwargs['adapter_wildcards'] = False
-        super(ColorspaceAdapter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         has_nucleotide_seq = False
         if set(self.sequence) <= set('ACGT'):
             # adapter was given in basespace
@@ -528,7 +540,7 @@ class ColorspaceAdapter(Adapter):
             maximum error rate).
         """
         if self.where != PREFIX:
-            return super(ColorspaceAdapter, self).match_to(read)
+            return super().match_to(read)
         # create artificial adapter that includes a first color that encodes the
         # transition from primer base into adapter
         asequence = (

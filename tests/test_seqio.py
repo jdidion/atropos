@@ -13,6 +13,7 @@ from atropos.io.seqio import (Sequence, ColorspaceSequence, FormatError,
     FastaReader, FastqReader, FastaQualReader, InterleavedSequenceReader,
     FastaFormat, FastqFormat, InterleavedFormatter, get_format,
     open_reader as openseq, sequence_names_match)
+from atropos.util import ALPHABETS
 from .utils import temporary_path
 
 # files tests/data/simple.fast{q,a}
@@ -23,6 +24,14 @@ simple_fastq = [
 
 simple_fasta = [ Sequence(x.name, x.sequence, None) for x in simple_fastq ]
 
+
+class TestAlphabet:
+    def test_alphabet(self):
+        alphabet = ALPHABETS['dna']
+        for base in ('A','C','G','T','N'):
+            assert base in alphabet
+        assert 'X' not in alphabet
+        assert alphabet.resolve('X') == 'N'
 
 class TestSequence:
     def test_too_many_qualities(self):
@@ -136,6 +145,13 @@ class TestFastqReader:
             reads = list(sr)
             assert not sr._file.closed
         assert tmp_sr._file is None
+    
+    def test_alphabet(self):
+        filename = "tests/data/bad_bases.fq"
+        with FastqReader(filename, alphabet=ALPHABETS['dna']) as f:
+            reads = list(f)
+            assert reads[0].sequence == 'ACGNGGACT'
+            assert reads[1].sequence == 'CGGACNNNC'
 
 
 class TestFastaQualReader:

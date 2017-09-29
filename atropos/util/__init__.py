@@ -10,6 +10,59 @@ from numbers import Number
 import time
 from atropos import AtroposError
 
+# TODO: the nucleotide table should be implemented as an alphabet.
+
+class NotInAlphabetError(Exception):
+    def __init__(self, character):
+        super().__init__()
+        self.character = character
+
+class Alphabet():
+    def __init__(self, valid_characters, default_character):
+        if not isinstance(valid_characters, set):
+            valid_characters = set(valid_characters)
+        if not default_character in valid_characters:
+            valid_characters.add(default_character)
+        self.valid_characters = valid_characters
+        self.default_character = default_character
+    
+    def __contains__(self, character):
+        return character in self.valid_characters
+    
+    def validate(self, character):
+        """Raises NotInAlphabetError if the character is not in the alphabet.
+        """
+        if not character in self:
+            raise NotInAlphabetError(character)
+    
+    def validate_string(self, string):
+        """Raises NotInAlphabetError if any character in 'string' is not in the
+        alphabet.
+        """
+        for character in string:
+            self.validate(character)
+        
+    def resolve(self, character):
+        """Returns 'character' if it's in the alphabet, otherwise the
+        alphabet's default character.
+        """
+        if character in self.valid_characters:
+            return character
+        else:
+            return self.default_character
+    
+    def resolve_string(self, string):
+        """Returns a new string with any non-alphabet characters replaced
+        with the default character.
+        """
+        return "".join(self.resolve(c) for c in string)
+
+ALPHABETS = dict(
+    dna=Alphabet('ACGT', 'N'),
+    iso=None,
+    colorspace=Alphabet('0123', None)
+)
+
 def build_iso_nucleotide_table():
     """Generate a dict mapping ISO nucleotide characters to their complements,
     in both upper and lower case.

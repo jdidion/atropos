@@ -29,8 +29,25 @@ cdef class Sequence(object):
     
     def __init__(self, str name, str sequence, str qualities=None, str name2='',
                  original_length=None, match=None, match_info=None, clipped=None,
-                 insert_overlap=False, merged=False, corrected=0):
-        """Set qualities to None if there are no quality values"""
+                 insert_overlap=False, merged=False, corrected=0, alphabet=None):
+        
+        # Validate sequence and qualities lengths are equal
+        if qualities is not None:
+            slen = len(sequence)
+            qlen = len(qualities)
+            
+            # check that sequence and qualities are the same length
+            if slen != qlen:
+                rname = truncate_string(name)
+                raise FormatError(
+                    "In read named {0!r}: length of quality sequence ({1}) and "
+                    "length  of read ({2}) do not match".format(rname, qlen, slen))
+        
+        # If an alphabet is specified, replace any bases not in the alphabet
+        # with the default character.
+        if alphabet:
+            sequence = alphabet.resolve_string(sequence)
+        
         self.name = name
         self.sequence = sequence
         self.qualities = qualities
@@ -42,12 +59,6 @@ cdef class Sequence(object):
         self.insert_overlap = insert_overlap
         self.merged = merged
         self.corrected = corrected
-        if qualities is not None and len(qualities) != len(sequence):
-            rname = truncate_string(name)
-            raise FormatError(
-                "In read named {0!r}: length of quality sequence ({1}) and "
-                "length  of read ({2}) do not match".format(
-                    rname, len(qualities), len(sequence)))
     
     def subseq(self, begin=0, end=None):
         if end is None:
@@ -156,12 +167,15 @@ class FastqReader(SequenceReader):
     file_format = "FASTQ"
     delivers_qualities = True
     
-    def __init__(self, filename, quality_base=33, sequence_class=Sequence):
+    def __init__(
+            self, filename, quality_base=33, sequence_class=Sequence,
+            alphabet=None):
         """
         file is a filename or a file-like object.
         If file is a filename, then .gz files are supported.
         """
-        super().__init__(filename, quality_base=quality_base)
+        super().__init__(
+            filename, quality_base=quality_base, alphabet=alphabet)
         self.sequence_class = sequence_class
     
     def __iter__(self):
@@ -197,9 +211,9 @@ class FastqReader(SequenceReader):
                 else:
                     line = line[:strip]
                     if not (line and line[0] == '+'):
-                        raise FormatError("Line {0} in FASTQ file is expected "
-                                          "to start with '+', but found {1!r}".format(
-                                          i+1, line[:10]))
+                        raise FormatError(
+                            "Line {0} in FASTQ file is expected to start with "
+                            "'+', but found {1!r}".format(i+1, line[:10]))
                     if len(line) > 1:
                         if not line[1:] == name:
                             raise FormatError(
@@ -216,7 +230,14 @@ class FastqReader(SequenceReader):
                     qualities = line[:strip]
                 else:
                     qualities = line.rstrip('\r\n')
-                yield sequence_class(name, sequence, qualities, name2=name2)
+                try:
+                    yield sequence_class(
+                        name, sequence, qualities, name2=name2,
+                        alphabet=self.alphabet)
+                except Exception as err:
+                    raise FormatError(
+                        "Error creating sequence record at line "
+                        "{}".format(i+1)) from err
             i = (i + 1) % 4
         if i != 0:
             raise FormatError("FASTQ file ended prematurely")

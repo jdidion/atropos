@@ -1,11 +1,18 @@
 # Changes
 
-v1.1.14 (dev)
+v1.1.15 (2017.09.28)
+-------------
+* Fix for #41: Error when using progress bar
+* Fix for #42: Discordance between Cutadapt and Atropos in number of expected events.
+* Added '--alphabet' option. Set to 'dna' to validate input sequences against the allowed DNA characters (A/C/G/T/N). This fixes #43 and partially fixes #44.
+* Fixed #44: Uncaught errors not being logged.
+
+v1.1.14 (2017.09.19)
 -------------
 * Fix for #39: miRNA option error (thanks to @mottodora)
 * Fix for #37: fixes overflow error when computing RandomMatchProbability on long reads (>150 bp)
 
-v1.1.13 (2017.08.xx)
+v1.1.13 (2017.09.14)
 --------------------
 * Fix for #38: Atropos fails with MultiCore error when using OrderPreservingWriterResultsHandler (thanks to @cshenanigans)
 

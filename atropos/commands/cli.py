@@ -16,7 +16,7 @@ from atropos import __version__
 from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
 from atropos.io.compression import splitext_compressed
 from atropos.io.seqio import SINGLE, PAIRED
-from atropos.util import MAGNITUDE
+from atropos.util import MAGNITUDE, ALPHABETS
 
 class BaseCommandParser(object):
     """Base class for Atropos sub-commands.
@@ -204,6 +204,11 @@ class BaseCommandParser(object):
             "--sample-id",
             default=None, metavar="ID",
             help="Optional sample ID. Added to the summary output.")
+        group.add_argument(
+            "--alphabet",
+            default=None, metavar="NAME", choices=tuple(ALPHABETS.keys()),
+            help="Specify a sequence alphabet to use for validating inputs. "
+                 "Currently, only 'dna' is supported. (no validation)")
     
     def add_command_options(self):
         """Add command-specific options. At the very least,

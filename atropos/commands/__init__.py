@@ -214,7 +214,11 @@ def execute_cli(args=()):
     
     try:
         command = get_command(command_name)
-        retcode, _ = command.execute(args)
+        retcode, summary = command.execute(args)
+        if 'exception' in summary:
+            logging.getLogger().error(
+                "Error executing command %s", command_name, 
+                exc_info=summary['exception']['details'])
         return retcode
     except Exception as err:
         logging.getLogger().error(

@@ -187,7 +187,8 @@ class BaseCommandRunner(object):
                 reader=options.sra_reader, 
                 quality_base=options.quality_base, 
                 colorspace=options.colorspace, 
-                input_read=options.input_read)
+                input_read=options.input_read,
+                alphabet=options.alphabet)
             options.sra_reader = None
         else:
             interleaved = bool(options.interleaved_input)
@@ -201,7 +202,7 @@ class BaseCommandRunner(object):
                 file1=input1, file2=input2, file_format=options.format, 
                 qualfile=qualfile, quality_base=options.quality_base, 
                 colorspace=options.colorspace, interleaved=interleaved, 
-                input_read=options.input_read)
+                input_read=options.input_read, alphabet=options.alphabet)
         
         # Wrap reader in subsampler
         if options.subsample:

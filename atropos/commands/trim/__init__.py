@@ -301,7 +301,7 @@ class CommandRunner(BaseCommandRunner):
                 adapter_wildcards=options.match_adapter_wildcards,
                 indels=options.indels, indel_cost=options.indel_cost,
                 cache=adapter_cache, gc_content=options.gc_content,
-                match_probability=match_probability)
+                match_probability=match_probability, alphabet=options.alphabet)
             if options.adapter_max_rmp:
                 parser_args['max_rmp'] = options.adapter_max_rmp
             adapter_parser = AdapterParser(**parser_args)
