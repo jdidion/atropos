@@ -338,7 +338,7 @@ def print_trim_report(summary, outfile):
                     indent=(INDENT, ''), pct=True)
         else:
             _print(
-                "Reads with adapter:",
+                "Reads with adapters:",
                 adapter_cutter['records_with_adapters'][0],
                 adapter_cutter['fraction_records_with_adapters'][0],
                 pct=True)
