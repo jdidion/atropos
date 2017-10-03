@@ -216,10 +216,12 @@ in Cutadapt). If the insert match is successful, then a less stringent adapter m
 Otherwise, the normal Cutadapt-style adapter matching is performed. 
 
 This new algorithm only works with paired-end data that contains a single 3' adapter in 
-each direction. To enable this aligner, use the `--aligner insert` option.
+each direction. To enable this aligner, use the ``--aligner insert`` option.
 
-    atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
-    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz \
+::
+
+    atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG
+    -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -o trimmed.1.fq.gz -p trimmed.2.fq.gz
     -pe1 reads.1.fq.gz -pe2 reads.2.fq.gz
 
 There are three parameters that can be used to fine-tune insert matching:
