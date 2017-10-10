@@ -381,15 +381,30 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
                     read_lengths[1], 0, adapter_match1.rstart)
                 correct_errors = True
         
-        # If exactly one of the two alignments failed and symmetrix is True,
+        # If exactly one of the two alignments failed and symmetric is True,
         # duplicate the good alignment
         if self.symmetric and sum(
                 bool(m) for m in (adapter_match1, adapter_match2)) == 1:
+
+            def create_symmetric_match(match, read, read_len):
+                if match.rstart > read_len:
+                    return None
+                match = match.copy()
+                # If we're not dealing with equal-length reads, and this read
+                # is shorter than the other, adjust the match end to be the
+                # read length. The 'matches' and 'errors' attributes will be
+                # wrong, but it shouldn't matter.
+                if match.rstop < read_len:
+                    match.astop -= (read_len - match.rstop)
+                    match.rstop = read_len
+                return match
+
             if adapter_match1:
-                adapter_match2 = adapter_match1.copy()
+                adapter_match2 = create_symmetric_match(adapter_match1, read2, read_lengths[1])
             else:
-                adapter_match1 = adapter_match2.copy()
-            if self.mismatch_action and not insert_match:
+                adapter_match1 = create_symmetric_match(adapter_match2, read1, read_lengths[0])
+
+            if self.mismatch_action and not insert_match and adapter_match1 and adapter_match2:
                 # Assume that the symmetric read segments overlap and
                 # perform error correction
                 insert_match = (
