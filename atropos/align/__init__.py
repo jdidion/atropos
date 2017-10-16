@@ -205,6 +205,7 @@ MatchInfo = namedtuple("MatchInfo", (
 # 8. https://github.com/yamada-kd/nepal
 # 9. The SeqAn C++ library implements several alignment algorithms: 
 # http://www.sciencedirect.com/science/article/pii/S0168165617315420
+# 10. Could we treat paired end read + adapter alignment as an MSA problem?
 
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.

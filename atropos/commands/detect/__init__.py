@@ -34,6 +34,7 @@ from atropos.util import (
 # ntCard https://github.com/bcgsc/ntCard
 # https://github.com/TGAC/KAT
 # https://arxiv.org/pdf/1707.01743.pdf
+# https://github.com/splatlab/squeakr
 
 # TODO: In KnownContaminantDetector, accept template sequences with wildcards
 # to match against.

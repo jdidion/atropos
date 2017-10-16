@@ -470,7 +470,6 @@ class Adapter(object):
         for idx, base in enumerate(seq, 1):
             cur_p *= base_probs[0 if base in c_bases else 1]
             probabilities[idx] = cur_p
-
         return probabilities
     
     def summarize(self):
@@ -484,7 +483,7 @@ class Adapter(object):
             total_front=total_front,
             total_back=total_back,
             total=total_front + total_back,
-            match_probabilities=self.random_match_probabilities())
+            match_probabilities=Const(self.random_match_probabilities()))
         
         where = self.where
         assert (

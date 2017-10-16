@@ -134,6 +134,9 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 * Consider supporting different error rates for read1 vs read2.
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
 * Add option to InsertAdapter to trim overhangs without adapter matching.
+* Look more closely at providing solutions to the Illumina two-color chemistry issue:
+    * Provide and option to exempt G calls from the assessment of quality
+    * Trim 3′ Gs from reads
 
 ### 1.6
 
