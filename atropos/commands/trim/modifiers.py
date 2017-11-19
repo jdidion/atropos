@@ -195,6 +195,7 @@ class AdapterCutter(Modifier):
 
 # Other error correction approaches:
 # https://www.ncbi.nlm.nih.gov/pubmed/25161220
+# https://github.com/Malfoy/BCOOL
 
 class ErrorCorrectorMixin(object):
     """Provides a method for error correction.

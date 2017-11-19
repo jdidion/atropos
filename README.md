@@ -26,19 +26,20 @@ Atropos is available from [pypi](https://pypi.python.org/pypi/atropos) and can b
 First install dependencies:
 
 * Required
-    * Python 3.3+ (python 2.x is NOT supported) - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
+    * Python 3.3+ (python 2.x is NOT supported)
+        - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
     * Cython 0.25.2+ (`pip install Cython`)
-* Optional
+* Optional python libraries
     * pytest (for running unit tests)
     * progressbar2 or tqdm (progressbar support)
     * pysam (SAM/BAM input)
-    * khmer 2.0+ (`pip install khmer`) (for detecting low-frequency adapter contamination)
+    * khmer 2.0+ (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
-    * [ngs](https://github.com/ncbi/ngs) (for SRA streaming)
+    * ngstream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
 
-Then run:
+Pip can be used to install atropos and optional dependencies, e.g.:
 
-`pip install atropos`
+pip install atropos[tqdm,pysam,ngstream]
 
 ## Conda
 
@@ -76,9 +77,20 @@ atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCC
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
-## Publication
+## Publications
 
-A [preprint](https://peerj.com/preprints/2452/) is available and the submitted paper is currently under review. The results in the paper can be fully reproduced using the workflow defined in the [paper](paper/README.md) directory.
+Atropos is [published](https://peerj.com/articles/3720/) in PeerJ.
+
+Please cite as:
+
+> Didion JP, Martin M, Collins FS. (2017) Atropos: specific, sensitive, and speedy trimming of sequencing reads. PeerJ 5:e3720 https://doi.org/10.7717/peerj.3720
+
+The results in the paper can be fully reproduced using the workflow defined in the [paper](paper/README.md) directory.
+
+The citation for the original Cutadapt paper is:
+ 
+> Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
+
 
 ## Links
 
@@ -152,6 +164,8 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
     * http://numba.pydata.org/
     * https://github.com/undefx/vecpy
     * https://github.com/serge-sans-paille/pythran
+    * https://github.com/IntelLabs/hpat
+    * https://github.com/cupy/cupy
 * >90% test coverage
 * Fuzz testing using AFL
     * http://lcamtuf.coredump.cx/afl/
@@ -161,7 +175,9 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 
 * Implement additional alternate alignment algorithms.
 * Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
-* Implement the quality trimming algorithm used in UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
+* Explore new quality trimming algorithms
+  * UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
+  * InfoTrim: github.com/JacobPorter/InfoTrim
 * Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcoming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
 * Experiment with replacing the multicore implementation with an asyncio-based implementation (using ProcessPoolExecutor and uvloop).
 * Automatic adaptive tuning of queue sizes to maximize the balance between memory usage and latency.
@@ -169,13 +185,3 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2017.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
-
-## Citations
-
-The citation for the original Cutadapt paper is:
- 
-> Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
-
-Atropos is currently published as a pre-print on PeerJ, and will be submitted for peer review shortly. For now, you can cite it as:
-
-> John P Didion, Marcel Martin, and Francis S Collins. "Atropos: specific, sensitive, and speedy trimming of sequencing reads." https://peerj.com/preprints/2452/

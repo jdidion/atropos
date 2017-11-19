@@ -35,6 +35,7 @@ from atropos.util import (
 # https://github.com/TGAC/KAT
 # https://arxiv.org/pdf/1707.01743.pdf
 # https://github.com/splatlab/squeakr
+# bounter is a general-purpose counter
 
 # TODO: In KnownContaminantDetector, accept template sequences with wildcards
 # to match against.
@@ -44,7 +45,11 @@ from atropos.util import (
 
 # TODO: parallelize adapter detection for multiple input files.
 
+
 class CommandRunner(BaseCommandRunner):
+    """
+
+    """
     name = 'detect'
     
     def __call__(self):

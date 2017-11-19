@@ -1,8 +1,12 @@
 # Changes
 
+v1.1.16 (dev)
+-------------
+
+
 v1.1.15 (2017.09.28)
 -------------
-* Fix for #41: Error when using progress bar
+* Fix for #41: Error when using progress bar.
 * Fix for #42: Discordance between Cutadapt and Atropos in number of expected events.
 * Added '--alphabet' option. Set to 'dna' to validate input sequences against the allowed DNA characters (A/C/G/T/N). This fixes #43 and partially fixes #44.
 * Fixed #44: Uncaught errors not being logged.
