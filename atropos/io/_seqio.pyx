@@ -1,7 +1,7 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 import copy
-from atropos.io import FormatError, SequenceReader
+from atropos.io import FormatError, PrefetchSequenceReader
 from atropos.util import reverse_complement, truncate_string
 
 cdef class Sequence(object):
@@ -149,7 +149,14 @@ cdef class Sequence(object):
     def __reduce__(self):
         return (Sequence, (self.name, self.sequence, self.qualities, self.name2))
 
-class FastqReader(SequenceReader):
+    def size_in_bytes(self):
+        size = len(self.name) + len(self.sequence)
+        if self.name2:
+            size += len(self.name2)
+        if self.qualities:
+            size += len(self.qualities)
+
+class FastqReader(PrefetchSequenceReader):
     """Reader for FASTQ files. Does not support multi-line FASTQ files.
     """
     file_format = "FASTQ"
@@ -163,7 +170,7 @@ class FastqReader(SequenceReader):
         super().__init__(filename, quality_base=quality_base)
         self.sequence_class = sequence_class
     
-    def __iter__(self):
+    def _iter(self):
         """
         Yield Sequence objects
         """
@@ -219,3 +226,7 @@ class FastqReader(SequenceReader):
             i = (i + 1) % 4
         if i != 0:
             raise FormatError("FASTQ file ended prematurely")
+
+    def estimate_num_records(self):
+        return self._estimate_num_records(
+            self.name, self._first_seq.size_in_bytes, 4, 2)

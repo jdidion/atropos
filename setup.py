@@ -108,7 +108,7 @@ cmdclass['sdist'] = sdist
 # Define install and test requirements based on python version
 version_info = sys.version_info
 
-install_requirements = ['xphyle>=3.0.6']
+install_requirements = ['xphyle>=3.0.6', 'pokrok']
 test_requirements = ['pytest'] #, 'jinja2', 'pysam'],
 
 if version_info < (3, 4):
@@ -138,7 +138,6 @@ setup(
     license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
     ext_modules = extensions,
     packages = find_packages(),
-    scripts = ['bin/atropos'],
     package_data = { 'atropos' : [
         'adapters/*.fa',
         'commands/**/templates/*'
@@ -146,12 +145,15 @@ setup(
     install_requires = install_requirements,
     tests_require = test_requirements,
     extras_require = {
-        'progressbar' : ['progressbar2'],
-        'tqdm' : ['tqdm'],
         'khmer' : ['khmer'],
         'pysam' : ['pysam'],
         'jinja' : ['jinja2'],
-        'sra' : ['srastream>=0.1.3']
+        'sra' : ['ngstream>=0.1.3']
+    },
+    entry_points = {
+        'pokrok' : [
+            'atropos_msg=atropos.plugins.message:AtroposMsgProgressMeterFactory'
+        ]
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",

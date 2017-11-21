@@ -7,8 +7,11 @@ TODO
 """
 from collections import namedtuple
 import csv
+import math
+import os
 import sys
 from xphyle import STDOUT, xopen
+from xphyle.utils import uncompressed_size
 from atropos import AtroposError
 from atropos.util import Summarizable, truncate_string, splitext_compressed
 
@@ -16,6 +19,9 @@ READ1 = 1
 READ2 = 2
 SINGLE = READ1
 PAIRED = 1|2
+
+LINESEP_LEN = len(os.linesep)
+
 
 class FormatError(AtroposError):
     """Raised when an input file (FASTA or FASTQ) is malformatted."""
@@ -38,6 +44,19 @@ class SequenceReaderBase(Summarizable): # pylint: disable=no-member
     - colorspace: bool
     - interleaved: bool
     """
+    def estimate_num_records(self):
+        """Estimates the total number of records in the file(s), if possible.
+
+        The way this is typically done is to divide the size of the file
+        (obtained via xphyle.utils.uncompressed_size) by the size of the first
+        record.
+
+        Returns:
+            An estimate of the number of records (or record pairs), or None if
+            the number cannot be estimated.
+        """
+        return None
+
     def summarize(self):
         return dict(
             input_names=self.input_names,
@@ -51,7 +70,7 @@ class SequenceReaderBase(Summarizable): # pylint: disable=no-member
 
 class SequenceReader(SequenceReaderBase):
     """Read possibly compressed files containing sequences.
-    
+
     Args:
         file is a path or a file-like object. In both cases, the file may
             be compressed (.gz, .bz2, .xz).
@@ -63,7 +82,7 @@ class SequenceReader(SequenceReaderBase):
     interleaved = False
     input_read = SINGLE
     _close_on_exit = False
-    
+
     def __init__(self, path, mode='r', quality_base=None):
         self.quality_base = quality_base
         if isinstance(path, str):
@@ -77,25 +96,41 @@ class SequenceReader(SequenceReaderBase):
                 # TODO: generate random unique name?
                 self.name = path.__class__
             self._file = path
-    
+
     @property
     def input_names(self):
         return (self.name, None)
-    
+
     def close(self):
         """Close the underlying file.
         """
         if self._close_on_exit and self._file is not None:
             self._file.close()
             self._file = None
-    
+
     def __enter__(self):
         if self._file is None:
             raise ValueError("I/O operation on closed SequenceReader")
         return self
-    
+
     def __exit__(self, *args):
         self.close()
+
+class PrefetchSequenceReader(SequenceReader):
+    """SequenceReader that prefetches the first line and stores it so it can
+    be inspected before iteration begins.
+    """
+    def __init__(self, path, mode='r', quality_base=None):
+        super().__init__(path, mode, quality_base)
+        self._seq_iter = self._iter()
+        self._first_seq = next(self.seqiter)
+
+    def __iter__(self):
+        yield self._first_seq
+        yield from self._seq_iter
+
+    def _iter(self):
+        raise NotImplementedError()
 
 try:
     from ._seqio import Sequence, FastqReader
@@ -131,7 +166,7 @@ class ColorspaceSequence(Sequence):
             raise FormatError(
                 "Primer base is {0!r} in read {1!r}, but it should be one of "
                 "A, C, G, T.".format(self.primer, truncate_string(name)))
-    
+
     def __repr__(self):
         fmt_str = \
             '<ColorspaceSequence(name={0!r}, primer={1!r}, sequence={2!r}{3})>'
@@ -141,7 +176,7 @@ class ColorspaceSequence(Sequence):
         return fmt_str.format(
             truncate_string(self.name), self.primer,
             truncate_string(self.sequence), qstr)
-    
+
     def __getitem__(self, key):
         return self.__class__(
             self.name,
@@ -160,12 +195,15 @@ class ColorspaceSequence(Sequence):
 class SraSequenceReader(SequenceReader):
     delivers_qualities = True
     file_format = "fastq"
-    
+
     def __init__(self, reader, quality_base=None, sequence_class=Sequence):
         super().__init__(reader, quality_base=quality_base)
         self.input_read = PAIRED if reader.paired else SINGLE
         self.sequence_class = sequence_class
-    
+
+    def estimate_num_records(self):
+        return self._file.read_count
+
     def __iter__(self):
         if self.input_read == PAIRED:
             for read in self._file:
@@ -173,10 +211,10 @@ class SraSequenceReader(SequenceReader):
         else:
             for read in self._file:
                 yield self._as_sequence(read[0])
-    
+
     def _as_sequence(self, frag):
         return self.sequence_class(*frag)
-    
+
     def close(self):
         self._file.finish()
 
@@ -184,10 +222,10 @@ class SraColorspaceSequenceReader(SraSequenceReader):
     """Reads colorspace sequences from an SRA accession.
     """
     colorspace = True
-    
+
     def __init__(self, reader, quality_base=33):
         super().__init__(
-            reader, quality_base=quality_base, 
+            reader, quality_base=quality_base,
             sequence_class=ColorspaceSequence)
 
 class FileWithPrependedLine(object):
@@ -197,7 +235,7 @@ class FileWithPrependedLine(object):
     of autodetecting input from a stream: As soon as the first line has been
     read, we know the file type, but also that line is "gone" and unavailable
     for further processing.
-    
+
     Args:
         file: An already opened file-like object.
         line: A single string (newline will be appended if not included).
@@ -207,24 +245,23 @@ class FileWithPrependedLine(object):
             line += '\n'
         self.first_line = line
         self._file = file
-    
+
     @property
     def name(self):
         return self._file.name
-    
+
     def __iter__(self):
         yield self.first_line
-        for line in self._file:
-            yield line
-    
+        yield from self._file
+
     def close(self):
         """Close the underlying file.
         """
         self._file.close()
 
-class FastaReader(SequenceReader):
+class FastaReader(PrefetchSequenceReader):
     """Reader for FASTA files.
-    
+
     Args:
         path: A path or a file-like object. In both cases, the file may
             be compressed (.gz, .bz2, .xz).
@@ -232,13 +269,13 @@ class FastaReader(SequenceReader):
         sequence_class: The class to use when creating new sequence objects.
     """
     file_format = "FASTA"
-    
+
     def __init__(self, path, keep_linebreaks=False, sequence_class=Sequence):
         super().__init__(path)
         self.sequence_class = sequence_class
         self._delimiter = '\n' if keep_linebreaks else ''
-    
-    def __iter__(self):
+
+    def _iter(self):
         """Read next entry from the file (single entry at a time).
         """
         name = None
@@ -262,19 +299,26 @@ class FastaReader(SequenceReader):
                 raise FormatError(
                     "At line {0}: Expected '>' at beginning of FASTA record, "
                     "but got {1!r}.".format(i+1, truncate_string(line)))
-        
+
         if name is not None:
             yield self.sequence_class(name, self._delimiter.join(seq), None)
 
+    def estimate_num_records(self):
+        # TODO: this will underestimate the record size (and thus overestimate
+        # the total number of records) for FASTA files with wrapped sequence
+        # lines.
+        return _estimate_num_records(
+            [self.name], self._first_seq.size_in_bytes, 2, 1)
+
 class ColorspaceFastaReader(FastaReader):
     """Reads colorspace sequences from a FASTA.
-    
+
     Args:
         path: The file to read.
         keep_linebreaks: Whether to keep linebreaks in wrapped sequences.
     """
     colorspace = True
-    
+
     def __init__(self, path, keep_linebreaks=False):
         super().__init__(
             path, keep_linebreaks, sequence_class=ColorspaceSequence)
@@ -283,7 +327,7 @@ class ColorspaceFastqReader(FastqReader):
     """Reads colorspace sequences from a FASTQ.
     """
     colorspace = True
-    
+
     def __init__(self, path, quality_base=33):
         super().__init__(
             path, quality_base=quality_base, sequence_class=ColorspaceSequence)
@@ -292,7 +336,7 @@ class SRAColorspaceFastqReader(FastqReader):
     """Reads SRA-formatted colorspace sequences from a FASTQ.
     """
     colorspace = True
-    
+
     def __init__(self, path, quality_base=33):
         super().__init__(
             path, quality_base=quality_base,
@@ -300,7 +344,7 @@ class SRAColorspaceFastqReader(FastqReader):
 
 class FastaQualReader(SequenceReaderBase):
     """Reader for reads that are stored in .(CS)FASTA and .QUAL files.
-    
+
     Args:
         fastafile and qualfile are filenames or file-like objects.
             If a filename is used, then .gz files are recognized.
@@ -312,7 +356,7 @@ class FastaQualReader(SequenceReaderBase):
     colorspace = False
     interleaved = False
     input_read = SINGLE
-    
+
     def __init__(
             self, fastafile, qualfile, quality_base=33,
             sequence_class=Sequence):
@@ -320,11 +364,11 @@ class FastaQualReader(SequenceReaderBase):
         self.qualreader = FastaReader(qualfile, keep_linebreaks=True)
         self.quality_base = quality_base
         self.sequence_class = sequence_class
-    
+
     @property
     def input_names(self):
         return ((self.fastareader.name, self.qualreader.name), None)
-    
+
     def __iter__(self):
         """Yield Sequence objects.
         """
@@ -348,29 +392,32 @@ class FastaQualReader(SequenceReaderBase):
             assert fastaread.name == qualread.name
             yield self.sequence_class(
                 fastaread.name, fastaread.sequence, qualities)
-    
+
     def close(self):
         """Close the underlying files.
         """
         self.fastareader.close()
         self.qualreader.close()
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         self.close()
+
+    def estimate_num_records(self):
+        return self.fastareader.estimate_num_records()
 
 class ColorspaceFastaQualReader(FastaQualReader):
     """Reads sequences and qualities from separate files and returns
     :class:`ColorspaceSequence`s.
-    
+
     Args:
         fastafile, qualfile: FASTA files that contain the sequences and
             qualities, respectively.
     """
     colorspace = True
-    
+
     def __init__(self, fastafile, qualfile, quality_base=33):
         super().__init__(
             fastafile, qualfile, quality_base=quality_base,
@@ -379,7 +426,7 @@ class ColorspaceFastaQualReader(FastaQualReader):
 class PairedSequenceReader(SequenceReaderBase):
     """Read paired-end reads from two files. Wraps two SequenceReader instances,
     making sure that reads are properly paired.
-    
+
     Args:
         file1, file2: The pair of files.
         colorspace: Whether the sequences are in colorspace.
@@ -387,7 +434,7 @@ class PairedSequenceReader(SequenceReaderBase):
     """
     input_read = PAIRED
     interleaved = False
-    
+
     def __init__(
             self, file1, file2, quality_base=33, colorspace=False,
             file_format=None):
@@ -397,16 +444,16 @@ class PairedSequenceReader(SequenceReaderBase):
         self.reader2 = open_reader(
             file2, colorspace=colorspace, quality_base=quality_base,
             file_format=file_format)
-    
+
     @property
     def input_names(self):
         return (
-            self.reader1.input_names[0], 
+            self.reader1.input_names[0],
             self.reader2.input_names[0])
-    
+
     def __getattr__(self, name):
         return getattr(self.reader1, name)
-    
+
     def __iter__(self):
         """Iterate over the paired reads. Each item is a pair of Sequence
         objects.
@@ -438,22 +485,30 @@ class PairedSequenceReader(SequenceReaderBase):
                     "does not match '{1}' in file 2.".format(
                         read1.name, read2.name))
             yield (read1, read2)
-    
+
     def close(self):
         """Close the underlying files.
         """
         self.reader1.close()
         self.reader2.close()
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         self.close()
 
+    def estimate_num_records(self):
+        ests = list(filter(None, (
+            self.reader1.estimate_num_records() +
+            self.reader2.estimate_num_records())))
+        if len(ests) == 0:
+            return None
+        return max(ests)
+
 class InterleavedSequenceReader(SequenceReaderBase):
     """Read paired-end reads from an interleaved FASTQ file.
-    
+
     Args:
         path: The interleaved FASTQ file.
         colorspace: Whether the sequences are in colorspace.
@@ -461,16 +516,16 @@ class InterleavedSequenceReader(SequenceReaderBase):
     """
     input_read = PAIRED
     interleaved = True
-    
+
     def __init__(
             self, path, quality_base=33, colorspace=False, file_format=None):
         self.reader = open_reader(
             path, quality_base=quality_base, colorspace=colorspace,
             file_format=file_format)
-    
+
     def __getattr__(self, name):
         return getattr(self.reader, name)
-    
+
     def __iter__(self):
         # Avoid usage of zip() below since it will consume one item too many.
         itr = iter(self.reader)
@@ -486,7 +541,7 @@ class InterleavedSequenceReader(SequenceReaderBase):
                     "Reads are improperly paired. Name {0!r} (first) does not "
                     "match {1!r} (second).".format(read1.name, read2.name))
             yield (read1, read2)
-    
+
     def close(self):
         """Close the underlying reader.
         """
@@ -498,10 +553,13 @@ class InterleavedSequenceReader(SequenceReaderBase):
     def __exit__(self, *args):
         self.close()
 
+    def estimate_num_records(self):
+        return math.ceil(self.reader.estimate_num_records() / 2)
+
 class SAMReader(SequenceReaderBase):
     """Reader for SAM/BAM files. Paired-end files must be name-sorted. Does
     not support secondary/supplementary reads. This is an abstract class.
-    
+
     Args:
         path: A filename or a file-like object. If a filename, then .gz files
             are supported.
@@ -512,104 +570,120 @@ class SAMReader(SequenceReaderBase):
     interleaved = False
     has_qualfile = False
     colorspace = False
-    
+
     def __init__(self, path, quality_base=33, sequence_class=Sequence):
         self._close_on_exit = is_path = isinstance(path, str)
         self.quality_base = quality_base
         self.sequence_class = sequence_class
-        
+
         if is_path:
             self.name = path
         else:
             self.name = path.name
-        
+
         is_bam = self.name.endswith('.bam')
-        
+
         if is_path:
             mode = 'rb' if is_bam else 'rt'
             self._file = xopen(path, mode)
         else:
             self._file = path
-        
+
         parser_class = BAMParser if is_bam else SAMParser
         self._sam_iter = parser_class(self._file)
-    
+
     @property
     def input_names(self):
         return (self.name, None)
-    
+
     def __iter__(self):
         # pysam raises an error of the SAM/BAM header is not complete,
         # even though it's unnecessary for our puroses. In that case,
         # we use our own simple SAM parser.
         return self._iter(self._sam_iter)
-    
+
     def _iter(self, sam):
         """Create an iterator over records in the SAM/BAM file.
         """
         raise NotImplementedError()
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         self.close()
-    
+
     def close(self):
         """Close the underling AlignmentFile.
         """
         if self._close_on_exit and self._file is not None:
             self._file.close()
             self._file = None
-    
+
     def _as_sequence(self, read):
         return self.sequence_class(
             read.query_name,
             read.query_sequence,
             read.query_qualities)
 
+    def estimate_num_records(self):
+        return self._sam_iter.estimate_num_records()
+
+
 SAMRead = namedtuple(
     'SAMRead', (
-        'query_name', 'query_sequence', 'query_qualities', 
+        'query_name', 'query_sequence', 'query_qualities',
         'is_read1', 'is_read2'))
 
 class SAMParser():
     def __init__(self, sam_file):
+        self.sam_file = sam_file
         self._reader = csv.reader(sam_file, delimiter='\t')
+        self._header_size = 0
         line = None
         for line in self._reader:
             # skip header lines
             if not line[0].startswith('@'):
+                self._header_size += len(line)
                 break
         self._next_line = line
-        
+
     def __iter__(self):
         return self
-    
+
     def __next__(self):
         if self._next_line is None:
             raise StopIteration()
-        
+
         is_read1 = (int(self._next_line[1]) & 64) > 0
         read = SAMRead(
-            self._next_line[0], self._next_line[9], self._next_line[10], 
+            self._next_line[0], self._next_line[9], self._next_line[10],
             is_read1, not is_read1)
-        
+
         try:
             self._next_line = next(self._reader)
         except:
             self._next_line = None
-        
+
         return read
+
+    def estimate_num_records(self):
+        record_len = len('\t'.join(self._next_line))
+        return _estimate_num_records(
+            self.sam_file, record_len, 1, header_size=self._header_size)
+
+# TODO: Not sure how to estimate the number of records in a name-sorted BAM
+# file. There is no index, and bgzip doesn't have an option to get the
+# uncompressed size. Not sure if gzip -l will work correctly for a bgzip file.
 
 class BAMParser():
     def __init__(self, bam_file):
         import pysam
         self._reader = pysam.AlignmentFile(self._file)
-    
+
     def __iter__(self):
         return self
-    
+
     def __next__(self):
         read = next(self._reader)
         return SAMRead(
@@ -621,39 +695,47 @@ class SingleEndSAMReader(SAMReader):
     """Reader for single-end SAM/BAM files.
     """
     input_read = SINGLE
-    
+
     def _iter(self, sam):
         for read in sam:
             yield self._as_sequence(read)
 
-class Read1SingleEndSAMReader(SAMReader):
+class PairedEndEstimatorMixin():
+    def estimate_num_records(self):
+        est = super().estimate_num_records()
+        if est is None:
+            return None
+        else:
+            return math.ceil(est / 2)
+
+class Read1SingleEndSAMReader(SAMReader, PairedEndEstimatorMixin):
     """Reads a paired-end SAM/BAM file as if it were single-end, yielding
     only the first read from each pair.
     """
     input_read = READ1
-    
+
     def _iter(self, sam):
         for read in sam:
             if read.is_read1:
                 yield self._as_sequence(read)
 
-class Read2SingleEndSAMReader(SAMReader):
+class Read2SingleEndSAMReader(SAMReader, PairedEndEstimatorMixin):
     """Reads a paired-end SAM/BAM file as if it were single-end, yielding
     only the second read from each pair.
     """
     input_read = READ2
-    
+
     def _iter(self, sam):
         for read in sam:
             if read.is_read2:
                 yield self._as_sequence(read)
 
-class PairedEndSAMReader(SAMReader):
+class PairedEndSAMReader(SAMReader, PairedEndEstimatorMixin):
     """Reads pairs of reads from a SAM/BAM file. The file must be name-sorted.
     """
     input_read = PAIRED
     interleaved = True
-    
+
     def _iter(self, sam):
         for reads in zip(sam, sam):
             if reads[0].query_name != reads[1].query_name:
@@ -663,30 +745,56 @@ class PairedEndSAMReader(SAMReader):
                     "name-sorted and does not contain any "
                     "secondary/supplementary alignments.",
                     reads[0].query_name, reads[1].query_name)
-            
+
             if reads[0].is_read1:
                 assert reads[1].is_read2
             else:
                 assert reads[1].is_read1
                 reads = (reads[1], reads[0])
-            
+
             yield tuple(self._as_sequence(r) for r in reads)
+
+def _estimate_num_records(
+        input_file, record_size, lineseps, format_chars=0,
+        header_size=0):
+    """Convenience method to compute the estimated number of records in
+    the input file(s).
+
+    Args:
+        input_file: Path to input file.
+        record_size: The approximate size of a single record (without
+            whitespace or formatting characters).
+        lineseps: Number of line separators in a record (including one at
+            the end).
+        format_chars: Number of formatting chars, e.g. '>' in FASTA and '@'
+            and '+' in FASTQ.
+
+    Returns:
+        Integer estimate of the number of records in the file.
+    """
+    file_size = uncompressed_size(input_file) - header_size
+    if file_size is None:
+        return None
+    return int(
+        file_size /
+        (record_size + (lineseps * LINESEP_LEN) + format_chars))
+
 
 class SequenceFileFormat():
     """Base class for sequence formatters.
     """
     def format(self, read):
         """Format a Sequence as a string.
-        
+
         Args:
             read: The Sequence object.
-        
+
         Returns:
             A string representation of the sequence object in the sequence
             file format.
         """
         raise NotImplementedError()
-    
+
     def header(self):
         """Returns the header to be written at the beginning of the file.
         """
@@ -694,7 +802,7 @@ class SequenceFileFormat():
 
 class FastaFormat(SequenceFileFormat):
     """FASTA SequenceFileFormat.
-    
+
     Args:
         line_length: Max line length (in characters), or None. Determines
             whether and how lines are wrapped.
@@ -704,10 +812,10 @@ class FastaFormat(SequenceFileFormat):
         if line_length:
             from textwrap import TextWrapper
             self.text_wrapper = TextWrapper(width=line_length)
-    
+
     def format(self, read):
         return self.format_entry(read.name, read.sequence)
-    
+
     def format_entry(self, name, sequence):
         """Convert a sequence record to a string.
         """
@@ -727,7 +835,7 @@ class FastqFormat(SequenceFileFormat):
     def format(self, read):
         return self.format_entry(
             read.name, read.sequence, read.qualities, read.name2)
-    
+
     def format_entry(self, name, sequence, qualities, name2=""):
         """Convert a sequence record to a string.
         """
@@ -749,14 +857,14 @@ class SAMFormat(SequenceFileFormat):
     """
     def __init__(self, flag):
         self.flag = str(flag)
-    
+
     def format(self, read):
         return "".join((
-            read.name, "\t", self.flag, 
+            read.name, "\t", self.flag,
             '\t*\t0\t0\t*\t*\t0\t0\t',
-            read.sequence, '\t', 
+            read.sequence, '\t',
             read.qualities, '\n'))
-    
+
     def header(self):
         return "@HD\tVN:1.5\tSO:unsorted\n"
 
@@ -767,16 +875,16 @@ class Formatter():
         self.written = 0
         self.read1_bp = 0
         self.read2_bp = 0
-    
+
     def format(self, result, read1, read2=None):
         """Format read(s) and add them to `result`.
-        
+
         Args:
             result: A dict mapping file names to lists of formatted reads.
             read1, read2: The reads to format.
         """
         raise NotImplementedError()
-    
+
     def _get_result_list(self, result, file1, seq_format1, seq_format2=None):
         if file1 in result:
             return result[file1]
@@ -789,7 +897,7 @@ class Formatter():
                 result_list.append(header)
             result[file1] = result_list
             return result_list
-    
+
     @property
     def written_bp(self):
         """Tuple of base-pairs written (read1_bp, read2_bp).
@@ -798,7 +906,7 @@ class Formatter():
 
 class SingleEndFormatter(Formatter):
     """Wrapper for a SequenceFileFormat for single-end data.
-    
+
     Args:
         seq_format: The SequenceFileFormat object.
         file1: The single-end file.
@@ -807,10 +915,10 @@ class SingleEndFormatter(Formatter):
         super().__init__()
         self.file1 = file1
         self.seq_format = seq_format
-    
+
     def format(self, result, read1, read2=None):
         """Format read(s) and add them to `result`.
-        
+
         Args:
             result: A dict mapping file names to lists of formatted reads.
             read1, read2: The reads to format.
@@ -827,7 +935,7 @@ class InterleavedFormatter(Formatter):
         self.file1 = file1
         self.seq_format1 = seq_format1
         self.seq_format2 = seq_format2 or seq_format1
-    
+
     """Format read pairs as successive reads in an interleaved file.
     """
     def format(self, result, read1, read2=None):
@@ -849,7 +957,7 @@ class PairedEndFormatter(Formatter):
             (file1, seq_format1),
             (file2, seq_format2 or seq_format1)
         ]
-    
+
     def format(self, result, read1, read2):
         for read, (path, seq_format) in zip((read1, read2), self.data):
             result_list = self._get_result_list(result, path, seq_format)
@@ -878,10 +986,10 @@ def sequence_names_match(read1, read2):
     end in '/1' and '/2'. Also, the fastq-dump tool (used for converting SRA
     files to FASTQ) appends a .1 and .2 to paired-end reads if option -I is
     used.
-    
+
     Args:
         read1, read2: The sequences to compare.
-    
+
     Returns:
         Whether the sequences are equal.
     """
@@ -905,13 +1013,13 @@ def paired_to_read2(reader):
         yield read2
 
 def open_reader(
-        file1=None, file2=None, qualfile=None, quality_base=None, 
-        colorspace=False, file_format=None, interleaved=False, 
+        file1=None, file2=None, qualfile=None, quality_base=None,
+        colorspace=False, file_format=None, interleaved=False,
         input_read=None):
     """Open sequence files in FASTA or FASTQ format for reading. This is
     a factory that returns an instance of one of the ...Reader
     classes also defined in this module.
-    
+
     Args:
         file1, file2, qualfile: Paths to regular or compressed files or
             file-like objects. Use file1 if data is single-end. If file2 is also
@@ -937,12 +1045,12 @@ def open_reader(
             "When interleaved is set, file2 and qualfile must be None")
     if file2 is not None and qualfile is not None:
         raise ValueError("Setting both file2 and qualfile is not supported")
-    
+
     if file2 is not None:
         return PairedSequenceReader(
             file1, file2, quality_base=quality_base, colorspace=colorspace,
             file_format=file_format)
-    
+
     if qualfile is not None:
         if colorspace:
             # read from .(CS)FASTA/.QUAL
@@ -951,10 +1059,10 @@ def open_reader(
         else:
             return FastaQualReader(
                 file1, qualfile, quality_base=quality_base)
-    
+
     if file_format is None and file1 != STDOUT:
         file_format = guess_format_from_name(file1)
-    
+
     if file_format is None:
         if file1 == STDOUT:
             file1 = sys.stdin
@@ -969,7 +1077,7 @@ def open_reader(
             # TODO: guess SAM/BAM from data
             file1 = FileWithPrependedLine(file1, line)
             break
-    
+
     if file_format is not None:
         file_format = file_format.lower()
         if file_format in ('sam', 'bam'):
@@ -1003,7 +1111,7 @@ def open_reader(
             return fastq_handler(file1, quality_base=quality_base)
         elif file_format == 'sra-fastq' and colorspace:
             return SRAColorspaceFastqReader(file1, quality_base=quality_base)
-    
+
     raise UnknownFileType(
         "File format {0!r} is unknown (expected 'sra-fastq' (only for "
         "colorspace), 'fasta', 'fastq', 'sam', or 'bam').".format(file_format))
@@ -1013,7 +1121,7 @@ def sra_reader(reader, quality_base=None, colorspace=False, input_read=None):
     and 2) be iterable. Furthermore, each value yielded by the iterator must
     be a list of N tuples, where N = 2 if paired else 1, and where each tuple
     is (name, sequence, qualities).
-    
+
     Args:
         reader: An existing reader.
         quality_base: Base for quality values.
@@ -1027,10 +1135,10 @@ def sra_reader(reader, quality_base=None, colorspace=False, input_read=None):
         wrapped = SraColorspaceSequenceReader(reader, quality_base)
     else:
         wrapped = SraSequenceReader(reader, quality_base)
-    
+
     if not reader.paired or input_read == PAIRED:
         return wrapped
-    
+
     if input_read == READ1:
         return paired_to_read1(wrapped)
     else:
@@ -1038,12 +1146,12 @@ def sra_reader(reader, quality_base=None, colorspace=False, input_read=None):
 
 def guess_format_from_name(path, raise_on_failure=False):
     """Detect file format based on the file name.
-    
+
     Args:
         path: The filename to guess.
         raise_on_failure: Whether to raise an exception if the filename cannot
             be detected.
-    
+
     Returns:
         The format name.
     """
@@ -1052,7 +1160,7 @@ def guess_format_from_name(path, raise_on_failure=False):
         name = path
     elif hasattr(path, "name"):	 # seems to be an open file-like object
         name = path.name
-    
+
     if name:
         name, ext1, _ = splitext_compressed(name)
         ext = ext1.lower()
@@ -1063,20 +1171,20 @@ def guess_format_from_name(path, raise_on_failure=False):
             return 'fastq'
         elif ext in ('.sam', '.bam'):
             return ext[1:]
-    
+
     if raise_on_failure:
         raise UnknownFileType(
             "Could not determine whether file {0!r} is FASTA or FASTQ: file "
             "name extension {1!r} not recognized".format(path, ext))
 
 def create_seq_formatter(
-        file1, file2=None, qualities=None, colorspace=False, file_format=None, 
+        file1, file2=None, qualities=None, colorspace=False, file_format=None,
         interleaved=False, line_length=None):
     """Create a Formatter, deriving the format name from the file extension.
-    
+
     Args:
         file1, file2: Output files.
-        
+
         qualities: When file_format is None, this can be set to True or False to
             specify whether the written sequences will have quality values.
             This is is used in two ways:
@@ -1085,27 +1193,27 @@ def create_seq_formatter(
               appropriately.
             * When False (no qualities available), an exception is raised when
               the auto-detected output format is FASTQ.
-        
+
         colorspace: If True, instances of the Colorspace... formats are
             returned.
-        
+
         file_format: If set to None, file format is autodetected from the file
             name extension. Set to 'fasta', 'fastq', or 'sra-fastq' to not
             auto-detect. Colorspace is not auto-detected and must always be
             requested explicitly.
-        
+
         interleaved: Whether the output should be interleaved (file2 must be
             None).
-        
+
         line_length: Maximum length of a sequence line in FASTA output.
-    
+
     Returns:
         A Formatter instance.
     """
     if file_format is None:
         file_format = guess_format_from_name(
             file1, raise_on_failure=qualities is None)
-    
+
     if file_format is None:
         if qualities is True:
             # Format not recognized, but know we want to write reads with
@@ -1118,16 +1226,16 @@ def create_seq_formatter(
             raise UnknownFileType("Could not determine file type.")
     else:
         file_format = file_format.lower()
-    
+
     if file_format in ('sam', 'fastq') and qualities is False:
         raise ValueError(
             "Output format cannot be {} since no quality values are "
             "available.".format(file_format))
-    
+
     if file_format == 'sam':
         if file2 is not None:
             raise ValueError("Only one output file allowed for SAM format")
-        
+
         if interleaved:
             return PairedEndSAMFormatter(file1)
         else:
@@ -1147,7 +1255,7 @@ def create_seq_formatter(
             raise UnknownFileType(
                 "File format {0!r} is unknown (expected 'fasta' or "
                 "'fastq').".format(file_format))
-        
+
         if file2 is not None:
             return PairedEndFormatter(file1, file2, fmt)
         elif interleaved:

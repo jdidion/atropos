@@ -9,11 +9,6 @@ from atropos.commands import execute_cli
 # Print a helpful error message if the extension modules cannot be imported.
 check_importability()
 
-try:
-    import _preamble
-except ImportError:
-    pass
-
 def main(args=sys.argv[1:]):
     """Main method.
     
@@ -21,6 +16,3 @@ def main(args=sys.argv[1:]):
         args: Command-line arguments.
     """
     sys.exit(execute_cli(args))
-
-if __name__ == '__main__':
-    main()

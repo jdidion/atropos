@@ -10,6 +10,7 @@ from numbers import Number
 import os
 import time
 from atropos import AtroposError
+import pokrok as pk
 from xphyle.formats import FORMATS
 
 def build_iso_nucleotide_table():
@@ -728,3 +729,14 @@ def run_interruptible(func, *args, **kwargs):
         logging.getLogger().error("Unknown error", exc_info=True)
         retcode = 1
     return retcode
+
+def magnitude_formatter(magnitude):
+    """Returns a function that formats integers as magnitude strings.
+    """
+    suffix = ""
+    if magnitude is None:
+        div = 1.0
+    else:
+        div = float(MAGNITUDE[magnitude.upper()])
+        suffix = magnitude
+    return lambda val: "{:.1f} {}".format(val / div, suffix)

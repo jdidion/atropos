@@ -4,6 +4,7 @@ from collections import Sequence
 import copy
 import platform
 import sys
+import pokrok as pk
 from atropos import __version__, AtroposError
 from atropos.adapters import AdapterCache
 from atropos.io import open_reader, sra_reader
@@ -180,6 +181,7 @@ class BaseCommandRunner(object):
         self.batches = 0
         self.done = False
         self._empty_batch = [None] * self.size
+        self._progress_type = None
         self._progress_options = None
         
         if options.sra_reader:
@@ -225,9 +227,17 @@ class BaseCommandRunner(object):
         self.iterable = enumerate(reader, 1)
         
         if options.progress:
-            self._progress_options = (
-                options.progress, self.size, self.max_reads,
-                options.counter_magnitude)
+            if self.max_reads:
+                size = self.max_reads
+            else:
+                size = self.reader.estimate_num_records()
+                if size and options.subsample:
+                    size = int(size * options.subsample)
+
+            self._progress_type = options.progress
+            self._progress_options = dict(
+                size=size, batch_size=self.size,
+                counter_magnitude=options.counter_magnitude)
         
         self.init_summary()
     
@@ -244,14 +254,17 @@ class BaseCommandRunner(object):
         input batches. BaseCommandRunner is itself an iterable, and will be
         wrapped with a progress bar if _progress_options is set.
         """
-        if self._progress_options:
+        if self._progress_type:
             # Wrap iterator in progress bar
-            from atropos.util.progress import create_progress_reader
-            itr = create_progress_reader(self, *self._progress_options)
-            # itr may be none if there are no progress bar libraries available
-            if itr is not None:
-                return itr
-        return self
+            plugin_name = None
+            if isinstance(self._progress_type, str):
+                plugin_name = 'atropos_{}'.format(self._progress_type)
+            else:
+                pk.configure(filename=None) # TODO: locate .pokrok file within package
+            return pk.progress_iter(
+                self, plugin_name=plugin_name, **self._progress_options)
+        else:
+            return self
 
     def __iter__(self):
         return self

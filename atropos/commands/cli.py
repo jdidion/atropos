@@ -109,9 +109,10 @@ class BaseCommandParser(object):
             help="Print debugging information. (no)")
         self.parser.add_argument(
             "--progress",
-            choices=('bar', 'msg'), default=None,
-            help="Show progress. bar = show progress bar; msg = show a status "
-                 "message. (no)")
+            nargs="?", choices=('bar', 'msg'), default=False,
+            help="Show progress. An optional argument determines what type of "
+                 "progress meter to use: bar = progress bar; msg = status "
+                 "message. Otherwise the default progress meter is shown. (no)")
         self.parser.add_argument(
             "--quiet",
             action='store_true', default=False,
@@ -311,12 +312,15 @@ class BaseCommandParser(object):
                 if name.endswith('.'):
                     name = name[:-1]
                 options.sample_id = name
-        
+
         if options.quiet:
-            options.progress = None
-        elif options.progress and options.output == STDERR:
-            logging.getLogger().warning(
-                "Progress bar may corrupt output written to STDERR")
+            options.progress = False
+        else:
+            if options.progress is None:
+                options.progress = True
+            if options.progress and options.output == STDERR:
+                logging.getLogger().warning(
+                    "Progress bar may corrupt output written to STDERR")
         
         if options.report_file in (STDOUT, STDERR) and options.quiet:
             logging.getLogger().warning(
