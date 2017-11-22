@@ -3,6 +3,7 @@ include README.rst
 include CHANGES.md
 include CITATION
 include LICENSE.txt
+include pokrok.json
 include doc/*.rst
 include doc/conf.py
 include doc/Makefile

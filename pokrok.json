@@ -1,0 +1,16 @@
+{
+  "default_style": {
+    "sized": [
+      "COUNTER",
+      "PERCENT",
+      "ELAPSED",
+      "BAR",
+      "ETA"
+    ],
+    "unsized": [
+      "COUNTER",
+      "TIMER",
+      "SPINNER"
+    ]
+  }
+}
