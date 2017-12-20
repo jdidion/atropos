@@ -164,8 +164,10 @@ A [preprint](https://peerj.com/preprints/2452/) is available and the submitted p
 * Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcoming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
 * Experiment with replacing the multicore implementation with an asyncio-based implementation (using ProcessPoolExecutor and uvloop).
 * Automatic adaptive tuning of queue sizes to maximize the balance between memory usage and latency.
+* Potential performance improvements in BAM reading: https://www.biostars.org/p/186732/
+* Multithreaded writing to single output may be possible. This would be implemented in xphyle.
 
-While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2017.
+While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2018.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 
