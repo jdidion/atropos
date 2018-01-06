@@ -67,7 +67,7 @@ To take advantage of multi-threading, set the `--threads` option:
 atropos --threads 8 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA -o trimmed.fq.gz -se reads.fq.gz
 ```
 
-To take advantage of the new aligner (if you have paired-end reads with 3' adatpers), set the `--aligner` option to 'insert':
+To take advantage of the new aligner (if you have paired-end reads with 3' adapters), set the `--aligner` option to 'insert':
 
 ```
 atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG \
