@@ -55,7 +55,7 @@ First install dependencies:
       we recommend upgrading to a newer python version.
    -  Cython 0.25.2+ (``pip install Cython``)
 
--  Optional
+-  Maybe
 
    -  pytest (for running unit tests)
    -  progressbar2 or tqdm (progressbar support)

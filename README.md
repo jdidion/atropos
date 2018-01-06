@@ -29,7 +29,7 @@ First install dependencies:
     * Python 3.3+ (python 2.x is NOT supported)
         - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
     * Cython 0.25.2+ (`pip install Cython`)
-* Optional python libraries
+* Maybe python libraries
     * pytest (for running unit tests)
     * progressbar2 or tqdm (progressbar support)
     * pysam (SAM/BAM input)
@@ -104,23 +104,27 @@ The citation for the original Cutadapt paper is:
 
 ### 1.2
 
-* Migrate to xphyle (https://github.com/jdidion/xphyle) for file management.
-* Provide option for RNA-seq data that will trim polyA sequence.
+* Migrate to [xphyle](https://github.com/jdidion/xphyle) for file management.
+* Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
 * Accept multiple input files.
-* Support SAM output.
-* Expand the list of contaminants that are detected by default.
-* Direct streaming and trimming of reads from SRA using [srastream](https://github.com/jdidion/srastream).
+* Support SAM output (including #33).
+* Direct streaming and trimming of reads from SRA and htsget using [ngstream](https://github.com/jdidion/ngstream).
+* Read "cropping" (#50)
+* Support for ThruPlex-style adapters (in which barcode is part of query sequence; #55)
 * Accessibility:
     * Create recipe for homebrew.
     * Automatically update conda and homebrew recipes for each release.
     * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
+* Improve documentation (#24)
 
 ### 1.3
 
 * Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
-* Automate creation and sending of user statistics and crash reports using [pytattle](https://github.com/biologyguy/PyTattle).
+* Provide option for RNA-seq data that will trim polyA sequence.
+* Add formal config file support (#53)
+* Automate crash reporting using [sentry](https://github.com/getsentry/raven-python).
 * Look at some new trimming/qc programs
     * https://github.com/OpenGene/AfterQC
     * http://tagcleaner.sourceforge.net/
@@ -140,6 +144,7 @@ The citation for the original Cutadapt paper is:
 ### 1.5
 
 * Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
+* Enable user to define custom read structure: https://github.com/nh13/read-structure-examples
 * Support for paired-end demultiplexing
 * Demultiplexing based on barcodes: https://github.com/marcelm/cutadapt/issues/118.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
