@@ -398,7 +398,7 @@ class CommandRunner(BaseCommandRunner):
             elif oper == 'G' and (options.nextseq_trim is not None):
                 modifiers.add_modifier(
                     NextseqQualityTrimmer,
-                    read=1|2, cutoff=options.nextseq_trim,
+                    cutoff=options.nextseq_trim,
                     base=options.quality_base)
             elif oper == 'Q' and options.quality_cutoff:
                 modifiers.add_modifier(

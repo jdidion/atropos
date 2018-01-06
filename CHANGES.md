@@ -2,7 +2,7 @@
 
 v1.1.16 (dev)
 -------------
-
+* Fix for #58: NextSeqTrimmer not trimming from both ends. Thanks to @pkMyt1!
 
 v1.1.15 (2017.09.28)
 -------------
