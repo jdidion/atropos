@@ -19,6 +19,7 @@
 FROM phusion/baseimage:latest
 WORKDIR /tmp
 ENV BUILD_PACKAGES \
+    locales \
     build-essential \
     gcc-multilib \
     automake \
@@ -27,7 +28,8 @@ ENV BUILD_PACKAGES \
     libgsl-dev
 ADD art_illumina_src151.tar.gz .
 ADD art_illumina_src151-adapter-enabled.tar.gz .
-RUN apt-get update \
+RUN apt-get clean \
+    && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         $BUILD_PACKAGES \
@@ -37,7 +39,7 @@ RUN apt-get update \
     && make \
     && make install \
     && cd .. \
-    && apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) \
-    && rm -rf /var/lib/apt/lists/* /tmp/* \
     && locale-gen en_US.UTF-8 \
-    && update-locale LANG=en_US.UTF-8
+    && update-locale LANG=en_US.UTF-8 \
+    && apt-get remove --purge -y $BUILD_PACKAGES $(apt-mark showauto) \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
