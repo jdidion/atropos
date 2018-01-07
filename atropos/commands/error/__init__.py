@@ -81,6 +81,9 @@ class BaseQualityErrorEstimator(ErrorEstimator):
         return (self.total_qual / self.total_len, None)
 
 # Error estimation using shadow counts
+# DEPRECATED
+# TODO: Replace with Zhu et al. cubic splines method or something faster
+# https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-016-1052-3
 
 FILTER_RE = re.compile("A+|C+|G+|T+|.*N.*")
 

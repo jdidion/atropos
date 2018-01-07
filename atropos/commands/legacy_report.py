@@ -580,7 +580,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
             _print()
             
             if adapter["total"] == 0:
-                return
+                continue
             
             if where_name == "anywhere":
                 _print(
@@ -719,6 +719,9 @@ def print_stats_report(data, outfile):
             _print(*histbin)
     
     def _print_base_histogram(title, hist, extra_width=4, index_name='Pos'):
+        if hist is None:
+            _print("No Data")
+            return
         _print_title(title, level=2)
         _print(
             index_name, *hist['columns'], header=True, extra_width=extra_width)
