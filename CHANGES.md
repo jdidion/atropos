@@ -1,7 +1,8 @@
 # Changes
 
-v1.1.16 (dev)
+v1.1.16 (2018.01.07)
 -------------
+* Fix for #57: LegacyReport stops on adapter with no trimmed reads, and LegacyReport errors when histogram data is None. Thanks to @cokelaer and @pyMyt1!
 * Fix for #58: NextSeqTrimmer not trimming from both ends. Thanks to @pkMyt1!
 
 v1.1.15 (2017.09.28)
