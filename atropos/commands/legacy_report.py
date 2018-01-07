@@ -709,6 +709,9 @@ def print_stats_report(data, outfile):
     
     def _print_histogram(title, hist1, hist2=None):
         _print_title(title, level=2)
+        if hist1 is None:
+            _print("No Data")
+            return
         if hist2:
             hist = (
                 (key, hist1.get(key, 0), hist2.get(key, 0))
@@ -719,10 +722,10 @@ def print_stats_report(data, outfile):
             _print(*histbin)
     
     def _print_base_histogram(title, hist, extra_width=4, index_name='Pos'):
+        _print_title(title, level=2)
         if hist is None:
             _print("No Data")
             return
-        _print_title(title, level=2)
         _print(
             index_name, *hist['columns'], header=True, extra_width=extra_width)
         for pos, row in hist['rows'].items():
@@ -733,6 +736,10 @@ def print_stats_report(data, outfile):
             _print(pos, *base_pcts, extra_width=extra_width)
     
     def _print_tile_histogram(title, hist):
+        if hist is None:
+            _print_title(title, level=2)
+            _print("No Data")
+            return
         ncol = len(hist['columns'])
         max_tile_width = max(
             4, len(str(math.ceil(data['read1']['counts'] / ncol)))) + 1
@@ -743,12 +750,15 @@ def print_stats_report(data, outfile):
         """Print a histogram of position x tile, with values as the median
         base quality.
         """
+        _print_title(title, level=2)
+        if hist is None:
+            _print("No Data")
+            return
         quals = hist['columns']
         tiles = hist['columns2']
         ncol = len(tiles)
         max_tile_width = max(
             4, len(str(math.ceil(data['read1']['counts'] / ncol)))) + 1
-        _print_title(title, level=2)
         _print('Pos', *tiles, header=True, extra_width=max_tile_width)
         for pos, tiles in hist['rows'].items():
             # compute the weighted median for each tile at each position
