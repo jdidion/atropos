@@ -280,10 +280,10 @@ class InsertAligner(object):
         if len1 > len2:
             seq1 = seq1[:len2]
         elif len2 > len1:
-            seq2 = seq1[:len1]
+            seq2 = seq2[:len1]
 
         seq2_rc = reverse_complement(seq2)
-        
+
         def _match(insert_match, offset, insert_match_size, prob): # pylint disable=unused-argument
             if offset < self.min_adapter_overlap:
                 # The reads are mostly overlapping, to the point where
@@ -358,9 +358,9 @@ class InsertAligner(object):
         # overlap and error rate thresholds. We sort by matches and
         # then mismatches, and then check each in turn until we find
         # one with an adapter match (if any).
-        
+
         insert_matches = self.aligner.locate(seq2_rc, seq1)
-        
+
         if insert_matches:
             # Filter by random-match probability
             filtered_matches = []

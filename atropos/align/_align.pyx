@@ -542,8 +542,7 @@ def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_
 DEF OVERHANG_MULTIPLIER = 100000
 
 cdef class MultiAligner:
-    """
-    Same as Aligner above, but 1) returns up to 'max_matches' matches
+    """Same as Aligner above, but 1) returns up to 'max_matches' matches
     rather than a single best match, and 2) does not allow indels or
     wildcards.
     TODO: implement quality-weighted mismatches as in Skewer.

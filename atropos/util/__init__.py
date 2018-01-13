@@ -1,6 +1,6 @@
 """Widely useful utility methods.
 """
-from collections import OrderedDict, Iterable
+from collections import OrderedDict, Iterable, Sequence
 from datetime import datetime
 import errno
 import functools

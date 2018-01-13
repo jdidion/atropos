@@ -420,6 +420,30 @@ def test_error_correction_no_insert_match_two_adapter_matches():
     assert not new_read2.insert_overlap
     assert new_read2.sequence == reverse_complement(correct_frag)
 
+def test_error_correction_unequal_read_lengths():
+    # Test case for issue #51
+    read1 = Sequence(
+        'read1',
+        'TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA',
+        'CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0')
+    read2 = Sequence(
+        'read1',
+        'ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT',
+        'CCCCCG@FCFGGCFGGGGFEFGFGGFCFGGGFGFGGGGGGGGGGGGGGGGGGGGGGGGGGG9FGGGGGGGFGDFFGGGGGGGGGGGGGGGGG8;>@?@FEGGGGGGGGGGGGGGGGGGGGG=DDFAEFFFGF>B>EA):DFFBDFFB6CDEDDD9=99DD>55)580:A5)*)*;DD>**51:0118):)4))1***0:*)*)((***0*.(((((*)/.)1/(6((()1.)(((6).-----8<:C<73')
+    aligner = InsertAligner(
+        'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG',
+        'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT')
+    insert_match, adapter_match1, adapter_match2 = aligner.match_insert(
+        read1.sequence, read2.sequence)
+    ec = ErrorCorrectorMixin('N')
+    ec.correct_errors(read1, read2, insert_match, truncate_seqs=True)
+
+    assert read1.corrected == 3
+    assert read2.corrected == 3
+    for i in (80, 86, 104):
+        assert read1.sequence[i] == 'N', 'Read 1 not corrected to N at {}'.format(i)
+        assert read2.sequence[104-i] == 'N', 'Read 2 not corrected to N at {}'.format(104-i)
+
 def ints2quals(ints):
     return ''.join(chr(i+33) for i in ints)
 
