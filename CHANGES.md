@@ -1,23 +1,23 @@
 # Changes
 
-v1.1.17 (dev)
--------------
-
+v1.1.17 (2018.01.13)
+--------------------
+* Fix #51: Reads of different lengths not error corrected.
 
 v1.1.16 (2018.01.07)
--------------
+--------------------
 * Fix for #57: LegacyReport stops on adapter with no trimmed reads, and LegacyReport errors when histogram data is None. Thanks to @cokelaer and @pyMyt1!
 * Fix for #58: NextSeqTrimmer not trimming from both ends. Thanks to @pkMyt1!
 
 v1.1.15 (2017.09.28)
--------------
+--------------------
 * Fix for #41: Error when using progress bar.
 * Fix for #42: Discordance between Cutadapt and Atropos in number of expected events.
 * Added '--alphabet' option. Set to 'dna' to validate input sequences against the allowed DNA characters (A/C/G/T/N). This fixes #43 and partially fixes #44.
 * Fixed #44: Uncaught errors not being logged.
 
 v1.1.14 (2017.09.19)
--------------
+--------------------
 * Fix for #39: miRNA option error (thanks to @mottodora)
 * Fix for #37: fixes overflow error when computing RandomMatchProbability on long reads (>150 bp)
 
