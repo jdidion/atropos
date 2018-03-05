@@ -4,6 +4,8 @@ jdidion/atropos_paper
 jdidion/skewer
 jdidion/seqpurge
 jdidion/adapterremoval
+jdidion/fastp
+jdidion/cutadapt
 # Reference
 jdidion/hg38_reference
 # Tools with references/indexes

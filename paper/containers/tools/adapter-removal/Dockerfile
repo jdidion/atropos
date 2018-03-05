@@ -2,13 +2,13 @@
 # Dockerfile
 #
 # Software:         AdapterRemoval
-# Software Version: 2.2.0
+# Software Version: 2.2.2
 # Description:      AdapterRemoval2 image
 # Website:          https://github.com/MikkelSchubert/adapterremoval
 # Provides:         AdapterRemoval
 # Base Image:       phusion/baseimage:latest
-# Build Cmd:        docker build -f Dockerfile -t mikkelschubert/adapterremoval:latest .
-#                   docker tag mikkelschubert/adapterremoval:latest jdidion/adapterremoval
+# Build Cmd:        docker build -f Dockerfile -t jdidion/adapterremoval:latest .
+#                   docker tag jdidion/adapterremoval:latest jdidion/adapterremoval
 # Pull Cmd:         docker pull jdidion/adapterremoval
 # Run Cmd:          docker run jdidion/adapterremoval AdapterRemoval --help
 # Note: for me to be able to deploy this, it has to be tagged with my repo
@@ -16,7 +16,7 @@
 #################################################################
 FROM phusion/baseimage:latest
 WORKDIR /tmp
-ENV VERSION v2.2.0
+ENV VERSION v2.2.2
 ENV BUILD_PACKAGES \
     build-essential \
     g++ \

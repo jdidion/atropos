@@ -2,7 +2,7 @@
 # Dockerfile
 #
 # Software:         STAR
-# Software Version: 2.5.3a
+# Software Version: 2.5.4b
 # Description:      Phusion STAR RNA-Seq aligner Image
 # Website:          https://github.com/alexdobin/STAR
 # Provides:         STAR
@@ -27,11 +27,11 @@ ENV RUNTIME_PACKAGES \
     time
 
 # STAR
-ENV STAR_VERSION 2.5.3a
+ENV STAR_VERSION 2.5.4.b
 ENV STAR_URL "https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz"
 
 # Install samtools
-ENV SAMTOOLS_VERSION 1.4
+ENV SAMTOOLS_VERSION 1.7
 ENV SAMTOOLS_URL "https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2"
 
 # Install compiler and perl stuff

@@ -120,27 +120,20 @@ The citation for the original Cutadapt paper is:
 
 ### 1.3
 
-* Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
+* Add auto-trimming mode for paired-end reads.
+* Support for UMIs.
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
-* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Add formal config file support (#53)
 * Automate crash reporting using [sentry](https://github.com/getsentry/raven-python).
-* Look at some new trimming/qc programs
-    * https://github.com/OpenGene/AfterQC
-    * http://tagcleaner.sourceforge.net/
-    * https://github.com/mdshw5/fastqp/blob/master/README.md
 
 ### 1.4
 
+* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+* Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
 * General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
-* CPU and memory profiling. Try out:
-    * https://github.com/nvdv/vprof
-    * https://github.com/what-studio/profiling
-    * https://github.com/fabianp/memory_profiler
-    * https://github.com/rkern/line_profiler#line-profiler
 
 ### 1.5
 
@@ -148,18 +141,28 @@ The citation for the original Cutadapt paper is:
 * Enable user to define custom read structure: https://github.com/nh13/read-structure-examples
 * Support for paired-end demultiplexing
 * Demultiplexing based on barcodes: https://github.com/marcelm/cutadapt/issues/118.
-* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 * Consider supporting different error rates for read1 vs read2.
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
-* Add option to InsertAdapter to trim overhangs without adapter matching.
 * Look more closely at providing solutions to the Illumina two-color chemistry issue:
     * Provide and option to exempt G calls from the assessment of quality
     * Trim 3′ Gs from reads
+* Also look at addressing any issues with one-color chemistry (iSeq).
+* Consider whether to support trimming/QC of raw IonTorrent data.
 
 ### 1.6
 
 * Implement a public plugin API.
 * Add more logging and convert log messages from old-style to new-style format strings.
+* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
+* CPU and memory profiling. Try out:
+    * https://github.com/nvdv/vprof
+    * https://github.com/what-studio/profiling
+    * https://github.com/fabianp/memory_profiler
+    * https://github.com/rkern/line_profiler#line-profiler
+* Look at some new trimming/qc programs; decide whether to add to benchmarks and/or incorporate any of their features
+    * https://github.com/OpenGene/fastp/issues
+    * http://tagcleaner.sourceforge.net/
+    * https://github.com/mdshw5/fastqp/blob/master/README.md
 
 ### 2.0
 

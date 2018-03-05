@@ -22,7 +22,7 @@ ENV GENCODE_37_FILE "gencode.v${GENCODE_VERSION}lift37.annotation.gtf.gz"
 ENV GENCODE_38_FILE "gencode.v${GENCODE_VERSION}.annotation.gtf.gz"
 ENV BEDOPS_VERSION 2.4.26
 ENV BEDOPS_URL "https://github.com/bedops/bedops/archive/v${BEDOPS_VERSION}.tar.gz"
-ENV SAMTOOLS_VERSION 1.4
+ENV SAMTOOLS_VERSION 1.7
 ENV SAMTOOLS_URL "https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2"
 ENV SRA_VERSION 2.8.2-1
 ENV SRA_URL "https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${SRA_VERSION}/sratoolkit.${SRA_VERSION}-ubuntu64.tar.gz"

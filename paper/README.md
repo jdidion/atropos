@@ -4,10 +4,9 @@ The peer-reviewed manuscript is
 
 > Didion JP, Martin M, Collins FS. (2017) Atropos: specific, sensitive, and speedy trimming of sequencing reads. PeerJ 5:e3720 https://doi.org/10.7717/peerj.3720
 
-See the [manuscript folder](manuscript/README.md) for details on how the
-manuscript was created.
+See the [manuscript folder](manuscript/README.md) for details on how the manuscript was created.
 
-The version of Atropos used in the manuscript can be found at: https://github.com/jdidion/atropos/releases/tag/1.1.5. Note that additional tools have been added, tool versions (including Atropos) have been updated, and the workflow has been modified since publication. These changes will eventually be refelected in an updated preprint on BioRxiv.
+The version of Atropos used in the peer-reviewed manuscript can be found at: https://github.com/jdidion/atropos/releases/tag/1.1.5. Note that additional tools have been added, tool versions (including Atropos) have been updated, and the workflow has been modified since publication. These changes will eventually be refelected in an updated preprint on BioRxiv.
 
 # Overview
 

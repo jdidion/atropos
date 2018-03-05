@@ -2,7 +2,7 @@
 # Dockerfile
 #
 # Software:         bwa, bwa-meth, samtools
-# Software Version: 0.7.15, 0.10, 1.4
+# Software Version: 0.7.17, 0.20, 1.7
 # Description:      Alpine bwa and bwa-meth Image
 # Website:          https://github.com/lh3/bwa
 #                   https://github.com/brentp/bwa-meth
@@ -29,9 +29,9 @@ ENV RUNTIME_PACKAGES \
     libncursesw5-dev \
     python3-pip \
     time
-ENV BWA_VERSION 0.7.15
+ENV BWA_VERSION 0.7.17
 ENV BWA_URL "https://github.com/lh3/bwa/releases/download/v${BWA_VERSION}/bwa-${BWA_VERSION}.tar.bz2"
-ENV SAMTOOLS_VERSION 1.4
+ENV SAMTOOLS_VERSION 1.7
 ENV SAMTOOLS_URL "https://github.com/samtools/samtools/releases/download/${SAMTOOLS_VERSION}/samtools-${SAMTOOLS_VERSION}.tar.bz2"
 
 RUN apt-get update && apt-get install --yes \

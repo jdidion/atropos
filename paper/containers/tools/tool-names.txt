@@ -5,6 +5,8 @@ atropos (adapter)	Atropos (adapter-match)
 atropos (insert)	Atropos (insert-match)
 seqpurge	SeqPurge
 skewer	Skewer
+fastp   fastp
+cutadapt    Cutadapt
 bwa	BWA
 bwameth	bwa-meth
 star	STAR
