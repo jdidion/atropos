@@ -79,6 +79,8 @@ simReads.into {
   skewerSimReads
   seqPurgeSimReads
   adapterRemovalSimReads
+  fastpSimReads
+  cutadaptSimReads
 }
 
 /* Process: Atropos adapter trimming
@@ -256,6 +258,77 @@ process AdapterRemoval {
   """
 }
 
+/* Process: fastp adapter trimming
+ * -------------------------------
+ */
+process fastp {
+  tag { taskId }
+  cpus { threads }
+  container {
+    "${params.containerPrefix}jdidion/fastp${params.containerSuffix}"
+  }
+
+  input:
+  set err, file(reads), file(alns) from fastpSimReads
+  each threads from params.threadCounts
+  each qcut from params.quals
+
+  output:
+  val(taskId) into fastpTaskId
+  set val("${taskId}"), val(err), file(alns), file("${taskId}.{1,2}.fq.gz") into trimmedFastp
+  set val("${taskId}"), file("${taskId}.timing.txt") into timingFastp
+  set val("${taskId}"), file("${taskId}.machine_info.txt") into machineFastp
+  set val("${taskId}"), file(".jobid") into jobFastp
+  file "${taskId}.report.txt"
+
+  script:
+  taskId = "fastp_${task.cpus}_${err}_q${qcut}"
+  """
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
+  /usr/bin/time -v -o ${taskId}.timing.txt fastp \
+    -i ${reads[0]} -I ${reads[1]} -o ${taskId}.1.fq.gz -O ${taskId}.2.fq.gz
+    --adapter_sequence $params.adapter1 --adapter_sequence_r2 $params.adapter2
+    --thread $task.cpus --cut_by_quality3 --cut_mean_quality $qcut
+    --length_required $params.minLength --disable_quality_filtering
+    > "${taskId}.report.txt"
+  """
+}
+
+/* Process: Cutadapt adapter trimming
+ * ----------------------------------
+ */
+process Cutadapt {
+  tag { taskId }
+  cpus { threads }
+  container {
+    "${params.containerPrefix}jdidion/cutadapt${params.containerSuffix}"
+  }
+
+  input:
+  set err, file(reads), file(alns) from cutadaptSimReads
+  each threads from params.threadCounts
+  each qcut from params.quals
+
+  output:
+  val(taskId) into cutadaptTaskId
+  set val("${taskId}"), val(err), file(alns), file("${taskId}.{1,2}.fq.gz") into trimmedCutadapt
+  set val("${taskId}"), file("${taskId}.timing.txt") into timingCutadapt
+  set val("${taskId}"), file("${taskId}.machine_info.txt") into machineCutadapt
+  set val("${taskId}"), file(".jobid") into jobCutadapt
+  file "${taskId}.report.txt"
+
+  script:
+  taskId = "cutadapt_${task.cpus}_${err}_q${qcut}"
+  """
+  cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
+  /usr/bin/time -v -o ${taskId}.timing.txt cutadapt \
+    -j $task.cpus -O 7 -q $qcut --trim-n \
+    -a $params.adapter1 -A $params.adapter2 -m $params.minLength \
+    -o ${taskId}.1.fq.gz -p ${taskId}.2.fq.gz ${reads[0]} ${reads[1]}
+    > "${taskId}.report.txt"
+  """
+}
+
 /* Channel: merged tool outputs
  * ----------------------------
  * If you add a tool process, make sure to add the trimmedXXX channel
@@ -267,7 +340,9 @@ Channel
     trimmedAtropos,
     trimmedSkewer,
     trimmedSeqPurge,
-    trimmedAdapterRemoval
+    trimmedAdapterRemoval,
+    trimmedFastp,
+    trimmedCutadapt
   )
   .set { trimmedMerged }
 
@@ -348,7 +423,9 @@ Channel
     timingAtropos,
     timingSkewer,
     timingSeqPurge,
-    timingAdapterRemoval
+    timingAdapterRemoval,
+    timingFastp,
+    timingCutadapt
   )
   .set { timingMerged }
 
@@ -409,7 +486,9 @@ Channel
     machineAtropos,
     machineSkewer,
     machineSeqPurge,
-    machineAdapterRemoval
+    machineAdapterRemoval,
+    machineFastp,
+    machineCutadapt
   )
   .set { machineMerged }
 
@@ -464,7 +543,9 @@ Channel
     jobAtropos,
     jobSkewer,
     jobSeqPurge,
-    jobAdapterRemoval
+    jobAdapterRemoval,
+    jobFastp,
+    jobCutadapt
   )
   .set { jobMerged }
 
