@@ -4,7 +4,7 @@ class: CommandLineTool
 
 requirements:
 - class: DockerRequirement
-  dockerPull: jdidion/atropos:1.1.1
+  dockerPull: jdidion/atropos:1.1.17
 - class: InlineJavascriptRequirement
 
 baseCommand: [atropos, trim]

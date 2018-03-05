@@ -4,10 +4,10 @@ class: CommandLineTool
 
 requirements:
 - class: DockerRequirement
-  dockerPull: jdidion/adapterremoval:2.2.2
+  dockerPull: jdidion/fastp
 - class: InlineJavascriptRequirement
 
-baseCommand: [AdapterRemoval]
+baseCommand: [fastp]
 
 inputs:
   paired_input1:
@@ -15,64 +15,62 @@ inputs:
     format: "http://edamontology.org/format_1930" # FASTQ
     streamable: true
     inputBinding:
-      prefix: --file1
+      prefix: -i
   paired_output1:
     type: File
     format: "http://edamontology.org/format_1930" # FASTQ
     inputBinding:
-      prefix: -output1
+      prefix: -o
   paired_input2:
     type: File?
     format: "http://edamontology.org/format_1930" # FASTQ
     streamable: true
     inputBinding:
-      prefix: --file2
+      prefix: -I
   paired_output2:
     type: File?
     format: "http://edamontology.org/format_1930" # FASTQ
     inputBinding:
-      prefix: -output2
-  gzip:
+      prefix: -O
+  quality:
+    type: int?
+    inputBinding:
+      prefix: -q
+    default: 0
+  cut_mean_quality:
+    type: int?
+    inputBinding:
+      prefix: --cut_mean_quality
+    default: 20
+  cut_quality5:
+    type: int?
+    inputBinding:
+      prefix: --cut_by_quality5
+  cut_quality3:
+    type: int?
+    inputBinding:
+      prefix: --cut_by_quality3
+  disable_length_filtering:
     type: boolean
     inputBinding:
-      prefix: --gzip
+      prefix: --disable_length_filtering
   adapter1:
     type: string
     inputBinding:
-      prefix: -adapter1
+      prefix: --adapter_sequence
   adapter2:
     type: string?
     inputBinding:
-      prefix: -adapter2
-  mismatch_rate:
-    type: double?
+      prefix: --adapter_sequence_r2
+  correction:
+    type: bool
     inputBinding:
-      prefix: --mm
-  trimns:
-    type: boolean
-    inputBinding:
-      prefix: --trimns
-  trimqualities:
-    type: boolean
-    inputBinding:
-      prefix: --trimqualities
-  minquality:
-    type: int?
-    inputBinding:
-      prefix: --minquality
-  minlength:
-    type: int?
-    inputBinding:
-      prefix: --minlength
+      prefix: --correction
   threads:
     type: int?
     inputBinding:
-      prefix: --threads
+      prefix: --thread
     default: 1
-  settings_file:
-    type: File?
-    inputBinding:
-      prefix: --settings
 
 outputs:
   trimmed1:
@@ -85,7 +83,3 @@ outputs:
     streamable: true
     outputBinding:
       glob: $(inputs.paired_output2)
-  settings:
-    type: File?
-    outputBinding:
-      glob: $(inputs.settings_file)
