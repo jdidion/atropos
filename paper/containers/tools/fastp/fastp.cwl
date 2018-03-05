@@ -4,7 +4,7 @@ class: CommandLineTool
 
 requirements:
 - class: DockerRequirement
-  dockerPull: jdidion/fastp
+  dockerPull: jdidion/fastp:0.12.3
 - class: InlineJavascriptRequirement
 
 baseCommand: [fastp]
