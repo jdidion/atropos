@@ -116,6 +116,7 @@ The citation for the original Cutadapt paper is:
     * Automatically update conda and homebrew recipes for each release.
     * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
 * Improve documentation (#24)
+* Port over improvements in latest versions of Cutadapt https://cutadapt.readthedocs.io/en/stable/
 
 ### 1.3
 
