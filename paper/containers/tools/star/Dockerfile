@@ -27,7 +27,7 @@ ENV RUNTIME_PACKAGES \
     time
 
 # STAR
-ENV STAR_VERSION 2.5.4.b
+ENV STAR_VERSION 2.5.4b
 ENV STAR_URL "https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz"
 
 # Install samtools
