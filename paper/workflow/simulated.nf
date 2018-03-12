@@ -25,6 +25,11 @@
  * - Reduce params.batchSize
  * - If you have all of the software installed locally, you can disable
  *   Docker/Singularity by commenting out the 'container' directives.
+ *
+ * Note: When running the 'local' profile, a fake .jobid file is generated in
+ * order to satisfy the output file requirement, even though the tasks that
+ * process .jobid files are not run. Hopefully a future version of nextflow
+ * will support conditional output files.
  */
 
 // An absolute path to the container image is required for Singularity but
@@ -131,6 +136,9 @@ process Atropos {
     alignerArgs = "-O 7"
   }
   """
+  if [ "${workflow.profile}" == "local" ]; then
+    touch .jobid
+  fi
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${taskId}.timing.txt atropos trim \
     --op-order GACQW -T $task.cpus --batch-size $params.batchSize \
@@ -172,6 +180,9 @@ process Skewer {
   script:
   taskId = "skewer_${task.cpus}_${err}_q${qcut}"
   """
+  if [ "${workflow.profile}" == "local" ]; then
+    touch .jobid
+  fi
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${taskId}.timing.txt skewer \
     -m pe -l $params.minLength -r 0.2 \
@@ -210,6 +221,9 @@ process SeqPurge {
   script:
   taskId = "seqpurge_${task.cpus}_${err}_q${qcut}"
   """
+  if [ "${workflow.profile}" == "local" ]; then
+    touch .jobid
+  fi
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${taskId}.timing.txt SeqPurge \
     -in1 ${reads[0]} -in2 ${reads[1]} \
@@ -247,6 +261,9 @@ process AdapterRemoval {
   script:
   taskId = "adapterremoval_${task.cpus}_${err}_q${qcut}"
   """
+  if [ "${workflow.profile}" == "local" ]; then
+    touch .jobid
+  fi
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${taskId}.timing.txt AdapterRemoval \
     --file1 ${reads[0]} --file2 ${reads[1]} \
@@ -283,13 +300,23 @@ process fastp {
 
   script:
   taskId = "fastp_${task.cpus}_${err}_q${qcut}"
+  cutArgs = null
+  if ( qcut > 0) {
+    cutArgs = "--cut_by_quality3 --cut_mean_quality $qcut"
+  }
+  else {
+    cutArgs = ""
+  }
   """
+  if [ "${workflow.profile}" == "local" ]; then
+    touch .jobid
+  fi
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${taskId}.timing.txt fastp \
-    -i ${reads[0]} -I ${reads[1]} -o ${taskId}.1.fq.gz -O ${taskId}.2.fq.gz
-    --adapter_sequence $params.adapter1 --adapter_sequence_r2 $params.adapter2
-    --thread $task.cpus --cut_by_quality3 --cut_mean_quality $qcut
-    --length_required $params.minLength --disable_quality_filtering
+    -i ${reads[0]} -I ${reads[1]} -o ${taskId}.1.fq.gz -O ${taskId}.2.fq.gz \
+    --adapter_sequence $params.adapter1 --adapter_sequence_r2 $params.adapter2 \
+    --thread $task.cpus $cutArgs \
+    --length_required $params.minLength --disable_quality_filtering \
     > "${taskId}.report.txt"
   """
 }
@@ -320,11 +347,14 @@ process Cutadapt {
   script:
   taskId = "cutadapt_${task.cpus}_${err}_q${qcut}"
   """
+  if [ "${workflow.profile}" == "local" ]; then
+    touch .jobid
+  fi
   cat /proc/cpuinfo /proc/meminfo > ${taskId}.machine_info.txt
   /usr/bin/time -v -o ${taskId}.timing.txt cutadapt \
     -j $task.cpus -O 7 -q $qcut --trim-n \
     -a $params.adapter1 -A $params.adapter2 -m $params.minLength \
-    -o ${taskId}.1.fq.gz -p ${taskId}.2.fq.gz ${reads[0]} ${reads[1]}
+    -o ${taskId}.1.fq.gz -p ${taskId}.2.fq.gz ${reads[0]} ${reads[1]} \
     > "${taskId}.report.txt"
   """
 }
@@ -520,7 +550,7 @@ process CreateMachineTable {
   
   input:
   val parsedRows from machineParsed.toList()
-    
+
   output:
   file "machine_info.txt"
   
@@ -582,7 +612,10 @@ process ParseJob {
   
   input:
   set val(name), file(jobSummaryFile) from jobSummary
-  
+
+  when:
+  workflow.profile == 'cluster'
+
   output:
   stdout jobParsed
   
@@ -604,7 +637,10 @@ process ShowJobMemoryUsage {
   
   input:
   val parsedJobs from jobParsed.toList()
-  
+
+  when:
+  workflow.profile == 'cluster'
+
   output:
   file "job.mem.pickle"
   file "job.mem.tex"

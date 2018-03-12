@@ -111,3 +111,4 @@ From the 'containers' directory, run:
 * These papers do a nice job of benchmarking trimmers. Consider adding some more benchmarks.
     * http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-16-S1-S2
     * https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-015-0454-y
+* Make machine info work on OSX (currently requires /proc/cpuinfo and /proc/meminfo)
