@@ -300,12 +300,9 @@ process fastp {
 
   script:
   taskId = "fastp_${task.cpus}_${err}_q${qcut}"
-  cutArgs = null
-  if ( qcut > 0) {
+  cutArgs = ""
+  if (qcut > 0) {
     cutArgs = "--cut_by_quality3 --cut_mean_quality $qcut"
-  }
-  else {
-    cutArgs = ""
   }
   """
   if [ "${workflow.profile}" == "local" ]; then
