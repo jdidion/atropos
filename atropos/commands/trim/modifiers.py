@@ -864,7 +864,8 @@ class AddUMI(Modifier):
         Returns:
             Modified read.
         """
-        read.name = read.name + self.delim + read.umi
+        if read.umi:
+            read.name = read.name + self.delim + read.umi
         return read
 
 
