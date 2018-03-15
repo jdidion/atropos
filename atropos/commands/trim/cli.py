@@ -588,13 +588,13 @@ standard output.
         group = self.add_group("UMI options")
         group.add_argument(
             "--read1_umi",
-            type=int, default=None
-            help="How many bases on the 5' end of read 1 are UMI?"
+            type=int, default=None,
+            help="How many bases on the 5' end of read 1 are UMI? (default: 0)"
         )
         group.add_argument(
             "--read2_umi",
             type=int, default=None,
-            help="How many bases on the 5' end of read 2 are UMI?"
+            help="How many bases on the 5' end of read 2 are UMI? (default: 0)"
         )
     
     def validate_command_options(self, options):

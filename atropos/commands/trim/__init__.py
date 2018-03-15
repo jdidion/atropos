@@ -15,8 +15,8 @@ from atropos.io import STDOUT
 from atropos.util import RandomMatchProbability, Const, run_interruptible
 from .modifiers import (
     AdapterCutter, DoubleEncoder, InsertAdapterCutter, LengthTagModifier,
-    MergeOverlapping, MinCutter, NEndTrimmer, NextseqQualityTrimmer,
-    NonDirectionalBisulfiteTrimmer, OverwriteRead, PairedEndModifiers,
+    MergeOverlapping, MinCutter, NEndTrimmer, NextseqQualityTrimmer, UmiTrimmer,
+    SyncUMI, AddUMI, NonDirectionalBisulfiteTrimmer, OverwriteRead, PairedEndModifiers,
     PrefixSuffixAdder, PrimerTrimmer, QualityTrimmer, RRBSTrimmer,
     SingleEndModifiers, SuffixRemover, SwiftBisulfiteTrimmer,
     UnconditionalCutter, ZeroCapper)
@@ -350,6 +350,19 @@ class CommandRunner(BaseCommandRunner):
         else:
             modifiers = SingleEndModifiers()
         
+        if options.read1_umi or options.read2_umi:
+            modifiers.add_modifier_pair(UmiTrimmer,
+                dict(number_of_bases=options.read1_umi),
+                dict(number_of_bases=options.read2_umi))
+            
+            if options.paired:
+                modifiers.add_modifier(SyncUMI, 
+                    delim=':')
+            else:
+                modifiers.add_modifier(AddUMI, delim = ":")
+
+            
+        
         for oper in options.op_order:
             if oper == 'W' and options.overwrite_low_quality:
                 lowq, highq, window = options.overwrite_low_quality
@@ -406,7 +419,7 @@ class CommandRunner(BaseCommandRunner):
                     cutoff_front=options.quality_cutoff[0],
                     cutoff_back=options.quality_cutoff[1],
                     base=options.quality_base)
-        
+
         if options.bisulfite:
             if isinstance(options.bisulfite, str):
                 if "non-directional" in options.bisulfite:

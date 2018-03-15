@@ -681,7 +681,7 @@ class PrefixSuffixAdder(Modifier):
     """Add a suffix and a prefix to read names.
     """
     def __init__(self, prefix="", suffix=""):
-        self.prefix = prefix
+        self.prefiax = prefix
         self.suffix = suffix
     
     def __call__(self, read):
@@ -784,19 +784,90 @@ class NEndTrimmer(Trimmer):
 
 class UmiTrimmer(Trimmer):
     """Trim N bases from 5' end of the read and append to to the read ID
+    
     """
 
     def __init__(self, number_of_bases=0):
+        """
+        Args:
+            number_of_bases: number of bases as UMI on the 5' end of the read
+        """
         super(UmiTrimmer, self).__init__()
         self.umi_bases = number_of_bases
     
     def __call__(self, read):
-        if number_of_bases:
-            begin, end_bases, new_read = self.subseq(read, umi_bases)
-            return read.sequence[:umi_bases], new_read
-        else:
-            return '', read
+        """Trim off {number_of_bases} on the read sequence and set UMI for the read object 
+            (see Sequence class from io/_seqio.pyx)
         
+        Args: 
+            read: read to modify
+
+        Return:
+            modified read with UMI set
+
+        """
+        if self.umi_bases:
+            new_read = self.subseq(read, self.umi_bases, len(read.sequence))
+            umi = read.sequence[:self.umi_bases]
+            new_read.add_umi(umi = umi)
+            return new_read
+        else:
+            read.add_umi(umi = '')
+            return read
+        
+class SyncUMI(ReadPairModifier):
+    """Adding UMI read name by syncing UMI from read1 and read2
+    """
+    def __init__(self, delim = ':'):
+        """
+        Args:
+            delim: separator for {read_id}{DELIM}{read1_UMI}{DELIM}{read2_UMI}
+        """
+        self.delim = delim
+
+    def __call__(self, read1, read2):
+        """ADding UMI to read name
+        
+        Args:
+            read1, read2: The reads to modify.
+        
+        Returns:
+            A tuple of modified reads (read1, read2).
+        """
+        UMI = []
+        if read1.umi:
+            UMI.append(read1.umi)
+        
+        if read2.umi:
+            UMI.append(read2.umi)
+        UMI = self.delim.join(UMI)
+        read1.name = read1.name + self.delim + UMI
+        read2.name = read2.name + self.delim + UMI
+        return(read1, read2)
+
+class AddUMI(Modifier):
+    """Adding UMI to read name
+    """
+    def __init__(self, delim = ':'):
+        """
+        Args:
+            delim: separator for {read_id}{DELIM}{read1_UMI}{DELIM}{read2_UMI}
+        """
+        self.delim = delim
+
+    def __call__(self, read):
+        """ADding UMI to read name
+        
+        Args:
+            read: The read to modify.
+        
+        Returns:
+            Modified read.
+        """
+        read.name = read.name + self.delim + read.umi
+        return read
+
+
 
 
 class RRBSTrimmer(MinCutter):
