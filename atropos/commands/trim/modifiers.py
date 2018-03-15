@@ -782,6 +782,23 @@ class NEndTrimmer(Trimmer):
         end_cut = end_cut.start() if end_cut else len(read)
         return self.subseq(read, start_cut, end_cut)
 
+class UmiTrimmer(Trimmer):
+    """Trim N bases from 5' end of the read and append to to the read ID
+    """
+
+    def __init__(self, number_of_bases=0):
+        super(UmiTrimmer, self).__init__()
+        self.umi_bases = number_of_bases
+    
+    def __call__(self, read):
+        if number_of_bases:
+            begin, end_bases, new_read = self.subseq(read, umi_bases)
+            return read.sequence[:umi_bases], new_read
+        else:
+            return '', read
+        
+
+
 class RRBSTrimmer(MinCutter):
     """Sequences that are adapter-trimmed are further trimmed 2 bp on the 3'
     end to remove potential methylation-biased bases from the end-repair

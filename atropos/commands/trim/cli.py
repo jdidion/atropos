@@ -583,6 +583,19 @@ standard output.
             help="Where data compression should be performed. Defaults to "
                  "'writer' if system-level compression can be used and "
                  "(1 < threads < 8), otherwise defaults to 'worker'.")
+
+
+        group = self.add_group("UMI options")
+        group.add_argument(
+            "--read1_umi",
+            type=int, default=None
+            help="How many bases on the 5' end of read 1 are UMI?"
+        )
+        group.add_argument(
+            "--read2_umi",
+            type=int, default=None,
+            help="How many bases on the 5' end of read 2 are UMI?"
+        )
     
     def validate_command_options(self, options):
         parser = self.parser
