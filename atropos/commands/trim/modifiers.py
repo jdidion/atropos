@@ -681,7 +681,7 @@ class PrefixSuffixAdder(Modifier):
     """Add a suffix and a prefix to read names.
     """
     def __init__(self, prefix="", suffix=""):
-        self.prefiax = prefix
+        self.prefix = prefix
         self.suffix = suffix
     
     def __call__(self, read):
