@@ -814,7 +814,27 @@ class UmiTrimmer(Trimmer):
         else:
             read.add_umi(umi = '')
             return read
-        
+
+def stitch_name(read_name, UMI, delim):
+    '''
+    standardize UMI-appended read name,
+    the resulting read name should be: @{read_name}{delim}{UMI} {DESCRIPTION}
+
+
+    Args:
+        read_name: name of the Sequence object
+        UMI: unique molecular identifier sequence
+        delim: separater for fields
+    
+    Return:
+        A standardized read name
+    '''
+    fields = read_name.split(' ')
+    out_name = fields[0] + delim + UMI 
+    if len(fields) > 1:
+        out_name = out_name +  ' ' +  ' '.join(fields[1:])
+    return out_name
+
 class SyncUMI(ReadPairModifier):
     """Adding UMI read name by syncing UMI from read1 and read2
     """
@@ -841,8 +861,8 @@ class SyncUMI(ReadPairModifier):
         if read2.umi:
             UMI.append(read2.umi)
         UMI = self.delim.join(UMI)
-        read1.name = read1.name + self.delim + UMI
-        read2.name = read2.name + self.delim + UMI
+        read1.name = stitch_name(read1.name, UMI, self.delim)
+        read2.name = stitch_name(read2.name, UMI, self.delim)
         return(read1, read2)
 
 class AddUMI(Modifier):
@@ -865,7 +885,7 @@ class AddUMI(Modifier):
             Modified read.
         """
         if read.umi:
-            read.name = read.name + self.delim + read.umi
+            read.name = stitch_name(read.name, read.umi, self.delim)
         return read
 
 

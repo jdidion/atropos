@@ -357,9 +357,9 @@ class CommandRunner(BaseCommandRunner):
             
             if options.paired:
                 modifiers.add_modifier(SyncUMI, 
-                    delim=':')
+                    delim=options.delim)
             else:
-                modifiers.add_modifier(AddUMI, delim = ":")
+                modifiers.add_modifier(AddUMI, delim=options.delim)
 
             
         
