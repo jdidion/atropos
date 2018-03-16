@@ -379,7 +379,9 @@ class CommandRunner(BaseCommandRunner):
                         max_adapter_mismatch_frac=\
                             options.insert_match_adapter_error_rate,
                         match_probability=match_probability,
-                        insert_max_rmp=options.insert_max_rmp)
+                        insert_max_rmp=options.insert_max_rmp,
+                        read_wildcards=options.match_read_wildcards,
+                        adapter_wildcards=options.match_adapter_wildcards)
                 else:
                     a1_args = dict(
                         adapters=adapters1,

@@ -117,6 +117,7 @@ The citation for the original Cutadapt paper is:
     * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
 * Improve documentation (#24)
 * Port over improvements in latest versions of Cutadapt https://cutadapt.readthedocs.io/en/stable/
+* Switch to using entry point instead of Atropos executable.
 
 ### 1.3
 
@@ -151,6 +152,7 @@ The citation for the original Cutadapt paper is:
 
 ### 1.6
 
+* Switch to using Click for CLI.
 * Implement a public plugin API.
 * Add more logging and convert log messages from old-style to new-style format strings.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.

@@ -245,7 +245,8 @@ class InsertAligner(object):
             insert_max_rmp=1E-6, adapter_max_rmp=0.001,
             min_insert_overlap=1, max_insert_mismatch_frac=0.2,
             min_adapter_overlap=1, max_adapter_mismatch_frac=0.2,
-            adapter_check_cutoff=9, base_probs=None):
+            adapter_check_cutoff=9, base_probs=None,
+            adapter_wildcards=True, read_wildcards=False):
         self.adapter1 = adapter1
         self.adapter1_len = len(adapter1)
         self.adapter2 = adapter2
@@ -260,6 +261,8 @@ class InsertAligner(object):
         self.adapter_check_cutoff = adapter_check_cutoff
         self.base_probs = base_probs or dict(
             match_prob=0.25, mismatch_prob=0.75)
+        self.adapter_wildcards = adapter_wildcards
+        self.read_wildcards = read_wildcards
         self.aligner = MultiAligner(
             max_insert_mismatch_frac,
             START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
@@ -299,8 +302,14 @@ class InsertAligner(object):
             # the alignment will fail. We need to use a comparison that is a bit
             # more forgiving.
             
-            a1_match = compare_prefixes(seq1[insert_match_size:], self.adapter1)
-            a2_match = compare_prefixes(seq2[insert_match_size:], self.adapter2)
+            a1_match = compare_prefixes(
+                seq1[insert_match_size:], self.adapter1,
+                wildcard_ref=self.adapter_wildcards,
+                wildcard_query=self.read_wildcards)
+            a2_match = compare_prefixes(
+                seq2[insert_match_size:], self.adapter2,
+                wildcard_ref=self.adapter_wildcards,
+                wildcard_query=self.read_wildcards)
             adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
             max_adapter_mismatches = round(
                 adapter_len * self.max_adapter_mismatch_frac)

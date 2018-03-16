@@ -367,7 +367,6 @@ class Adapter(object):
                 self, read)
         
         # try approximate matching
-        alignment = None
         if not self.indels and self.where in (PREFIX, SUFFIX):
             if self.where == PREFIX:
                 alignment = align.compare_prefixes(

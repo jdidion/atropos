@@ -2,12 +2,11 @@
 
 dev
 ---
-* Added four new tools to the benchmarks:
+* Added two new tools to the benchmarks:
   * fastp
   * Cutadapt
-  * Sickle
-  * SeqPrep
 * Updated versions of several tools used in the paper. Rebuilt containers and pushed them to Dockerhub.
+* Fix #64: InsertAligner not respecting match_adapter_wildcards and match_read_wildcards options.
 
 v1.1.17 (2018.01.13)
 --------------------

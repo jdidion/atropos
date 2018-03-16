@@ -381,7 +381,8 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         self.adapter2 = adapter2
         self.aligner = InsertAligner(
             adapter1.sequence, adapter2.sequence,
-            min_insert_overlap=min_insert_overlap, **aligner_args)
+            min_insert_overlap=min_insert_overlap,
+            **aligner_args)
         self.min_insert_len = min_insert_overlap
         self.action = action
         self.symmetric = symmetric
