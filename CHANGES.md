@@ -3,6 +3,8 @@
 dev
 ---
 * Merged PR #63: Implementation of UMI support. Thanks @wckdouglas!
+* Eliminate the bin/ folder; switch to using entry points for the atropos
+  executable.
 
 v1.1.18 (2018.03.16)
 --------------------

@@ -127,7 +127,6 @@ setup(
     license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
     ext_modules = extensions,
     packages = find_packages(),
-    scripts = ['bin/atropos'],
     package_data = { 'atropos' : [
         'adapters/*.fa',
         'commands/**/templates/*'
@@ -140,6 +139,11 @@ setup(
         'pysam' : ['pysam'],
         'jinja' : ['jinja2'],
         'sra' : ['srastream>=0.1.3']
+    },
+    entry_points={
+        'console_scripts': [
+            'atropos = atropos.__main__:main'
+        ]
     },
     classifiers = [
         "Development Status :: 5 - Production/Stable",
