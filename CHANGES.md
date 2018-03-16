@@ -1,7 +1,7 @@
 # Changes
 
-dev
----
+v1.1.18 (2018.03.16)
+--------------------
 * Added two new tools to the benchmarks:
   * fastp
   * Cutadapt
