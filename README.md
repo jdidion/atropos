@@ -106,6 +106,7 @@ The citation for the original Cutadapt paper is:
 
 * Migrate to [xphyle](https://github.com/jdidion/xphyle) for file management.
 * Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
+* Add auto-trimming mode for paired-end reads.
 * Accept multiple input files.
 * Support SAM output (including #33).
 * Direct streaming and trimming of reads from SRA and htsget using [ngstream](https://github.com/jdidion/ngstream).
@@ -117,52 +118,46 @@ The citation for the original Cutadapt paper is:
     * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
 * Improve documentation (#24)
 * Port over improvements in latest versions of Cutadapt https://cutadapt.readthedocs.io/en/stable/
-* Switch to using entry point instead of Atropos executable.
+* Migrate dependency management to Pipfile (using pipenv).
 
 ### 1.3
 
-* Add auto-trimming mode for paired-end reads.
-* Support for UMIs.
+* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
+* Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Add formal config file support (#53)
 * Automate crash reporting using [sentry](https://github.com/getsentry/raven-python).
-
-### 1.4
-
-* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
-* Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
-* Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
-* General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
-* Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
-
-### 1.5
-
-* Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
 * Enable user to define custom read structure: https://github.com/nh13/read-structure-examples
 * Support for paired-end demultiplexing
 * Demultiplexing based on barcodes: https://github.com/marcelm/cutadapt/issues/118.
-* Consider supporting different error rates for read1 vs read2.
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
+* General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
+
+### 1.4
+
+* Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
+* Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
+* Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
+* Consider supporting different error rates for read1 vs read2.
 * Look more closely at providing solutions to the Illumina two-color chemistry issue:
     * Provide and option to exempt G calls from the assessment of quality
     * Trim 3′ Gs from reads
 * Also look at addressing any issues with one-color chemistry (iSeq).
 * Consider whether to support trimming/QC of raw IonTorrent data.
+* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 
-### 1.6
+### 1.5
 
 * Switch to using Click for CLI.
 * Implement a public plugin API.
 * Add more logging and convert log messages from old-style to new-style format strings.
-* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 * CPU and memory profiling. Try out:
     * https://github.com/nvdv/vprof
     * https://github.com/what-studio/profiling
     * https://github.com/fabianp/memory_profiler
     * https://github.com/rkern/line_profiler#line-profiler
 * Look at some new trimming/qc programs; decide whether to add to benchmarks and/or incorporate any of their features
-    * https://github.com/OpenGene/fastp/issues
     * http://tagcleaner.sourceforge.net/
     * https://github.com/mdshw5/fastqp/blob/master/README.md
 
