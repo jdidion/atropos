@@ -31,7 +31,7 @@ cdef class Sequence(object):
     def __init__(self, str name, str sequence, str qualities=None, str name2='',
                  original_length=None, match=None, match_info=None, clipped=None,
                  insert_overlap=False, merged=False, corrected=0, alphabet=None, 
-                 str umi=''):
+                 str umi=None):
         
         # Validate sequence and qualities lengths are equal
         if qualities is not None:
@@ -122,9 +122,6 @@ cdef class Sequence(object):
             new_read.match = match
         
         return new_read
-
-    def add_umi(self, umi = ''):
-        self.umi = umi
     
     def __getitem__(self, key):
         """slicing"""

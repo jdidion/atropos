@@ -2,7 +2,6 @@
 """
 from collections import Sequence, defaultdict
 import logging
-import os
 import sys
 import textwrap
 from atropos.commands.base import (
@@ -12,11 +11,11 @@ from atropos.commands.stats import (
     SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
 from atropos.io import STDOUT
-from atropos.util import RandomMatchProbability, Const, run_interruptible
+from atropos.util import RandomMatchProbability, run_interruptible
 from .modifiers import (
     AdapterCutter, DoubleEncoder, InsertAdapterCutter, LengthTagModifier,
     MergeOverlapping, MinCutter, NEndTrimmer, NextseqQualityTrimmer, UmiTrimmer,
-    SyncUMI, AddUMI, NonDirectionalBisulfiteTrimmer, OverwriteRead, PairedEndModifiers,
+    SyncUmi, AddUmi, NonDirectionalBisulfiteTrimmer, OverwriteRead, PairedEndModifiers,
     PrefixSuffixAdder, PrimerTrimmer, QualityTrimmer, RRBSTrimmer,
     SingleEndModifiers, SuffixRemover, SwiftBisulfiteTrimmer,
     UnconditionalCutter, ZeroCapper)
@@ -349,20 +348,17 @@ class CommandRunner(BaseCommandRunner):
             modifiers = PairedEndModifiers(options.paired)
         else:
             modifiers = SingleEndModifiers()
-        
+
         if options.read1_umi or options.read2_umi:
             modifiers.add_modifier_pair(UmiTrimmer,
                 dict(number_of_bases=options.read1_umi),
                 dict(number_of_bases=options.read2_umi))
-            
-            if options.paired:
-                modifiers.add_modifier(SyncUMI, 
-                    delim=options.delim)
-            else:
-                modifiers.add_modifier(AddUMI, delim=options.delim)
 
-            
-        
+            if options.paired:
+                modifiers.add_modifier(SyncUmi, delim=options.umi_delim)
+            else:
+                modifiers.add_modifier(AddUmi, delim=options.umi_delim)
+
         for oper in options.op_order:
             if oper == 'W' and options.overwrite_low_quality:
                 lowq, highq, window = options.overwrite_low_quality

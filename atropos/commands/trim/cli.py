@@ -230,6 +230,20 @@ standard output.
         group = self.add_group(
             "Modifications", title="Additional read modifications")
         group.add_argument(
+            "--read1_umi",
+            type=int, default=None, metavar='N',
+            help="Clip N UMI bases from the 5' end of read 1 and append them "
+                 "to the read name. (default: 0)")
+        group.add_argument(
+            "--read2_umi",
+            type=int, default=None, metavar='N',
+            help="Clip N UMI bases from the 5' end of read 2 and append them "
+                 "to the read name. (default: 0)")
+        group.add_argument(
+            "--umi-delim",
+            default=':', metavar='CHAR',
+            help="Delimiter for separating UMI from read ID. (default: ':')")
+        group.add_argument(
             "--op-order",
             type=CharList(choices=('A','C','G','Q','W')), default="CGQAW",
             help="The order in which trimming operations are be applied. This "
@@ -238,7 +252,8 @@ standard output.
                  "Q = quality trimming; W = overwrite poor quality reads. The "
                  "default is 'WCGQA' to maintain compatibility with "
                  "Cutadapt; however, this is likely to change to 'GAWCQ' in "
-                 "the near future.")
+                 "the near future. Note that UMI clipping is always performed "
+                 "before any other trimming operation.")
         group.add_argument(
             "-u",
             "--cut",
@@ -584,25 +599,6 @@ standard output.
                  "'writer' if system-level compression can be used and "
                  "(1 < threads < 8), otherwise defaults to 'worker'.")
 
-
-        group = self.add_group("UMI options, clipping UMI from sequence and append to read name")
-        group.add_argument(
-            "--read1_umi",
-            type=int, default=None,
-            help="How many bases on the 5' end of read 1 are UMI? (default: 0)"
-        )
-        group.add_argument(
-            "--read2_umi",
-            type=int, default=None,
-            help="How many bases on the 5' end of read 2 are UMI? (default: 0)"
-        )
-        group.add_argument(
-            "--delim",
-            default=':',
-            help="Deliminator for separating UMI from read ID (default: ':')"
-        )
-
-    
     def validate_command_options(self, options):
         parser = self.parser
         paired = options.paired

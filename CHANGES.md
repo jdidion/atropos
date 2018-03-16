@@ -1,5 +1,9 @@
 # Changes
 
+dev
+---
+* Merged PR #63: Implementation of UMI support. Thanks @wckdouglas!
+
 v1.1.18 (2018.03.16)
 --------------------
 * Added two new tools to the benchmarks:
