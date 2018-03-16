@@ -483,3 +483,78 @@ def test_overwrite_read():
     assert new_read2.sequence == highseq
     assert new_read2.qualities == ints2quals(highq)
     assert new_read1.corrected == new_read2.corrected == 0
+
+
+def test_UMI_trim_pair():
+    seq1 =  'TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
+    qual1 = 'CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0'
+
+    seq2 = 'ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT'
+    qual2 = 'CCCCCG@FCFGGCFGGGGFEFGFGGFCFGGGFGFGGGGGGGGGGGGGGGGGGGGGGGGGGG9FGGGGGGGFGDFFGGGGGGGGGGGGGGGGG8;>@?@FEGGGGGGGGGGGGGGGGGGGGG=DDFAEFFFGF>B>EA):DFFBDFFB6CDEDDD9=99DD>55)580:A5)*)*;DD>**51:0118):)4))1***0:*)*)((***0*.(((((*)/.)1/(6((()1.)(((6).-----8<:C<73'
+    ##  5 bases UMI from both reads
+    read1 = Sequence('read1', seq1, qual1)
+
+    trimmer = UmiTrimmer(number_of_bases=5)
+    trimmed_read1 = trimmer(read1)
+    assert trimmed_read1.sequence == 'AGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
+    assert trimmed_read1.umi == 'TTTGC'
+
+    read2 = Sequence('read2', seq2, qual2)
+    trimmed_read2 = trimmer(read2)
+    assert trimmed_read2.sequence == 'CTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT'
+    assert trimmed_read2.umi == 'ATAGG'
+
+    umi_to_name = SyncUMI(delim='_')
+    new_read1, new_read2 = umi_to_name(trimmed_read1, trimmed_read2)
+    assert new_read1.name == 'read1_TTTGC_ATAGG'
+    assert new_read2.name == 'read2_TTTGC_ATAGG'
+
+
+    ## 5 bases from read1, 0 from read2
+    read1 = Sequence('read1', seq1, qual1)
+    trimmer = UmiTrimmer(number_of_bases=5)
+    trimmed_read1 = trimmer(read1)
+
+    read2 = Sequence('read2', seq2, qual2)
+    trimmer = UmiTrimmer(number_of_bases = 0)
+    untrim_read2 = trimmer(read2)
+    assert untrim_read2.sequence == 'ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT'
+    assert untrim_read2.umi == ''
+    umi_to_name = SyncUMI(delim='_')
+    new_read1, new_read2 = umi_to_name(trimmed_read1, untrim_read2)
+    assert new_read1.name == 'read1_TTTGC'
+    assert new_read2.name == 'read2_TTTGC'
+
+    ## 0 bases from read1, 5 from read2
+    read1 = Sequence('read1', seq1, qual1)
+    trimmer = UmiTrimmer(number_of_bases=0)
+    untrim_read1 = trimmer(read1)
+
+    read2 = Sequence('read2', seq2, qual2)
+    trimmer = UmiTrimmer(number_of_bases = 5)
+    trimmed_read2 = trimmer(read2)
+    umi_to_name = SyncUMI(delim='_')
+    new_read1, new_read2 = umi_to_name(untrim_read1, trimmed_read2)
+    assert new_read1.name == 'read1_ATAGG'
+    assert new_read2.name == 'read2_ATAGG'
+
+def test_UMI_trim_single():
+    seq1 =  'TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
+    qual1 = 'CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0'
+
+    ##  5 bases UMI from read1
+    read1 = Sequence('read1', seq1, qual1)
+    trimmer = UmiTrimmer(number_of_bases=5)
+    trimmed_read1 = trimmer(read1)
+    assert trimmed_read1.sequence == 'AGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
+    assert trimmed_read1.umi == 'TTTGC'
+
+    addUMI = AddUMI(delim = "_")
+    assert addUMI(trimmed_read1).name == 'read1_TTTGC'
+
+
+    read1 = Sequence('read1', seq1, qual1)
+    trimmer = UmiTrimmer(number_of_bases=0)
+    trimmed_read1 = trimmer(read1)
+    assert addUMI(trimmed_read1).umi == ""
+    assert addUMI(trimmed_read1).name == "read1"

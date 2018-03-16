@@ -26,10 +26,12 @@ cdef class Sequence(object):
         public bint insert_overlap
         public bint merged
         public int corrected
+        public str umi
     
     def __init__(self, str name, str sequence, str qualities=None, str name2='',
                  original_length=None, match=None, match_info=None, clipped=None,
-                 insert_overlap=False, merged=False, corrected=0, alphabet=None):
+                 insert_overlap=False, merged=False, corrected=0, alphabet=None, 
+                 str umi=''):
         
         # Validate sequence and qualities lengths are equal
         if qualities is not None:
@@ -59,6 +61,7 @@ cdef class Sequence(object):
         self.insert_overlap = insert_overlap
         self.merged = merged
         self.corrected = corrected
+        self.umi = umi
     
     def subseq(self, begin=0, end=None):
         if end is None:
@@ -119,6 +122,9 @@ cdef class Sequence(object):
             new_read.match = match
         
         return new_read
+
+    def add_umi(self, umi = ''):
+        self.umi = umi
     
     def __getitem__(self, key):
         """slicing"""

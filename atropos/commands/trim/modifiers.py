@@ -783,6 +783,115 @@ class NEndTrimmer(Trimmer):
         end_cut = end_cut.start() if end_cut else len(read)
         return self.subseq(read, start_cut, end_cut)
 
+class UmiTrimmer(Trimmer):
+    """Trim N bases from 5' end of the read and append to to the read ID
+    
+    """
+
+    def __init__(self, number_of_bases=0):
+        """
+        Args:
+            number_of_bases: number of bases as UMI on the 5' end of the read
+        """
+        super(UmiTrimmer, self).__init__()
+        self.umi_bases = number_of_bases
+    
+    def __call__(self, read):
+        """Trim off {number_of_bases} on the read sequence and set UMI for the read object 
+            (see Sequence class from io/_seqio.pyx)
+        
+        Args: 
+            read: read to modify
+
+        Return:
+            modified read with UMI set
+
+        """
+        if self.umi_bases:
+            new_read = self.subseq(read, self.umi_bases, len(read.sequence))
+            umi = read.sequence[:self.umi_bases]
+            new_read.add_umi(umi = umi)
+            return new_read
+        else:
+            read.add_umi(umi = '')
+            return read
+
+def stitch_name(read_name, UMI, delim):
+    '''
+    standardize UMI-appended read name,
+    the resulting read name should be: @{read_name}{delim}{UMI} {DESCRIPTION}
+
+
+    Args:
+        read_name: name of the Sequence object
+        UMI: unique molecular identifier sequence
+        delim: separater for fields
+    
+    Return:
+        A standardized read name
+    '''
+    fields = read_name.split(' ')
+    out_name = fields[0] + delim + UMI 
+    if len(fields) > 1:
+        out_name = out_name +  ' ' +  ' '.join(fields[1:])
+    return out_name
+
+class SyncUMI(ReadPairModifier):
+    """Adding UMI read name by syncing UMI from read1 and read2
+    """
+    def __init__(self, delim = ':'):
+        """
+        Args:
+            delim: separator for {read_id}{DELIM}{read1_UMI}{DELIM}{read2_UMI}
+        """
+        self.delim = delim
+
+    def __call__(self, read1, read2):
+        """ADding UMI to read name
+        
+        Args:
+            read1, read2: The reads to modify.
+        
+        Returns:
+            A tuple of modified reads (read1, read2).
+        """
+        UMI = []
+        if read1.umi:
+            UMI.append(read1.umi)
+        
+        if read2.umi:
+            UMI.append(read2.umi)
+        UMI = self.delim.join(UMI)
+        read1.name = stitch_name(read1.name, UMI, self.delim)
+        read2.name = stitch_name(read2.name, UMI, self.delim)
+        return(read1, read2)
+
+class AddUMI(Modifier):
+    """Adding UMI to read name
+    """
+    def __init__(self, delim = ':'):
+        """
+        Args:
+            delim: separator for {read_id}{DELIM}{read1_UMI}{DELIM}{read2_UMI}
+        """
+        self.delim = delim
+
+    def __call__(self, read):
+        """ADding UMI to read name
+        
+        Args:
+            read: The read to modify.
+        
+        Returns:
+            Modified read.
+        """
+        if read.umi:
+            read.name = stitch_name(read.name, read.umi, self.delim)
+        return read
+
+
+
+
 class RRBSTrimmer(MinCutter):
     """Sequences that are adapter-trimmed are further trimmed 2 bp on the 3'
     end to remove potential methylation-biased bases from the end-repair
