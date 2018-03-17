@@ -4,6 +4,7 @@ iterators.
 import logging
 from atropos.util import MAGNITUDE, Timestamp
 
+
 class ProgressMessageReader(object):
     """Wrapper around an iterable that logs an INFO message at a specified
     interval.
@@ -17,9 +18,10 @@ class ProgressMessageReader(object):
         mag_format: Function that formats an integer as a string with magnitude
             (e.g. 1000000 => 1M).
     """
+
     def __init__(
-            self, iterable, batch_size, interval=1000000, max_items=None,
-            mag_format=None):
+        self, iterable, batch_size, interval=1000000, max_items=None, mag_format=None
+    ):
         self.iterable = iterable
         self.batch_size = batch_size
         self.interval = interval
@@ -34,7 +36,7 @@ class ProgressMessageReader(object):
             self.msg = "Read {0}/" + max_items + " records in {1:.1f} seconds"
         else:
             self.msg = "Read {0} records in {1:.1f} seconds"
-        
+
     def __next__(self):
         value = next(self.iterable)
         if value:
@@ -44,16 +46,15 @@ class ProgressMessageReader(object):
                 ctr = self.ctr
                 if self.mag_format:
                     ctr = self.mag_format(ctr)
-                logging.getLogger().info(
-                    self.msg.format(ctr, duration['wallclock']))
+                logging.getLogger().info(self.msg.format(ctr, duration['wallclock']))
         return value
-    
+
     next = __next__
-    
+
     def __iter__(self):
         self.start = Timestamp()
         return self
-    
+
     def close(self):
         """Log the total number of records iterated and close the underlying
         iterable.
@@ -61,9 +62,15 @@ class ProgressMessageReader(object):
         logging.getLogger().info("Read a total of %s records", self.ctr)
         self.iterable.close()
 
+
 def create_progress_reader(
-        reader, progress_type="bar", batch_size=1, max_items=None,
-        counter_magnitude="M", **kwargs):
+    reader,
+    progress_type="bar",
+    batch_size=1,
+    max_items=None,
+    counter_magnitude="M",
+    **kwargs
+):
     """Wrap an iterable in a progress bar of the specified type.
     
     Args:
@@ -85,26 +92,24 @@ def create_progress_reader(
         reader is returned.
     """
     mag_format = magnitude_formatter(counter_magnitude)
-    
     if progress_type == "msg":
         return ProgressMessageReader(
-            reader, batch_size, max_items=max_items, mag_format=mag_format,
-            **kwargs)
-            
+            reader, batch_size, max_items=max_items, mag_format=mag_format, **kwargs
+        )
+
     try:
-        return create_progressbar_reader(
-            reader, batch_size, max_items, mag_format)
+        return create_progressbar_reader(reader, batch_size, max_items, mag_format)
+
     except:
         pass
-    
     try:
-        return create_tqdm_reader(
-            reader, batch_size, max_items, **kwargs)
+        return create_tqdm_reader(reader, batch_size, max_items, **kwargs)
+
     except:
         pass
-    
     logging.getLogger().warning("No progress bar library available")
     return reader
+
 
 def magnitude_formatter(magnitude):
     """Returns a function that formats integers as magnitude strings.
@@ -117,8 +122,8 @@ def magnitude_formatter(magnitude):
         suffix = magnitude
     return lambda val: "{:.1f} {}".format(val / div, suffix)
 
-def create_progressbar_reader(
-        reader, batch_size=1, max_reads=None, mag_format=None):
+
+def create_progressbar_reader(reader, batch_size=1, max_reads=None, mag_format=None):
     """Wrap an iterable in a ProgressBar.
     
     Args:
@@ -128,19 +133,20 @@ def create_progressbar_reader(
     """
     import progressbar
     import progressbar.widgets
-    
+
     class ProgressBarReader(progressbar.ProgressBar):
         """Extension of ProgressBar that supports starting and stopping the
         BatchReader.
         """
+
         def __init__(self, iterable, widgets, batch_size=1, max_value=None):
             super(ProgressBarReader, self).__init__(
-                widgets=widgets,
-                max_value=max_value or progressbar.UnknownLength)
+                widgets=widgets, max_value=max_value or progressbar.UnknownLength
+            )
             self.batch_size = batch_size
             self._iterable = iterable
             self.done = False
-        
+
         def __next__(self):
             try:
                 value = next(self._iterable)
@@ -148,10 +154,11 @@ def create_progressbar_reader(
                     self.start()
                 self.update(self.value + (value[0] * self.batch_size))
                 return value
+
             except StopIteration:
                 self.close()
                 raise
-        
+
         def close(self):
             """Finish the progress bar and close the underlying iterator.
             """
@@ -162,30 +169,47 @@ def create_progressbar_reader(
                 self._iterable.close()
             except:
                 pass
-    
+
     class MagCounter(progressbar.widgets.WidgetBase):
         """Custom widget that formats the value using a specified magnitude.
         """
+
         def __init__(self, mag_format):
             super().__init__()
             self._format = mag_format
-    
+
         def __call__(self, progress, data):
             return self._format(data["value"])
-        
+
     if max_reads:
-        reader = ProgressBarReader(reader, [
-            MagCounter(mag_format), " Reads (", progressbar.Percentage(), ") ",
-            progressbar.Timer(), " ", progressbar.Bar(),
-            progressbar.AdaptiveETA()
-        ], batch_size, max_reads)
+        reader = ProgressBarReader(
+            reader,
+            [
+                MagCounter(mag_format),
+                " Reads (",
+                progressbar.Percentage(),
+                ") ",
+                progressbar.Timer(),
+                " ",
+                progressbar.Bar(),
+                progressbar.AdaptiveETA(),
+            ],
+            batch_size,
+            max_reads,
+        )
     else:
-        reader = ProgressBarReader(reader, [
-            MagCounter(mag_format), " Reads", progressbar.Timer(),
-            progressbar.AnimatedMarker()
-        ], batch_size)
-    
+        reader = ProgressBarReader(
+            reader,
+            [
+                MagCounter(mag_format),
+                " Reads",
+                progressbar.Timer(),
+                progressbar.AnimatedMarker(),
+            ],
+            batch_size,
+        )
     return reader
+
 
 def create_tqdm_reader(reader, batch_size=1, max_reads=None, **kwargs):
     """Wrap an iterable in a tqdm progress bar.
@@ -198,18 +222,23 @@ def create_tqdm_reader(reader, batch_size=1, max_reads=None, **kwargs):
         The wrapped iterable.
     """
     import tqdm
+
     if batch_size == 1:
         return tqdm.tqdm(reader, total=max_reads)
+
     else:
+
         class TqdmReader:
+
             def __init__(self, reader, batch_size, max_reads):
                 self.reader = reader
                 self.batch_size = batch_size
                 self.progress = tqdm.tqdm(total=max_reads)
-            
+
             def __iter__(self):
                 for value in self.reader:
                     yield value
+
                     self.progress.update(self.batch_size)
-        
+
         return TqdmReader(reader, batch_size, max_reads)

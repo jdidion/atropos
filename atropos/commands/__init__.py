@@ -31,6 +31,7 @@ import re
 import textwrap
 from atropos import __version__
 
+
 class Command(object):
     """Contains information about a command package.
     
@@ -53,12 +54,13 @@ class Command(object):
             modules described above. If None, they are determined automatically
             from the command name.
     """
+
     def __init__(self, name, module=None, cli_module=None, report_module=None):
         self.name = name
         self.package = module or 'atropos.commands.{}'.format(name)
         self.cli_module = cli_module or '{}.cli'.format(self.package)
         self.report_module = report_module or '{}.reports'.format(self.package)
-    
+
     def execute(self, args=()):
         """Parse command line arguments, execute the command, and generate
         summary reports.
@@ -69,42 +71,42 @@ class Command(object):
         options = self.parse_args(args)
         retcode, summary = self.run_command(options)
         if retcode == 0 and options.report_file:
-            logging.getLogger().debug(
-                "Writing report to %s", options.report_file)
+            logging.getLogger().debug("Writing report to %s", options.report_file)
             self.generate_reports(summary, options)
         else:
             logging.getLogger().debug("Not generating report file")
         return retcode, summary
-    
+
     def get_command_parser_class(self):
         """Returns the CommandParser class within the cli module.
         """
         mod = import_module(self.cli_module)
         return mod.CommandParser
-    
+
     @property
     def usage(self):
         """Returns the command's usage string.
         """
         return self.get_command_parser_class().usage
-    
+
     @property
     def description(self):
         """Returns the command's description string.
         """
         return self.get_command_parser_class().description
-    
+
     def get_help(self, fmt="* {name}: {description}", wrap=80, indent=2):
         """Returns a string to include in the command help.
         """
-        helpstr = fmt.format(
-            name=self.name, description=self.description.strip())
+        helpstr = fmt.format(name=self.name, description=self.description.strip())
         if wrap:
-            helpstr = "\n".join(textwrap.wrap(
-                re.sub(r'\s+', ' ', helpstr), wrap,
-                subsequent_indent=' ' * indent))
+            helpstr = "\n".join(
+                textwrap.wrap(
+                    re.sub(r'\s+', ' ', helpstr), wrap, subsequent_indent=' ' * indent
+                )
+            )
         return helpstr
-    
+
     def parse_args(self, args):
         """Parse the command line options.
         
@@ -114,13 +116,13 @@ class Command(object):
         parser_class = self.get_command_parser_class()
         parser = parser_class()
         return parser.parse(args)
-    
+
     def get_command_runner_class(self):
         """Returns the CommandRunner class within the top-level module.
         """
         mod = import_module(self.package)
         return mod.CommandRunner
-    
+
     def run_command(self, options):
         """Run the command.
         
@@ -133,13 +135,13 @@ class Command(object):
         runner_class = self.get_command_runner_class()
         runner = runner_class(options)
         return runner.run()
-    
+
     def get_report_generator_class(self):
         """Returns the ReportGenerator class within the reports module.
         """
         mod = import_module(self.report_module)
         return mod.ReportGenerator
-    
+
     def generate_reports(self, summary, options):
         """Generate reports.
         
@@ -153,23 +155,29 @@ class Command(object):
         generator = generator_class(options)
         generator.generate_reports(summary)
 
+
 COMMANDS = dict(
     (name, Command(name))
     for _, name, ispkg in walk_packages([os.path.dirname(__file__)])
-    if ispkg)
+    if ispkg
+)
+
 
 def get_command(name):
     """Returns the Command object for the specified command name.
     """
     if name not in COMMANDS:
         raise ValueError("Invalid command: {}".format(name))
+
     return COMMANDS[name]
+
 
 def iter_commands():
     """Iterate over commands, ordered by command name.
     """
     for name in sorted(COMMANDS.keys()):
         yield COMMANDS[name]
+
 
 def execute_cli(args=()):
     """Executes the Atropos command-line interface.
@@ -188,45 +196,51 @@ def execute_cli(args=()):
     if len(args) == 0 or args[0] in ('-h', '--help'):
         print_subcommands()
         return 2
-    
+
     config_args = None
-    
     if args[0] == '--config':
         with open(args[1], 'rt') as config_file:
             config_args = list(
-                token
-                for line in config_file
-                for token in line.rstrip().split())
+                token for line in config_file for token in line.rstrip().split()
+            )
         args = args[2:]
-    
+
     def parse_command(args):
         if not args or args[0][0] == '-':
             return ('trim', args)
+
         else:
             return (args[0], args[1:])
-    
+
     if len(args) == 0:
         command_name, args = parse_command(config_args)
     else:
         command_name, args = parse_command(args)
         if config_args:
             args = config_args + args
-    
     try:
         command = get_command(command_name)
         retcode, summary = command.execute(args)
         if 'exception' in summary:
             logging.getLogger().error(
-                "Error executing command %s", command_name, 
-                exc_info=summary['exception']['details'])
+                "Error executing command %s",
+                command_name,
+                exc_info=summary['exception']['details'],
+            )
         return retcode
+
     except Exception as err:
         logging.getLogger().error(
-            "Error executing command: %s", command_name, exc_info=err)
+            "Error executing command: %s", command_name, exc_info=err
+        )
         return 2
+
 
 def print_subcommands():
     """Prints usage message listing the available subcommands.
     """
-    print(__doc__.format(__version__, "\n".join(
-        command.get_help() for command in iter_commands())))
+    print(
+        __doc__.format(
+            __version__, "\n".join(command.get_help() for command in iter_commands())
+        )
+    )

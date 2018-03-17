@@ -9,13 +9,15 @@ from atropos.adapters import AdapterCache
 from atropos.io.seqio import open_reader, sra_reader
 from atropos.util import MergingDict, Const, Summarizable, Timing
 
+
 class Pipeline(object):
     """Base class for analysis pipelines.
     """
+
     def __init__(self):
         self.record_counts = {}
         self.bp_counts = {}
-    
+
     def __call__(self, command_runner, raise_on_error=False, **kwargs):
         self.start(**kwargs)
         try:
@@ -24,18 +26,19 @@ class Pipeline(object):
         except Exception as err:
             if raise_on_error:
                 raise
+
             else:
                 command_runner.summary['exception'] = dict(
-                    message=str(err),
-                    details=sys.exc_info())
+                    message=str(err), details=sys.exc_info()
+                )
         finally:
             self.finish(command_runner.summary, **kwargs)
-    
+
     def start(self, **kwargs):
         """Start the pipeline.
         """
         pass
-    
+
     def process_batch(self, batch):
         """Run the pipeline on a batch of records.
         
@@ -45,23 +48,20 @@ class Pipeline(object):
         """
         batch_meta, records = batch
         context = batch_meta.copy()
-        
         if not context['source'] in self.record_counts:
             self.record_counts[context['source']] = 0
         self.record_counts[context['source']] += context['size']
-        
         if not context['source'] in self.bp_counts:
             self.bp_counts[context['source']] = [0, 0]
         context['bp'] = self.bp_counts[context['source']]
-        
         self.add_to_context(context)
         self.handle_records(context, records)
-    
+
     def add_to_context(self, context):
         """Add items to the batch context.
         """
         pass
-    
+
     def handle_records(self, context, records):
         """Handle a sequence of records.
         
@@ -75,8 +75,10 @@ class Pipeline(object):
             except Exception as err:
                 raise AtroposError(
                     "An error occurred at record {} of batch {}".format(
-                    idx, context['index'])) from err
-    
+                        idx, context['index']
+                    )
+                ) from err
+
     def handle_record(self, context, record):
         """Handle a single record.
         
@@ -85,7 +87,7 @@ class Pipeline(object):
             record: The record.
         """
         raise NotImplementedError()
-    
+
     def handle_reads(self, context, read1, read2=None):
         """Handle a read or read-pair.
         
@@ -94,31 +96,36 @@ class Pipeline(object):
             read1, read2: The read pair; read2 will be None for single-end data.
         """
         raise NotImplementedError()
-    
+
     def finish(self, summary, **kwargs):
         """Finish the pipeline, including adding information to the summary.
         
         Args:
             summary: Summary dict to update.
         """
-        total_bp_counts = tuple(sum(b) for b in zip(*self.bp_counts.values()))
+        total_bp_counts = tuple(sum(b) for b in zip(* self.bp_counts.values()))
         summary.update(
             record_counts=self.record_counts,
             total_record_count=sum(self.record_counts.values()),
             bp_counts=self.bp_counts,
             total_bp_counts=total_bp_counts,
-            sum_total_bp_count=sum(total_bp_counts))
+            sum_total_bp_count=sum(total_bp_counts),
+        )
+
 
 class SingleEndPipelineMixin(object):
     """Mixin for pipelines that implements `handle_record` for single-end data.
     """
+
     def handle_record(self, context, record):
         context['bp'][0] += len(record)
         return self.handle_reads(context, record)
 
+
 class PairedEndPipelineMixin(object):
     """Mixin for pipelines that implements `handle_record` for paired-end data.
     """
+
     def handle_record(self, context, record):
         read1, read2 = record
         bps = context['bp']
@@ -126,44 +133,48 @@ class PairedEndPipelineMixin(object):
         bps[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
 
+
 class Summary(MergingDict):
     """Contains summary information.
     """
+
     @property
     def has_exception(self):
         return 'exception' in self
-    
+
     def finish(self):
         """Replaces Summarizable members with their summaries, and computes
         some aggregate values.
         """
         self._post_process_dict(self)
-    
+
     def _post_process_dict(self, dict_val):
         if dict_val is None:
             return
+
         for key, value in tuple(dict_val.items()):
             if value is None:
                 continue
+
             if isinstance(value, Summarizable):
                 dict_val[key] = value = value.summarize()
             if isinstance(value, dict):
                 self._post_process_dict(value)
             elif (
-                    isinstance(value, Sequence) and
-                    len(value) > 0 and
-                    all(
-                        val is None or isinstance(val, dict)
-                        for val in value)):
+                isinstance(value, Sequence) and
+                len(value) > 0 and
+                all(val is None or isinstance(val, dict) for val in value)
+            ):
                 for val in value:
                     self._post_process_dict(val)
             else:
                 if isinstance(value, Const):
                     dict_val[key] = value = value.value
                 self._post_process_other(dict_val, key, value)
-    
+
     def _post_process_other(self, parent, key, value):
         pass
+
 
 class BaseCommandRunner(object):
     """Base class for command executors.
@@ -171,6 +182,7 @@ class BaseCommandRunner(object):
     Args:
         options: Command-line options.
     """
+
     def __init__(self, options, summary_class=Summary):
         self.options = options
         self.summary = summary_class()
@@ -181,14 +193,14 @@ class BaseCommandRunner(object):
         self.done = False
         self._empty_batch = [None] * self.size
         self._progress_options = None
-        
         if options.sra_reader:
             self.reader = reader = sra_reader(
-                reader=options.sra_reader, 
-                quality_base=options.quality_base, 
-                colorspace=options.colorspace, 
+                reader=options.sra_reader,
+                quality_base=options.quality_base,
+                colorspace=options.colorspace,
                 input_read=options.input_read,
-                alphabet=options.alphabet)
+                alphabet=options.alphabet,
+            )
             options.sra_reader = None
         else:
             interleaved = bool(options.interleaved_input)
@@ -199,17 +211,23 @@ class BaseCommandRunner(object):
             else:
                 qualfile = options.input2
             self.reader = reader = open_reader(
-                file1=input1, file2=input2, file_format=options.input_format,
-                qualfile=qualfile, quality_base=options.quality_base, 
-                colorspace=options.colorspace, interleaved=interleaved, 
-                input_read=options.input_read, alphabet=options.alphabet)
-        
+                file1=input1,
+                file2=input2,
+                file_format=options.input_format,
+                qualfile=qualfile,
+                quality_base=options.quality_base,
+                colorspace=options.colorspace,
+                interleaved=interleaved,
+                input_read=options.input_read,
+                alphabet=options.alphabet,
+            )
         # Wrap reader in subsampler
         if options.subsample:
             import random
+
             if options.subsample_seed:
                 random.seed(options.subsample_seed)
-            
+
             def subsample(reader, frac):
                 """Generator that yields a random subsample of records.
                 
@@ -220,26 +238,25 @@ class BaseCommandRunner(object):
                 for reads in reader:
                     if random.random() < frac:
                         yield reads
-            
+
             reader = subsample(reader, options.subsample)
-        
         self.iterable = enumerate(reader, 1)
-        
         if options.progress:
             self._progress_options = (
-                options.progress, self.size, self.max_reads,
-                options.counter_magnitude)
-        
+                options.progress, self.size, self.max_reads, options.counter_magnitude
+            )
         self.init_summary()
-    
+
     def __getattr__(self, name):
         if hasattr(self.reader, name):
             return getattr(self.reader, name)
+
         elif hasattr(self.options, name):
             return getattr(self.options, name)
+
         else:
             raise ValueError("Unknown attribute: {}".format(name))
-    
+
     def iterator(self):
         """Returns an iterator (an object with the __iter__ method) over
         input batches. BaseCommandRunner is itself an iterable, and will be
@@ -248,32 +265,33 @@ class BaseCommandRunner(object):
         if self._progress_options:
             # Wrap iterator in progress bar
             from atropos.io.progress import create_progress_reader
-            itr = create_progress_reader(self, *self._progress_options)
+
+            itr = create_progress_reader(self, * self._progress_options)
             # itr may be none if there are no progress bar libraries available
             if itr is not None:
                 return itr
+
         return self
 
     def __iter__(self):
         return self
-    
+
     def __next__(self):
         if self.done:
             raise StopIteration()
-        
+
         try:
             read_index, record = next(self.iterable)
         except:
             self.finish()
             raise
-        
+
         batch = copy.copy(self._empty_batch)
         batch[0] = record
         batch_index = 1
         max_size = self.size
         if self.max_reads:
             max_size = min(max_size, self.max_reads - read_index + 1)
-        
         while batch_index < max_size:
             try:
                 read_index, record = next(self.iterable)
@@ -282,28 +300,28 @@ class BaseCommandRunner(object):
             except StopIteration:
                 self.finish()
                 break
+
             except:
                 self.finish()
                 raise
-        
+
         if self.max_reads and read_index >= self.max_reads:
             self.finish()
-        
         self.batches += 1
-        
         batch_meta = dict(
             index=self.batches,
             # TODO: When multi-file input is supported, 'source' will need to
             # be the index of the current file/pair from which records are
             # being read.
             source=0,
-            size=batch_index)
-        
+            size=batch_index,
+        )
         if batch_index == self.size:
             return (batch_meta, batch)
+
         else:
             return (batch_meta, batch[0:batch_index])
-    
+
     def init_summary(self):
         """Initialize the summary dict with general information.
         """
@@ -316,10 +334,9 @@ class BaseCommandRunner(object):
         self.summary['sample_id'] = self.options.sample_id
         self.summary['input'] = self.reader.summarize()
         self.summary['input'].update(
-            batch_size=self.size,
-            max_reads=self.max_reads,
-            batches=self.batches)
-    
+            batch_size=self.size, max_reads=self.max_reads, batches=self.batches
+        )
+
     def run(self):
         """Run the command, wrapping it in a Timing, catching any exceptions,
         and finally closing the reader.
@@ -330,16 +347,15 @@ class BaseCommandRunner(object):
         with self.timing:
             try:
                 self.return_code = self()
-            except Exception as err: # pylint: disable=broad-except
+            except Exception as err:  # pylint: disable=broad-except
                 self.summary['exception'] = dict(
-                    message=str(err),
-                    details=sys.exc_info())
+                    message=str(err), details=sys.exc_info()
+                )
                 self.return_code = 1
             finally:
                 self.finish()
-        
         return (self.return_code, self.summary)
-    
+
     def __call__(self):
         """Execute the command. Must be implemented within the command
         module.
@@ -348,7 +364,7 @@ class BaseCommandRunner(object):
             The return code.
         """
         raise NotImplementedError()
-    
+
     def finish(self):
         """Finish the command.
         """
@@ -357,7 +373,7 @@ class BaseCommandRunner(object):
             self.done = True
             self.reader.close()
         self.summary.finish()
-    
+
     def load_known_adapters(self):
         """Load known adapters based on setting in command-line options.
         

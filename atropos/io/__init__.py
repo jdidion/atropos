@@ -9,11 +9,13 @@ from atropos.io.compression import get_file_opener
 STDOUT = '-'
 STDERR = '_'
 
+
 def abspath(path):
     """Returns the user home-resolved absolute path.
     """
     return os.path.abspath(os.path.expanduser(path))
-    
+
+
 def resolve_path(path, parent=None):
     """Resolves the absolute path of the specified file.
     
@@ -32,7 +34,9 @@ def resolve_path(path, parent=None):
         apath = abspath(os.path.join(parent, path))
     if not os.path.exists(apath):
         raise IOError(errno.ENOENT, "%s does not exist" % apath, apath)
+
     return apath
+
 
 def check_path(path, ptype=None, access=None):
     """Checks that a path exists, is of the specified type, and allows the
@@ -46,17 +50,20 @@ def check_path(path, ptype=None, access=None):
         IOError if the path does not exist, is not of the specified type, or
         doesn't allow the specified access.
     """
-    if (
-            ptype == 'f' and not path.startswith("/dev/") and
-            not os.path.isfile(path)):
+    if (ptype == 'f' and not path.startswith("/dev/") and not os.path.isfile(path)):
         raise IOError(errno.EISDIR, "{} is not a file".format(path), path)
+
     elif ptype == 'd' and not os.path.isdir(path):
         raise IOError(errno.ENOTDIR, "{} is not a directory".format(path), path)
+
     elif not os.path.exists(path):
         raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
+
     if access is not None and not os.access(path, access):
         raise IOError(errno.EACCES, "{} is not accessable".format(path), path)
+
     return path
+
 
 def check_writeable(rawpath, ptype=None):
     """Resolves the absolute path. Raises an IOError if the path is not
@@ -68,6 +75,7 @@ def check_writeable(rawpath, ptype=None):
     """
     if rawpath in (STDOUT, STDERR):
         return rawpath
+
     rawpath = abspath(rawpath)
     try:
         path = resolve_path(rawpath)
@@ -80,6 +88,7 @@ def check_writeable(rawpath, ptype=None):
             os.makedirs(dirpath)
         path = os.path.join(dirpath, os.path.basename(rawpath))
     return path
+
 
 def open_output(filename, mode='w', context_wrapper=False):
     """Replacement for the "open" function that is only for writing text files.
@@ -100,6 +109,7 @@ def open_output(filename, mode='w', context_wrapper=False):
         mode = 'at'
     if mode not in ('wt', 'wb', 'at', 'ab'):
         raise ValueError("mode '{0}' not supported".format(mode))
+
     if not isinstance(filename, str):
         raise ValueError("the filename must be a string")
 
@@ -109,21 +119,26 @@ def open_output(filename, mode='w', context_wrapper=False):
         if mode == 'wb':
             fileobj = fileobj.buffer
         if context_wrapper:
+
             class StdWrapper(object):
                 """Context manager for stdout/stderr that is no-op on exit.
                 """
+
                 def __init__(self, fileobj):
                     self.fileobj = fileobj
+
                 def __enter__(self):
                     return self.fileobj
+
                 def __exit__(self, exception_type, exception_value, traceback):
                     pass
+
             fileobj = StdWrapper(fileobj)
     else:
         filename = check_writeable(filename, 'f')
         fileobj = open(filename, mode)
-    
     return fileobj
+
 
 def xopen(filename, mode='r', use_system=True):
     """Replacement for the "open" function that can also open files that have
@@ -153,6 +168,7 @@ def xopen(filename, mode='r', use_system=True):
         mode = 'at'
     if mode not in ('rt', 'rb', 'wt', 'wb', 'at', 'ab'):
         raise ValueError("mode '{0}' not supported".format(mode))
+
     if not isinstance(filename, str):
         raise ValueError("the filename must be a string")
 
@@ -165,9 +181,10 @@ def xopen(filename, mode='r', use_system=True):
         if 'b' in mode:
             fileobj = fileobj.buffer
         return fileobj
-    
+
     file_opener = get_file_opener(filename)
     if file_opener:
         return file_opener(filename, mode, use_system=use_system)
+
     else:
         return open(filename, mode)

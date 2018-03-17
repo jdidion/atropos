@@ -13,6 +13,8 @@ C 1 0 3 2
 G 2 3 0 1
 T 3 2 1 0
 """
+
+
 def _initialize_dicts():
     """
     Create the colorspace encoding and decoding dictionaries.
@@ -26,8 +28,7 @@ def _initialize_dicts():
         for j, char2 in enumerate("ACGT"):
             # XOR of nucleotides gives color
             enc[char1 + char2] = chr(ord('0') + (i ^ j))
-    enc.update({ 'NN': '4', 'N.': '4', '.N': '4', '..': '4'})
-
+    enc.update({'NN': '4', 'N.': '4', '.N': '4', '..': '4'})
     dec = {}
     for i, char1 in enumerate("ACGT"):
         dec['.' + str(i)] = 'N'
@@ -38,10 +39,11 @@ def _initialize_dicts():
             # XOR of nucleotides gives color
             dec[char1 + chr(ord('0') + (i ^ j))] = char2
     dec['N4'] = 'N'
-
     return (enc, dec)
 
+
 ENCODE, DECODE = _initialize_dicts()
+
 
 def encode(nucs):
     """Given a sequence of nucleotides, convert them to colorspace. Only
@@ -53,10 +55,12 @@ def encode(nucs):
     """
     if not nucs:
         return nucs
+
     encoded = nucs[0:1]
     for idx in range(len(nucs) - 1):
-        encoded += ENCODE[nucs[idx:idx+2]]
+        encoded += ENCODE[nucs[idx:idx + 2]]
     return encoded
+
 
 def decode(colors):
     """Decode a sequence of colors to nucleotide space. The first character in
@@ -68,6 +72,7 @@ def decode(colors):
     """
     if len(colors) < 2:
         return colors
+
     result = base = colors[0]
     for col in colors[1:]:
         base = DECODE[base + col]
