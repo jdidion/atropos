@@ -253,9 +253,9 @@ MatchInfo = namedtuple(
 #    https://github.com/Martinsos/edlib
 # 6. Phred-adjusted ML for error probability: 
 # https://biosails.github.io/pheniqs/glossary.html#phred_adjusted_maximum_likelihood_decoding
-# 7. Adaptive banded alignment: https://github.com/ocxtal/libgaba
-# Also think about different sequence encodings that might enable faster alignment
-# https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
+# 7. Adaptive banded alignment:
+#     * https://github.com/ocxtal/libgaba
+#     * https://github.com/ocxtal/adaptivebandbench
 # 8. https://github.com/yamada-kd/nepal
 # 9. The SeqAn C++ library implements several alignment algorithms: 
 # http://www.sciencedirect.com/science/article/pii/S0168165617315420
@@ -264,6 +264,12 @@ MatchInfo = namedtuple(
 # * http://www.combio.pl/alfree/tools/
 # * http://www.combio.pl/alfree
 # * http://bioinformatics.org.au/tools/decaf+py/
+# 12. Heng Li's review of pairwise alignment references several fast implementations,
+# including Parasail and BitPal: (alndp.pdf)
+# * Heng's dynamic programming algorithm
+#   https://github.com/jts/nanopolish/tree/master/src/thirdparty
+# Also think about different sequence encodings that might enable faster alignment
+# https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.
     

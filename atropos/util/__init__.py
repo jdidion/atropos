@@ -284,7 +284,9 @@ class Timing(Summarizable):
         """
         if not self.cur_time:
             self.update()
-        assert self.start_time is not None
+        if self.start_time is None:
+            raise AtroposError(
+                'Timing instance must be started before it can be summarized')
         summary = dict(start=self.start_time.isoformat())
         summary.update(self.cur_time - self.start_time)
         return summary
@@ -387,8 +389,8 @@ class NestedDict(dict, Mergeable, Summarizable):
         """Returns a flattened version of the nested dict.
         
         Returns:
-            When `shape=='long'`, a list of (key1, key2, value) tuples.
-            When `shape=='wide'`, a dict of
+            When `self.shape=='long'`, a list of (key1, key2, value) tuples.
+            When `self.shape=='wide'`, a dict of
                 {columns:keys2, rows: {key1, values}}, where `keys2` is the set
                 of keys in the child dicts.
         """
@@ -441,10 +443,10 @@ def merge_dicts(dest, src):
         if dest.get(key, None) is None:
             dest[key] = v_src
         elif v_src is not None:
-            dest[key] = merge_values(dest[key], v_src)
+            dest[key] = merge_values(key, dest[key], v_src)
 
 
-def merge_values(v_dest, v_src):
+def merge_values(key, v_dest, v_src):
     """Merge two values based on their types, as follows:
     
     - Mergeable: merging is done by the dest object's merge function.
@@ -456,30 +458,50 @@ def merge_values(v_dest, v_src):
     - Otherwise: Treated as a Const (i.e. must be identical).
     
     Args:
+        key:
         v_dest: The dest value.
         v_src: The src value.
     
     Returns:
         The merged value.
     """
+
+    def assert_of_type(_type=None):
+        if _type is None:
+            _type = v_dest.__class__
+        if not all(isinstance(o, _type) for o in (v_src, v_dest)):
+            raise TypeError(
+                "When merging {}, source and/or dest were not of type "
+                "{}".format(key, _type))
+        return _type
+
+    def assert_equal():
+        _type = assert_of_type()
+        if v_dest != v_src:
+            raise ValueError(
+                "When merging, objects of type {} must be equal; "
+                "{} != {}".format(_type, v_src, v_dest))
+
     if isinstance(v_dest, Mergeable):
         v_dest = v_dest.merge(v_src)
     elif isinstance(v_dest, dict):
-        assert isinstance(v_src, dict)
+        assert_of_type(dict)
         merge_dicts(v_dest, v_src)
     elif isinstance(v_dest, str):
-        assert v_dest == v_src
+        assert_equal()
     elif isinstance(v_dest, Number):
+        assert_of_type(Number)
         v_dest += v_src
     elif isinstance(v_dest, Iterable):
+        assert_of_type(Iterable)
         i_dest = tuple(v_dest)
         i_src = tuple(v_src)
         if len(i_dest) == 0:
             v_dest = i_src
         elif len(i_src) > 0:
-            v_dest = [merge_values(d, s) for d, s in zip(i_dest, i_src)]
+            v_dest = [merge_values(key, d, s) for d, s in zip(i_dest, i_src)]
     else:
-        assert v_dest == v_src
+        assert_equal()
     return v_dest
 
 
@@ -534,7 +556,7 @@ def qual2int(qual, base=33):
             new Illumina = 33).
     
     Returns:
-        The integer quality.
+        An iterable of integer qualities.
     """
     return ord(qual) - base
 
@@ -559,7 +581,7 @@ def qual2prob(qchar):
     return 10 ** (-qual2int(qchar) / 10)
 
 
-def enumerate_range(collection, start, end):
+def enumerate_range(collection, start, end, step=1):
     """Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...
     
     Only up to (start-end+1) items will be yielded.
@@ -568,6 +590,7 @@ def enumerate_range(collection, start, end):
         collection: The collection to enumerate.
         start: The starting index.
         end: The ending index.
+        step: The amount to increment the index each iteration (defaults to 1).
     
     Yields:
         (index, item) tuples.
@@ -576,8 +599,7 @@ def enumerate_range(collection, start, end):
     itr = iter(collection)
     while idx < end:
         yield (idx, next(itr))
-
-        idx += 1
+        idx += step
 
 
 def mean(values):
@@ -626,7 +648,8 @@ def stdev(values, mu0=None):
 
     if mu0 is None:
         mu0 = mean(values)
-    return math.sqrt(sum((val - mu0) ** 2 for val in values) / len(values))
+
+    return math.sqrt(sum((val - mu0) ** 2 for val in values) / (len(values) - 1))
 
 
 def weighted_stdev(values, counts, mu0=None):
@@ -647,7 +670,7 @@ def weighted_stdev(values, counts, mu0=None):
         mu0 = weighted_mean(values, counts)
     return math.sqrt(
         sum(((val - mu0) ** 2) * count for val, count in zip(values, counts)) /
-        sum(counts)
+        (sum(counts) - 1)
     )
 
 
@@ -665,7 +688,7 @@ def median(values):
     if datalen == 0:
         raise ValueError("Cannot determine the median of an empty sequence")
 
-    values.sort()
+    values = sorted(values)
     idx = datalen // 2
     if datalen % 2 == 1:
         return values[idx]

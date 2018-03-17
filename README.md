@@ -1,6 +1,7 @@
 [![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=master)](https://travis-ci.org/jdidion/atropos])
 [![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
+[![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
 
 # Atropos
 
@@ -103,7 +104,7 @@ The citation for the original Cutadapt paper is:
 
 ## Roadmap
 
-### 1.2
+### 1.2.x
 
 * Pending backports to 1.1.x branch
   * Fix for #36
@@ -112,10 +113,13 @@ The citation for the original Cutadapt paper is:
   * List of commits to migrate from xphyle branch:
     * 349c215
     * 7641c8d
-    
+    * 77781ff
+    * 268d390
 * Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
-* Add auto-trimming mode for paired-end reads.
-* Accept multiple input files.
+* Adapter detection:
+    * Parallelize adapter detection for multiple input files.
+    * Implement new detector for paired-end data that detects adapter sequences based on overhangs of aligned inserts.
+* Implement new trimming mode that blindly trims overhangs of aligned inserts.
 * Support SAM output (including #33).
 * Direct streaming and trimming of reads from SRA and htsget using [ngstream](https://github.com/jdidion/ngstream).
 * Read "cropping" (#50)
@@ -128,12 +132,13 @@ The citation for the original Cutadapt paper is:
 * Port over improvements in latest versions of Cutadapt https://cutadapt.readthedocs.io/en/stable/
 * Migrate dependency management to Pipfile (using pipenv).
 
-### 1.3
+### 1.3.x
 
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
 * Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
 * Provide option for RNA-seq data that will trim polyA sequence.
+    * https://github.com/ibest/seqyclean
 * Add formal config file support (#53)
 * Automate crash reporting using [sentry](https://github.com/getsentry/raven-python).
 * Enable user to define custom read structure: https://github.com/nh13/read-structure-examples
@@ -142,7 +147,7 @@ The citation for the original Cutadapt paper is:
 * Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
 * General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 
-### 1.4
+### 1.4.x
 
 * Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
@@ -155,7 +160,7 @@ The citation for the original Cutadapt paper is:
 * Consider whether to support trimming/QC of raw IonTorrent data.
 * Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
 
-### 1.5
+### 1.5.x
 
 * Switch to using Click for CLI.
 * Implement a public plugin API.
@@ -195,8 +200,10 @@ The citation for the original Cutadapt paper is:
 * Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcoming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
 * Experiment with replacing the multicore implementation with an asyncio-based implementation (using ProcessPoolExecutor and uvloop).
 * Automatic adaptive tuning of queue sizes to maximize the balance between memory usage and latency.
+* Potential performance improvements in BAM reading: https://www.biostars.org/p/186732/
+* Multithreaded writing to single output may be possible. This would be implemented in xphyle.
 
-While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2017.
+While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2018.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
 

@@ -16,11 +16,14 @@ from distutils.command.build_ext import build_ext as _build_ext
 
 import versioneer
 
+
 MIN_CYTHON_VERSION = '0.25.2'
 
-if sys.version_info < (3, 6):
-    sys.stdout.write("At least Python 3.3 is required.\n")
-    sys.exit(1)
+
+cmdclass = versioneer.get_cmdclass()
+VersioneerBuildExt = cmdclass.get('build_ext', _build_ext)
+VersioneerSdist = cmdclass.get('sdist', _sdist)
+
 
 def out_of_date(extensions):
     """
@@ -79,17 +82,8 @@ def check_cython_version():
             "', but at least version " + str(MIN_CYTHON_VERSION) + " is required.\n")
         sys.exit(1)
 
-extensions = [
-    Extension('atropos.align._align', sources=['atropos/align/_align.pyx']),
-    Extension('atropos.commands.trim._qualtrim', sources=['atropos/commands/trim/_qualtrim.pyx']),
-    Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
-]
 
-cmdclass = versioneer.get_cmdclass()
-versioneer_build_ext = cmdclass.get('build_ext', _build_ext)
-versioneer_sdist = cmdclass.get('sdist', _sdist)
-
-class build_ext(versioneer_build_ext):
+class build_ext(VersioneerBuildExt):
     def run(self):
         # If we encounter a PKG-INFO file, then this is likely a .tar.gz/.zip
         # file retrieved from PyPI that already includes the pre-cythonized
@@ -104,9 +98,8 @@ class build_ext(versioneer_build_ext):
             self.extensions = cythonize(self.extensions)
         _build_ext.run(self)
 
-cmdclass['build_ext'] = build_ext
 
-class sdist(versioneer_sdist):
+class sdist(VersioneerSdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
@@ -114,7 +107,31 @@ class sdist(versioneer_sdist):
         cythonize(extensions)
         versioneer_sdist.run(self)
 
+
+cmdclass['build_ext'] = build_ext
 cmdclass['sdist'] = sdist
+
+
+# Define install and test requirements based on python version
+version_info = sys.version_info
+
+
+install_requirements = ['xphyle>=4.0.0']
+test_requirements = ['pytest'] #, 'jinja2', 'pysam'],
+
+
+if sys.version_info < (3, 6):
+    sys.stdout.write("At least Python 3.3 is required.\n")
+    sys.exit(1)
+
+
+# Define extensions to be Cythonized
+extensions = [
+    Extension('atropos.align._align', sources=['atropos/align/_align.pyx']),
+    Extension('atropos.commands.trim._qualtrim', sources=['atropos/commands/trim/_qualtrim.pyx']),
+    Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
+]
+
 
 setup(
     name = 'atropos',
@@ -131,7 +148,8 @@ setup(
         'adapters/*.fa',
         'commands/**/templates/*'
     ] },
-    tests_require = ['pytest'], #, 'jinja2', 'pysam'],
+    install_requires = install_requirements,
+    tests_require = test_requirements,
     extras_require = {
         'progressbar' : ['progressbar2'],
         'tqdm' : ['tqdm'],

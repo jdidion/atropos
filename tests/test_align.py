@@ -5,7 +5,6 @@ from atropos.adapters import BACK
 from atropos.align import (
     locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
 )
-from atropos.util import RandomMatchProbability
 
 
 class TestAligner():
@@ -130,17 +129,6 @@ def test_wildcards_in_both():
 def test_no_match():
     a = locate('CTGATCTGGCCG', 'AAAAGGG', 0.1, BACK)
     assert a is None, a
-
-
-def test_factorial():
-    f = RandomMatchProbability()
-    # simple test
-    assert f.factorial(0) == 1
-    assert f.factorial(1) == 1
-    assert f.factorial(3) == 6
-    assert int(f.factorial(27)) == int(math.factorial(27))
-    # test big number
-    assert int(f.factorial(150)) == int(math.factorial(150))
 
 
 def test_match_probability():

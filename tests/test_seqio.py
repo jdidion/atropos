@@ -8,6 +8,7 @@ from io import StringIO
 import shutil
 from textwrap import dedent
 from tempfile import mkdtemp
+from unittest import skipIf, TestCase
 from atropos.io import xopen, open_output
 from atropos.io.seqio import (
     Sequence,
@@ -63,12 +64,17 @@ class TestSequence:
             ColorspaceSequence(name="name", sequence="K0123", qualities="####")
 
 
-class TestFastaReader:
+class TestFastaReader(TestCase):
 
     def test(self):
+        with self.assertRaises(ValueError):
+            with FastaReader(None) as f:
+                pass
+
         with FastaReader("tests/data/simple.fasta") as f:
             reads = list(f)
         assert reads == simple_fasta
+
         fasta = StringIO(">first_sequence\nSEQUENCE1\n>second_sequence\nSEQUENCE2\n")
         reads = list(FastaReader(fasta))
         assert reads == simple_fasta
@@ -428,6 +434,21 @@ class TestPairedSequenceReader:
         assert not match('abc', 'xyz')
 
 
+try:
+    import ngstream
+    ngs_available = True
+except:
+    ngs_available = False
+
+
+@skipIf(not ngs_available, "ngstream library not available")
+class TestSraReader(TestCase):
+    def test_sra_reader(self):
+        with ngstream.sra.SraReader(item_limit=10) as ngs_reader:
+            # atropos_reader = sra_reader(reader)
+            pass
+
+
 def create_truncated_file(path):
     # Random text
     text = ''.join(random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ') for _ in range(200))
@@ -439,20 +460,18 @@ def create_truncated_file(path):
     f.close()
 
 
-# Disable these tests in Python 3.2 and 3.3
-if not ((3, 2) <= sys.version_info[:2] <= (3, 3)):
+def test_truncated_gz():
+    with raises(EOFError), temporary_path('truncated.gz') as path:
+        create_truncated_file(path)
+        f = xopen(path, 'r')
+        f.read()
+        f.close()
 
-    def test_truncated_gz():
-        with raises(EOFError), temporary_path('truncated.gz') as path:
-            create_truncated_file(path)
-            f = xopen(path, 'r')
-            f.read()
-            f.close()
 
-    def test_truncated_gz_iter():
-        with raises(EOFError), temporary_path('truncated.gz') as path:
-            create_truncated_file(path)
-            f = xopen(path, 'r', use_system=False)  # work around bug in py3.4
-            for line in f:
-                pass
-            f.close()
+def test_truncated_gz_iter():
+    with raises(EOFError), temporary_path('truncated.gz') as path:
+        create_truncated_file(path)
+        f = xopen(path, 'r', use_system=False)  # work around bug in py3.4
+        for line in f:
+            pass
+        f.close()

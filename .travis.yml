@@ -9,10 +9,13 @@ python:
 install:
 - pip install --upgrade pip wheel
 - pip install Cython
+- pip install pytest-cov
+- pip install coveralls
 - make install
 script:
 - make test
 after_success:
+- coveralls
 - pylint atropos
 # push Docker images for full releases
 - > 
