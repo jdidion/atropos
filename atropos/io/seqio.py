@@ -5,6 +5,7 @@ TODO
 - Sequence.name should be Sequence.description or so (reserve .name for the part
   before the first space)
 """
+from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import csv
 import sys
@@ -811,10 +812,10 @@ class PairedEndSAMReader(SAMReader):
             yield tuple(self._as_sequence(r) for r in reads)
 
 
-class SequenceFileFormat():
+class SequenceFileFormat:
     """Base class for sequence formatters.
     """
-
+    @abstractmethod
     def format(self, read):
         """Format a Sequence as a string.
         
@@ -825,7 +826,12 @@ class SequenceFileFormat():
             A string representation of the sequence object in the sequence
             file format.
         """
-        raise NotImplementedError()
+        pass
+
+    def header(self):
+        """Returns the header to be written at the beginning of the file.
+        """
+        return None
 
 
 class FastaFormat(SequenceFileFormat):
@@ -883,7 +889,7 @@ class ColorspaceFastqFormat(FastqFormat):
         return self.format_entry(read.name, read.primer + read.sequence, read.qualities)
 
 
-class SAMFormat():
+class SAMFormat(SequenceFileFormat):
     """SAM SequenceFileFormat.
     """
 
@@ -904,8 +910,11 @@ class SAMFormat():
             )
         )
 
+    def header(self):
+        return "@HD\tVN:1.5\tSO:unsorted\n"
 
-class Formatter:
+
+class Formatter(metaclass=ABCMeta):
     """Base class for Formatters.
     """
 
@@ -914,11 +923,7 @@ class Formatter:
         self.read1_bp = 0
         self.read2_bp = 0
 
-    def header(self):
-        """Returns the header to be written at the beginning of the file.
-        """
-        return ""
-
+    @abstractmethod
     def format(self, result, read1, read2=None):
         """Format read(s) and add them to `result`.
 
@@ -926,7 +931,20 @@ class Formatter:
             result: A dict mapping file names to lists of formatted reads.
             read1, read2: The reads to format.
         """
-        raise NotImplementedError()
+        pass
+
+    def _get_result_list(self, result, file1, seq_format1, seq_format2=None):
+        if file1 in result:
+            return result[file1]
+        else:
+            result_list = []
+            header = seq_format1.header()
+            if header:
+                if seq_format2 and header != seq_format2.header():
+                    raise ValueError("sequence formats must have same header")
+                result_list.append(header)
+            result[file1] = result_list
+            return result_list
 
     @property
     def written_bp(self):
@@ -955,7 +973,9 @@ class SingleEndFormatter(Formatter):
             result: A dict mapping file names to lists of formatted reads.
             read1, read2: The reads to format.
         """
-        result[self.file1].append(self.seq_format.format(read1))
+        result_list = self._get_result_list(
+            result, self.file1, self.seq_format)
+        result_list.append(self.seq_format.format(read1))
         self.written += 1
         self.read1_bp += len(read1)
 
@@ -971,9 +991,10 @@ class InterleavedFormatter(Formatter):
         self.seq_format2 = seq_format2 or seq_format1
 
     def format(self, result, read1, read2=None):
-        result[self.file1].extend(
-            (self.seq_format1.format(read1), self.seq_format2.format(read2))
-        )
+        result_list = self._get_result_list(
+            result, self.file1, self.seq_format1, self.seq_format2)
+        result_list.append(self.seq_format1.format(read1))
+        result_list.append(self.seq_format2.format(read2))
         self.written += 1
         self.read1_bp += len(read1)
         self.read2_bp += len(read2)
@@ -986,14 +1007,15 @@ class PairedEndFormatter(Formatter):
 
     def __init__(self, file1, file2, seq_format1, seq_format2=None):
         super().__init__()
-        self.file1 = file1
-        self.file2 = file2
-        self.seq_format1 = seq_format1
-        self.seq_format2 = seq_format2 or seq_format1
+        self.data = [
+            (file1, seq_format1),
+            (file2, seq_format2 or seq_format1)
+        ]
 
     def format(self, result, read1, read2):
-        result[self.file1].append(self.seq_format1.format(read1))
-        result[self.file2].append(self.seq_format2.format(read2))
+        for read, (path, seq_format) in zip((read1, read2), self.data):
+            result_list = self._get_result_list(result, path, seq_format)
+            result_list.append(seq_format.format(read))
         self.written += 1
         self.read1_bp += len(read1)
         self.read2_bp += len(read2)
@@ -1004,17 +1026,11 @@ class SingleEndSAMFormatter(SingleEndFormatter):
     def __init__(self, file1):
         super().__init__(file1, SAMFormat(0))
 
-    def header(self, result):
-        result.append("@HD\tVN:1.5\tSO:unsorted")
-
 
 class PairedEndSAMFormatter(InterleavedFormatter):
 
     def __init__(self, file1):
         super().__init__(file1, SAMFormat(65), SAMFormat(129))
-
-    def header(self, result):
-        result.append("@HD\tVN:1.5\tSO:unsorted")
 
 
 def sra_colorspace_sequence(name, sequence, qualities, name2, alphabet=None):
