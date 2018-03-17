@@ -6,7 +6,7 @@ from atropos.commands.cli import (
     BaseCommandParser, configure_threads, parse_stat_args, readable_file,
     readwriteable_file, writeable_file, positive, probability, CharList,
     Delimited, int_or_str)
-from atropos.io import STDOUT, STDERR
+from atropos.io import STDOUT, STDERR, guess_format_from_name
 
 class CommandParser(BaseCommandParser):
     name = 'trim'
@@ -37,7 +37,8 @@ standard output.
             zero_cap=None,
             action='trim',
             batch_size=None,
-            known_adapter=None)
+            known_adapter=None,
+            use_interleaved_output=False)
         
         group = self.add_group(
             "Adapters",
@@ -360,6 +361,12 @@ standard output.
                  "output. Use '{name}' in FILE to demultiplex reads into "
                  "multiple files. (write to standard output)")
         group.add_argument(
+            "--output-format",
+            choices=('fasta', 'fastq', 'sam'), metavar="FORMAT", default=None,
+            help="The format of the output file. If not specified, the output "
+                 "format is determined from the filename. Defaults to FASTQ "
+                 "when writing to stdout. (autodetect)")
+        group.add_argument(
             "--info-file",
             type=writeable_file, metavar="FILE",
             help="Write information about each read and its adapter matches "
@@ -593,7 +600,7 @@ standard output.
             help="Size of queue for batches of results to be written. "
                  "(THREADS * 100)")
         group.add_argument(
-            "--compression",
+            "--compression-mode",
             choices=("worker", "writer"), default=None,
             help="Where data compression should be performed. Defaults to "
                  "'writer' if system-level compression can be used and "
@@ -602,50 +609,79 @@ standard output.
     def validate_command_options(self, options):
         parser = self.parser
         paired = options.paired
-        
-        if not paired:
-            if not options.output:
-                parser.error("An output file is required")
-            if options.untrimmed_paired_output:
-                parser.error(
-                    "Option --untrimmed-paired-output can only be used when "
-                    "trimming paired-end reads (with option -p).")
-        else:
-            if not options.interleaved_output:
-                if not options.output:
+
+        # Any of these options imply paired-end and siable legacy mode
+        paired_both = (
+            options.adapters2 or options.front2 or options.anywhere2 or
+            options.cut2 or options.cut_min2 or
+            options.interleaved_output or options.pair_filter or
+            options.overwrite_low_quality or
+            options.too_short_paired_output or
+            options.too_long_paired_output)
+
+        # If any of the options in the "paired" group are set, we implicitly
+        # expect paired-end input
+        paired_implicit = (
+            paired_both or options.paired_output or
+            options.untrimmed_paired_output)
+
+        if options.output_format is None and options.output is not None:
+            options.output_format = guess_format_from_name(
+                options.output, raise_on_failure=True)
+
+        if paired or paired_implicit:
+            any_output = options.output or options.paired_output
+
+            if options.interleaved_output:
+                if any_output:
                     parser.error(
-                        "When you use -p or --paired-output, you must also "
-                        "use the -o option.")
-                if not options.paired_output:
+                        "Cannot specify both interleaved and paired output.")
+                options.use_interleaved_output = True
+            elif options.output_format == 'sam':
+                if any_output:
                     parser.error(
-                        "When paired-end trimming is enabled via -A/-G/-B/-U, "
-                        "a second output file needs to be specified via -p "
+                        "SAM output must be specified using the -l option")
+                options.use_interleaved_output = True
+            elif not any_output or options.output in (STDOUT, STDERR):
+                # If no output files are specified, write interleaved
+                # output to stdout by default.
+                options.use_interleaved_output = True
+            else:
+                if options.output is None:
+                    parser.error(
+                        "When you use -p or --paired-output, you must "
+                        "also use the -o option.")
+                elif options.paired_output is None:
+                    parser.error(
+                        "When paired-end trimming is enabled, a second "
+                        "output file needs to be specified via -p "
                         "(--paired-output).")
-                if (bool(options.untrimmed_output) !=
+
+                if (
+                        bool(options.untrimmed_output) !=
                         bool(options.untrimmed_paired_output)):
                     parser.error(
-                        "When trimming paired-end reads, you must use either "
-                        "none or both of the --untrimmed-output/"
+                        "When trimming paired-end reads, you must use "
+                        "either none or both of the --untrimmed-output/"
                         "--untrimmed-paired-output options.")
-                if (options.too_short_output and
-                        not options.too_short_paired_output):
+
+                if (
+                        bool(options.too_short_output) !=
+                        bool(options.too_short_paired_output)):
                     parser.error(
-                        "When using --too-short-output with ""paired-end "
-                        "reads, you also need to use --too-short-paired-output")
-                if (options.too_long_output and
-                        not options.too_long_paired_output):
+                        "When using --too-short-output with paired-end "
+                        "reads, you also need to use "
+                        "--too-short-paired-output")
+
+                if (
+                        bool(options.too_long_output) !=
+                        bool(options.too_long_paired_output)):
                     parser.error(
                         "When using --too-long-output with paired-end "
-                        "reads, you also need to use --too-long-paired-output")
-            
-            # Any of these options switch off legacy mode
-            if (options.adapters2 or options.front2 or options.anywhere2 or
-                    options.cut2 or options.cut_min2 or
-                    options.quality_cutoff or options.trim_n or
-                    options.interleaved_input or options.pair_filter or
-                    options.too_short_paired_output or
-                    options.too_long_paired_output or
-                    options.overwrite_low_quality):
+                        "reads, you also need to use "
+                        "--too-long-paired-output")
+
+            if paired_both or options.quality_cutoff or options.trim_n:
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
                 # Read modifications (such as quality trimming) are applied also
                 # to second read.
@@ -657,6 +693,11 @@ standard output.
                 paired = 'first'
             
             options.paired = paired
+
+        elif options.untrimmed_paired_output:
+            parser.error(
+                "Option --untrimmed-paired-output can only be used when "
+                "trimming paired-end reads (with option -p).")
         
         # Send report to stderr if main output will be going to stdout
         if options.output is None and options.report_file == STDOUT:
@@ -767,7 +808,8 @@ standard output.
         if options.pair_filter is None:
             options.pair_filter = 'any'
         
-        if ((options.discard_trimmed or options.discard_untrimmed) and
+        if (
+                (options.discard_trimmed or options.discard_untrimmed) and
                 (options.untrimmed_output is not None)):
             parser.error(
                 "Only one of the --discard-trimmed, --discard-untrimmed "
@@ -855,18 +897,18 @@ standard output.
         if options.threads is not None:
             threads = configure_threads(options, parser)
             
-            if options.compression is None:
-                # Our tests show that with 8 or more threads, worker compression
-                # is more efficient.
+            if options.compression_mode is None:
                 if options.writer_process and 2 < threads < 8:
+                    # Our tests show that with 8 or more threads, worker compression
+                    # is more efficient.
                     from atropos.io import compression
                     if compression.can_use_system_compression():
-                        options.compression = "writer"
+                        options.compression_mode = "writer"
                     else:
-                        options.compression = "worker"
+                        options.compression_mode = "worker"
                 else:
-                    options.compression = "worker"
-            elif options.compression == "writer":
+                    options.compression_mode = "worker"
+            elif options.compression_mode == "writer":
                 if not options.writer_process:
                     parser.error(
                         "Writer compression and --no-writer-process are "
@@ -875,14 +917,14 @@ standard output.
                     logging.getLogger().warning(
                         "Writer compression requires > 2 threads; using "
                         "worker compression instead")
-                    options.compression = "worker"
+                    options.compression_mode = "worker"
             
             # Set queue sizes if necessary.
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
             if options.read_queue_size is None:
                 options.read_queue_size = (
-                    threads * (100 if options.compression == "writer" else 500))
+                    threads * (100 if options.compression_mode == "writer" else 500))
             elif (
                     options.read_queue_size > 0 and
                     options.read_queue_size < threads):
@@ -890,7 +932,7 @@ standard output.
             
             if options.result_queue_size is None:
                 options.result_queue_size = (
-                    threads * (100 if options.compression == "worker" else 500))
+                    threads * (100 if options.compression_mode == "worker" else 500))
             elif (
                     options.result_queue_size > 0 and
                     options.result_queue_size < threads):

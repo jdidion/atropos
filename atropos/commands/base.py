@@ -199,7 +199,7 @@ class BaseCommandRunner(object):
             else:
                 qualfile = options.input2
             self.reader = reader = open_reader(
-                file1=input1, file2=input2, file_format=options.format, 
+                file1=input1, file2=input2, file_format=options.input_format,
                 qualfile=qualfile, quality_base=options.quality_base, 
                 colorspace=options.colorspace, interleaved=interleaved, 
                 input_read=options.input_read, alphabet=options.alphabet)

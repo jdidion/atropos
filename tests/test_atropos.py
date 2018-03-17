@@ -277,11 +277,6 @@ def test_no_args():
         assert execute_cli() != 0
 
 
-def test_two_fastqs():
-    with raises(SystemExit), redirect_stderr():
-        execute_cli(['-pe1', datapath('paired.1.fastq'), '-pe2', datapath('paired.2.fastq')])
-
-
 def test_anchored_no_indels():
     '''anchored 5' adapter, mismatches only (no indels)'''
     run('-g ^TTAGACATAT --no-indels -e 0.1', 'anchored_no_indels.fasta', 'anchored_no_indels.fasta')

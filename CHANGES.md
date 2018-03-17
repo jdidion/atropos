@@ -2,9 +2,19 @@
 
 dev
 ---
+* *Breaking changes:*
+  * We dropped support for python 3.3-3.5 in order to take advantage of many new features in 3.6 (such as type annotations), and to migrate to xphyle for file management. The 1.1.x branch will maintain 3.3-3.5 support and will receive any new bug fixes (but no new features).
+  * The --compression argument has been renamed to --compression-mode, to avoid confusion with the new --compression-format option (see below).
+  * The --format option has been renamed to --input-format, to avoid confusion with the new --output-format option
 * Merged PR #63: Implementation of UMI support. Thanks @wckdouglas!
 * Eliminate the bin/ folder; switch to using entry points for the atropos
   executable.
+* Fix #36: Progress bars don't increment correctly when batch size > 1 used.
+
+* Moved all file management code to use xphyle
+* Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
+* Added --output-format option to manually specify output format instead of determining the format from the output file name.
+* Enabled output to stdout by default with single-end and interleaved reads.
 
 v1.1.18 (2018.03.16)
 --------------------

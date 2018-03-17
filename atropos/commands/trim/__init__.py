@@ -490,13 +490,18 @@ class CommandRunner(BaseCommandRunner):
         else:
             output1 = options.output
             output2 = options.paired_output
-        
-        seq_formatter_args = dict(
+
+        if options.output_format is None:
+            if self.delivers_qualities:
+                options.output_format = 'fastq'
+            else:
+                options.output_format = 'fasta'
+
+        formatters = Formatters(output1, dict(
+            file_format=options.output_format,
             qualities=self.delivers_qualities,
             colorspace=options.colorspace,
-            interleaved=interleaved
-        )
-        formatters = Formatters(output1, seq_formatter_args)
+            interleaved=interleaved))
         force_create = []
             
         if options.merge_overlapping:
@@ -692,12 +697,12 @@ class CommandRunner(BaseCommandRunner):
         
         # Reserve a thread for the writer process if it will be doing the
         # compression and if one is available.
-        compression = self.compression
-        if compression is None:
-            compression = "worker"
+        compression_mode = self.compression_mode
+        if compression_mode is None:
+            compression_mode = "worker"
             if self.writer_process and can_use_system_compression():
-                compression = "writer"
-        if compression == "writer" and threads > 2:
+                compression_mode = "writer"
+        if compression_mode == "writer" and threads > 2:
             threads -= 1
         
         # Queue by which results are sent from the worker processes to the
@@ -706,14 +711,14 @@ class CommandRunner(BaseCommandRunner):
         writer_manager = None
         
         if self.writer_process:
-            if compression == "writer":
+            if compression_mode == "writer":
                 worker_result_handler = WorkerResultHandler(
                     QueueResultHandler(result_queue))
             else:
                 worker_result_handler = CompressingWorkerResultHandler(
                     QueueResultHandler(result_queue))
             writer_manager = WriterManager(
-                writers, compression, self.preserve_order, result_queue,
+                writers, compression_mode, self.preserve_order, result_queue,
                 timeout)
         else:
             worker_result_handler = WorkerResultHandler(

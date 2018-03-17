@@ -18,7 +18,7 @@ import versioneer
 
 MIN_CYTHON_VERSION = '0.25.2'
 
-if sys.version_info < (3, 3):
+if sys.version_info < (3, 6):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
 
@@ -154,9 +154,7 @@ setup(
         "License :: Public Domain",
         "Natural Language :: English",
         "Programming Language :: Cython",
-        "Programming Language :: Python :: 3.3",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.6"
     ]
 )

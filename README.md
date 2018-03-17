@@ -26,13 +26,14 @@ Atropos is available from [pypi](https://pypi.python.org/pypi/atropos) and can b
 First install dependencies:
 
 * Required
-    * Python 3.3+ (python 2.x is NOT supported)
+    * Python 3.6s+ (python 2.x is NOT supported)
         - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
     * Cython 0.25.2+ (`pip install Cython`)
+    * xphyle 4+
 * Maybe python libraries
     * pytest (for running unit tests)
-    * progressbar2 or tqdm (progressbar support)
-    * pysam (SAM/BAM input)
+    * pokrok + your favorite progress bar library (e.g. progressbar2, tqdm) (progressbar support)
+    * pysam (SAM/BAM support)
     * khmer 2.0+ (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
     * ngstream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
@@ -104,7 +105,14 @@ The citation for the original Cutadapt paper is:
 
 ### 1.2
 
+* Pending backports to 1.1.x branch
+  * Fix for #36
+
 * Migrate to [xphyle](https://github.com/jdidion/xphyle) for file management.
+  * List of commits to migrate from xphyle branch:
+    * 349c215
+    * 7641c8d
+    
 * Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
 * Add auto-trimming mode for paired-end reads.
 * Accept multiple input files.
@@ -191,3 +199,10 @@ The citation for the original Cutadapt paper is:
 While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2017.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
+
+
+## Unit test needs
+
+* Compressed file handling, including
+    * new --compression-format option
+    * Default use of stdout with single-end and interleaved input

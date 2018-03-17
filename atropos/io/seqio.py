@@ -705,7 +705,49 @@ class ColorspaceFastqFormat(FastqFormat):
         return self.format_entry(
             read.name, read.primer + read.sequence, read.qualities)
 
-class SingleEndFormatter():
+class SAMFormat():
+    """SAM SequenceFileFormat.
+    """
+    def __init__(self, flag):
+        self.flag = str(flag)
+
+    def format(self, read):
+        return "".join((
+            read.name, "\t", self.flag,
+            '\t*\t0\t0\t*\t*\t0\t0\t',
+            read.sequence, '\t',
+            read.qualities, '\n'))
+
+class Formatter:
+    """Base class for Formatters.
+    """
+    def __init__(self):
+        self.written = 0
+        self.read1_bp = 0
+        self.read2_bp = 0
+
+    def header(self):
+        """Returns the header to be written at the beginning of the file.
+        """
+        return ""
+
+    def format(self, result, read1, read2=None):
+        """Format read(s) and add them to `result`.
+
+        Args:
+            result: A dict mapping file names to lists of formatted reads.
+            read1, read2: The reads to format.
+        """
+        raise NotImplementedError()
+
+    @property
+    def written_bp(self):
+        """Tuple of base-pairs written (read1_bp, read2_bp).
+        """
+        return (self.read1_bp, self.read2_bp)
+
+
+class SingleEndFormatter(Formatter):
     """Wrapper for a SequenceFileFormat for single-end data.
     
     Args:
@@ -713,15 +755,13 @@ class SingleEndFormatter():
         file1: The single-end file.
     """
     def __init__(self, seq_format, file1):
-        self.seq_format = seq_format
+        super().__init__()
         self.file1 = file1
-        self.written = 0
-        self.read1_bp = 0
-        self.read2_bp = 0
-    
+        self.seq_format = seq_format
+
     def format(self, result, read1, read2=None):
         """Format read(s) and add them to `result`.
-        
+
         Args:
             result: A dict mapping file names to lists of formatted reads.
             read1, read2: The reads to format.
@@ -729,38 +769,57 @@ class SingleEndFormatter():
         result[self.file1].append(self.seq_format.format(read1))
         self.written += 1
         self.read1_bp += len(read1)
-    
-    @property
-    def written_bp(self):
-        """Tuple of base-pairs written (read1_bp, read2_bp).
-        """
-        return (self.read1_bp, self.read2_bp)
 
-class InterleavedFormatter(SingleEndFormatter):
+class InterleavedFormatter(Formatter):
     """Format read pairs as successive reads in an interleaved file.
     """
+    def __init__(self, file1, seq_format1, seq_format2=None):
+        super().__init__()
+        self.file1 = file1
+        self.seq_format1 = seq_format1
+        self.seq_format2 = seq_format2 or seq_format1
+
     def format(self, result, read1, read2=None):
         result[self.file1].extend((
-            self.seq_format.format(read1),
-            self.seq_format.format(read2)))
+            self.seq_format1.format(read1),
+            self.seq_format2.format(read2)))
         self.written += 1
         self.read1_bp += len(read1)
         self.read2_bp += len(read2)
 
-class PairedEndFormatter(SingleEndFormatter):
+class PairedEndFormatter(Formatter):
     """Wrapper for a SequenceFileFormat. Both reads in a pair are formatted
     using the specified format.
     """
-    def __init__(self, seq_format, file1, file2):
-        super(PairedEndFormatter, self).__init__(seq_format, file1)
+    def __init__(self, file1, file2, seq_format1, seq_format2=None):
+        super().__init__()
+        self.file1 = file1
         self.file2 = file2
+        self.seq_format1 = seq_format1
+        self.seq_format2 = seq_format2 or seq_format1
     
     def format(self, result, read1, read2):
-        result[self.file1].append(self.seq_format.format(read1))
-        result[self.file2].append(self.seq_format.format(read2))
+        result[self.file1].append(self.seq_format1.format(read1))
+        result[self.file2].append(self.seq_format2.format(read2))
         self.written += 1
         self.read1_bp += len(read1)
         self.read2_bp += len(read2)
+
+
+class SingleEndSAMFormatter(SingleEndFormatter):
+    def __init__(self, file1):
+        super().__init__(file1, SAMFormat(0))
+
+    def header(self, result):
+        result.append("@HD\tVN:1.5\tSO:unsorted")
+
+
+class PairedEndSAMFormatter(InterleavedFormatter):
+    def __init__(self, file1):
+        super().__init__(file1, SAMFormat(65), SAMFormat(129))
+
+    def header(self, result):
+        result.append("@HD\tVN:1.5\tSO:unsorted")
 
 def sra_colorspace_sequence(name, sequence, qualities, name2, alphabet=None):
     """Factory for an SRA colorspace sequence (which has one quality value
@@ -963,7 +1022,7 @@ def guess_format_from_name(path, raise_on_failure=False):
     Returns:
         The format name.
     """
-    name = None
+    name = ext = None
     if isinstance(path, str):
         name = path
     elif hasattr(path, "name"):	 # seems to be an open file-like object
@@ -985,39 +1044,13 @@ def guess_format_from_name(path, raise_on_failure=False):
             "Could not determine whether file {0!r} is FASTA or FASTQ: file "
             "name extension {1!r} not recognized".format(path, ext))
 
-def create_seq_formatter(file1, file2=None, interleaved=False, **kwargs):
-    """Create a formatter, deriving the format name from the file extension.
+def create_seq_formatter(
+        file1, file2=None, qualities=None, colorspace=False, file_format=None,
+        interleaved=False, line_length=None):
+    """Create a Formatter, deriving the format name from the file extension.
     
     Args:
         file1, file2: Output files.
-        interleaved: Whether the output should be interleaved (file2 must be
-            None).
-        kwargs: Additional arguments to pass to :method:`get_format`.
-    """
-    seq_format = get_format(file1, **kwargs)
-    if file2 is not None:
-        return PairedEndFormatter(seq_format, file1, file2)
-    elif interleaved:
-        return InterleavedFormatter(seq_format, file1)
-    else:
-        return SingleEndFormatter(seq_format, file1)
-
-def get_format(
-        path, file_format=None, colorspace=False, qualities=None,
-        line_length=None):
-    """Create a SequenceFileFormat instance.
-    
-    Args:
-        path: The filename.
-        
-        file_format: If set to None, file format is autodetected from the file
-        name extension. Set to 'fasta', 'fastq', or 'sra-fastq' to not
-        auto-detect. Colorspace is not auto-detected and must always be
-        requested explicitly.
-        
-        colorspace: If True, instances of the Colorspace... formats are
-            returned.
-        
         qualities: When file_format is None, this can be set to True or False to
             specify whether the written sequences will have quality values.
             This is is used in two ways:
@@ -1026,13 +1059,26 @@ def get_format(
               appropriately.
             * When False (no qualities available), an exception is raised when
               the auto-detected output format is FASTQ.
-    
+
+        colorspace: If True, instances of the Colorspace... formats are
+            returned.
+
+        file_format: If set to None, file format is autodetected from the file
+            name extension. Set to 'fasta', 'fastq', or 'sra-fastq' to not
+            auto-detect. Colorspace is not auto-detected and must always be
+            requested explicitly.
+
+        interleaved: Whether the output should be interleaved (file2 must be
+            None).
+
+        line_length: Maximum length of a sequence line in FASTA output.
+
     Returns:
-        A SequenceFileFormat object.
+        A Formatter instance.
     """
     if file_format is None:
         file_format = guess_format_from_name(
-            path, raise_on_failure=qualities is None)
+            file1, raise_on_failure=qualities is None)
     
     if file_format is None:
         if qualities is True:
@@ -1042,27 +1088,43 @@ def get_format(
         elif qualities is False:
             # Same, but we know that we want to write reads without qualities.
             file_format = 'fasta'
-    
-    if file_format is None:
-        raise UnknownFileType("Could not determine file type.")
-    
-    if file_format == 'fastq' and qualities is False:
-        raise ValueError(
-            "Output format cannot be FASTQ since no quality values are "
-            "available.")
-    
-    file_format = file_format.lower()
-    if file_format == 'fasta':
-        if colorspace:
-            return ColorspaceFastaFormat(line_length)
         else:
-            return FastaFormat(line_length)
-    elif file_format == 'fastq':
-        if colorspace:
-            return ColorspaceFastqFormat()
-        else:
-            return FastqFormat()
+            raise UnknownFileType("Could not determine file type.")
     else:
-        raise UnknownFileType(
-            "File format {0!r} is unknown (expected 'fasta' or "
-            "'fastq').".format(file_format))
+        file_format = file_format.lower()
+
+    if file_format in ('sam', 'fastq') and qualities is False:
+        raise ValueError(
+            "Output format cannot be {} since no quality values are "
+            "available.".format(file_format))
+
+    if file_format == 'sam':
+        if file2 is not None:
+            raise ValueError("Only one output file allowed for SAM format")
+
+        if interleaved:
+            return PairedEndSAMFormatter(file1)
+        else:
+            return SingleEndSAMFormatter(file1)
+    else:
+        if file_format == 'fasta':
+            if colorspace:
+                fmt = ColorspaceFastaFormat(line_length)
+            else:
+                fmt = FastaFormat(line_length)
+        elif file_format == 'fastq':
+            if colorspace:
+                fmt = ColorspaceFastqFormat()
+            else:
+                fmt = FastqFormat()
+        else:
+            raise UnknownFileType(
+                "File format {0!r} is unknown (expected 'fasta' or "
+                "'fastq').".format(file_format))
+
+        if file2 is not None:
+            return PairedEndFormatter(file1, file2, fmt)
+        elif interleaved:
+            return InterleavedFormatter(file1, fmt)
+        else:
+            return SingleEndFormatter(file1, fmt)
