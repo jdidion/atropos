@@ -1,8 +1,10 @@
 # coding: utf-8
 from pytest import raises
 from atropos.adapters import (
-    Adapter, Match, ColorspaceAdapter, FRONT, BACK, parse_braces, LinkedAdapter)
+    Adapter, Match, ColorspaceAdapter, FRONT, BACK, parse_braces, LinkedAdapter
+)
 from atropos.io.seqio import Sequence
+
 
 def test_issue_52():
     adapter = Adapter(
@@ -11,9 +13,20 @@ def test_issue_52():
         max_error_rate=0.12,
         min_overlap=5,
         read_wildcards=False,
-        adapter_wildcards=True)
+        adapter_wildcards=True,
+    )
     read = Sequence(name="abc", sequence='CCCCAGAACTACAGTCCCGGC')
-    am = Match(astart=0, astop=17, rstart=5, rstop=21, matches=15, errors=2, front=None, adapter=adapter, read=read)
+    am = Match(
+        astart=0,
+        astop=17,
+        rstart=5,
+        rstop=21,
+        matches=15,
+        errors=2,
+        front=None,
+        adapter=adapter,
+        read=read,
+    )
     assert am.wildcards() == 'GGC'
     """
     The result above should actually be 'CGGC' since the correct
@@ -39,14 +52,14 @@ def test_issue_80():
     #
     # This is correct, albeit a little surprising, since an alignment without
     # indels would have only two errors.
-
     adapter = Adapter(
         sequence="TCGTATGCCGTCTTC",
         where=BACK,
         max_error_rate=0.2,
         min_overlap=3,
         read_wildcards=False,
-        adapter_wildcards=False)
+        adapter_wildcards=False,
+    )
     read = Sequence(name="seq2", sequence="TCGTATGCCCTCC")
     result = adapter.match_to(read)
     assert read.original_length == 13, result
@@ -82,8 +95,23 @@ def test_parse_braces():
 
 
 def test_parse_braces_fail():
-    for expression in ['{', '}', '{}', '{5', '{1}', 'A{-7}', 'A{', 'A{1', 'N{7', 'AN{7', 'A{4{}',
-            'A{4}{3}', 'A{b}', 'A{6X}', 'A{X6}']:
+    for expression in [
+        '{',
+        '}',
+        '{}',
+        '{5',
+        '{1}',
+        'A{-7}',
+        'A{',
+        'A{1',
+        'N{7',
+        'AN{7',
+        'A{4{}',
+        'A{4}{3}',
+        'A{b}',
+        'A{6X}',
+        'A{X6}',
+    ]:
         with raises(ValueError):
             parse_braces(expression)
 
@@ -101,7 +129,6 @@ def test_random_match_probabilities():
     a = Adapter('A', BACK)
     rmp = a.random_match_probabilities()
     assert rmp == [1.0, 0.25]
-    
     a = Adapter('AC', BACK, gc_content=0.4)
     rmp = a.random_match_probabilities()
     assert rmp == [1.0, 0.3, 0.06]

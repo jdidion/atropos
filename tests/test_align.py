@@ -3,10 +3,13 @@ import math
 from .utils import approx_equal
 from atropos.adapters import BACK
 from atropos.align import (
-    locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner)
+    locate, compare_prefixes, compare_suffixes, Aligner, InsertAligner
+)
 from atropos.util import RandomMatchProbability
 
+
 class TestAligner():
+
     def test(self):
         reference = 'CTCCAGCTTAGACATATC'
         aligner = Aligner(reference, 0.1, flags=BACK)
@@ -22,7 +25,7 @@ def test_polya():
     s = 'AAAAAAAAAAAAAAAAA'
     t = 'ACAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
     result = locate(s, t, 0.0, BACK)
-    #start_s, stop_s, start_t, stop_t, matches, cost = result
+    # start_s, stop_s, start_t, stop_t, matches, cost = result
     assert result == (0, len(s), 4, 4 + len(s), len(s), 0)
 
 
@@ -43,46 +46,52 @@ WILDCARD_SEQUENCES = [
     'CHCATHGATC',  # H=A|C|T
     'CVCVTTVATC',  # V=A|C|G
     'CCNATNGATC',  # N=A|C|G|T
-    'CCCNTTNATC',  # N
-#   'CCCXTTXATC',  # X
+    'CCCNTTNATC',
+    # N
+    #   'CCCXTTXATC',  # X
 ]
 
 
 def test_compare_prefixes():
     assert compare_prefixes('AAXAA', 'AAAAATTTTTTTTT') == (0, 5, 0, 5, 4, 1)
-    assert compare_prefixes('AANAA', 'AACAATTTTTTTTT', wildcard_ref=True) == (0, 5, 0, 5, 5, 0)
-    assert compare_prefixes('AANAA', 'AACAATTTTTTTTT', wildcard_ref=True) == (0, 5, 0, 5, 5, 0)
+    assert compare_prefixes('AANAA', 'AACAATTTTTTTTT', wildcard_ref=True) == (
+        0, 5, 0, 5, 5, 0
+    )
+    assert compare_prefixes('AANAA', 'AACAATTTTTTTTT', wildcard_ref=True) == (
+        0, 5, 0, 5, 5, 0
+    )
     assert compare_prefixes('XAAAAA', 'AAAAATTTTTTTTT') == (0, 6, 0, 6, 4, 2)
-
     a = WILDCARD_SEQUENCES[0]
     for s in WILDCARD_SEQUENCES:
         r = s + 'GCCAGGGTTGATTCGGCTGATCTGGCCG'
         result = compare_prefixes(a, r, wildcard_query=True)
         assert result == (0, 10, 0, 10, 10, 0), result
-
         result = compare_prefixes(r, a, wildcard_ref=True)
         assert result == (0, 10, 0, 10, 10, 0)
-
     for s in WILDCARD_SEQUENCES:
         for t in WILDCARD_SEQUENCES:
             r = s + 'GCCAGGG'
-            result = compare_prefixes(s, r, )
+            result = compare_prefixes(s, r)
             assert result == (0, 10, 0, 10, 10, 0)
-
             result = compare_prefixes(r, s, wildcard_ref=True, wildcard_query=True)
             assert result == (0, 10, 0, 10, 10, 0)
-
     r = WILDCARD_SEQUENCES[0] + 'GCCAGG'
     for wildc_ref in (False, True):
         for wildc_query in (False, True):
-            result = compare_prefixes('CCCXTTXATC', r, wildcard_ref=wildc_ref, wildcard_query=wildc_query)
+            result = compare_prefixes(
+                'CCCXTTXATC', r, wildcard_ref=wildc_ref, wildcard_query=wildc_query
+            )
             assert result == (0, 10, 0, 10, 8, 2)
 
 
 def test_compare_suffixes():
     assert compare_suffixes('AAXAA', 'TTTTTTTAAAAA') == (0, 5, 7, 12, 4, 1)
-    assert compare_suffixes('AANAA', 'TTTTTTTAACAA', wildcard_ref=True) == (0, 5, 7, 12, 5, 0)
-    assert compare_suffixes('AANAA', 'TTTTTTTAACAA', wildcard_ref=True) == (0, 5, 7, 12, 5, 0)
+    assert compare_suffixes('AANAA', 'TTTTTTTAACAA', wildcard_ref=True) == (
+        0, 5, 7, 12, 5, 0
+    )
+    assert compare_suffixes('AANAA', 'TTTTTTTAACAA', wildcard_ref=True) == (
+        0, 5, 7, 12, 5, 0
+    )
     assert compare_suffixes('AAAAAX', 'TTTTTTTAAAAA') == (0, 6, 6, 12, 4, 2)
 
 
@@ -91,7 +100,6 @@ def test_wildcards_in_adapter():
     for a in WILDCARD_SEQUENCES:
         result = locate(a, r, 0.0, BACK, wildcard_ref=True)
         assert result == (0, 10, 9, 19, 10, 0), result
-
     a = 'CCCXTTXATC'
     result = locate(a, r, 0.0, BACK, wildcard_ref=True)
     assert result is None
@@ -113,6 +121,7 @@ def test_wildcards_in_both():
         for s in WILDCARD_SEQUENCES:
             if 'X' in s or 'X' in a:
                 continue
+
             r = 'CATCTGTCC' + s + 'GCCAGGGTTGATTCGGCTGATCTGGCCG'
             result = locate(a, r, 0.0, BACK, wildcard_ref=True, wildcard_query=True)
             assert result == (0, 10, 9, 19, 10, 0), result
@@ -121,6 +130,7 @@ def test_wildcards_in_both():
 def test_no_match():
     a = locate('CTGATCTGGCCG', 'AAAAGGG', 0.1, BACK)
     assert a is None, a
+
 
 def test_factorial():
     f = RandomMatchProbability()
@@ -132,6 +142,7 @@ def test_factorial():
     # test big number
     assert int(f.factorial(150)) == int(math.factorial(150))
 
+
 def test_match_probability():
     a = InsertAligner('TTAGACATAT', 'CAGTGGAGTA')
     k = 3
@@ -140,6 +151,7 @@ def test_match_probability():
     i4 = (120 / 24) * (0.25 ** 4) * 0.75
     i5 = 0.25 ** 5
     assert approx_equal(a.match_probability(k, n), i3 + i4 + i5, 0.0001)
+
 
 def test_insert_align():
     a1_seq = 'TTAGACATATGG'
@@ -153,6 +165,7 @@ def test_insert_align():
     assert match2.rstart == 20
     assert match2.length == 10
 
+
 def test_short_adapter_overlap():
     a1_seq = 'TTAGACATAT'
     a2_seq = 'CAGTGGAGTA'
@@ -164,6 +177,7 @@ def test_short_adapter_overlap():
     assert match1.length == 2
     assert match2.rstart == 28
     assert match2.length == 2
+
 
 def test_insert_align_different_lengths():
     # Test for #51. This is the alignment:
@@ -180,19 +194,17 @@ def test_insert_align_different_lengths():
 
 def test_multi_aligner_no_mismatches():
     from atropos.align._align import MultiAligner
+
     a = MultiAligner(max_error_rate=0, min_overlap=3)
     matches = a.locate('AGAGATCAGATGACAGATC', 'GATCA')
     assert len(matches) == 2
-    
     matches.sort(key=lambda x: x[4], reverse=True)
-    
     assert matches[0][0] == 3
     assert matches[0][1] == 8
     assert matches[0][2] == 0
     assert matches[0][3] == 5
     assert matches[0][4] == 5
     assert matches[0][5] == 0
-    
     assert matches[1][0] == 15
     assert matches[1][1] == 19
     assert matches[1][2] == 0
@@ -200,22 +212,20 @@ def test_multi_aligner_no_mismatches():
     assert matches[1][4] == 4
     assert matches[1][5] == 0
 
+
 def test_multi_aligner_with_mismatches():
     from atropos.align._align import MultiAligner
+
     a = MultiAligner(max_error_rate=0.1, min_overlap=10)
     matches = a.locate('GATATCAGATGACAGATCAGAGATCAGAT', 'GAGATCAGATGA')
-    
     assert len(matches) == 2
-    
     matches.sort(key=lambda x: x[5])
-    
     assert matches[0][0] == 19
     assert matches[0][1] == 29
     assert matches[0][2] == 0
     assert matches[0][3] == 10
     assert matches[0][4] == 10
     assert matches[0][5] == 0
-    
     assert matches[1][0] == 0
     assert matches[1][1] == 12
     assert matches[1][2] == 0
