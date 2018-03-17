@@ -15,14 +15,16 @@ from atropos.commands.cli import (
     Delimited,
     int_or_str,
 )
-from atropos.io import STDOUT, STDERR, guess_format_from_name
+from atropos.io import STDOUT, STDERR
+from atropos.io.seqio import guess_format_from_name
 
 
 class CommandParser(BaseCommandParser):
     name = 'trim'
     usage = """
 atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
-atropos trim -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq -pe1 in1.fastq -pe2 in2.fastq
+atropos trim -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq \
+  -pe1 in1.fastq -pe2 in2.fastq
 """
     description = """
 Trim adapters and low-quality bases, and perform other NGS preprocessing. This
@@ -152,7 +154,7 @@ standard output.
             default=0.5,
             help="Expected GC content of sequences.",
         )
-        ## Arguments specific to the choice of aligner
+        # Arguments specific to the choice of aligner
         group.add_argument(
             "--aligner",
             choices=('adapter', 'insert'),
@@ -816,6 +818,7 @@ standard output.
     def validate_command_options(self, options):
         parser = self.parser
         paired = options.paired
+
         # Any of these options imply paired-end and siable legacy mode
         paired_both = (
             options.adapters2 or
@@ -829,15 +832,18 @@ standard output.
             options.too_short_paired_output or
             options.too_long_paired_output
         )
+
         # If any of the options in the "paired" group are set, we implicitly
         # expect paired-end input
         paired_implicit = (
             paired_both or options.paired_output or options.untrimmed_paired_output
         )
+
         if options.output_format is None and options.output is not None:
             options.output_format = guess_format_from_name(
                 options.output, raise_on_failure=True
             )
+
         if paired or paired_implicit:
             any_output = options.output or options.paired_output
             if options.interleaved_output:
@@ -847,6 +853,10 @@ standard output.
             elif options.output_format == 'sam':
                 if any_output:
                     parser.error("SAM output must be specified using the -l option")
+                if options.no_writer_process:
+                    parser.warn(
+                        "Note: output SAM files cannot be concatenated; "
+                        "use 'samtools merge' instead.")
                 options.use_interleaved_output = True
             elif not any_output or options.output in (STDOUT, STDERR):
                 # If no output files are specified, write interleaved
@@ -891,6 +901,7 @@ standard output.
                         "reads, you also need to use "
                         "--too-long-paired-output"
                     )
+
             if paired_both or options.quality_cutoff or options.trim_n:
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
                 # Read modifications (such as quality trimming) are applied also
@@ -901,15 +912,19 @@ standard output.
                 # -A/-G/-B/-U). This exists for backwards compatibility
                 # ('legacy mode').
                 paired = 'first'
+
             options.paired = paired
+
         elif options.untrimmed_paired_output:
             parser.error(
                 "Option --untrimmed-paired-output can only be used when "
                 "trimming paired-end reads (with option -p)."
             )
+
         # Send report to stderr if main output will be going to stdout
         if options.output is None and options.report_file == STDOUT:
             options.report_file = STDERR
+
         # If the user specifies a max rmp, that is used for determining the
         # minimum overlap and -O is set to 1, otherwise -O is set to the old
         # default of 3.
@@ -938,7 +953,9 @@ standard output.
             if options.insert_match_error_rate is None:
                 options.insert_match_error_rate = options.error_rate or 0.2
             if options.insert_match_adapter_error_rate is None:
-                options.insert_match_adapter_error_rate = options.insert_match_error_rate
+                options.insert_match_adapter_error_rate = \
+                    options.insert_match_error_rate
+
         if options.merge_overlapping:
             if options.merged_output is None:
                 logging.getLogger().warning(
@@ -946,6 +963,7 @@ standard output.
                 )
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
+
         if options.mirna:
             if not (options.adapters or options.front or options.anywhere):
                 options.adapters = ['TGGAATTCTCGG']  # illumina small RNA adapter
@@ -959,10 +977,11 @@ standard output.
             # TODO: set default adapter sequences
             # Jury is out on whether quality trimming helps. For aligners like
             # bwameth, it actually leads to worse results.
-            #if options.quality_cutoff is None:
-            #    options.quality_cutoff = "20,20"
+            # if options.quality_cutoff is None:
+            #     options.quality_cutoff = "20,20"
             if options.bisulfite == "swift" and paired != "both":
                 parser.error("Swift trimming is only compatible with paired-end reads")
+
             if options.bisulfite not in (
                 "rrbs",
                 "non-directional",
@@ -977,18 +996,18 @@ standard output.
                     arguments to the Modifiers.
                     """
                     try:
-                        parts = [int(part) for part in arg.split(",")]
-                        assert len(parts) == 4
-                        if parts[0] <= 0 and parts[1] <= 0:
+                        bsparts = [int(part) for part in arg.split(",")]
+                        assert len(bsparts) == 4
+                        if bsparts[0] <= 0 and bsparts[1] <= 0:
                             return None
 
                         return dict(
                             zip(
                                 ("lengths", "count_trimmed", "only_trimmed"),
                                 (
-                                    (parts[0], -1 * parts[1]),
-                                    (False, True)[parts[2]],
-                                    (False, True)[parts[3]],
+                                    (bsparts[0], -1 * bsparts[1]),
+                                    (False, True)[bsparts[2]],
+                                    (False, True)[bsparts[3]],
                                 ),
                             )
                         )
@@ -997,13 +1016,15 @@ standard output.
                         parser.error("Invalidate format for bisulfite parameters")
 
                 temp = [
-                    parse_bisulfite_params(arg) for arg in options.bisulfite.split(";")
+                    parse_bisulfite_params(arg)
+                    for arg in options.bisulfite.split(";")
                 ]
                 if paired == "both" and len(temp) == 1:
                     temp = [temp[0], temp[0]]
                 elif paired != "both" and len(temp) > 1:
                     parser.error("Too many bisulfite parameters for single-end reads")
                 options.bisulfite = temp
+
         if options.overwrite_low_quality:
             if not paired:
                 parser.error(
@@ -1011,13 +1032,16 @@ standard output.
                 )
             if (options.overwrite_low_quality[0] > options.overwrite_low_quality[1]):
                 parser.error("For --overwrite-low-quality, LOWQ must be <= HIGHQ")
+
         if options.quality_cutoff:
             if all(c <= 0 for c in options.quality_cutoff):
                 options.quality_cutoff = None
             elif len(options.quality_cutoff) == 1:
                 options.quality_cutoff = [0] + options.quality_cutoff
+
         if options.pair_filter is None:
             options.pair_filter = 'any'
+
         if (
             (options.discard_trimmed or options.discard_untrimmed) and
             (options.untrimmed_output is not None)
@@ -1026,20 +1050,25 @@ standard output.
                 "Only one of the --discard-trimmed, --discard-untrimmed "
                 "and --untrimmed-output options can be used at the same time."
             )
+
         if options.output is not None and '{name}' in options.output:
             if options.discard_trimmed:
                 parser.error("Do not use --discard-trimmed when demultiplexing.")
             if paired:
                 parser.error("Demultiplexing not supported for paired-end files, yet.")
+
         if options.maq:
             options.colorspace = True
             options.double_encode = True
             options.trim_primer = True
             options.suffix = "/1"
+
         if options.strip_f3 or options.maq:
             options.strip_suffix.append('_F3')
+
         if options.zero_cap is None:
             options.zero_cap = options.colorspace
+
         if options.colorspace:
             if options.anywhere:
                 parser.error(
@@ -1055,13 +1084,16 @@ standard output.
                 parser.error("Trimming the primer makes only sense in colorspace.")
             if options.double_encode:
                 parser.error("Double-encoding makes only sense in colorspace.")
+
         if options.error_rate is None:
             options.error_rate = 0.1
+
         if options.cut:
             if len(options.cut) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if len(options.cut) == 2 and options.cut[0] * options.cut[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
+
         if options.cut_min:
             if len(options.cut_min) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
@@ -1070,11 +1102,13 @@ standard output.
                 options.cut_min[0] * options.cut_min[1] > 0
             ):
                 parser.error("You cannot remove bases from the same end twice.")
+
         if paired == 'both' and options.cut2:
             if len(options.cut2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if len(options.cut2) == 2 and options.cut2[0] * options.cut2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
+
         if paired == 'both' and options.cut_min2:
             if len(options.cut_min2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
@@ -1083,6 +1117,7 @@ standard output.
                 options.cut_min2[0] * options.cut_min2[1] > 0
             ):
                 parser.error("You cannot remove bases from the same end twice.")
+
         if not options.stats or options.stats == 'none':
             options.stats = None
         else:
@@ -1096,6 +1131,7 @@ standard output.
                 else:
                     stats[name] = args
             options.stats = stats
+
         if options.threads is not None:
             threads = configure_threads(options, parser)
             if options.compression_mode is None:
@@ -1122,6 +1158,7 @@ standard output.
                         "worker compression instead"
                     )
                     options.compression_mode = "worker"
+
             # Set queue sizes if necessary.
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
@@ -1129,16 +1166,16 @@ standard output.
                 options.read_queue_size = (
                     threads * (100 if options.compression_mode == "writer" else 500)
                 )
-            elif (options.read_queue_size > 0 and options.read_queue_size < threads):
+            elif 0 < options.read_queue_size < threads:
                 parser.error("Read queue size must be >= 'threads'")
+
             if options.result_queue_size is None:
                 options.result_queue_size = (
                     threads * (100 if options.compression_mode == "worker" else 500)
                 )
-            elif (
-                options.result_queue_size > 0 and options.result_queue_size < threads
-            ):
+            elif 0 < options.result_queue_size < threads:
                 parser.error("Result queue size must be >= 'threads'")
+
             max_queue_size = options.read_queue_size + options.result_queue_size
             if options.batch_size is None:
                 options.batch_size = max(1000, max_queue_size / 10e6)
@@ -1149,5 +1186,6 @@ standard output.
                     options.batch_size,
                     max_queue_size,
                 )
+
         if options.batch_size is None:
             options.batch_size = 1000

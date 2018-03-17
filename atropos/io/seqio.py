@@ -5,6 +5,8 @@ TODO
 - Sequence.name should be Sequence.description or so (reserve .name for the part
   before the first space)
 """
+from collections import namedtuple
+import csv
 import sys
 from atropos import AtroposError
 from atropos.io import STDOUT, xopen
@@ -632,33 +634,43 @@ class SAMReader(SequenceReaderBase):
             are supported.
         sequence_class: The class to use when creating new sequence objects.
     """
-    file_format = "SAM"
+    file_format = 'SAM'
     delivers_qualities = True
     interleaved = False
     has_qualfile = False
     colorspace = False
 
     def __init__(self, path, quality_base=33, sequence_class=Sequence, alphabet=None):
-        self._close_on_exit = False
-        if isinstance(path, str):
-            path = xopen(path, 'rb')
-            self._close_on_exit = True
-        if isinstance(path, str):
-            self.name = path
-        else:
-            self.name = path.name
-        self._file = path
+        self._close_on_exit = is_path = isinstance(path, str)
         self.quality_base = quality_base
         self.sequence_class = sequence_class
         self.alphabet = alphabet
+
+        if is_path:
+            self.name = path
+        else:
+            self.name = path.name
+
+        is_bam = self.name.endswith('.bam')
+
+        if is_path:
+            mode = 'rb' if is_bam else 'rt'
+            self._file = xopen(path, mode)
+        else:
+            self._file = path
+
+        parser_class = BAMParser if is_bam else SAMParser
+        self._sam_iter = parser_class(self._file)
 
     @property
     def input_names(self):
         return (self.name, None)
 
     def __iter__(self):
-        import pysam
-        return self._iter(pysam.AlignmentFile(self._file))
+        # pysam raises an error of the SAM/BAM header is not complete,
+        # even though it's unnecessary for our puroses. In that case,
+        # we use our own simple SAM parser.
+        return self._iter(self._sam_iter)
 
     def _iter(self, sam):
         """Create an iterator over records in the SAM/BAM file.
@@ -682,9 +694,61 @@ class SAMReader(SequenceReaderBase):
         return self.sequence_class(
             read.query_name,
             read.query_sequence,
-            ''.join(chr(33 + q) for q in read.query_qualities),
+            read.query_qualities,
             alphabet=self.alphabet,
         )
+
+
+SAMRead = namedtuple(
+    'SAMRead', (
+        'query_name', 'query_sequence', 'query_qualities',
+        'is_read1', 'is_read2'))
+
+
+class SAMParser:
+    def __init__(self, sam_file):
+        self._reader = csv.reader(sam_file, delimiter='\t')
+        line = None
+        for line in self._reader:
+            # skip header lines
+            if not line[0].startswith('@'):
+                break
+        self._next_line = line
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._next_line is None:
+            raise StopIteration()
+
+        is_read1 = (int(self._next_line[1]) & 64) > 0
+        read = SAMRead(
+            self._next_line[0], self._next_line[9], self._next_line[10],
+            is_read1, not is_read1)
+
+        try:
+            self._next_line = next(self._reader)
+        except:
+            self._next_line = None
+
+        return read
+
+
+class BAMParser:
+    def __init__(self, bam_file):
+        import pysam
+        self._reader = pysam.AlignmentFile(self._file)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        read = next(self._reader)
+        return SAMRead(
+            read.query_name, read.query_sequence,
+            ''.join(chr(33 + q) for q in read.query_qualities),
+            read.is_read1, read.is_read2)
 
 
 class SingleEndSAMReader(SAMReader):
@@ -1087,7 +1151,7 @@ def open_reader(
 
     if file_format is not None:
         file_format = file_format.lower()
-        if file_format in ("sam", "bam"):
+        if file_format in ('sam', 'bam'):
             if colorspace:
                 raise ValueError(
                     "SAM/BAM format is not currently supported for colorspace " "reads"
