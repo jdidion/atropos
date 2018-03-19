@@ -44,9 +44,10 @@ def out_of_date(extensions):
             # times are not preserved and therefore depends on the order in
             # which files were unpacked.
             if not os.path.exists(csource) or (
-                os.path.getmtime(pyx) > os.path.getmtime(csource) + 5):
+                    os.path.getmtime(pyx) > os.path.getmtime(csource) + 5):
                 return True
     return False
+
 
 def no_cythonize(extensions, **_ignore):
     """
@@ -67,6 +68,7 @@ def no_cythonize(extensions, **_ignore):
             sources.append(sfile)
         extension.sources[:] = sources
 
+
 def check_cython_version():
     """Exit if Cython was not found or is too old"""
     try:
@@ -83,7 +85,7 @@ def check_cython_version():
         sys.exit(1)
 
 
-class build_ext(VersioneerBuildExt):
+class BuildExtCython(VersioneerBuildExt):
     def run(self):
         # If we encounter a PKG-INFO file, then this is likely a .tar.gz/.zip
         # file retrieved from PyPI that already includes the pre-cythonized
@@ -99,27 +101,21 @@ class build_ext(VersioneerBuildExt):
         _build_ext.run(self)
 
 
-class sdist(VersioneerSdist):
+class SdistCython(VersioneerSdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
         check_cython_version()
         cythonize(extensions)
-        versioneer_sdist.run(self)
+        _sdist.run(self)
 
 
-cmdclass['build_ext'] = build_ext
-cmdclass['sdist'] = sdist
+cmdclass['build_ext'] = BuildExtCython
+cmdclass['sdist'] = SdistCython
 
 
 # Define install and test requirements based on python version
 version_info = sys.version_info
-
-
-install_requirements = ['xphyle>=4.0.0']
-test_requirements = ['pytest'] #, 'jinja2', 'pysam'],
-
-
 if sys.version_info < (3, 6):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
@@ -128,42 +124,46 @@ if sys.version_info < (3, 6):
 # Define extensions to be Cythonized
 extensions = [
     Extension('atropos.align._align', sources=['atropos/align/_align.pyx']),
-    Extension('atropos.commands.trim._qualtrim', sources=['atropos/commands/trim/_qualtrim.pyx']),
+    Extension(
+        'atropos.commands.trim._qualtrim',
+        sources=['atropos/commands/trim/_qualtrim.pyx']),
     Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
 ]
+install_requirements = ['xphyle>=4.0.0', 'Cython>=0.25.2']
+test_requirements = ['pytest']  # , 'jinja2', 'pysam'],
 
 
 setup(
-    name = 'atropos',
-    version = versioneer.get_version(),
-    cmdclass = cmdclass,
-    author = 'John Didion',
-    author_email = 'john.didion@nih.gov',
-    url = 'https://atropos.readthedocs.org/',
-    description = 'trim adapters from high-throughput sequencing reads',
-    license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
-    ext_modules = extensions,
-    packages = find_packages(),
-    package_data = { 'atropos' : [
+    name='atropos',
+    version=versioneer.get_version(),
+    cmdclass=cmdclass,
+    author='John Didion',
+    author_email='github@didion.net',
+    url='https://atropos.readthedocs.org/',
+    description='Specific, sensitive, and speedy trimming of NGS reads.',
+    license='MIT',
+    ext_modules=extensions,
+    packages=find_packages(),
+    package_data={'atropos': [
         'adapters/*.fa',
         'commands/**/templates/*'
-    ] },
-    install_requires = install_requirements,
-    tests_require = test_requirements,
-    extras_require = {
-        'progressbar' : ['progressbar2'],
-        'tqdm' : ['tqdm'],
-        'khmer' : ['khmer'],
-        'pysam' : ['pysam'],
-        'jinja' : ['jinja2'],
-        'sra' : ['srastream>=0.1.3']
+    ]},
+    install_requires=install_requirements,
+    tests_require=test_requirements,
+    extras_require={
+        'progressbar': ['progressbar2'],
+        'tqdm': ['tqdm'],
+        'khmer': ['khmer'],
+        'pysam': ['pysam'],
+        'jinja': ['jinja2'],
+        'sra': ['ngstream']
     },
     entry_points={
         'console_scripts': [
-            'atropos = atropos.__main__:main'
+            'atropos=atropos.__main__:main'
         ]
     },
-    classifiers = [
+    classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Environment :: Console",
         "Intended Audience :: Science/Research",
