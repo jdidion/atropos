@@ -11,7 +11,9 @@ from atropos import AtroposError
 from atropos.align import (
     Aligner, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1, STOP_WITHIN_SEQ2
 )
-from atropos.util import (BASE_COMPLEMENTS, reverse_complement, mean, quals2ints)
+from atropos.util import (
+    BASE_COMPLEMENTS, reverse_complement, mean, quals2ints, RandomMatchProbability
+)
 from .qualtrim import quality_trim_index, nextseq_trim_index
 
 
@@ -360,6 +362,83 @@ class ErrorCorrectorMixin(object):
         return dict(
             records_corrected=self.corrected_pairs, bp_corrected=self.corrected_bp
         )
+
+
+class AutoAdapterCutter(ReadPairModifier):
+    """AdapterCutter that use InsertAligner to identify insert overlap and 
+    trim off the overhands without performing any adapter matches
+
+    Args:
+
+    """
+    
+    def __init__(
+        self, 
+        min_insert_len, 
+        insert_match_error_rate,
+        insert_max_rmp=1E-6,
+        match_probability=RandomMatchProbability(),
+        indel_cost = 100000
+    ):
+        self.min_insert_len = min_insert_len
+        self.insert_match_error_rate = insert_match_error_rate
+        self.match_probability = match_probability
+        self.insert_max_rmp = insert_max_rmp
+        self.indel_cost = indel_cost
+    
+    def __call__(self, read1, read2):
+        """ Functionally overlapped with part of InsertAligner and
+        InsertAdapterCutter.__call__
+        maybe there's a way to share these functions?
+
+        Args:
+            read1, read2: paired-end reads
+        """
+
+        read_lengths = [len(r) for r in (read1, read2)]
+        if min(read_lengths) < self.min_insert_len:
+            return (read1, read2)
+
+        len1 = len(read1.sequence)
+        len2 = len(read2.sequence)
+        seq_len = min(len1, len2)
+        seq1 = read1.sequence
+        seq2 = read2.sequence
+        # this length cutoff may not be needed
+        # if we want to collect adapter sequences
+        if len1 > len2:
+            seq1 = seq1[:len2]
+        elif len2 > len1:
+            seq2 = seq2[:len1]
+        seq2_rc = reverse_complement(seq2)
+
+
+        #using the old built-in Aligner to do a single match
+        # or the MultiAligner should be used?
+        aligner = Aligner(
+            reference = seq2_rc,
+            max_error_rate = self.insert_match_error_rate,
+            flags = START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+            min_overlap = self.min_insert_len,
+            indel_cost = self.indel_cost,
+        )
+        insert_match = aligner.locate(seq1)
+
+        if not insert_match:
+            return (read1, read2)
+
+        offset = min(insert_match[0], seq_len - insert_match[3])
+        insert_match_size = seq_len - offset
+        prob = self.match_probability(insert_match[4], insert_match_size)
+        
+        if prob > self.insert_max_rmp:
+             return (read1, read2)
+
+        # insert_match[2] should always be 0
+        _, _, read1 = read1.subseq(insert_match[2], insert_match[3])
+        _, _, read2 = read2.subseq(0, insert_match_size)
+        return (read1, read2)
+        
 
 
 class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):

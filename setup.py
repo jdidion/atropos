@@ -129,7 +129,8 @@ extensions = [
         sources=['atropos/commands/trim/_qualtrim.pyx']),
     Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
 ]
-install_requirements = ['xphyle>=4.0.0', 'Cython>=0.25.2']
+#install_requirements = ['xphyle>=4.0.0', 'Cython>=0.25.2']
+install_requirements = ['xphyle>=3.1.1', 'Cython>=0.25.2']
 test_requirements = ['pytest']  # , 'jinja2', 'pysam'],
 
 

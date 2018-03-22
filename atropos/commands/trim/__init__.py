@@ -14,6 +14,7 @@ from atropos.util import RandomMatchProbability, run_interruptible
 from .modifiers import (
     AdapterCutter,
     DoubleEncoder,
+    AutoAdapterCutter,
     InsertAdapterCutter,
     LengthTagModifier,
     MergeOverlapping,
@@ -365,8 +366,7 @@ class CommandRunner(BaseCommandRunner):
                 adapter_cache.save()
         # Create Modifiers
         # TODO: can this be replaced with an argparse required group?
-        if (
-            not adapters1 and
+        if (not adapters1 and
             not adapters2 and
             not options.quality_cutoff and
             options.nextseq_trim is None and
@@ -381,18 +381,20 @@ class CommandRunner(BaseCommandRunner):
             options.max_n is None and
             (not options.paired or options.overwrite_low_quality is None)
         ):
-            raise ValueError("You need to provide at least one adapter sequence.")
+            if options.aligner != 'insert':
+                raise ValueError("You need to provide at least one adapter sequence.")
 
-        if (
-            options.aligner == 'insert' and
-            any(
-                not a or len(a) != 1 or a[0].where != BACK
-                for a in (adapters1, adapters2)
-            )
-        ):
-            raise ValueError(
-                "Insert aligner requires a single 3' adapter for each read"
-            )
+#        if (
+#            options.aligner == 'insert' and
+#            any(
+#                not a or len(a) != 1 or a[0].where != BACK
+#                for a in (adapters1, adapters2)
+#            )
+#        ):
+#
+#            raise ValueError(
+#                "Insert aligner requires a single 3' adapter for each read"
+#            )
 
         if options.debug:
             for adapter in adapters1 + adapters2:
@@ -421,7 +423,7 @@ class CommandRunner(BaseCommandRunner):
                     window_size=window,
                     base=options.quality_base,
                 )
-            elif oper == 'A' and (adapters1 or adapters2):
+            elif oper == 'A' and (adapters1 or adapters2 or options.aligner == "insert"):
                 # TODO: generalize this using some kind of factory class
                 if options.aligner == 'insert':
                     # Use different base probabilities if we're trimming
@@ -432,19 +434,33 @@ class CommandRunner(BaseCommandRunner):
                     #   base_probs = dict(match_prob=0.33, mismatch_prob=0.67)
                     # else:
                     #   base_probs = dict(match_prob=0.25, mismatch_prob=0.75)
-                    modifiers.add_modifier(
-                        InsertAdapterCutter,
-                        adapter1=adapters1[0],
-                        adapter2=adapters2[0],
-                        action=options.action,
-                        mismatch_action=options.correct_mismatches,
-                        max_insert_mismatch_frac=options.insert_match_error_rate,
-                        max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
-                        match_probability=match_probability,
-                        insert_max_rmp=options.insert_max_rmp,
-                        read_wildcards=options.match_read_wildcards,
-                        adapter_wildcards=options.match_adapter_wildcards,
-                    )
+
+                    if ((adapters1 or adapters2) and 
+                        any(a or len(a) == 1 or a[0].where == BACK 
+                            for a in (adapters1, adapters2))): 
+                        modifiers.add_modifier(
+                            InsertAdapterCutter,
+                            adapter1=adapters1[0],
+                            adapter2=adapters2[0],
+                            action=options.action,
+                            mismatch_action=options.correct_mismatches,
+                            max_insert_mismatch_frac=options.insert_match_error_rate,
+                            max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
+                            match_probability=match_probability,
+                            insert_max_rmp=options.insert_max_rmp,
+                            read_wildcards=options.match_read_wildcards,
+                            adapter_wildcards=options.match_adapter_wildcards,
+                        )
+                    # if no adpater is provided, use auto trimmer
+                    elif not adapters1 and not adapters2:
+                        modifiers.add_modifier(
+                            AutoAdapterCutter,
+                            min_insert_len = options.minimum_length or 15,
+                            insert_match_error_rate=options.insert_match_error_rate,
+                            insert_max_rmp=options.insert_max_rmp,
+                            match_probability=match_probability,
+                            indel_cost = options.indel_cost
+                        )
                 else:
                     a1_args = dict(
                         adapters=adapters1, times=options.times, action=options.action
