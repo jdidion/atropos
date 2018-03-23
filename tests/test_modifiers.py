@@ -585,7 +585,7 @@ def test_auto_trim():
     # test successful case with overhang on 3' end of both reads
     read1 = Sequence('read1', seq1, qual1)
     read2 = Sequence('read2', seq2, qual2)
-    auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0.1)
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0.1)
     res_read1, res_read2 = auto_trim(read1, read2)
     assert res_read1.sequence == reverse_complement(res_read2.sequence)
     assert res_read1.sequence != seq1
@@ -594,7 +594,7 @@ def test_auto_trim():
     # test too little overlap
     read1 = Sequence('read1', seq1, qual1)
     read2 = Sequence('read2', seq2, qual2)
-    auto_trim = AutoAdapterCutter(min_insert_len = 21, insert_match_error_rate = 0.1) 
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 21, insert_match_error_rate = 0.1) 
     res_read1, res_read2 = auto_trim(read1, read2)
     assert res_read1.sequence == seq1 and res_read2.sequence == seq2
 
@@ -604,7 +604,7 @@ def test_auto_trim():
     qual2_left_overhang = 'HH' + qual2
     read1 = Sequence('read1', seq1, qual1)
     read2_left_overhang = Sequence('read2', seq2, qual2) 
-    auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0.1) 
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0.1) 
     res_read1, res_read2 = auto_trim(read1, read2_left_overhang)
     assert res_read1.sequence == reverse_complement(res_read2.sequence)
 
@@ -613,7 +613,7 @@ def test_auto_trim():
     seq1_mutated = seq1.replace('TATTA','TATCA')
     read1 = Sequence('read1', seq1_mutated, qual1)
     read2 = Sequence('read2', seq2, qual2)
-    auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0) 
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0) 
     res_read1, res_read2 = auto_trim(read1, read2)
     assert res_read1.sequence == seq1_mutated and res_read2.sequence == seq2
 
@@ -621,7 +621,7 @@ def test_auto_trim():
     # rescue by chaning mismatch prob
     read1 = Sequence('read1', seq1_mutated, qual1)
     read2 = Sequence('read2', seq2, qual2)
-    auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0.1) 
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0.1) 
     res_read1, res_read2 = auto_trim(read1, read2)
     assert len(res_read1.sequence) == len(reverse_complement(res_read2.sequence)) and \
         len(seq1_mutated) != len(seq2)
@@ -632,7 +632,7 @@ def test_auto_trim():
     qual2_in = qual2 + 'H'
     read1 = Sequence('read1', seq1, qual1)
     read2 = Sequence('read2', seq2_in, qual2_in)
-    auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0, indel_cost = 1) 
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0, indel_cost = 1) 
     res_read1, res_read2 = auto_trim(read1, read2)
     assert res_read1.sequence == seq1 and res_read2.sequence == seq2_in
 
@@ -640,6 +640,6 @@ def test_auto_trim():
     # rescue by chaning mmismatch prob
     read1 = Sequence('read1', seq1, qual1)
     read2 = Sequence('read2', seq2_in, qual2_in)
-    auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0.1, indel_cost = 1) 
+    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0.1, indel_cost = 1) 
     res_read1, res_read2 = auto_trim(read1, read2)
     assert len(res_read1.sequence) + 1 == len(res_read2.sequence)

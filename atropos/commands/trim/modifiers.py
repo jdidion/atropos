@@ -431,7 +431,7 @@ class AutoAdapterCutter(ReadPairModifier):
             reference = seq2_rc,
             max_error_rate = self.insert_match_error_rate,
             flags = START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
-            min_overlap = self.min_insert_len,
+            min_overlap = self.min_insert_overlap,
             indel_cost = self.indel_cost,
         )
         insert_match = aligner.locate(seq1)
