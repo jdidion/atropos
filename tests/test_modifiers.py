@@ -618,7 +618,7 @@ def test_auto_trim():
     assert res_read1.sequence == seq1_mutated and res_read2.sequence == seq2
 
     
-    # rescue by chaning mismatch prob
+    # rescue by changing mismatch prob
     read1 = Sequence('read1', seq1_mutated, qual1)
     read2 = Sequence('read2', seq2, qual2)
     auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0.1) 
