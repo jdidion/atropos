@@ -26,7 +26,7 @@ cdef class Sequence(object):
         public bint insert_overlap
         public bint merged
         public int corrected
-        public object umi
+        public str umi
     
     def __init__(self, str name, str sequence, str qualities=None, str name2='',
                  original_length=None, match=None, match_info=None, clipped=None,
