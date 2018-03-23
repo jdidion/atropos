@@ -618,7 +618,7 @@ def test_auto_trim():
     assert res_read1.sequence == seq1_mutated and res_read2.sequence == seq2
 
     
-    # save by chaning mismatch prob
+    # rescue by chaning mismatch prob
     read1 = Sequence('read1', seq1_mutated, qual1)
     read2 = Sequence('read2', seq2, qual2)
     auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0.1) 
@@ -637,7 +637,7 @@ def test_auto_trim():
     assert res_read1.sequence == seq1 and res_read2.sequence == seq2_in
 
 
-    # save by chaning mmismatch prob
+    # rescue by chaning mmismatch prob
     read1 = Sequence('read1', seq1, qual1)
     read2 = Sequence('read2', seq2_in, qual2_in)
     auto_trim = AutoAdapterCutter(min_insert_len = 5, insert_match_error_rate = 0.1, indel_cost = 1) 
