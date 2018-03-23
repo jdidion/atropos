@@ -368,19 +368,31 @@ class AutoAdapterCutter(ReadPairModifier):
     """AdapterCutter that use InsertAligner to identify insert overlap and 
     trim off the overhands without performing any adapter matches
 
-    Args:
 
+    TODO: add a list/set instance for storing trimmed-off sequences, and add a method
+        to assemble these sequences to identify true adapter sequences.
+
+    Args:
+        min_insert_overlap: Minimum overlap required between reads to be
+            considered an insert match.
+        insert_match_error_rate: Error rate toleration for aligning read 1 and 2
+        insert_max_rmp: Overlapping inserts only match when the probablity of 
+            observing k of n matching bases is <= PROB
+        match_probability: random match probability based on binomial distritbution 
+            (see utils.__init__.py)
+        indel_cost: Integer cost of insertions and deletions during
+            adapter match.
     """
     
     def __init__(
         self, 
-        min_insert_len, 
+        min_insert_overlap, 
         insert_match_error_rate,
         insert_max_rmp=1E-6,
         match_probability=RandomMatchProbability(),
         indel_cost = 100000
     ):
-        self.min_insert_len = min_insert_len
+        self.min_insert_overlap = min_insert_overlap
         self.insert_match_error_rate = insert_match_error_rate
         self.match_probability = match_probability
         self.insert_max_rmp = insert_max_rmp
@@ -388,7 +400,7 @@ class AutoAdapterCutter(ReadPairModifier):
     
     def __call__(self, read1, read2):
         """ Functionally overlapped with part of InsertAligner and
-        InsertAdapterCutter.__call__
+        InsertAdapterCutter.__call__.
         maybe there's a way to share these functions?
 
         Args:
@@ -396,7 +408,7 @@ class AutoAdapterCutter(ReadPairModifier):
         """
 
         read_lengths = [len(r) for r in (read1, read2)]
-        if min(read_lengths) < self.min_insert_len:
+        if min(read_lengths) < self.min_insert_overlap:
             return (read1, read2)
 
         len1 = len(read1.sequence)
@@ -434,6 +446,7 @@ class AutoAdapterCutter(ReadPairModifier):
         if prob > self.insert_max_rmp:
              return (read1, read2)
 
+        # we are only looking at 3' adpaters on both reads
         # insert_match[2] should always be 0
         _, _, read1 = read1.subseq(insert_match[2], insert_match[3])
         _, _, read2 = read2.subseq(0, insert_match_size)

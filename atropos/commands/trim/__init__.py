@@ -456,7 +456,7 @@ class CommandRunner(BaseCommandRunner):
                     elif not adapters1 and not adapters2:
                         modifiers.add_modifier(
                             AutoAdapterCutter,
-                            min_insert_len = options.minimum_length or 15,
+                            min_insert_overlap = options.minimum_length or 15,
                             insert_match_error_rate=options.insert_match_error_rate,
                             insert_max_rmp=options.insert_max_rmp,
                             match_probability=match_probability,
