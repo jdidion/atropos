@@ -60,7 +60,7 @@ class SequenceReaderBase(Summarizable):  # pylint: disable=no-member
 
 class SequenceReader(SequenceReaderBase):
     """Read possibly compressed files containing sequences.
-    
+
     Args:
         file is a path or a file-like object. In both cases, the file may
             be compressed (.gz, .bz2, .xz).
@@ -252,7 +252,7 @@ class FileWithPrependedLine(object):
     of autodetecting input from a stream: As soon as the first line has been
     read, we know the file type, but also that line is "gone" and unavailable
     for further processing.
-    
+
     Args:
         file: An already opened file-like object.
         line: A single string (newline will be appended if not included).
@@ -282,7 +282,7 @@ class FileWithPrependedLine(object):
 
 class FastaReader(SequenceReader):
     """Reader for FASTA files.
-    
+
     Args:
         path: A path or a file-like object. In both cases, the file may
             be compressed (.gz, .bz2, .xz).
@@ -336,7 +336,7 @@ class FastaReader(SequenceReader):
 
 class ColorspaceFastaReader(FastaReader):
     """Reads colorspace sequences from a FASTA.
-    
+
     Args:
         path: The file to read.
         keep_linebreaks: Whether to keep linebreaks in wrapped sequences.
@@ -379,7 +379,7 @@ class SRAColorspaceFastqReader(FastqReader):
 
 class FastaQualReader(SequenceReaderBase):
     """Reader for reads that are stored in .(CS)FASTA and .QUAL files.
-    
+
     Args:
         fastafile and qualfile are filenames or file-like objects.
             If a filename is used, then .gz files are recognized.
@@ -456,7 +456,7 @@ class FastaQualReader(SequenceReaderBase):
 class ColorspaceFastaQualReader(FastaQualReader):
     """Reads sequences and qualities from separate files and returns
     :class:`ColorspaceSequence`s.
-    
+
     Args:
         fastafile, qualfile: FASTA files that contain the sequences and
             qualities, respectively.
@@ -476,7 +476,7 @@ class ColorspaceFastaQualReader(FastaQualReader):
 class PairedSequenceReader(SequenceReaderBase):
     """Read paired-end reads from two files. Wraps two SequenceReader
     instances, making sure that reads are properly paired.
-    
+
     Args:
         file1, file2: The pair of files.
         colorspace: Whether the sequences are in colorspace.
@@ -569,7 +569,7 @@ class PairedSequenceReader(SequenceReaderBase):
 
 class InterleavedSequenceReader(SequenceReaderBase):
     """Read paired-end reads from an interleaved FASTQ file.
-    
+
     Args:
         path: The interleaved FASTQ file.
         colorspace: Whether the sequences are in colorspace.
@@ -629,7 +629,7 @@ class InterleavedSequenceReader(SequenceReaderBase):
 class SAMReader(SequenceReaderBase):
     """Reader for SAM/BAM files. Paired-end files must be name-sorted. Does
     not support secondary/supplementary reads. This is an abstract class.
-    
+
     Args:
         path: A filename or a file-like object. If a filename, then .gz files
             are supported.
@@ -818,10 +818,10 @@ class SequenceFileFormat:
     @abstractmethod
     def format(self, read):
         """Format a Sequence as a string.
-        
+
         Args:
             read: The Sequence object.
-        
+
         Returns:
             A string representation of the sequence object in the sequence
             file format.
@@ -836,7 +836,7 @@ class SequenceFileFormat:
 
 class FastaFormat(SequenceFileFormat):
     """FASTA SequenceFileFormat.
-    
+
     Args:
         line_length: Max line length (in characters), or None. Determines
             whether and how lines are wrapped.
@@ -955,7 +955,7 @@ class Formatter(metaclass=ABCMeta):
 
 class SingleEndFormatter(Formatter):
     """Wrapper for a SequenceFileFormat for single-end data.
-    
+
     Args:
         seq_format: The SequenceFileFormat object.
         file1: The single-end file.
@@ -973,8 +973,7 @@ class SingleEndFormatter(Formatter):
             result: A dict mapping file names to lists of formatted reads.
             read1, read2: The reads to format.
         """
-        result_list = self._get_result_list(
-            result, self.file1, self.seq_format)
+        result_list = self._get_result_list(result, self.file1, self.seq_format)
         result_list.append(self.seq_format.format(read1))
         self.written += 1
         self.read1_bp += len(read1)
@@ -1048,10 +1047,10 @@ def sequence_names_match(read1, read2):
     end in '/1' and '/2'. Also, the fastq-dump tool (used for converting SRA
     files to FASTQ) appends a .1 and .2 to paired-end reads if option -I is
     used.
-    
+
     Args:
         read1, read2: The sequences to compare.
-    
+
     Returns:
         Whether the sequences are equal.
     """
@@ -1091,7 +1090,7 @@ def open_reader(
     """Open sequence files in FASTA or FASTQ format for reading. This is
     a factory that returns an instance of one of the ...Reader
     classes also defined in this module.
-    
+
     Args:
         file1, file2, qualfile: Paths to regular or compressed files or
             file-like objects. Use file1 if data is single-end. If file2 is also
@@ -1111,7 +1110,7 @@ def open_reader(
         input_read: When file1 is a paired-end interleaved or SAM/BAM
             file, this specifies whether to only use the first or second read
             (1 or 2) or to use both reads (None).
-        alphabet: An Alphabet instance - the alphabet to use to validate 
+        alphabet: An Alphabet instance - the alphabet to use to validate
             sequences.
     """
     if interleaved and (file2 is not None or qualfile is not None):
@@ -1236,7 +1235,7 @@ def sra_reader(
     and 2) be iterable. Furthermore, each value yielded by the iterator must
     be a list of N tuples, where N = 2 if paired else 1, and where each tuple
     is (name, sequence, qualities).
-    
+
     Args:
         reader: An existing reader.
         quality_base: Base for quality values.
@@ -1245,7 +1244,7 @@ def sra_reader(
         input_read: When file1 is a paired-end interleaved or SAM/BAM
             file, this specifies whether to only use the first or second read
             (1 or 2) or to use both reads (None).
-        alphabet: An Alphabet instance - the alphabet to use to validate 
+        alphabet: An Alphabet instance - the alphabet to use to validate
             sequences.
     """
     if colorspace:
@@ -1268,12 +1267,12 @@ def sra_reader(
 
 def guess_format_from_name(path, raise_on_failure=False):
     """Detect file format based on the file name.
-    
+
     Args:
         path: The filename to guess.
         raise_on_failure: Whether to raise an exception if the filename cannot
             be detected.
-    
+
     Returns:
         The format name.
     """
@@ -1311,7 +1310,7 @@ def create_seq_formatter(
     line_length=None,
 ):
     """Create a Formatter, deriving the format name from the file extension.
-    
+
     Args:
         file1, file2: Output files.
         qualities: When file_format is None, this can be set to True or False to
