@@ -366,7 +366,8 @@ class CommandRunner(BaseCommandRunner):
                 adapter_cache.save()
         # Create Modifiers
         # TODO: can this be replaced with an argparse required group?
-        if (not adapters1 and
+        if (
+            not adapters1 and
             not adapters2 and
             not options.quality_cutoff and
             options.nextseq_trim is None and
