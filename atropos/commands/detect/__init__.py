@@ -9,7 +9,8 @@ from atropos.commands.base import (
     BaseCommandRunner, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin
 )
 from atropos.util import (
-    reverse_complement, sequence_complexity, enumerate_range, run_interruptible
+    reverse_complement, sequence_complexity, enumerate_range, run_interruptible,
+    RandomMatchProbability
 )
 
 

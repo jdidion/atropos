@@ -574,6 +574,14 @@ def test_UMI_trim_single():
 
 
 def test_auto_trim():
+    """
+    Truth:
+    Adapter is in bracket:
+
+    read1: CCAACTTGATATTAATAACA[TTAGACA]
+    read2: TGTTATTAATATCAAGTTGG[CAGTG]
+    """    
+
     seq1 = 'CCAACTTGATATTAATAACATTAGACA'
     qual1 = 'HHHHHHHHHHHHHHHHHHHHHHHHHHH'
 
@@ -599,16 +607,6 @@ def test_auto_trim():
     assert res_read1.sequence == seq1 and res_read2.sequence == seq2
 
 
-    # test left overhang on read2
-    seq2_left_overhang = 'CC' + seq2
-    qual2_left_overhang = 'HH' + qual2
-    read1 = Sequence('read1', seq1, qual1)
-    read2_left_overhang = Sequence('read2', seq2, qual2) 
-    auto_trim = AutoAdapterCutter(min_insert_overlap = 5, insert_match_error_rate = 0.1) 
-    res_read1, res_read2 = auto_trim(read1, read2_left_overhang)
-    assert res_read1.sequence == reverse_complement(res_read2.sequence)
-
-
     # test too much mismatch in overlap
     seq1_mutated = seq1.replace('TATTA','TATCA')
     read1 = Sequence('read1', seq1_mutated, qual1)
@@ -628,6 +626,7 @@ def test_auto_trim():
 
 
     # test insert
+    # insert a 'T' in seq2
     seq2_in = 'TGTTATTTAATATCAAGTTGGCAGTG'
     qual2_in = qual2 + 'H'
     read1 = Sequence('read1', seq1, qual1)

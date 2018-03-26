@@ -370,7 +370,9 @@ class AutoAdapterCutter(ReadPairModifier):
 
 
     TODO: add a list/set instance for storing trimmed-off sequences, and add a method
-        to assemble these sequences to identify true adapter sequences.
+        to assemble these sequences to identify true adapter sequences. 
+        If this is going to be implemented, need to be aware of if UMI is trimmed 
+        on one end but not the other, may give wrong assemble of adapter.
 
     Args:
         min_insert_overlap: Minimum overlap required between reads to be
@@ -445,7 +447,7 @@ class AutoAdapterCutter(ReadPairModifier):
         
         if prob > self.insert_max_rmp:
              return (read1, read2)
-
+            
         # we are only looking at 3' adpaters on both reads
         # insert_match[2] should always be 0
         _, _, read1 = read1.subseq(insert_match[2], insert_match[3])
