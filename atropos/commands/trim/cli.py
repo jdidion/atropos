@@ -164,7 +164,8 @@ standard output.
             "strategy used in Cutdapt ('adapter') or the more accurate "
             "insert-based alignment algorithm ('insert'). Note that "
             "insert-based alignment can only be used with paired-end "
-            "reads containing 3' adapters. New algorithms are being "
+            "reads containing 3' adapters. If no adapters are given, "
+            "3' overhangs will be trimmed. New algorithms are being "
             "implemented and the default is likely to change. (adapter)",
         )
         # TODO: all the different matching options are pretty confusing. Either
