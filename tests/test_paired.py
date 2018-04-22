@@ -85,7 +85,7 @@ def test_paired_separate():
 
 def test_paired_end_legacy():
     '''--paired-output, not using -A/-B/-G'''
-    # The -m 14 filters out one read, which should then also be filtered out in 
+    # The -m 14 filters out one read, which should then also be filtered out in
     # the second output file.
     run_paired('-a TTAGACATAT -m 14',
         in1='paired.1.fastq', in2='paired.2.fastq',
@@ -172,7 +172,7 @@ def test_unmatched_read_names():
         finally:
             os.remove('out1.fastq')
             os.remove('out2.fastq')
-            
+
 def test_legacy_minlength():
     '''Ensure -m is not applied to second read in a pair in legacy mode'''
     run_paired('-a XXX -m 27',
@@ -355,7 +355,7 @@ def test_no_writer_process():
         assert os.path.basename(outfiles[1]) == 'tmp2-out.2.fastq'
         tmpdir = os.path.dirname(outfiles[0])
         assert tmpdir == os.path.dirname(outfiles[1])
-        
+
         # TODO: If the final worker doesn't get the chance to process any
         # batches, the last output file is never created.
         assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.0.fastq'))
@@ -364,9 +364,9 @@ def test_no_writer_process():
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.0.fastq'))
         assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.1.fastq'))
         #assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.2.fastq'))
-        
+
         # TODO: check contents
-    
+
     run_paired('--threads 3 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
         in1='big.1.fq', in2='big.2.fq',
         expected1='out.1.fastq', expected2='out.2.fastq',
@@ -416,8 +416,8 @@ def test_sam():
         aligners=['insert']
     )
 
-def test_long_reads():
-    run_paired(''
-        in1='long.1.fq', in2='long.2.fq',
-        expected1=, expected2=,
-        aligners=BACK_ALIGNERS)
+# def test_long_reads():
+#     run_paired(''
+#         in1='long.1.fq', in2='long.2.fq',
+#         expected1=, expected2=,
+#         aligners=BACK_ALIGNERS)

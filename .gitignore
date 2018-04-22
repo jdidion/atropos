@@ -50,3 +50,4 @@ hg3*.fa*
 paper/workflow/results
 *.ipynb
 *.tar
+.pytest_cache/
