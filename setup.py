@@ -133,6 +133,14 @@ install_requirements = ['xphyle>=4.0.0-rc.0', 'Cython>=0.25.2']
 test_requirements = ['pytest']  # , 'jinja2', 'pysam'],
 
 
+with open('README.md') as f:
+    README = f.read()
+
+
+with open('LICENSE') as f:
+    LICENSE = f.read()
+
+
 setup(
     name='atropos',
     version=versioneer.get_version(),
@@ -141,7 +149,8 @@ setup(
     author_email='github@didion.net',
     url='https://atropos.readthedocs.org/',
     description='Specific, sensitive, and speedy trimming of NGS reads.',
-    license='MIT',
+    long_description=README,
+    license=LICENSE,
     ext_modules=extensions,
     packages=find_packages(),
     package_data={'atropos': [

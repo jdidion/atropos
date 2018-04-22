@@ -50,4 +50,4 @@ paper/workflow/results
 *.ipynb
 *.tar
 .pytest_cache/
-.coveragerc
+.coverage*
