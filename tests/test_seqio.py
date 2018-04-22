@@ -2,7 +2,6 @@
 from pytest import raises
 from collections import defaultdict
 import random
-import sys
 import os
 from io import StringIO
 import shutil
@@ -39,7 +38,7 @@ simple_fastq = [
 simple_fasta = [Sequence(x.name, x.sequence, None) for x in simple_fastq]
 
 
-class TestAlphabet:
+class TestAlphabet(TestCase):
 
     def test_alphabet(self):
         alphabet = ALPHABETS['dna']
@@ -49,7 +48,7 @@ class TestAlphabet:
         assert alphabet.resolve('X') == 'N'
 
 
-class TestSequence:
+class TestSequence(TestCase):
 
     def test_too_many_qualities(self):
         with raises(FormatError):
@@ -68,7 +67,7 @@ class TestFastaReader(TestCase):
 
     def test(self):
         with self.assertRaises(ValueError):
-            with FastaReader(None) as f:
+            with FastaReader(None) as _:
                 pass
 
         with FastaReader("tests/data/simple.fasta") as f:
@@ -106,7 +105,7 @@ class TestFastaReader(TestCase):
                 SEQUENCE2
                 """)
             )
-            reads = list(FastaReader(fasta))
+            _ = list(FastaReader(fasta))
 
     def test_fastareader_keeplinebreaks(self):
         with FastaReader("tests/data/simple.fasta", keep_linebreaks=True) as f:
@@ -118,22 +117,21 @@ class TestFastaReader(TestCase):
         filename = "tests/data/simple.fasta"
         with open(filename) as f:
             assert not f.closed
-            reads = list(openseq(f))
+            _ = list(openseq(f))
             assert not f.closed
         assert f.closed
         with FastaReader(filename) as sr:
             tmp_sr = sr
             assert not sr._file.closed
-            reads = list(sr)
+            _ = list(sr)
             assert not sr._file.closed
         assert tmp_sr._file is None
         # Open it a second time
-        with FastaReader(filename) as sr:
+        with FastaReader(filename) as _:
             pass
 
 
-class TestFastqReader:
-
+class TestFastqReader(TestCase):
     def test_fastqreader(self):
         with FastqReader("tests/data/simple.fastq") as f:
             reads = list(f)
@@ -148,7 +146,7 @@ class TestFastqReader:
 
     def test_fastq_wrongformat(self):
         with raises(FormatError), FastqReader("tests/data/withplus.fastq") as f:
-            reads = list(f)
+            _ = list(f)
 
     def test_fastq_incomplete(self):
         fastq = StringIO("@name\nACGT+\n")
@@ -159,13 +157,13 @@ class TestFastqReader:
         filename = "tests/data/simple.fastq"
         with open(filename) as f:
             assert not f.closed
-            reads = list(openseq(f))
+            _ = list(openseq(f))
             assert not f.closed
         assert f.closed
         with FastqReader(filename) as sr:
             tmp_sr = sr
             assert not sr._file.closed
-            reads = list(sr)
+            _ = list(sr)
             assert not sr._file.closed
         assert tmp_sr._file is None
 
@@ -177,8 +175,7 @@ class TestFastqReader:
             assert reads[1].sequence == 'CGGACNNNC'
 
 
-class TestFastaQualReader:
-
+class TestFastaQualReader(TestCase):
     def test_mismatching_read_names(self):
         with raises(FormatError):
             fasta = StringIO(">name\nACG")
@@ -192,12 +189,13 @@ class TestFastaQualReader:
             list(FastaQualReader(fasta, qual))
 
 
-class TestSeqioOpen:
+class TestSeqioOpen(TestCase):
+    _tmpdir = None
 
-    def setup(self):
+    def setUp(self):
         self._tmpdir = mkdtemp()
 
-    def teardown(self):
+    def tearDown(self):
         shutil.rmtree(self._tmpdir)
 
     def test_sequence_reader(self):
@@ -258,8 +256,7 @@ def write_seq_output(reads, fmt):
             f.write("".join(seqs))
 
 
-class TestInterleavedReader:
-
+class TestInterleavedReader(TestCase):
     def test(self):
         expected = [
             (
@@ -290,13 +287,15 @@ class TestInterleavedReader:
             list(InterleavedSequenceReader(s))
 
 
-class TestFastaWriter:
+class TestFastaWriter(TestCase):
+    _tmpdir = None
+    path = None
 
-    def setup(self):
+    def setUp(self):
         self._tmpdir = mkdtemp()
         self.path = os.path.join(self._tmpdir, 'tmp.fasta')
 
-    def teardown(self):
+    def tearDown(self):
         shutil.rmtree(self._tmpdir)
 
     def test(self):
@@ -332,13 +331,15 @@ class TestFastaWriter:
         assert s == '>name\n\n', '{0!r}'.format(s)
 
 
-class TestFastqWriter:
+class TestFastqWriter(TestCase):
+    _tmpdir = None
+    path = None
 
-    def setup(self):
+    def setUp(self):
         self._tmpdir = mkdtemp()
         self.path = os.path.join(self._tmpdir, 'tmp.fastq')
 
-    def teardown(self):
+    def tearDown(self):
         shutil.rmtree(self._tmpdir)
 
     def test(self):
@@ -359,8 +360,7 @@ class TestFastqWriter:
             ) == '@name\nCCATA\n+name\n!#!#!\n@name2\nHELLO\n+name2\n&&&!&\n'
 
 
-class TestInterleavedWriter:
-
+class TestInterleavedWriter(TestCase):
     def test(self):
         reads = [
             (
@@ -379,11 +379,13 @@ class TestInterleavedWriter:
         assert "foo" in result
         assert "".join(
             result["foo"]
-        ) == '@A/1 comment\nTTA\n+\n##H\n@A/2 comment\nGCT\n+\nHH#\n@B/1\nCC\n+\nHH\n@B/2\nTG\n+\n#H\n'
+        ) == (
+            '@A/1 comment\nTTA\n+\n##H\n@A/2 comment\nGCT\n+\nHH#\n@B/1\nCC\n+\nHH\n'
+            '@B/2\nTG\n+\n#H\n'
+        )
 
 
-class TestSAMWriter:
-
+class TestSAMWriter(TestCase):
     def test_single_end(self):
         reads = [Sequence('A/1', 'TTA', '##H'), Sequence('B/1', 'CC', 'HH')]
         fmt = SingleEndSAMFormatter("foo")
@@ -395,7 +397,10 @@ class TestSAMWriter:
         assert fmt.read2_bp == 0
         assert "foo" in result
         result_str = "".join(result["foo"])
-        expected = '@HD\tVN:1.5\tSO:unsorted\nA/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n'
+        expected = (
+            '@HD\tVN:1.5\tSO:unsorted\nA/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0'
+            '\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n'
+        )
         print(result_str)
         print(expected)
         assert result_str == expected
@@ -414,12 +419,15 @@ class TestSAMWriter:
         assert fmt.read2_bp == 5
         assert "foo" in result
         result_str = "".join(result["foo"])
-        expected = '@HD\tVN:1.5\tSO:unsorted\nA/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n'
+        expected = (
+            '@HD\tVN:1.5\tSO:unsorted\nA/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129'
+            '\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2'
+            '\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n'
+        )
         assert result_str == expected
 
 
-class TestPairedSequenceReader:
-
+class TestPairedSequenceReader(TestCase):
     def test_sequence_names_match(self):
 
         def match(name1, name2):
@@ -437,14 +445,14 @@ class TestPairedSequenceReader:
 try:
     import ngstream
     ngs_available = True
-except:
+except ModuleNotFoundError:
     ngs_available = False
 
 
 @skipIf(not ngs_available, "ngstream library not available")
 class TestSraReader(TestCase):
     def test_sra_reader(self):
-        with ngstream.sra.SraReader(item_limit=10) as ngs_reader:
+        with ngstream.sra.SraReader(item_limit=10) as _:
             # atropos_reader = sra_reader(reader)
             pass
 
@@ -472,6 +480,6 @@ def test_truncated_gz_iter():
     with raises(EOFError), temporary_path('truncated.gz') as path:
         create_truncated_file(path)
         f = xopen(path, 'r', use_system=False)  # work around bug in py3.4
-        for line in f:
+        for _ in f:
             pass
         f.close()

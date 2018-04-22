@@ -129,8 +129,14 @@ extensions = [
         sources=['atropos/commands/trim/_qualtrim.pyx']),
     Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
 ]
-install_requirements = ['xphyle>=4.0.0-rc.0', 'Cython>=0.25.2']
-test_requirements = ['pytest']  # , 'jinja2', 'pysam'],
+install_requirements = [
+    'Cython>=0.25.2',
+    'xphyle>=4.0.0-rc.0',
+]
+test_requirements = [
+    'pytest',
+    # 'jinja2', 'pysam',
+]
 
 
 with open('README.md') as f:
