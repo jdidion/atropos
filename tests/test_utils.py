@@ -77,12 +77,12 @@ class UtilTests(TestCase):
             ))
 
         nd1.shape = 'long'
-        assert set(nd1.summarize()) == {(
+        assert set(nd1.summarize()) == {
             ('a', 'x', 2),
             ('a', 'y', 1),
             ('a', 'z', 1),
             ('b', 'y', 1)
-        )}
+        }
 
     def test_MergingDict(self):
         obj = object()
