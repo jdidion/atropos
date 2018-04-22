@@ -112,7 +112,7 @@ class UtilTests(TestCase):
         assert md['c'] == 'foo'
         assert md['d'] == 12
         assert md['e'] == [5, 7, 9]
-        assert md['f'] == True
+        assert md['f'] is True
 
         failures = [
             ('a', 2, ValueError),
