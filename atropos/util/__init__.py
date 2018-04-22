@@ -11,17 +11,13 @@ import time
 from atropos import AtroposError
 
 
-
-# TODO: the nucleotide table should be implemented as an alphabet.
 class NotInAlphabetError(Exception):
-
     def __init__(self, character):
         super().__init__()
         self.character = character
 
 
 class Alphabet():
-
     def __init__(self, valid_characters, default_character):
         if not isinstance(valid_characters, set):
             valid_characters = set(valid_characters)
@@ -69,6 +65,8 @@ ALPHABETS = dict(dna=Alphabet('ACGT', 'N'), iso=None, colorspace=Alphabet('0123'
 def build_iso_nucleotide_table():
     """Generate a dict mapping ISO nucleotide characters to their complements,
     in both upper and lower case.
+
+    TODO: the nucleotide table should be implemented as an alphabet.
     """
     nuc = {
         'A': 'T',
@@ -100,7 +98,7 @@ LOG2 = math.log(2)
 class RandomMatchProbability(object):
     """Class for computing random match probability for DNA sequences based on
     binomial expectation. Maintains a cache of factorials to speed computation.
-    
+
     Args:
         init_size: Initial cache size.
     """
@@ -114,11 +112,11 @@ class RandomMatchProbability(object):
     def __call__(self, matches, size, match_prob=0.25, mismatch_prob=0.75):
         """Computes the random-match probability for a given sequence size and
         number of matches.
-        
+
         Args:
             match_prob: Probability of two random bases matching.
             mismatch_prob: Probability of two random bases not matcing.
-        
+
         Returns:
             The probability.
         """
@@ -191,7 +189,7 @@ class Summarizable(object):
 class Const(Mergeable):
     """A :class:`Mergeable` that is a constant value. Merging simply checks
     that two values are identical.
-    
+
     Args:
         value: The value to treat as a constant.
     """
@@ -201,7 +199,7 @@ class Const(Mergeable):
 
     def merge(self, other):
         """Check that `self==other`.
-        
+
         Raises:
             ValueError
         """
@@ -242,11 +240,11 @@ class Timestamp(object):
 
     def __sub__(self, other, minval=0.01):
         """Subtract another timestamp from this one.
-        
+
         Args:
             other: The other timestamp.
             minval: The minimum difference.
-        
+
         Returns:
             A dict of {wallclock=<datetime_diff>, cpu=<clock_diff>}.
         """
@@ -294,7 +292,7 @@ class Timing(Summarizable):
 
 class CountingDict(dict, Mergeable, Summarizable):
     """A dictionary that always returns 0 on get of a missing key.
-    
+
     Args:
         sort_by: Whether summary is sorted by key (0) or value (1).
     """
@@ -360,7 +358,7 @@ class Histogram(CountingDict):
 
 class NestedDict(dict, Mergeable, Summarizable):
     """A dict that initalizes :class:`CountingDict`s for missing keys.
-    
+
     Args:
         shape: The flattened shape: 'long' or 'wide'.
     """
@@ -387,7 +385,7 @@ class NestedDict(dict, Mergeable, Summarizable):
 
     def summarize(self):
         """Returns a flattened version of the nested dict.
-        
+
         Returns:
             When `self.shape=='long'`, a list of (key1, key2, value) tuples.
             When `self.shape=='wide'`, a dict of
@@ -431,11 +429,11 @@ def merge_dicts(dest, src):
     """Merge corresponding items in `src` into `dest`. Values in `src` missing
     in `dest` are simply added to `dest`. Values that appear in both `src` and
     `dest` are merged using `merge_values`.
-    
+
     Args:
         dest: The dict to merge into.
         src: The dict to merge from.
-    
+
     Raises:
         ValueError if a value is not one of the accepted types.
     """
@@ -448,7 +446,7 @@ def merge_dicts(dest, src):
 
 def merge_values(key, v_dest, v_src):
     """Merge two values based on their types, as follows:
-    
+
     - Mergeable: merging is done by the dest object's merge function.
     - dict: merge_dicts is called recursively.
     - Number: values are summed.
@@ -456,12 +454,12 @@ def merge_values(key, v_dest, v_src):
     they must be the same length. Then, corresponding values are handled as
     above. The value is returned as a list.
     - Otherwise: Treated as a Const (i.e. must be identical).
-    
+
     Args:
         key:
         v_dest: The dest value.
         v_src: The src value.
-    
+
     Returns:
         The merged value.
     """
@@ -471,23 +469,22 @@ def merge_values(key, v_dest, v_src):
             _type = v_dest.__class__
         if not all(isinstance(o, _type) for o in (v_src, v_dest)):
             raise TypeError(
-                "When merging {}, source and/or dest were not of type "
-                "{}".format(key, _type))
+                f"When merging {key}, source and/or dest were not of type {_type}")
         return _type
 
     def assert_equal():
         _type = assert_of_type()
         if v_dest != v_src:
             raise ValueError(
-                "When merging, objects of type {} must be equal; "
-                "{} != {}".format(_type, v_src, v_dest))
+                f"When merging, objects of type {_type} must be equal; "
+                f"{v_src} != {v_dest}")
 
     if isinstance(v_dest, Mergeable):
         v_dest = v_dest.merge(v_src)
     elif isinstance(v_dest, dict):
         assert_of_type(dict)
         merge_dicts(v_dest, v_src)
-    elif isinstance(v_dest, str):
+    elif isinstance(v_dest, str) or isinstance(v_dest, bool):
         assert_equal()
     elif isinstance(v_dest, Number):
         assert_of_type(Number)
@@ -528,10 +525,10 @@ def reverse_complement(seq):
 
 def sequence_complexity(seq):
     """Computes a simple measure of sequence complexity.
-    
+
     Args:
         seq: The sequence to measure.
-    
+
     Returns:
         Complexity, as a value [0,2], where 0 = a homopolymer and
         2 = completely random.
@@ -549,12 +546,12 @@ def sequence_complexity(seq):
 
 def qual2int(qual, base=33):
     """Convert a quality charater to a phred-scale int.
-    
+
     Args:
         q: The quality value.
         base: The offset of the first quality value (Old Illumina = 64,
             new Illumina = 33).
-    
+
     Returns:
         An iterable of integer qualities.
     """
@@ -563,12 +560,12 @@ def qual2int(qual, base=33):
 
 def quals2ints(quals, base=33):
     """Convert an iterable of quality characters to phred-scale ints.
-    
+
     Args:
         quals: The qualities.
         base: The offset of the first quality value (Old Illumina = 64,
             new Illumina = 33).
-    
+
     Returns:
         A tuple of integer qualities.
     """
@@ -583,15 +580,15 @@ def qual2prob(qchar):
 
 def enumerate_range(collection, start, end, step=1):
     """Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...
-    
+
     Only up to (start-end+1) items will be yielded.
-    
+
     Args:
         collection: The collection to enumerate.
         start: The starting index.
         end: The ending index.
         step: The amount to increment the index each iteration (defaults to 1).
-    
+
     Yields:
         (index, item) tuples.
     """
@@ -604,10 +601,10 @@ def enumerate_range(collection, start, end, step=1):
 
 def mean(values):
     """Computes the mean of a sequence of numeric values.
-    
+
     Args:
         values: Sequence of numeric values.
-    
+
     Returns:
         The mean (floating point).
     """
@@ -619,10 +616,10 @@ def mean(values):
 
 def weighted_mean(values, counts):
     """Computes the mean of a sequence of numeric values weighted by counts.
-    
+
     Args:
         values: Sequence of numeric values.
-    
+
     Returns:
         The weighted mean (floating point).
     """
@@ -677,10 +674,10 @@ def weighted_stdev(values, counts, mu0=None):
 def median(values):
     """Median function borrowed from python statistics module, and sped up by
     in-place sorting of the array.
-    
+
     Args:
         data: Sequence of numeric values.
-    
+
     Returns:
         The median (floating point).
     """
@@ -699,12 +696,12 @@ def median(values):
 
 def weighted_median(values, counts):
     """Compute the median of `values` weighted by `counts`.
-    
+
     Args:
         values: Sequence of unique values.
         counts: Sequence of counts, where each count is the number of times the
             value at the corresponding position appears in the sample.
-    
+
     Returns:
         The weighted median.
     """
@@ -791,16 +788,16 @@ def truncate_string(string, max_len=100):
 
 def run_interruptible(func, *args, **kwargs):
     """Run a function, gracefully handling keyboard interrupts.
-    
+
     Args:
         func: The function to execute.
         args, kwargs: Positional and keyword arguments to pass to `func`.
-    
+
     Returns:
         A (unix-style) return code (0=normal, anything else is an error).
-    
+
     Raises:
-        
+
     """
     retcode = 0
     try:
