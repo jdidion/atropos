@@ -29,12 +29,16 @@ import os
 from pkgutil import walk_packages
 import re
 import textwrap
+from typing import Sequence, Tuple, Callable, Iterator
 from atropos import __version__
+from atropos.commands.base import BaseCommandRunner, Summary
+from atropos.commands.cli import BaseCommandParser
+from atropos.commands.reports import BaseReportGenerator
 
 
-class Command(object):
+class Command:
     """Contains information about a command package.
-    
+
     A command package consists of at least 3 modules:
     1. The top level module (__init__.py), which contains the logic to run the
     command. It must have a top-level CommandRunner class that extends
@@ -45,26 +49,28 @@ class Command(object):
     3. The reports module (reports.py), which generates reports from the
     command summary. It must have a top-level ReportGenerator class that
     extends atropos.commands.reports.BaseReportGenerator.
-    
+
     Args:
         name: The command name. Must match the name of a submodule of
             atropos.commands, or all of the other arguments must be
             specified.
-        module, cli_module, report_module: The absolute names of the three
-            modules described above. If None, they are determined automatically
-            from the command name.
+        module:
+        cli_module:
+        report_module: The absolute names of the three  modules described above. If
+            None, they are determined automatically from the command name.
     """
-
-    def __init__(self, name, module=None, cli_module=None, report_module=None):
+    def __init__(
+            self, name: str, module: str = None, cli_module: str = None,
+            report_module: str = None):
         self.name = name
         self.package = module or 'atropos.commands.{}'.format(name)
         self.cli_module = cli_module or '{}.cli'.format(self.package)
         self.report_module = report_module or '{}.reports'.format(self.package)
 
-    def execute(self, args=()):
+    def execute(self, args: Sequence[str] = ()) -> Tuple[int, Summary]:
         """Parse command line arguments, execute the command, and generate
         summary reports.
-        
+
         Returns:
             The return code.
         """
@@ -77,25 +83,27 @@ class Command(object):
             logging.getLogger().debug("Not generating report file")
         return retcode, summary
 
-    def get_command_parser_class(self):
+    def get_command_parser_class(self) -> BaseCommandParser:
         """Returns the CommandParser class within the cli module.
         """
         mod = import_module(self.cli_module)
         return mod.CommandParser
 
     @property
-    def usage(self):
+    def usage(self) -> str:
         """Returns the command's usage string.
         """
         return self.get_command_parser_class().usage
 
     @property
-    def description(self):
+    def description(self) -> str:
         """Returns the command's description string.
         """
         return self.get_command_parser_class().description
 
-    def get_help(self, fmt="* {name}: {description}", wrap=80, indent=2):
+    def get_help(
+            self, fmt: str = "* {name}: {description}", wrap: int = 80,
+            indent: int = 2) -> str:
         """Returns a string to include in the command help.
         """
         helpstr = fmt.format(name=self.name, description=self.description.strip())
@@ -109,15 +117,15 @@ class Command(object):
 
     def parse_args(self, args):
         """Parse the command line options.
-        
+
         Returns:
             A Namespace-like object.
         """
-        parser_class = self.get_command_parser_class()
+        parser_class: Callable[..., BaseCommandParser] = self.get_command_parser_class()
         parser = parser_class()
         return parser.parse(args)
 
-    def get_command_runner_class(self):
+    def get_command_runner_class(self) -> Callable[..., BaseCommandRunner]:
         """Returns the CommandRunner class within the top-level module.
         """
         mod = import_module(self.package)
@@ -125,10 +133,10 @@ class Command(object):
 
     def run_command(self, options):
         """Run the command.
-        
+
         Args:
             options: A Namespace-like object.
-        
+
         Returns:
             Tuple (retcode, summary).
         """
@@ -136,20 +144,18 @@ class Command(object):
         runner = runner_class(options)
         return runner.run()
 
-    def get_report_generator_class(self):
+    def get_report_generator_class(self) -> Callable[..., BaseReportGenerator]:
         """Returns the ReportGenerator class within the reports module.
         """
         mod = import_module(self.report_module)
         return mod.ReportGenerator
 
-    def generate_reports(self, summary, options):
+    def generate_reports(self, summary: Summary, options) -> None:
         """Generate reports.
-        
+
         Args:
             summary: The summary dict.
             options: Command-line options.
-            report_file: The report file name/prefix.
-            report_formats: A list of formats.
         """
         generator_class = self.get_report_generator_class()
         generator = generator_class(options)
@@ -163,7 +169,7 @@ COMMANDS = dict(
 )
 
 
-def get_command(name):
+def get_command(name: str) -> Command:
     """Returns the Command object for the specified command name.
     """
     if name not in COMMANDS:
@@ -172,24 +178,24 @@ def get_command(name):
     return COMMANDS[name]
 
 
-def iter_commands():
+def iter_commands() -> Iterator[Command]:
     """Iterate over commands, ordered by command name.
     """
     for name in sorted(COMMANDS.keys()):
         yield COMMANDS[name]
 
 
-def execute_cli(args=()):
+def execute_cli(args: Sequence[str] = ()) -> int:
     """Executes the Atropos command-line interface.
-    
+
     The first argument is expected to be the command name. If not (i.e. args is
     empty or the first argument starts with a '-'), the 'trim' command is
     assumed. If the first argument is '-h' or '--help', the command-level help
     is printed.
-        
+
     Args:
         args: Command-line arguments.
-    
+
     Returns:
         The return code.
     """
@@ -205,12 +211,11 @@ def execute_cli(args=()):
             )
         args = args[2:]
 
-    def parse_command(args):
-        if not args or args[0][0] == '-':
-            return ('trim', args)
-
+    def parse_command(_args):
+        if not _args or _args[0][0] == '-':
+            return 'trim', _args
         else:
-            return (args[0], args[1:])
+            return _args[0], _args[1:]
 
     if len(args) == 0:
         command_name, args = parse_command(config_args)
@@ -236,7 +241,7 @@ def execute_cli(args=()):
         return 2
 
 
-def print_subcommands():
+def print_subcommands() -> None:
     """Prints usage message listing the available subcommands.
     """
     print(

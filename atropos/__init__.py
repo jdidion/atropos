@@ -1,7 +1,6 @@
 # coding: utf-8
 """Top-level Atropos package.
 """
-import os
 import sys
 
 from atropos._version import get_versions
@@ -16,24 +15,17 @@ class AtroposError(Exception):
     pass
 
 
-def check_importability():  # pragma: no cover
+def check_importability() -> bool:  # pragma: no cover
     """Check that cython modules haev been compile.
+
+    Returns:
+        True if a cython-compiled module can be imported, otherwise False.
     """
     try:
         import atropos.align._align  # pylint: disable=unused-variable
+        return True
     except ImportError as err:
         if 'undefined symbol' in str(err):
-            print(
-                """
-ERROR: A required extension module could not be imported because it is
-incompatible with your system. A quick fix is to recompile the extension
-modules with the following command:
-
-    {0} setup.py build_ext -i
-
-See the documentation for alternative ways of installing the program.
-
-The original error message follows.
-""".format(sys.executable)
-            )
-        raise
+            return False
+        else:
+            raise

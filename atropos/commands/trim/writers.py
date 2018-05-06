@@ -1,33 +1,38 @@
 """Classes for formatting and writing trimmed reads to output.
 """
+from pathlib import Path
 import sys
+from typing import Sequence, Tuple, Union, Optional
+from xphyle.types import ModeArg
 from atropos.io import STDOUT, xopen, open_output
 from atropos.io.compression import splitext_compressed
 from atropos.io.seqio import create_seq_formatter
 from .filters import NoFilter
 
 
-class Writers(object):
+FileDesc = Union[Path, Tuple[Path, ModeArg]]
+
+
+class Writers:
     """Manages writing to one or more outputs.
-    
+
     Args:
         force_create: Whether empty output files should be created.
     """
-
-    def __init__(self, force_create=[]):
+    def __init__(self, force_create: Sequence[Path] = []):
         self.writers = {}
         self.force_create = force_create
         self.suffix = None
 
-    def get_writer(self, file_desc, compressed=False):
+    def get_writer(self, file_desc: FileDesc, compressed: bool = False):
         """Create the writer for a file descriptor if it does not already
         exist.
-        
+
         Args:
             file_desc: File descriptor. If `compressed==True`, this is a tuple
                 (path, mode), otherwise it's only a path.
             compressed: Whether data has already been compressed.
-        
+
         Returns:
             The writer.
         """
@@ -47,9 +52,9 @@ class Writers(object):
                 self.writers[path] = xopen(real_path, "w")
         return self.writers[path]
 
-    def write_result(self, result, compressed=False):
+    def write_result(self, result, compressed: bool = False) -> None:
         """Write results to output.
-        
+
         Args:
             result: Dict with keys being file descriptors and values being data
                 (either bytes or strings). Strings are expected to already have
@@ -59,10 +64,10 @@ class Writers(object):
         for file_desc, data in result.items():
             self.write(file_desc, data, compressed)
 
-    def write(self, file_desc, data, compressed=False):
+    def write(self, file_desc: FileDesc, data, compressed: bool = False):
         """Write data to output. If the specified path has not been seen before,
         the output is opened.
-        
+
         Args:
             file_desc: File descriptor. If `compressed==True`, this is a tuple
                 (path, mode), otherwise it's only a path.
@@ -83,9 +88,9 @@ class Writers(object):
                 writer.close()
 
 
-class Formatters(object):
+class Formatters:
     """Manages multiple formatters.
-    
+
     Args:
         output: The output file name template.
         seq_formatter_args: Additional arguments to pass to the formatter
@@ -101,13 +106,14 @@ class Formatters(object):
         self.info_formatters = []
         self.discarded = 0
 
-    def add_seq_formatter(self, filter_type, file1, file2=None):
+    def add_seq_formatter(self, filter_type, file1: Path, file2: Optional[Path] = None):
         """Add a formatter.
-        
+
         Args:
             filter_type: The type of filter that triggers writing with the
                 formatter.
-            file1, file2: The output file(s).
+            file1:
+            file2: The output file(s).
         """
         self.seq_formatters[filter_type] = create_seq_formatter(
             file1, file2, ** self.seq_formatter_args
@@ -143,7 +149,7 @@ class Formatters(object):
     def format(self, result, dest, read1, read2=None):
         """Format read(s) and add to a result dict. Also writes info records
         to any registered info formatters.
-        
+
         Args:
             result: The result dict.
             dest: The destination (filter type).
@@ -177,7 +183,7 @@ class Formatters(object):
 
 class DelimFormatter:
     """Base class for formatters that write to a delimited file.
-    
+
     Args:
         path: The output file path.
         delim: The field delimiter.

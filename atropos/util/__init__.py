@@ -1,6 +1,7 @@
 """Widely useful utility methods.
 """
-from collections import OrderedDict, Iterable, Sequence
+from abc import ABCMeta
+from collections import OrderedDict, Iterable
 from datetime import datetime
 import errno
 import functools
@@ -8,6 +9,7 @@ import logging
 import math
 from numbers import Number
 import time
+from typing import Dict
 from atropos import AtroposError
 
 
@@ -17,11 +19,11 @@ class NotInAlphabetError(Exception):
         self.character = character
 
 
-class Alphabet():
+class Alphabet:
     def __init__(self, valid_characters, default_character):
         if not isinstance(valid_characters, set):
             valid_characters = set(valid_characters)
-        if not default_character in valid_characters:
+        if default_character not in valid_characters:
             valid_characters.add(default_character)
         self.valid_characters = valid_characters
         self.default_character = default_character
@@ -32,7 +34,7 @@ class Alphabet():
     def validate(self, character):
         """Raises NotInAlphabetError if the character is not in the alphabet.
         """
-        if not character in self:
+        if character not in self:
             raise NotInAlphabetError(character)
 
     def validate_string(self, string):
@@ -62,7 +64,7 @@ class Alphabet():
 ALPHABETS = dict(dna=Alphabet('ACGT', 'N'), iso=None, colorspace=Alphabet('0123', None))
 
 
-def build_iso_nucleotide_table():
+def build_iso_nucleotide_table() -> Dict[str, str]:
     """Generate a dict mapping ISO nucleotide characters to their complements,
     in both upper and lower case.
 
@@ -166,7 +168,7 @@ class RandomMatchProbability(object):
         self.max_n = idx
 
 
-class Mergeable(object):
+class Mergeable:
     """Base class for objects that can merge themselves with another.
     """
 
@@ -176,7 +178,7 @@ class Mergeable(object):
         raise NotImplementedError()
 
 
-class Summarizable(object):
+class Summarizable:
     """Base class for objects that can summarize themselves.
     """
 
@@ -220,7 +222,7 @@ class Const(Mergeable):
         return str(self.value)
 
 
-class Timestamp(object):
+class Timestamp:
     """Records datetime and clock time at object creation.
     """
 

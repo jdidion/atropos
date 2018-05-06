@@ -1,17 +1,29 @@
 import sys
 from atropos import check_importability
 from atropos.commands import execute_cli
+from typing import Sequence
 
 
-def main(args=sys.argv[1:]):
+def main(args: Sequence[str] = sys.argv[1:]) -> None:
     """Main method.
 
     Args:
         args: Command-line arguments.
     """
-    check_importability()
-    sys.exit(execute_cli(args))
+    if not check_importability():
+        print(
+            f"""
+ERROR: A required extension module could not be imported because it is
+incompatible with your system. A quick fix is to recompile the extension
+modules with the following command:
 
+{sys.executable} setup.py build_ext -i
 
-if __name__ == '__main__':
-    main()
+See the documentation for alternative ways of installing the program.
+
+The original error message follows.
+""")
+        rc = 1
+    else:
+        rc = execute_cli(args)
+    sys.exit(rc)

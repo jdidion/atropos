@@ -1,15 +1,19 @@
 """Implementation of the 'trim' command.
 """
-from collections import Sequence, defaultdict
+from abc import ABCMeta
+from collections import Sequence as SequenceCollection
 import logging
 import sys
 import textwrap
+from typing import Dict, Optional
 from atropos.commands.base import (
     BaseCommandRunner, Summary, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin
 )
-from atropos.commands.stats import (SingleEndReadStatistics, PairedEndReadStatistics)
+from atropos.commands.stats import (
+    StatsMode, SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
 from atropos.io import STDOUT
+from atropos.io.seqio import Sequence
 from atropos.util import RandomMatchProbability, run_interruptible
 from .modifiers import (
     AdapterCutter,
@@ -35,6 +39,7 @@ from .modifiers import (
     SwiftBisulfiteTrimmer,
     UnconditionalCutter,
     ZeroCapper,
+    Modifiers
 )
 from .filters import (
     FilterFactory,
@@ -46,62 +51,31 @@ from .filters import (
     TooShortReadFilter,
     TrimmedFilter,
     UntrimmedFilter,
+    Filters
 )
 from .writers import (
     Formatters, InfoFormatter, RestFormatter, WildcardFormatter, Writers
 )
 
 
-class TrimPipeline(Pipeline):
-    """Base trimming pipeline.
-    
-    Args:
-        record_handler:
-        result_handler:
-    """
-
-    def __init__(self, record_handler, result_handler):
-        super().__init__()
-        self.record_handler = record_handler
-        self.result_handler = result_handler
-
-    def start(self, worker=None):
-        self.result_handler.start(worker)
-
-    def add_to_context(self, context):
-        context['results'] = {}
-
-    def handle_records(self, context, records):
-        super().handle_records(context, records)
-        self.result_handler.write_result(context['index'], context['results'])
-
-    def handle_reads(self, context, read1, read2=None):
-        return self.record_handler.handle_record(context, read1, read2)
-
-    def finish(self, summary, **kwargs):
-        self.result_handler.finish()
-        super().finish(summary)
-        summary.update(self.record_handler.summarize())
-
-
-class RecordHandler(object):
+class RecordHandler:
     """Base class for record handlers.
     """
-
-    def __init__(self, modifiers, filters, formatters):
+    def __init__(self, modifiers: Modifiers, filters: Filters, formatters: Formatters):
         self.modifiers = modifiers
         self.filters = filters
         self.formatters = formatters
 
-    def handle_record(self, context, read1, read2=None):
+    def handle_record(
+            self, context: dict, read1: Sequence, read2: Optional[Sequence] = None):
         """Handle a pair of reads.
         """
         reads = self.modifiers.modify(read1, read2)
         dest = self.filters.filter(*reads)
         self.formatters.format(context['results'], dest, *reads)
-        return (dest, reads)
+        return dest, reads
 
-    def summarize(self):
+    def summarize(self) -> dict:
         """Returns a summary dict.
         """
         return dict(
@@ -113,34 +87,44 @@ class RecordHandler(object):
         )
 
 
-class StatsRecordHandlerWrapper(object):
+class StatsRecordHandlerWrapper:
     """Wrapper around a record handler that collects read statistics
     before and/or after trimming.
-    
+
     Args:
         record_handler:
         paired: Whether reads are paired-end.
-        mode: Collection mode; pre=only collect pre-trim stats; post=only
+        stats_arg: Sequence; when to collect stats ('pre', 'post')
+        kwargs:
+            mode: Collection mode; pre=only collect pre-trim stats; post=only
             collect post-trim stats; both=collect both pre- and post-trim stats.
     """
 
-    def __init__(self, record_handler, paired, stats_args, **kwargs):
+    def __init__(
+            self, record_handler: RecordHandler, paired: bool,
+            stats_args: Dict[StatsMode, dict], **kwargs):
         self.record_handler = record_handler
         self.read_statistics_class = (
             PairedEndReadStatistics if paired else SingleEndReadStatistics
         )
         self.pre = self.post = None
-        if 'pre' in stats_args:
+        if StatsMode.PRE in stats_args:
             self.pre = {}
             self.pre_kwargs = kwargs.copy()
-            self.pre_kwargs.update(stats_args['pre'])
-        if 'post' in stats_args:
+            self.pre_kwargs.update(stats_args[StatsMode.PRE])
+        if StatsMode.POST in stats_args:
             self.post = {}
             self.post_kwargs = kwargs.copy()
-            self.post_kwargs.update(stats_args['post'])
+            self.post_kwargs.update(stats_args[StatsMode.POST])
 
-    def handle_record(self, context, read1, read2=None):
+    def handle_record(
+            self, context, read1: Sequence, read2: Optional[Sequence] = None):
         """Handle a pair of reads.
+
+        Args:
+            context:
+            read1:
+            read2:
         """
         if self.pre is not None:
             self.collect(self.pre, context['source'], read1, read2, ** self.pre_kwargs)
@@ -153,13 +137,17 @@ class StatsRecordHandlerWrapper(object):
             )
         return (dest, reads)
 
-    def collect(self, stats, source, read1, read2=None, **kwargs):
+    def collect(
+            self, stats, source, read1: Sequece, read2: Optional[Sequence] = None,
+            **kwargs):
         """Collect stats on a pair of reads.
-        
+
         Args:
             stats: The :class:`ReadStatistics` object.
             source: The source file(s).
-            read1, read2: The reads.
+            read1
+            read2: The reads.
+            kwargs:
         """
         if source not in stats:
             stats[source] = self.read_statistics_class(**kwargs)
@@ -193,7 +181,7 @@ class ResultHandler(object):
 
     def finish(self, total_batches=None):
         """Finish the result handler.
-        
+
         Args:
             total_batches: Total number of batches processed.
         """
@@ -201,7 +189,7 @@ class ResultHandler(object):
 
     def write_result(self, batch_num, result):
         """Write a batch of results to output.
-        
+
         Args:
             batch_num: The batch number.
             result: The result to write.
@@ -241,7 +229,7 @@ class WorkerResultHandler(ResultHandlerWrapper):
 
     def prepare_file(self, path, strings):
         """Prepare data for writing.
-        
+
         Returns:
             Tuple (path, data).
         """
@@ -250,7 +238,7 @@ class WorkerResultHandler(ResultHandlerWrapper):
 
 class WriterResultHandler(ResultHandler):
     """ResultHandler that writes results to disk.
-    
+
     Args:
         writers: :class:`Writers` object.
         compressed: Whether the data is compressed.
@@ -277,6 +265,38 @@ class WriterResultHandler(ResultHandler):
         self.writers.close()
 
 
+class TrimPipeline(Pipeline, metaclass=ABCMeta):
+    """Base trimming pipeline.
+
+    Args:
+        record_handler:
+        result_handler:
+    """
+
+    def __init__(self, record_handler: RecordHandler, result_handler: ResultHandler):
+        super().__init__()
+        self.record_handler = record_handler
+        self.result_handler = result_handler
+
+    def start(self, worker=None):
+        self.result_handler.start(worker)
+
+    def add_to_context(self, context):
+        context['results'] = {}
+
+    def handle_records(self, context, records):
+        super().handle_records(context, records)
+        self.result_handler.write_result(context['index'], context['results'])
+
+    def handle_reads(self, context, read1, read2=None):
+        return self.record_handler.handle_record(context, read1, read2)
+
+    def finish(self, summary, **kwargs):
+        self.result_handler.finish()
+        super().finish(summary)
+        summary.update(self.record_handler.summarize())
+
+
 class TrimSummary(Summary):
     """Summary that adds aggregate values for record and bp stats.
     """
@@ -299,7 +319,7 @@ class TrimSummary(Summary):
             if key.startswith('records_'):
                 frac_key = "fraction_{}".format(key)
                 total_records = self['total_record_count']
-                if isinstance(value, Sequence):
+                if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [frac(val, total_records) for val in value]
                     total = sum(val for val in value if val)
                     dict_val["total_{}".format(key)] = total
@@ -308,7 +328,7 @@ class TrimSummary(Summary):
             elif key.startswith('bp_'):
                 frac_key = "fraction_{}".format(key)
                 sum_total_bp = self['sum_total_bp_count']
-                if isinstance(value, Sequence):
+                if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [
                         frac(val, bps)
                         for val, bps in zip(value, self['total_bp_counts'])
@@ -657,7 +677,7 @@ class CommandRunner(BaseCommandRunner):
 
     def run_parallel(self, record_handler, writers, mixin_class):
         """Parallel implementation of run_atropos. Works as follows:
-        
+
         1. Main thread creates N worker processes (where N is the number of
         threads to be allocated) and (optionally) one writer process.
         2. Main thread loads batches of reads (or read pairs) from input file(s)
@@ -681,9 +701,9 @@ class CommandRunner(BaseCommandRunner):
         7. The main process reads summaries from the summary queue and merges
         them to create the complete summary, which is used to generate the
         report.
-        
+
         There are several possible points of failure:
-        
+
         1. The main process may exit due to an unexpected error, or becuase the
         user forces it to exit (Ctrl-C). In this case, an attempt is made to
         cancel all processes before exiting.
@@ -706,12 +726,12 @@ class CommandRunner(BaseCommandRunner):
         their particular environment. Additionally, a "soft" timeout is used,
         after which log messages are escallated from DEBUG to ERROR level. The
         user can then make the decision of whether or not to kill the program.
-        
+
         Args:
             record_handler: RecordHandler object.
             writers: Writers object.
             mixin_class: Mixin to use for creating pipeline class.
-        
+
         Returns:
             The return code.
         """

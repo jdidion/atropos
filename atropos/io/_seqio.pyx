@@ -1,9 +1,9 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 import copy
-from atropos.io import xopen
 from atropos.io.seqio import FormatError, SequenceReader
 from atropos.util import reverse_complement, truncate_string
+
 
 cdef class Sequence(object):
     """
@@ -27,29 +27,29 @@ cdef class Sequence(object):
         public bint merged
         public int corrected
         public str umi
-    
+
     def __init__(self, str name, str sequence, str qualities=None, str name2='',
                  original_length=None, match=None, match_info=None, clipped=None,
-                 insert_overlap=False, merged=False, corrected=0, alphabet=None, 
+                 insert_overlap=False, merged=False, corrected=0, alphabet=None,
                  str umi=None):
-        
+
         # Validate sequence and qualities lengths are equal
         if qualities is not None:
             slen = len(sequence)
             qlen = len(qualities)
-            
+
             # check that sequence and qualities are the same length
             if slen != qlen:
                 rname = truncate_string(name)
                 raise FormatError(
                     "In read named {0!r}: length of quality sequence ({1}) and "
                     "length  of read ({2}) do not match".format(rname, qlen, slen))
-        
+
         # If an alphabet is specified, replace any bases not in the alphabet
         # with the default character.
         if alphabet:
             sequence = alphabet.resolve_string(sequence)
-        
+
         self.name = name
         self.sequence = sequence
         self.qualities = qualities
@@ -62,7 +62,7 @@ cdef class Sequence(object):
         self.merged = merged
         self.corrected = corrected
         self.umi = umi
-    
+
     def subseq(self, begin=0, end=None):
         if end is None:
             new_read = self[begin:]
@@ -75,7 +75,7 @@ cdef class Sequence(object):
         if end_bases:
             new_read.clipped[offset+1] += end_bases
         return (begin, end_bases, new_read)
-    
+
     def clip(self, front=0, back=0):
         if back < 0:
             new_read = self[front:back]
@@ -88,11 +88,11 @@ cdef class Sequence(object):
         if back:
             new_read.clipped[offset+1] += back
         return (front, back, new_read)
-    
+
     def reverse_complement(self):
         """Returns a copy of this read with the sequence reverse-complemented
         and the qualities reversed.
-        
+
         TODO: add option to also reverse the alignment positions
         """
         sequence = reverse_complement(self.sequence)
@@ -101,7 +101,7 @@ cdef class Sequence(object):
             qualities = ''.join(reversed(self.qualities))
         if self.match_info:
             match_info = [copy.copy(m) for m in self.match_info]
-        
+
         new_read = self.__class__(
             self.name,
             sequence,
@@ -115,14 +115,14 @@ cdef class Sequence(object):
             self.merged,
             self.corrected
         )
-        
+
         if self.match:
             match = self.match.copy()
             match.read = new_read
             new_read.match = match
-        
+
         return new_read
-    
+
     def __getitem__(self, key):
         """slicing"""
         return self.__class__(
@@ -169,7 +169,7 @@ class FastqReader(SequenceReader):
     """
     file_format = "FASTQ"
     delivers_qualities = True
-    
+
     def __init__(
             self, filename, quality_base=33, sequence_class=Sequence,
             alphabet=None):
@@ -180,7 +180,7 @@ class FastqReader(SequenceReader):
         super().__init__(
             filename, quality_base=quality_base, alphabet=alphabet)
         self.sequence_class = sequence_class
-    
+
     def __iter__(self):
         """
         Yield Sequence objects

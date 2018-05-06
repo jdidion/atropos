@@ -1,34 +1,45 @@
 # coding: utf-8
 """Collect statistics to use in the QC report.
 """
+from abc import ABCMeta, abstractmethod
+from enum import Enum
 import re
+from typing import List, Pattern, Union
+from atropos.io.seqio import Sequence
 from atropos.util import (
     CountingDict, NestedDict, Histogram, Mergeable, Summarizable, ordered_dict, qual2int
 )
+
 
 DEFAULT_TILE_KEY_REGEXP = r"^(?:[^\:]+\:){4}([^\:]+)"
 """Regexp for the default Illumina read name format."""
 
 
-class PositionDicts(Mergeable, Summarizable):
+class StatsMode(Enum):
+    PRE = 'pre'
+    POST = 'post'
+
+
+class PositionDicts(Mergeable, Summarizable, metaclass=ABCMeta):
     """A sequence of dicts, one for each position in a sequence.
-    
+
     Args:
         is_qualities: Whether values are base qualities.
         quality_base: Base for quality values.
     """
+    dict_class = None
 
-    def __init__(self, is_qualities=False, quality_base=33):
-        self.dicts = []
+    def __init__(self, is_qualities: bool = False, quality_base: int = 33):
+        self.dicts: List[dict] = []
         self.is_qualities = is_qualities
         self.quality_base = quality_base
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> dict:
         if idx >= len(self.dicts):
             self.extend(idx + 1)
         return self.dicts[idx]
 
-    def extend(self, size):
+    def extend(self, size: int) -> None:
         """Extend the number of bases to `size`.
         """
         diff = size - len(self.dicts)
@@ -36,7 +47,7 @@ class PositionDicts(Mergeable, Summarizable):
             for _ in range(diff):
                 self.dicts.append(self.dict_class())
 
-    def merge(self, other):
+    def merge(self, other) -> None:
         if not isinstance(other, BaseCountingDicts):
             raise ValueError("Cannot merge object of type {}".format(type(other)))
 
@@ -47,8 +58,9 @@ class PositionDicts(Mergeable, Summarizable):
         if other_len > min_len:
             self.dicts.extend(other.dicts[min_len:other_len])
 
-    def summarize(self):
-        raise NotImplementedError()
+    @abstractmethod
+    def summarize(self) -> dict:
+        pass
 
 
 class BaseCountingDicts(PositionDicts):
@@ -57,10 +69,10 @@ class BaseCountingDicts(PositionDicts):
     """
     dict_class = CountingDict
 
-    def summarize(self):
+    def summarize(self) -> dict:
         """Flatten into a table with N rows (where N is the size of the
         sequence) and the columns are counts by nucleotide.
-        
+
         Returns:
             A tuple of (columns, [rows]), where each row is
             (position, (base_counts...))
@@ -89,7 +101,7 @@ class BaseNestedDicts(PositionDicts):
     """
     dict_class = NestedDict
 
-    def summarize(self):
+    def summarize(self) -> dict:
         """Flatten into a table of N*K rows, where N is the sequence size and
         K is the union of keys in the nested dicts, and the columns are counts
         by nucleotide.
@@ -122,9 +134,9 @@ class BaseNestedDicts(PositionDicts):
         )
 
 
-class ReadStatistics(object):
+class ReadStatistics:
     """Accumulates statistics on sequencing reads.
-    
+
     Args:
         qualities: Whether to collect base quality statistics.
         tiles: Whether to collect tile-level statistics. If True, the default
@@ -132,8 +144,9 @@ class ReadStatistics(object):
             string or compiled re for extracting the tile ID from the read name.
             Only applies to Illumina sequences.
     """
-
-    def __init__(self, qualities=None, quality_base=33, tiles=None):
+    def __init__(
+            self, qualities=None, quality_base: int = 33,
+            tiles: Union[bool, str, Pattern] = None):
         # max read length
         self.max_read_len = 0
         # read count
@@ -160,7 +173,7 @@ class ReadStatistics(object):
         # cache of computed values
         self._cache = {}
 
-    def _init_qualities(self):
+    def _init_qualities(self) -> None:
         # per-sequence mean qualities
         self.sequence_qualities = Histogram()
         # per-position quality composition
@@ -173,20 +186,20 @@ class ReadStatistics(object):
             )
             self.tile_sequence_qualities = NestedDict()
 
-
     # These are attributes that are computed on the fly. If called by name
     # (without leading '_'), __getattr__ uses the method to compute the value
     # if it is not already cached; on subsequent calls, the cached value is
     # returned.
-    def _gc_pct(self):
-        return (sum(base['C'] + base['G'] for base in self.bases) / self.total_bases)
 
-    def _total_bases(self):
+    def _gc_pct(self) -> float:
+        return sum(base['C'] + base['G'] for base in self.bases) / self.total_bases
+
+    def _total_bases(self) -> int:
         return sum(
             length * count for base in self.bases for length, count in base.items()
         )
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str):
         if name not in self._cache:
             func_name = '_' + name
             if not hasattr(self, func_name):
@@ -197,12 +210,12 @@ class ReadStatistics(object):
         return self._cache[name]
 
     @property
-    def track_tiles(self):
+    def track_tiles(self) -> bool:
         """Whether tile statistics are being accumulated.
         """
         return self.qualities and self.tile_key_regexp is not None
 
-    def collect_record(self, record):
+    def collect_record(self, record: Sequence):
         """Collect stats on a single sequence record.
         """
         if self.qualities is None and record.qualities:
@@ -253,7 +266,7 @@ class ReadStatistics(object):
 
     def add_base(self, i, base, qual=None, tile=None):
         """Add per-base information.
-        
+
         Args:
             i: Position
             base: Nucleotide

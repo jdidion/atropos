@@ -6,6 +6,7 @@ from collections import namedtuple
 from atropos.align._align import Aligner, MultiAligner, compare_prefixes, locate
 from atropos.util import RandomMatchProbability, reverse_complement
 
+
 # flags for global alignment
 # The interpretation of the first flag is:
 # An initial portion of seq1 may be skipped at no cost.
@@ -29,7 +30,7 @@ def compare_suffixes(
 ):
     """Find out whether one string is the suffix of the other one, allowing
     mismatches. Used to find an anchored 3' adapter when no indels are allowed.
-    
+
     Args:
         suffix_ref, suffix_query: The suffices to compare.
         wildcard_ref, wildcard_query: Whether wildcards are valid in either of
@@ -55,7 +56,7 @@ def compare_suffixes(
 # quite some runtime.
 class Match(object):
     """An alignment match.
-    
+
     Args:
         astart: Starting position of the match within the adapter.
         astop: Ending position of the match within the adapter.
@@ -136,7 +137,7 @@ class Match(object):
 
     def _guess_is_front(self):
         """Return whether this is guessed to be a front adapter.
-        
+
         The match is assumed to be a front adapter when the first base of
         the read is involved in the alignment to the adapter.
         """
@@ -251,13 +252,13 @@ MatchInfo = namedtuple(
 #    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
 # 5. EDLIB: edit distance-based alignment
 #    https://github.com/Martinsos/edlib
-# 6. Phred-adjusted ML for error probability: 
+# 6. Phred-adjusted ML for error probability:
 # https://biosails.github.io/pheniqs/glossary.html#phred_adjusted_maximum_likelihood_decoding
 # 7. Adaptive banded alignment:
 #     * https://github.com/ocxtal/libgaba
 #     * https://github.com/ocxtal/adaptivebandbench
 # 8. https://github.com/yamada-kd/nepal
-# 9. The SeqAn C++ library implements several alignment algorithms: 
+# 9. The SeqAn C++ library implements several alignment algorithms:
 # http://www.sciencedirect.com/science/article/pii/S0168165617315420
 # 10. Could we treat paired end read + adapter alignment as an MSA problem?
 # 11. Look at alignment-free tools for pairwise sequence comparison:
@@ -272,12 +273,12 @@ MatchInfo = namedtuple(
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.
-    
+
     If the inserts align, the overhangs are searched for the adapter sequences.
     Otherwise, each read is search for its adapter separately.
-    
+
     This only works with paired-end reads with 3' adapters.
-    
+
     Args:
         adapter1, adapter2: read1, read2 adapters.
         match_probability: Callable that calculates random match probability
@@ -337,10 +338,10 @@ class InsertAligner(object):
 
     def match_insert(self, seq1, seq2):
         """Use cutadapt aligner for insert and adapter matching.
-        
+
         Args:
             seq1, seq2: Sequences to match.
-        
+
         Returns:
             A :class:`Match` object, or None if there is no match.
         """

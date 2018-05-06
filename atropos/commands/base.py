@@ -1,154 +1,34 @@
 """Common classes/functions used in commands.
 """
-from collections import Sequence
+from abc import ABCMeta, abstractmethod
+from collections import Sequence as SequenceCollection
 import copy
 import platform
 import sys
+from typing import Callable, Tuple, Iterator, Optional, Any, Sequence as SequenceType
 from atropos import __version__, AtroposError
 from atropos.adapters import AdapterCache
-from atropos.io.seqio import open_reader, sra_reader
+from atropos.io.seqio import Sequence, open_reader, sra_reader
 from atropos.util import MergingDict, Const, Summarizable, Timing
 
 
-class Pipeline(object):
-    """Base class for analysis pipelines.
-    """
-
-    def __init__(self):
-        self.record_counts = {}
-        self.bp_counts = {}
-
-    def __call__(self, command_runner, raise_on_error=False, **kwargs):
-        self.start(**kwargs)
-        try:
-            for batch in command_runner.iterator():
-                self.process_batch(batch)
-        except Exception as err:
-            if raise_on_error:
-                raise
-
-            else:
-                command_runner.summary['exception'] = dict(
-                    message=str(err), details=sys.exc_info()
-                )
-        finally:
-            self.finish(command_runner.summary, **kwargs)
-
-    def start(self, **kwargs):
-        """Start the pipeline.
-        """
-        pass
-
-    def process_batch(self, batch):
-        """Run the pipeline on a batch of records.
-        
-        Args:
-            batch: A batch of reads. A batch has the format
-            ({batch_metadata}, [records]).
-        """
-        batch_meta, records = batch
-        context = batch_meta.copy()
-        if not context['source'] in self.record_counts:
-            self.record_counts[context['source']] = 0
-        self.record_counts[context['source']] += context['size']
-        if not context['source'] in self.bp_counts:
-            self.bp_counts[context['source']] = [0, 0]
-        context['bp'] = self.bp_counts[context['source']]
-        self.add_to_context(context)
-        self.handle_records(context, records)
-
-    def add_to_context(self, context):
-        """Add items to the batch context.
-        """
-        pass
-
-    def handle_records(self, context, records):
-        """Handle a sequence of records.
-        
-        Args:
-            context: The pipeline context (dict).
-            records: The sequence of records.
-        """
-        for idx, record in enumerate(records):
-            try:
-                self.handle_record(context, record)
-            except Exception as err:
-                raise AtroposError(
-                    "An error occurred at record {} of batch {}".format(
-                        idx, context['index']
-                    )
-                ) from err
-
-    def handle_record(self, context, record):
-        """Handle a single record.
-        
-        Args:
-            context: The pipeline context (dict).
-            record: The record.
-        """
-        raise NotImplementedError()
-
-    def handle_reads(self, context, read1, read2=None):
-        """Handle a read or read-pair.
-        
-        Args:
-            context: The pipeline context (dict).
-            read1, read2: The read pair; read2 will be None for single-end data.
-        """
-        raise NotImplementedError()
-
-    def finish(self, summary, **kwargs):
-        """Finish the pipeline, including adding information to the summary.
-        
-        Args:
-            summary: Summary dict to update.
-        """
-        total_bp_counts = tuple(sum(b) for b in zip(* self.bp_counts.values()))
-        summary.update(
-            record_counts=self.record_counts,
-            total_record_count=sum(self.record_counts.values()),
-            bp_counts=self.bp_counts,
-            total_bp_counts=total_bp_counts,
-            sum_total_bp_count=sum(total_bp_counts),
-        )
-
-
-class SingleEndPipelineMixin(object):
-    """Mixin for pipelines that implements `handle_record` for single-end data.
-    """
-
-    def handle_record(self, context, record):
-        context['bp'][0] += len(record)
-        return self.handle_reads(context, record)
-
-
-class PairedEndPipelineMixin(object):
-    """Mixin for pipelines that implements `handle_record` for paired-end data.
-    """
-
-    def handle_record(self, context, record):
-        read1, read2 = record
-        bps = context['bp']
-        bps[0] += len(read1.sequence)
-        bps[1] += len(read2.sequence)
-        return self.handle_reads(context, read1, read2)
+Batch = Tuple[dict, SequenceType[Sequence]]
 
 
 class Summary(MergingDict):
     """Contains summary information.
     """
-
     @property
-    def has_exception(self):
+    def has_exception(self) -> bool:
         return 'exception' in self
 
-    def finish(self):
+    def finish(self) -> None:
         """Replaces Summarizable members with their summaries, and computes
         some aggregate values.
         """
         self._post_process_dict(self)
 
-    def _post_process_dict(self, dict_val):
+    def _post_process_dict(self, dict_val: Optional[dict]) -> None:
         if dict_val is None:
             return
 
@@ -161,7 +41,7 @@ class Summary(MergingDict):
             if isinstance(value, dict):
                 self._post_process_dict(value)
             elif (
-                isinstance(value, Sequence) and
+                isinstance(value, SequenceCollection) and
                 len(value) > 0 and
                 all(val is None or isinstance(val, dict) for val in value)
             ):
@@ -176,14 +56,13 @@ class Summary(MergingDict):
         pass
 
 
-class BaseCommandRunner(object):
+class BaseCommandRunner(metaclass=ABCMeta):
     """Base class for command executors.
-    
+
     Args:
         options: Command-line options.
     """
-
-    def __init__(self, options, summary_class=Summary):
+    def __init__(self, options, summary_class: Callable[..., Summary] = Summary):
         self.options = options
         self.summary = summary_class()
         self.timing = Timing()
@@ -228,14 +107,14 @@ class BaseCommandRunner(object):
             if options.subsample_seed:
                 random.seed(options.subsample_seed)
 
-            def subsample(reader, frac):
+            def subsample(_reader, frac):
                 """Generator that yields a random subsample of records.
-                
+
                 Args:
-                    reader: The reader from which to sample.
+                    _reader: The reader from which to sample.
                     frac: The fraction of records to yield.
                 """
-                for reads in reader:
+                for reads in _reader:
                     if random.random() < frac:
                         yield reads
 
@@ -247,7 +126,7 @@ class BaseCommandRunner(object):
             )
         self.init_summary()
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         if hasattr(self.reader, name):
             return getattr(self.reader, name)
 
@@ -257,7 +136,7 @@ class BaseCommandRunner(object):
         else:
             raise ValueError("Unknown attribute: {}".format(name))
 
-    def iterator(self):
+    def iterator(self) -> Iterator[Batch]:
         """Returns an iterator (an object with the __iter__ method) over
         input batches. BaseCommandRunner is itself an iterable, and will be
         wrapped with a progress bar if _progress_options is set.
@@ -276,13 +155,13 @@ class BaseCommandRunner(object):
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def __next__(self) -> Batch:
         if self.done:
             raise StopIteration()
 
         try:
             read_index, record = next(self.iterable)
-        except:
+        except StopIteration:
             self.finish()
             raise
 
@@ -300,7 +179,6 @@ class BaseCommandRunner(object):
             except StopIteration:
                 self.finish()
                 break
-
             except:
                 self.finish()
                 raise
@@ -317,12 +195,11 @@ class BaseCommandRunner(object):
             size=batch_index,
         )
         if batch_index == self.size:
-            return (batch_meta, batch)
-
+            return batch_meta, batch
         else:
-            return (batch_meta, batch[0:batch_index])
+            return batch_meta, batch[0:batch_index]
 
-    def init_summary(self):
+    def init_summary(self) -> None:
         """Initialize the summary dict with general information.
         """
         self.summary['program'] = 'Atropos'
@@ -337,10 +214,10 @@ class BaseCommandRunner(object):
             batch_size=self.size, max_reads=self.max_reads, batches=self.batches
         )
 
-    def run(self):
+    def run(self) -> Tuple[int, Summary]:
         """Run the command, wrapping it in a Timing, catching any exceptions,
         and finally closing the reader.
-        
+
         Returns:
             The tuple (retcode, summary).
         """
@@ -354,18 +231,19 @@ class BaseCommandRunner(object):
                 self.return_code = 1
             finally:
                 self.finish()
-        return (self.return_code, self.summary)
+        return self.return_code, self.summary
 
-    def __call__(self):
+    @abstractmethod
+    def __call__(self) -> int:
         """Execute the command. Must be implemented within the command
         module.
-        
+
         Returns:
             The return code.
         """
-        raise NotImplementedError()
+        pass
 
-    def finish(self):
+    def finish(self) -> None:
         """Finish the command.
         """
         # Close the underlying reader.
@@ -374,11 +252,8 @@ class BaseCommandRunner(object):
             self.reader.close()
         self.summary.finish()
 
-    def load_known_adapters(self):
+    def load_known_adapters(self) -> AdapterCache:
         """Load known adapters based on setting in command-line options.
-        
-        Args:
-            options: Command-line options.
         """
         cache_file = None
         if self.options.cache_adapters:
@@ -396,3 +271,141 @@ class BaseCommandRunner(object):
         if self.options.cache_adapters:
             adapter_cache.save()
         return adapter_cache
+
+
+class Pipeline(metaclass=ABCMeta):
+    """Base class for analysis pipelines.
+    """
+    def __init__(self):
+        self.record_counts = {}
+        self.bp_counts = {}
+
+    def __call__(
+            self, command_runner: BaseCommandRunner, raise_on_error: bool = False,
+            **kwargs) -> None:
+        """
+
+        Args:
+            command_runner:
+            raise_on_error:
+            **kwargs:
+
+        Raises:
+
+        """
+        self.start(**kwargs)
+        try:
+            for batch in command_runner.iterator():
+                self.process_batch(batch)
+        except Exception as err:
+            if raise_on_error:
+                raise
+            else:
+                command_runner.summary['exception'] = dict(
+                    message=str(err), details=sys.exc_info()
+                )
+        finally:
+            self.finish(command_runner.summary, **kwargs)
+
+    def start(self, **kwargs) -> None:
+        """Start the pipeline.
+        """
+        pass
+
+    def process_batch(self, batch: Batch) -> None:
+        """Run the pipeline on a batch of records.
+
+        Args:
+            batch: A batch of reads. A batch has the format
+            ({batch_metadata}, [records]).
+        """
+        batch_meta, records = batch
+        context = batch_meta.copy()
+        if not context['source'] in self.record_counts:
+            self.record_counts[context['source']] = 0
+        self.record_counts[context['source']] += context['size']
+        if not context['source'] in self.bp_counts:
+            self.bp_counts[context['source']] = [0, 0]
+        context['bp'] = self.bp_counts[context['source']]
+        self.add_to_context(context)
+        self.handle_records(context, records)
+
+    def add_to_context(self, context: dict) -> None:
+        """Add items to the batch context.
+        """
+        pass
+
+    def handle_records(self, context: dict, records: SequenceType[Sequence]) -> None:
+        """Handle a sequence of records.
+
+        Args:
+            context: The pipeline context (dict).
+            records: The sequence of records.
+
+        Raises:
+
+        """
+        for idx, record in enumerate(records):
+            try:
+                self.handle_record(context, record)
+            except Exception as err:
+                raise AtroposError(
+                    "An error occurred at record {} of batch {}".format(
+                        idx, context['index']
+                    )
+                ) from err
+
+    @abstractmethod
+    def handle_record(self, context: dict, record: Sequence):
+        """Handle a single record.
+
+        Args:
+            context: The pipeline context (dict).
+            record: The record.
+        """
+        pass
+
+    @abstractmethod
+    def handle_reads(self, context: dict, read1: Sequence, read2: Sequence = None):
+        """Handle a read or read-pair.
+
+        Args:
+            context: The pipeline context (dict).
+            read1:
+            read2: The read pair; read2 will be None for single-end data.
+        """
+        pass
+
+    def finish(self, summary: Summary, **kwargs):
+        """Finish the pipeline, including adding information to the summary.
+
+        Args:
+            summary: Summary dict to update.
+        """
+        total_bp_counts = tuple(sum(b) for b in zip(* self.bp_counts.values()))
+        summary.update(
+            record_counts=self.record_counts,
+            total_record_count=sum(self.record_counts.values()),
+            bp_counts=self.bp_counts,
+            total_bp_counts=total_bp_counts,
+            sum_total_bp_count=sum(total_bp_counts),
+        )
+
+
+class SingleEndPipelineMixin:
+    """Mixin for pipelines that implements `handle_record` for single-end data.
+    """
+    def handle_record(self, context: dict, record: Sequence):
+        context['bp'][0] += len(record)
+        return self.handle_reads(context, record)
+
+
+class PairedEndPipelineMixin:
+    """Mixin for pipelines that implements `handle_record` for paired-end data.
+    """
+    def handle_record(self, context: dict, record: Sequence):
+        read1, read2 = record
+        bps = context['bp']
+        bps[0] += len(read1.sequence)
+        bps[1] += len(read2.sequence)
+        return self.handle_reads(context, read1, read2)

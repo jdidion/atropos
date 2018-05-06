@@ -1,29 +1,35 @@
 """Base class and functions for implementing command-line interfaces for
 Atropos subcommands.
 """
+from abc import ABCMeta, abstractmethod
 from argparse import ArgumentParser, ArgumentError, HelpFormatter
 import copy
 import logging
 from multiprocessing import cpu_count
+from numbers import Number
 import operator
 import os
+from pathlib import Path
 import platform
 import re
 import sys
 import textwrap
-import urllib
+from typing import Callable, Sequence, List, Type, TypeVar, Generic, Union, Optional
+from urllib.parse import urlparse
+from xphyle.paths import STDOUT, STDERR, check_path, as_path, resolve_path
+from xphyle.types import PathType, Permission
 from atropos import __version__
-from atropos.io import STDOUT, STDERR, resolve_path, check_path, check_writeable
 from atropos.io.compression import splitext_compressed
-from atropos.io.seqio import SINGLE, PAIRED
+from atropos.io.seqio import InputRead
 from atropos.util import MAGNITUDE, ALPHABETS
 
 
-class BaseCommandParser(object):
+class BaseCommandParser(metaclass=ABCMeta):
     """Base class for Atropos sub-commands.
-    
+
     Subclasses must define name, description, and usage members.
     """
+    name = ''
     preamble = "Atropos version {version}"
     usage = "atropos {command} [options]"
     description = ''
@@ -34,13 +40,14 @@ class BaseCommandParser(object):
         self.create_parser()
         self.add_common_options()
         self.add_command_options()
+        self.parser: ArgumentParser = None
 
-    def parse(self, args):
+    def parse(self, args: Sequence[str]):
         """Parse args using the conifgured ArgumentParser.
-        
+
         Args:
             args: Command line arguments.
-        
+
         Returns:
             A Namespace-like object.
         """
@@ -51,7 +58,7 @@ class BaseCommandParser(object):
         self.validate_command_options(options)
         return options
 
-    def create_parser(self):
+    def create_parser(self) -> None:
         """Create the ArgumentParser.
         """
         format_args = dict(name=self.name, version=__version__)
@@ -61,15 +68,16 @@ class BaseCommandParser(object):
             formatter_class=ParagraphHelpFormatter
         )
 
-    def get_description(self, **kwargs):
+    def get_description(self, **kwargs) -> str:
         description = "{}\n\n{}\n\n{}".format(
             * (part.strip() for part in (self.preamble, self.description, self.details))
         )
         return description.format(**kwargs)
 
     def add_group(
-        self, name, title=None, description=None, mutex=False, required=False
-    ):
+            self, name: str, title: Optional[str] = None,
+            description: Optional[str] = None, mutex: bool = False,
+            required: bool = False):
         """Add a group to the parser. The group will be stored under `name`
         and can later be retrieved via `get_group`.
         """
@@ -77,19 +85,18 @@ class BaseCommandParser(object):
             raise ValueError("Group already exists: {}".format(name))
 
         if mutex:
-            group = self.parser.add_mutually_exclusive_group(required)
+            group = self.parser.add_mutually_exclusive_group(required=required)
         else:
             group = self.parser.add_argument_group(title or name, description)
         self.groups[name] = group
         return group
 
-    def get_group(self, name):
+    def get_group(self, name: str):
         """If a group has already been created with `name`, return the group,
         otherwise create a new group with that name.
         """
         if name in self.groups:
             return self.groups[name]
-
         else:
             return self.add_group(name)
 
@@ -266,15 +273,16 @@ class BaseCommandParser(object):
             "Currently, only 'dna' is supported. (no validation)",
         )
 
+    @abstractmethod
     def add_command_options(self):
         """Add command-specific options. At the very least,
         "-o, --output" is required.
         """
-        raise NotImplementedError()
+        pass
 
-    def setup_logging(self, options):
+    def setup_logging(self, options) -> None:
         """Setup logging and print an introductory message.
-        
+
         Logging setup is only done if there are not already any handlers (can
         happen when this function is being called externally such as from unit
         tests).
@@ -313,17 +321,14 @@ class BaseCommandParser(object):
         if options.sra_accession:
             if options.input_format not in ('fastq', 'sam', 'bam', None):
                 raise ValueError(
-                    "Invalid file format for SRA accession: {}".format(
-                        options.input_format
-                    )
-                )
+                    f"Invalid file format for SRA accession: {options.input_format}")
 
             options.input_format = 'fastq'
             logging.getLogger().debug(
                 "Opening reader for SRA Accession {}".format(options.sra_accession)
             )
             try:
-                from srastream import SraReader
+                from ngstream import SraReader
 
                 options.sra_reader = SraReader(
                     options.sra_accession, batch_size=options.batch_size or 1000
@@ -332,12 +337,10 @@ class BaseCommandParser(object):
                 options.paired = options.sra_reader.paired
             except Exception:
                 logging.getLogger().exception(
-                    "Error while fetching accession {} from SRA".format(
-                        options.sra_accession
-                    )
+                    f"Error while fetching accession {options.sra_accession} from SRA"
                 )
                 parser.error(
-                    "Unable to read from accession {}".format(options.sra_accession)
+                    f"Unable to read from accession {options.sra_accession}"
                 )
         elif options.single_input:
             if options.input1 or options.input2 or options.interleaved_input:
@@ -360,7 +363,8 @@ class BaseCommandParser(object):
                 )
             options.paired = True
         if options.input_read is None:
-            options.input_read = PAIRED if options.paired else SINGLE
+            options.input_read = (
+                InputRead.PAIRED if options.paired else InputRead.SINGLE)
         # Set sample ID from the input file name(s)
         if options.sample_id is None:
             if options.sra_reader:
@@ -397,9 +401,9 @@ class BaseCommandParser(object):
         pass
 
 
-
-
 # Extensions to argparse
+
+
 class ParagraphHelpFormatter(HelpFormatter):
     """HelpFormatter that wraps text in paragraphs.
     """
@@ -413,24 +417,10 @@ class ParagraphHelpFormatter(HelpFormatter):
         return "\n\n".join(paragraphs)
 
 
-class TypeWithArgs(object):  # pylint: disable=no-member
-    """A data type that requires additional static arguments.
-    """
-
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self, string):
-        return self._do_call(string, * self.args, ** self.kwargs) or string
-
-    def _do_call(self, string, *args, **kwargs):
-        """Convert and/or validate `string`.
-        """
-        raise NotImplementedError()
+T = TypeVar('T')
 
 
-class CompositeType(object):
+class CompositeType:
     """A composite of multiple data types.
     """
 
@@ -444,17 +434,20 @@ class CompositeType(object):
         return result
 
 
-class ComparisonValidator(TypeWithArgs):
+class ComparisonValidator(Generic[T]):
     """Validator that compares an argument against an expected value.
     """
+    def __init__(self, rhs: T, oper: Callable[[T, T], bool], expected: bool = True):
+        self.rhs = rhs
+        self.oper = oper
+        self.expected = expected
 
-    def _do_call(self, lhs, rhs, oper, expected=True):
-        assert oper(lhs, rhs) == expected, "{}({}, {}) != {}".format(
-            oper, lhs, rhs, expected
-        )
+    def _do_call(self, lhs: T):
+        assert self.oper(lhs, self.rhs) == self.expected, \
+            f"{self.oper}({lhs}, {self.rhs}) != {self.expected}"
 
 
-class CharList(object):
+class CharList:
     """Parses a string into a list of characters and ensures they are all in
     the choices tuple.
     """
@@ -468,83 +461,93 @@ class CharList(object):
         return chars
 
 
-class Delimited(TypeWithArgs):
+class Delimited(Generic[T]):
     """Splits a string argument using a delimiter.
     """
-
-    def _do_call(
+    def __init__(
         self,
-        string,
-        delim=",",
-        data_type=None,
-        choices=None,
-        min_len=None,
-        max_len=None,
+        delim: str = ",",
+        data_type: Optional[Callable[[str], T]] = None,
+        choices: Optional[Sequence[Union[str, T]]] = None,
+        min_len: Optional[int] = None,
+        max_len: Optional[int] = None,
     ):
-        if isinstance(string, str):
-            vals = string.split(delim) if delim else (string,)
-        else:
-            vals = string
-        if vals[0] == "*" and choices is not None:
-            vals = choices
-        if data_type:
-            vals = [data_type(v) for v in vals]
-        if min_len and len(vals) < min_len:
-            raise ArgumentError(
-                self, "there must be at least {} values".format(min_len)
-            )
+        self.delim = delim
+        self.data_type = data_type
+        self.choices = choices
+        self.min_len = min_len
+        self.max_len = max_len
 
-        if max_len and len(vals) > max_len:
-            raise ArgumentError(self, "there can be at most {} values".format(max_len))
+    def __call__(self, arg: Union[str, List[T]]) -> List[T]:
+        if isinstance(arg, str):
+            vals = arg.split(self.delim) if self.delim else [arg]
+        else:
+            vals = arg
+        if vals[0] == "*" and self.choices is not None:
+            vals = self.choices
+        if self.data_type:
+            vals = [self.data_type(v) for v in vals]
+
+        if self.min_len and len(vals) < self.min_len:
+            raise ArgumentError(self, "there must be at least {self.min_len} values")
+
+        if self.max_len and len(vals) > self.max_len:
+            raise ArgumentError(self, f"there can be at most {self.max_len} values")
 
         return vals
 
 
-ACCESS = dict(r=os.R_OK, rU=os.R_OK, rb=os.R_OK, w=os.W_OK, wb=os.W_OK, x=os.X_OK)
+class EnumChoice(Generic[T]):
+    def __init__(self, enum_class: Callable[[str], T] = None):
+        self.enum_class = enum_class
+
+    def __call__(self, arg: str) -> T:
+        return self.enum_class(arg)
 
 
-class AccessiblePath(TypeWithArgs):
+class AccessiblePath:
     """Test that a path is accessible.
     """
+    def __init__(self, path_type: PathType, mode: Permission):
+        self.path_type = path_type
+        self.mode = mode
 
-    def _do_call(self, path, type_, mode):
-        if type_ == 'f' and path in (STDOUT, STDERR):
+    def __call__(self, path: Union[str, os.PathLike]) -> Path:
+        path = as_path(path)
+
+        if self.path_type == PathType.FILE and path in (STDOUT, STDERR):
             return path
 
-        if 'w' in mode:
-            return check_writeable(path, type_)
-
-        else:
-            return check_path(path, type_, ACCESS[mode])
+        return Path(check_path(path, self.path_type, self.mode))
 
 
 class ReadwriteableFile(object):
     """Validator for a file argument that must be both readable and writeable.
     """
-
     def __init__(self):
-        self.read_type = AccessiblePath('f', 'r')
-        self.write_type = AccessiblePath('f', 'w')
+        self.read_type = AccessiblePath(PathType.FILE, Permission.READ)
+        self.write_type = AccessiblePath(PathType.FILE, Permission.WRITE)
 
-    def __call__(self, string):
-        path = string
-        if os.path.exists(path):
+    def __call__(self, path: Union[str, os.PathLike]) -> Path:
+        path = as_path(path)
+        if path.exists():
             path = self.read_type(path)
         path = self.write_type(path)
         return path
 
 
-def existing_path(path):
+def existing_path(path: Union[str, os.PathLike]) -> Path:
     """Test that a path exists."""
+    path = as_path(path)
     if path == STDOUT:
         return path
+    return Path(resolve_path(path))
 
-    return resolve_path(path)
 
-
-readable_file = CompositeType(existing_path, AccessiblePath('f', 'r'))
+readable_file = CompositeType(
+    existing_path, AccessiblePath(PathType.FILE, Permission.READ))
 """Test that a file exists and is readable."""
-writeable_file = AccessiblePath('f', 'w')
+writeable_file = AccessiblePath(PathType.FILE, Permission.WRITE)
 """Test that a file 1) exists and is writelable, or 2) does not exist but
 is in a writeable directory.
 """
@@ -554,11 +557,11 @@ readwriteable_file = ReadwriteableFile()
 
 def readable_url(url):
     """Validator for a URL that must be readable.
-    
+
     Args:
         url: The URL to validate.
     """
-    parsed = urllib.parse.urlparse(url)
+    parsed = urlparse(url)
     scheme = parsed.scheme or 'file'
     if scheme == 'file':
         filename = readable_file(parsed.path)
@@ -568,9 +571,9 @@ def readable_url(url):
         return url
 
 
-str_list = Delimited(data_type=str)
+str_list = Delimited[str](data_type=str)
 """Comma-delimited list of strings."""
-INT_OR_STR_RE = re.compile(r"([\d\.]+)([KkMmGg]?)")
+INT_OR_STR_RE = re.compile(r"([\d.]+)([KkMmGg]?)")
 
 
 def int_or_str(arg):
@@ -600,7 +603,10 @@ def positive(type_=int, inclusive=False):
     return CompositeType(type_, ComparisonValidator(0, oper))
 
 
-def between(min_val=None, max_val=None, type_=int):
+N = TypeVar('N', bound=Number)
+
+
+def between(min_val: N = None, max_val: N = None, type_: Type[N] = int):
     """Returns a CompositeType that validates `min_val <= x <= max_val`.
     """
     return CompositeType(

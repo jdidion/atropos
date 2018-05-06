@@ -2,6 +2,7 @@
 """
 import logging
 import sys
+from typing import cast
 from atropos.commands.cli import (
     BaseCommandParser,
     configure_threads,
@@ -13,8 +14,10 @@ from atropos.commands.cli import (
     probability,
     CharList,
     Delimited,
+    EnumChoice,
     int_or_str,
 )
+from atropos.commands.stats import StatsMode
 from atropos.io import STDOUT, STDERR
 from atropos.io.seqio import guess_format_from_name
 
@@ -548,6 +551,7 @@ standard output.
         )
         group.add_argument(
             "--report-formats",
+            type=EnumChoice(StatsMode)
             nargs="*",
             choices=("txt", "json", "yaml", "pickle"),
             default=None,
@@ -854,7 +858,7 @@ standard output.
                 if any_output:
                     parser.error("SAM output must be specified using the -l option")
                 if options.no_writer_process:
-                    parser.warn(
+                    logging.getLogger().warning(
                         "Note: output SAM files cannot be concatenated; "
                         "use 'samtools merge' instead.")
                 options.use_interleaved_output = True
@@ -968,7 +972,7 @@ standard output.
             if not (options.adapters or options.front or options.anywhere):
                 options.adapters = ['TGGAATTCTCGG']  # illumina small RNA adapter
             if options.quality_cutoff is None:
-                options.quality_cutoff = (20, 20)
+                options.quality_cutoff = [20, 20]
             if options.minimum_length is None:
                 options.minimum_length = 16
             if options.error_rate is None:
@@ -1017,7 +1021,7 @@ standard output.
 
                 temp = [
                     parse_bisulfite_params(arg)
-                    for arg in options.bisulfite.split(";")
+                    for arg in cast(str, options.bisulfite).split(";")
                 ]
                 if paired == "both" and len(temp) == 1:
                     temp = [temp[0], temp[0]]
@@ -1030,7 +1034,7 @@ standard output.
                 parser.error(
                     "--overwrite-low-quality is not valid for single-end reads"
                 )
-            if (options.overwrite_low_quality[0] > options.overwrite_low_quality[1]):
+            if options.overwrite_low_quality[0] > options.overwrite_low_quality[1]:
                 parser.error("For --overwrite-low-quality, LOWQ must be <= HIGHQ")
 
         if options.quality_cutoff:

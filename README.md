@@ -195,6 +195,9 @@ The citation for the original Cutadapt paper is:
 
 * Implement additional alternate alignment algorithms.
 * Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
+* IMplement additional error correction approaches:
+  * https://www.ncbi.nlm.nih.gov/pubmed/25161220
+  * https://github.com/Malfoy/BCOOL
 * Explore new quality trimming algorithms
   * UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
   * InfoTrim: github.com/JacobPorter/InfoTrim
