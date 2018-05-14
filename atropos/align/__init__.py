@@ -22,14 +22,14 @@ STOP_WITHIN_SEQ2 = 8
 # Use this to get regular semiglobal alignment
 # (all gaps in the beginning or end are free)
 SEMIGLOBAL = (
-    START_WITHIN_SEQ1 | START_WITHIN_SEQ2 | 
+    START_WITHIN_SEQ1 | START_WITHIN_SEQ2 |
     STOP_WITHIN_SEQ1 | STOP_WITHIN_SEQ2)
 
 def compare_suffixes(
         suffix_ref, suffix_query, wildcard_ref=False, wildcard_query=False):
     """Find out whether one string is the suffix of the other one, allowing
     mismatches. Used to find an anchored 3' adapter when no indels are allowed.
-    
+
     Args:
         suffix_ref, suffix_query: The suffices to compare.
         wildcard_ref, wildcard_query: Whether wildcards are valid in either of
@@ -50,7 +50,7 @@ def compare_suffixes(
 
 class Match(object):
     """An alignment match.
-    
+
     Args:
         astart: Starting position of the match within the adapter.
         astop: Ending position of the match within the adapter.
@@ -66,7 +66,7 @@ class Match(object):
     __slots__ = [
         'astart', 'astop', 'rstart', 'rstop', 'matches', 'errors', 'front',
         'adapter', 'read', 'length']
-    
+
     def __init__(
             self, astart, astop, rstart, rstop, matches, errors,
             front=None, adapter=None, read=None):
@@ -82,8 +82,10 @@ class Match(object):
         # Number of aligned characters in the adapter. If there are indels,
         # this may be different from the number of characters in the read.
         self.length = self.astop - self.astart
-        assert self.length > 0
-        assert self.length - self.errors > 0
+        if self.length <= 0:
+            raise ValueError('Match length must be >= 0')
+        if self.length - self.errors <= 0:
+            raise ValueError('A Match requires at least one matching position.')
         # TODO: this assertion may not always hold now that we use both error
         # rates and probabilities
         #if self.adapter:
@@ -95,22 +97,22 @@ class Match(object):
             'errors={5})').format(
                 self.astart, self.astop, self.rstart, self.rstop, self.matches,
                 self.errors)
-    
+
     def copy(self):
         """Create a copy of this Match.
         """
         return Match(
             self.astart, self.astop, self.rstart, self.rstop, self.matches,
             self.errors, self.front, self.adapter, self.read)
-    
+
     def _guess_is_front(self):
         """Return whether this is guessed to be a front adapter.
-        
+
         The match is assumed to be a front adapter when the first base of
         the read is involved in the alignment to the adapter.
         """
         return self.rstart == 0
-    
+
     def wildcards(self, wildcard_char='N'):
         """Return a string that contains, for each wildcard character,
         the character that it matches. For example, if the adapter
@@ -136,7 +138,7 @@ class Match(object):
             return self.read.sequence[:self.rstart]
         else:
             return self.read.sequence[self.rstop:]
-    
+
     # TODO: write test
     def get_info_record(self):
         """Returns a :class:`MatchInfo`, which contains information about the
@@ -197,13 +199,13 @@ MatchInfo = namedtuple("MatchInfo", (
 #    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
 # 5. EDLIB: edit distance-based alignment
 #    https://github.com/Martinsos/edlib
-# 6. Phred-adjusted ML for error probability: 
+# 6. Phred-adjusted ML for error probability:
 # https://biosails.github.io/pheniqs/glossary.html#phred_adjusted_maximum_likelihood_decoding
 # 7. Adaptive banded alignment: https://github.com/ocxtal/libgaba
 # Also think about different sequence encodings that might enable faster alignment
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
 # 8. https://github.com/yamada-kd/nepal
-# 9. The SeqAn C++ library implements several alignment algorithms: 
+# 9. The SeqAn C++ library implements several alignment algorithms:
 # http://www.sciencedirect.com/science/article/pii/S0168165617315420
 # 10. Could we treat paired end read + adapter alignment as an MSA problem?
 # 11. Look at alignment-free tools for pairwise sequence comparison:
@@ -213,12 +215,12 @@ MatchInfo = namedtuple("MatchInfo", (
 
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.
-    
+
     If the inserts align, the overhangs are searched for the adapter sequences.
     Otherwise, each read is search for its adapter separately.
-    
+
     This only works with paired-end reads with 3' adapters.
-    
+
     Args:
         adapter1, adapter2: read1, read2 adapters.
         match_probability: Callable that calculates random match probability
@@ -267,13 +269,13 @@ class InsertAligner(object):
             max_insert_mismatch_frac,
             START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
             min_insert_overlap)
-    
+
     def match_insert(self, seq1, seq2):
         """Use cutadapt aligner for insert and adapter matching.
-        
+
         Args:
             seq1, seq2: Sequences to match.
-        
+
         Returns:
             A :class:`Match` object, or None if there is no match.
         """
@@ -295,13 +297,13 @@ class InsertAligner(object):
                 # error correction can be done even though no adapter
                 # trimming is required.
                 return (insert_match, None, None)
-            
+
             # TODO: this is very sensitive to the exact correct choice of
             # adapter. For example, if you specifiy GATCGGAA... and the correct
             # adapter is AGATCGGAA..., the prefixes will not match exactly and
             # the alignment will fail. We need to use a comparison that is a bit
             # more forgiving.
-            
+
             a1_match = compare_prefixes(
                 seq1[insert_match_size:], self.adapter1,
                 wildcard_ref=self.adapter_wildcards,
@@ -317,7 +319,7 @@ class InsertAligner(object):
                     a1_match[5] > max_adapter_mismatches and
                     a2_match[5] > max_adapter_mismatches):
                 return None
-            
+
             a1_prob = self.match_probability(a1_match[4], adapter_len)
             a2_prob = self.match_probability(a2_match[4], adapter_len)
             if (
@@ -329,7 +331,7 @@ class InsertAligner(object):
             adapter_len2 = min(self.adapter2_len, len2 - insert_match_size)
             best_adapter_matches, best_adapter_mismatches = (
                 a1_match if a1_prob < a2_prob else a2_match)[4:6]
-            
+
             return (
                 insert_match,
                 Match(
@@ -338,7 +340,7 @@ class InsertAligner(object):
                 Match(
                     0, adapter_len2, insert_match_size, len2,
                     best_adapter_matches, best_adapter_mismatches))
-        
+
         # # This is the old way of doing things, where we use the built-in
         # # Aligner to do a single match.
         # aligner = Aligner(
@@ -362,7 +364,7 @@ class InsertAligner(object):
         #     return None
         #
         # return _match(insert_match, offset, insert_match_size, prob)
-        
+
         # Use an aligner that returns all matches that satisfy the
         # overlap and error rate thresholds. We sort by matches and
         # then mismatches, and then check each in turn until we find
@@ -379,7 +381,7 @@ class InsertAligner(object):
                 prob = self.match_probability(insert_match[4], insert_match_size, **self.base_probs)
                 if prob <= self.insert_max_rmp:
                     filtered_matches.append((insert_match, offset, insert_match_size, prob))
-            
+
             if filtered_matches:
                 if len(filtered_matches) == 1:
                     return _match(*filtered_matches[0])
@@ -393,5 +395,5 @@ class InsertAligner(object):
                         match = _match(*match_args)
                         if match:
                             return match
-            
+
             return None
