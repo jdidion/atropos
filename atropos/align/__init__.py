@@ -252,6 +252,7 @@ MatchInfo = namedtuple(
 #    http://www.isical.ac.in/~bioinfo_miu/FOGSAA.7z
 # 5. EDLIB: edit distance-based alignment
 #    https://github.com/Martinsos/edlib
+#    Test with mode='HW', task='path', and add additionalEqualities if using wildcards
 # 6. Phred-adjusted ML for error probability:
 # https://biosails.github.io/pheniqs/glossary.html#phred_adjusted_maximum_likelihood_decoding
 # 7. Adaptive banded alignment:

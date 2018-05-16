@@ -178,6 +178,7 @@ The citation for the original Cutadapt paper is:
 ### 2.0
 
 * Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+* Consider use of prompt-toolkit for autocompletion of command line options https://github.com/jonathanslenders/python-prompt-toolkit
 * Consider adding additional report formats
     * https://github.com/marcelm/cutadapt/issues/112
 * Performance enhancements using
@@ -195,7 +196,7 @@ The citation for the original Cutadapt paper is:
 
 * Implement additional alternate alignment algorithms.
 * Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
-* IMplement additional error correction approaches:
+* Implement additional error correction approaches:
   * https://www.ncbi.nlm.nih.gov/pubmed/25161220
   * https://github.com/Malfoy/BCOOL
 * Explore new quality trimming algorithms
@@ -210,7 +211,6 @@ The citation for the original Cutadapt paper is:
 While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2018.
 
 If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
-
 
 ## Unit test needs
 
