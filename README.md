@@ -115,6 +115,7 @@ The citation for the original Cutadapt paper is:
     * 7641c8d
     * 77781ff
     * 268d390
+    * 014bd56
 
 * Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
 * Adapter detection:
