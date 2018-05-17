@@ -3,8 +3,10 @@
 Tests write output (should it return True or False or write)
 """
 from atropos.commands.trim.filters import (
-    NContentFilter, DISCARD, KEEP, SingleWrapper, PairedWrapper)
+    NContentFilter, DISCARD, KEEP, SingleWrapper, PairedWrapper
+)
 from atropos.io.seqio import Sequence
+
 
 def test_ncontentfilter():
     # third parameter is True if read should be discarded
@@ -14,12 +16,12 @@ def test_ncontentfilter():
         ('AAACCTTGGN', 1, KEEP),
         ('AAACNNNCTTGGN', 0.5, KEEP),
         ('NNNNNN', 1, DISCARD),
-        ('ANAAAA', 1/6, KEEP),
-        ('ANAAAA', 0, DISCARD)
+        ('ANAAAA', 1 / 6, KEEP),
+        ('ANAAAA', 0, DISCARD),
     ]
     for seq, count, expected in params:
         filter = NContentFilter(count=count)
-        _seq = Sequence('read1', seq, qualities='#'*len(seq))
+        _seq = Sequence('read1', seq, qualities='#' * len(seq))
         assert filter(_seq) == expected
 
 
@@ -34,8 +36,8 @@ def test_ncontentfilter_paired():
         filter = NContentFilter(count=count)
         filter_legacy = SingleWrapper(filter)
         filter_both = PairedWrapper(filter)
-        read1 = Sequence('read1', seq1, qualities='#'*len(seq1))
-        read2 = Sequence('read1', seq2, qualities='#'*len(seq2))
+        read1 = Sequence('read1', seq1, qualities='#' * len(seq1))
+        read2 = Sequence('read1', seq2, qualities='#' * len(seq2))
         assert filter_legacy(read1, read2) == filter(read1)
         # discard entire pair if one of the reads fulfills criteria
         assert filter_both(read1, read2) == expected

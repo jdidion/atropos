@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.19 (2018.05.16)
+--------------------
+* Fix #68: Error when using insert aligner with adapters of different lengths
+
 v1.1.18 (2018.03.16)
 --------------------
 * Added two new tools to the benchmarks:

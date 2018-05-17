@@ -279,24 +279,24 @@ class InsertAligner(object):
         Returns:
             A :class:`Match` object, or None if there is no match.
         """
-        len1 = len(seq1)
-        len2 = len(seq2)
-        seq_len = min(len1, len2)
-        if len1 > len2:
-            seq1 = seq1[:len2]
-        elif len2 > len1:
-            seq2 = seq2[:len1]
+        seq_len1 = len(seq1)
+        seq_len2 = len(seq2)
+        seq_len = min(seq_len1, seq_len2)
+        if seq_len1 > seq_len2:
+            seq1 = seq1[:seq_len2]
+        elif seq_len2 > seq_len1:
+            seq2 = seq2[:seq_len1]
 
         seq2_rc = reverse_complement(seq2)
 
-        def _match(insert_match, offset, insert_match_size, prob): # pylint disable=unused-argument
-            if offset < self.min_adapter_overlap:
+        def _match(_insert_match, _offset, _insert_match_size, _):
+            if _offset < self.min_adapter_overlap:
                 # The reads are mostly overlapping, to the point where
                 # there's not enough overhang to do a confident adapter
                 # match. We return just the insert match to signal that
                 # error correction can be done even though no adapter
                 # trimming is required.
-                return (insert_match, None, None)
+                return (_insert_match, None, None)
 
             # TODO: this is very sensitive to the exact correct choice of
             # adapter. For example, if you specifiy GATCGGAA... and the correct
@@ -304,42 +304,43 @@ class InsertAligner(object):
             # the alignment will fail. We need to use a comparison that is a bit
             # more forgiving.
 
-            a1_match = compare_prefixes(
-                seq1[insert_match_size:], self.adapter1,
-                wildcard_ref=self.adapter_wildcards,
-                wildcard_query=self.read_wildcards)
-            a2_match = compare_prefixes(
-                seq2[insert_match_size:], self.adapter2,
-                wildcard_ref=self.adapter_wildcards,
-                wildcard_query=self.read_wildcards)
-            adapter_len = min(offset, self.adapter1_len, self.adapter2_len)
-            max_adapter_mismatches = round(
-                adapter_len * self.max_adapter_mismatch_frac)
+            def _adapter_match(insert_seq, adapter_seq, adapter_len):
+                amatch = compare_prefixes(
+                    insert_seq[_insert_match_size:], adapter_seq,
+                    wildcard_ref=self.adapter_wildcards,
+                    wildcard_query=self.read_wildcards)
+                alen = min(_offset, adapter_len)
+                return amatch, alen, round(alen * self.max_adapter_mismatch_frac)
+
+            a1_match, a1_length, a1_max_mismatches = _adapter_match(
+                seq1, self.adapter1, self.adapter1_len)
+            a2_match, a2_length, a2_max_mismatches = _adapter_match(
+                seq2, self.adapter2, self.adapter2_len)
+
             if (
-                    a1_match[5] > max_adapter_mismatches and
-                    a2_match[5] > max_adapter_mismatches):
+                    a1_match[5] > a1_max_mismatches and
+                    a2_match[5] > a2_max_mismatches):
                 return None
 
-            a1_prob = self.match_probability(a1_match[4], adapter_len)
-            a2_prob = self.match_probability(a2_match[4], adapter_len)
-            if (
-                    (adapter_len > self.adapter_check_cutoff) and
-                    ((a1_prob * a2_prob) > self.adapter_max_rmp)):
-                return None
+            if min(a1_length, a2_length) > self.adapter_check_cutoff:
+                a1_prob = self.match_probability(a1_match[4], a1_length)
+                a2_prob = self.match_probability(a2_match[4], a2_length)
+                if (a1_prob * a2_prob) > self.adapter_max_rmp:
+                    return None
 
-            adapter_len1 = min(self.adapter1_len, len1 - insert_match_size)
-            adapter_len2 = min(self.adapter2_len, len2 - insert_match_size)
-            best_adapter_matches, best_adapter_mismatches = (
-                a1_match if a1_prob < a2_prob else a2_match)[4:6]
+            mismatches = min(a1_match[5], a2_match[5])
+
+            def _create_match(alen, slen):
+                alen = min(alen, slen - _insert_match_size)
+                _mismatches = min(alen, mismatches)
+                _matches = alen - _mismatches
+                return Match(0, alen, _insert_match_size, slen, _matches, _mismatches)
 
             return (
-                insert_match,
-                Match(
-                    0, adapter_len1, insert_match_size, len1,
-                    best_adapter_matches, best_adapter_mismatches),
-                Match(
-                    0, adapter_len2, insert_match_size, len2,
-                    best_adapter_matches, best_adapter_mismatches))
+                _insert_match,
+                _create_match(a1_length, seq_len1),
+                _create_match(a2_length, seq_len2)
+            )
 
         # # This is the old way of doing things, where we use the built-in
         # # Aligner to do a single match.
@@ -389,7 +390,7 @@ class InsertAligner(object):
                     # Test matches in order of random-match probability.
                     # TODO: compare against sorting by length (which is how
                     # SeqPurge essentially does it).
-                    #filtered_matches.sort(key=lambda x: x[2], reverse=True)
+                    # filtered_matches.sort(key=lambda x: x[2], reverse=True)
                     filtered_matches.sort(key=lambda x: x[3])
                     for match_args in filtered_matches:
                         match = _match(*match_args)
