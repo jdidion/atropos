@@ -20,4 +20,3 @@ docker run \
 docker build -f Dockerfile -t jdidion/bwa_hg37index . && \
 # cleanup
 rm -Rf bwa*index
-
