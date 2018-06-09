@@ -20,26 +20,26 @@ from atropos.util import MAGNITUDE, ALPHABETS
 
 class BaseCommandParser(object):
     """Base class for Atropos sub-commands.
-    
+
     Subclasses must define name, description, and usage members.
     """
     preamble = "Atropos version {version}"
     usage = "atropos {command} [options]"
     description = ''
     details = ''
-    
+
     def __init__(self):
         self.groups = {}
         self.create_parser()
         self.add_common_options()
         self.add_command_options()
-    
+
     def parse(self, args):
         """Parse args using the conifgured ArgumentParser.
-        
+
         Args:
             args: Command line arguments.
-        
+
         Returns:
             A Namespace-like object.
         """
@@ -49,7 +49,7 @@ class BaseCommandParser(object):
         self.validate_common_options(options)
         self.validate_command_options(options)
         return options
-    
+
     def create_parser(self):
         """Create the ArgumentParser.
         """
@@ -57,16 +57,17 @@ class BaseCommandParser(object):
             name=self.name,
             version=__version__)
         self.parser = ArgumentParser(
+            prog="atropos {}".format(self.name),
             usage=self.usage.format(**format_args),
             description=self.get_description(**format_args),
             formatter_class=ParagraphHelpFormatter)
-    
+
     def get_description(self, **kwargs):
         description = "{}\n\n{}\n\n{}".format(*(
             part.strip()
             for part in (self.preamble, self.description, self.details)))
         return description.format(**kwargs)
-    
+
     def add_group(
             self, name, title=None, description=None, mutex=False,
             required=False):
@@ -81,7 +82,7 @@ class BaseCommandParser(object):
             group = self.parser.add_argument_group(title or name, description)
         self.groups[name] = group
         return group
-    
+
     def get_group(self, name):
         """If a group has already been created with `name`, return the group,
         otherwise create a new group with that name.
@@ -90,7 +91,7 @@ class BaseCommandParser(object):
             return self.groups[name]
         else:
             return self.add_group(name)
-    
+
     def add_common_options(self):
         """Add common arguments to the parser.
         """
@@ -124,7 +125,10 @@ class BaseCommandParser(object):
             "--log-file",
             type=writeable_file, default=None, metavar="FILE",
             help="File to write logging info. (stdout)")
-        
+        self.parser.add_argument(
+            '--version', action='version', version=__version__,
+            help="Show version information and exit.")
+
         group = self.add_group("Input")
         group.add_argument(
             "-pe1",
@@ -209,16 +213,16 @@ class BaseCommandParser(object):
             default=None, metavar="NAME", choices=tuple(ALPHABETS.keys()),
             help="Specify a sequence alphabet to use for validating inputs. "
                  "Currently, only 'dna' is supported. (no validation)")
-    
+
     def add_command_options(self):
         """Add command-specific options. At the very least,
         "-o, --output" is required.
         """
         raise NotImplementedError()
-    
+
     def setup_logging(self, options):
         """Setup logging and print an introductory message.
-        
+
         Logging setup is only done if there are not already any handlers (can
         happen when this function is being called externally such as from unit
         tests).
@@ -241,17 +245,17 @@ class BaseCommandParser(object):
             handler.setLevel(level)
             logging.getLogger().setLevel(level)
             logging.getLogger().addHandler(handler)
-        
+
         logger = logging.getLogger()
         logger.info(
             "This is Atropos %s with Python %s", __version__,
             platform.python_version())
-    
+
     def validate_common_options(self, options):
         """Validate arguments to common options.
         """
         parser = self.parser
-        
+
         # Find out which 'mode' we need to use.
         # TODO: unit tests for SRA streaming
         # TODO: add srastream to pypi
@@ -267,7 +271,7 @@ class BaseCommandParser(object):
             try:
                 from srastream import SraReader
                 options.sra_reader = SraReader(
-                    options.sra_accession, 
+                    options.sra_accession,
                     batch_size=options.batch_size or 1000)
                 options.sra_reader.start()
                 options.paired = options.sra_reader.paired
@@ -294,10 +298,10 @@ class BaseCommandParser(object):
                     "trimming. If this is an interleaved file, use '-l' "
                     "instead.")
             options.paired = True
-        
+
         if options.input_read is None:
             options.input_read = PAIRED if options.paired else SINGLE
-        
+
         # Set sample ID from the input file name(s)
         if options.sample_id is None:
             if options.sra_reader:
@@ -316,18 +320,18 @@ class BaseCommandParser(object):
                 if name.endswith('.'):
                     name = name[:-1]
                 options.sample_id = name
-        
+
         if options.quiet:
             options.progress = None
         elif options.progress and options.output == STDERR:
             logging.getLogger().warning(
                 "Progress bar may corrupt output written to STDERR")
-        
+
         if options.report_file in (STDOUT, STDERR) and options.quiet:
             logging.getLogger().warning(
                 "Quiet mode - report will not be written to stdout")
             options.report_file = None
-    
+
     def validate_command_options(self, options):
         """Validate command-specific options.
         """
@@ -352,10 +356,10 @@ class TypeWithArgs(object): # pylint: disable=no-member
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
-    
+
     def __call__(self, string):
         return self._do_call(string, *self.args, **self.kwargs) or string
-    
+
     def _do_call(self, string, *args, **kwargs):
         """Convert and/or validate `string`.
         """
@@ -366,7 +370,7 @@ class CompositeType(object):
     """
     def __init__(self, *types):
         self.types = types
-    
+
     def __call__(self, string):
         result = string
         for datatype in self.types:
@@ -386,7 +390,7 @@ class CharList(object):
     """
     def __init__(self, choices):
         self.choices = set(choices)
-    
+
     def __call__(self, string):
         chars = list(string)
         assert all(char in self.choices for char in chars)
@@ -402,21 +406,21 @@ class Delimited(TypeWithArgs):
             vals = string.split(delim) if delim else (string,)
         else:
             vals = string
-        
+
         if vals[0] == "*" and choices is not None:
             vals = choices
-        
+
         if data_type:
             vals = [data_type(v) for v in vals]
-        
+
         if min_len and len(vals) < min_len:
             raise ArgumentError(
                 self, "there must be at least {} values".format(min_len))
-        
+
         if max_len and len(vals) > max_len:
             raise ArgumentError(
                 self, "there can be at most {} values".format(max_len))
-        
+
         return vals
 
 ACCESS = dict(
@@ -445,7 +449,7 @@ class ReadwriteableFile(object):
     def __init__(self):
         self.read_type = AccessiblePath('f', 'r')
         self.write_type = AccessiblePath('f', 'w')
-    
+
     def __call__(self, string):
         path = string
         if os.path.exists(path):
@@ -472,7 +476,7 @@ readwriteable_file = ReadwriteableFile()
 
 def readable_url(url):
     """Validator for a URL that must be readable.
-    
+
     Args:
         url: The URL to validate.
     """
