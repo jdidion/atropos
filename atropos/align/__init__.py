@@ -307,8 +307,8 @@ class InsertAligner(object):
             def _adapter_match(insert_seq, adapter_seq, adapter_len):
                 amatch = compare_prefixes(
                     insert_seq[_insert_match_size:], adapter_seq,
-                    wildcard_ref=self.adapter_wildcards,
-                    wildcard_query=self.read_wildcards)
+                    wildcard_ref=self.read_wildcards,
+                    wildcard_query=self.adapter_wildcards)
                 alen = min(_offset, adapter_len)
                 return amatch, alen, round(alen * self.max_adapter_mismatch_frac)
 
