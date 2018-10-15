@@ -4,11 +4,10 @@ cache:
   directories:
   - "$HOME/.cache/pip"
 python:
-- 3.3
 - 3.4.3
 - 3.5
 - 3.6
-#- "3.7-dev"
+- 3.7
 install:
 - pip install --upgrade pip wheel
 - pip install Cython
@@ -18,8 +17,8 @@ script:
 after_success:
 - pylint atropos
 # push Docker images for full releases
-- > 
-    test -n "$TRAVIS_TAG" && 
+- >
+    test -n "$TRAVIS_TAG" &&
     docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS &&
     export REPO=jdidion/atropos &&
     docker build -f Dockerfile -t $REPO:$TRAVIS_TAG . &&
