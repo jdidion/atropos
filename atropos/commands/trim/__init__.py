@@ -12,7 +12,6 @@ from atropos.commands.base import (
 from atropos.commands.stats import (
     StatsMode, SingleEndReadStatistics, PairedEndReadStatistics)
 from atropos.adapters import AdapterParser, BACK
-from atropos.io import STDOUT
 from atropos.io.seqio import Sequence
 from atropos.util import RandomMatchProbability, run_interruptible
 from .modifiers import (
@@ -56,6 +55,7 @@ from .filters import (
 from .writers import (
     Formatters, InfoFormatter, RestFormatter, WildcardFormatter, Writers
 )
+from xphyle import STDOUT
 
 
 class RecordHandler:

@@ -90,7 +90,7 @@ Please cite as:
 The results in the paper can be fully reproduced using the workflow defined in the [paper](paper/README.md) directory.
 
 The citation for the original Cutadapt paper is:
- 
+
 > Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
 
 
@@ -115,7 +115,9 @@ The citation for the original Cutadapt paper is:
     * 7641c8d
     * 77781ff
     * 268d390
+  * List of commits to migrate from 1.1 branch
     * 014bd56
+    * c9412b9
 
 * Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
 * Adapter detection:
@@ -138,7 +140,9 @@ The citation for the original Cutadapt paper is:
 
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
-* Provide PacBio- and nanopore-specific options (https://github.com/marcelm/cutadapt/issues/120).
+* Provide PacBio- and nanopore-specific options
+    * https://github.com/marcelm/cutadapt/issues/120
+    * https://github.com/hyeshik/poreplex
 * Provide option for RNA-seq data that will trim polyA sequence.
     * https://github.com/ibest/seqyclean
 * Add formal config file support (#53)
@@ -208,6 +212,7 @@ The citation for the original Cutadapt paper is:
 * Automatic adaptive tuning of queue sizes to maximize the balance between memory usage and latency.
 * Potential performance improvements in BAM reading: https://www.biostars.org/p/186732/
 * Multithreaded writing to single output may be possible. This would be implemented in xphyle.
+* Any way to incorporate protocol-specific trimming https://github.com/lh3/pre-pe
 
 While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2018.
 

@@ -1,26 +1,32 @@
 """Widely useful utility methods.
 """
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from collections import OrderedDict, Iterable
 from datetime import datetime
+from enum import Enum
 import errno
 import functools
 import logging
 import math
 from numbers import Number
 import time
-from typing import Dict
+from typing import (
+    Dict, Sequence, Tuple, Union, Optional, Generic, TypeVar, Type, Any, Callable
+)
 from atropos import AtroposError
+import pokrok as pk
 
 
 class NotInAlphabetError(Exception):
-    def __init__(self, character):
+    def __init__(self, character: str):
         super().__init__()
         self.character = character
 
 
 class Alphabet:
-    def __init__(self, valid_characters, default_character):
+    def __init__(
+            self, valid_characters: Sequence[str],
+            default_character: Optional[str] = None):
         if not isinstance(valid_characters, set):
             valid_characters = set(valid_characters)
         if default_character not in valid_characters:
@@ -28,23 +34,23 @@ class Alphabet:
         self.valid_characters = valid_characters
         self.default_character = default_character
 
-    def __contains__(self, character):
+    def __contains__(self, character: str) -> bool:
         return character in self.valid_characters
 
-    def validate(self, character):
+    def validate(self, character: str) -> None:
         """Raises NotInAlphabetError if the character is not in the alphabet.
         """
         if character not in self:
             raise NotInAlphabetError(character)
 
-    def validate_string(self, string):
+    def validate_string(self, string: str) -> None:
         """Raises NotInAlphabetError if any character in 'string' is not in the
         alphabet.
         """
         for character in string:
             self.validate(character)
 
-    def resolve(self, character):
+    def resolve(self, character: str) -> str:
         """Returns 'character' if it's in the alphabet, otherwise the
         alphabet's default character.
         """
@@ -54,14 +60,18 @@ class Alphabet:
         else:
             return self.default_character
 
-    def resolve_string(self, string):
+    def resolve_string(self, string: str) -> str:
         """Returns a new string with any non-alphabet characters replaced
         with the default character.
         """
         return "".join(self.resolve(c) for c in string)
 
 
-ALPHABETS = dict(dna=Alphabet('ACGT', 'N'), iso=None, colorspace=Alphabet('0123', None))
+ALPHABETS = dict(
+    dna=Alphabet('ACGT', 'N'),
+    iso=None,  # TODO
+    colorspace=Alphabet('0123', None)
+)
 
 
 def build_iso_nucleotide_table() -> Dict[str, str]:
@@ -93,11 +103,23 @@ IUPAC_BASES = frozenset(('X',) + tuple(BASE_COMPLEMENTS.keys()))
 """Valid IUPAC bases, plus 'X'"""
 GC_BASES = frozenset('CGRYSKMBDHVN')
 """IUPAC bases that include C or G."""
-MAGNITUDE = dict(G=1E9, M=1E6, K=1E3)
 LOG2 = math.log(2)
 
 
-class RandomMatchProbability(object):
+class Magnitude(Enum):
+    """Enumeration of some common number scales.
+    """
+    G = ('billion', 'giga', 1E9)
+    M = ('million', 'mega', 1E6)
+    K = ('thousand', 'kilo', 1E3)
+
+    def __init__(self, label, prefix, divisor):
+        self.label = label
+        self.prefix = prefix
+        self.divisor = divisor
+
+
+class RandomMatchProbability:
     """Class for computing random match probability for DNA sequences based on
     binomial expectation. Maintains a cache of factorials to speed computation.
 
@@ -105,17 +127,22 @@ class RandomMatchProbability(object):
         init_size: Initial cache size.
     """
 
-    def __init__(self, init_size=150):
+    def __init__(self, init_size: int = 150):
         self.cache = {}
         self.factorials = [1] * init_size
         self.max_n = 1
         self.cur_array_size = init_size
 
-    def __call__(self, matches, size, match_prob=0.25, mismatch_prob=0.75):
+    def __call__(
+            self, matches: int, size: int, match_prob: float = 0.25,
+            mismatch_prob: float = 0.75
+    ) -> float:
         """Computes the random-match probability for a given sequence size and
         number of matches.
 
         Args:
+            matches: Number of matches (numerator)
+            size: Size of the sequence (denominator)
             match_prob: Probability of two random bases matching.
             mismatch_prob: Probability of two random bases not matcing.
 
@@ -148,14 +175,14 @@ class RandomMatchProbability(object):
         self.cache[key] = prob
         return prob
 
-    def factorial(self, num):
+    def factorial(self, num: int) -> int:
         """Returns `num`!.
         """
         if num > self.max_n:
             self._fill_upto(num)
         return self.factorials[num]
 
-    def _fill_upto(self, num):
+    def _fill_upto(self, num: int) -> None:
         if num >= self.cur_array_size:
             extension_size = num - self.cur_array_size + 1
             self.factorials += [1] * extension_size
@@ -168,27 +195,30 @@ class RandomMatchProbability(object):
         self.max_n = idx
 
 
-class Mergeable:
+class Mergeable(metaclass=ABCMeta):
     """Base class for objects that can merge themselves with another.
     """
-
+    @abstractmethod
     def merge(self, other):
         """Merges `other` with `self` and returns the merged value.
         """
-        raise NotImplementedError()
+        pass
 
 
-class Summarizable:
+class Summarizable(metaclass=ABCMeta):
     """Base class for objects that can summarize themselves.
     """
-
+    @abstractmethod
     def summarize(self):
         """Returns a summary dict.
         """
-        raise NotImplementedError()
+        pass
 
 
-class Const(Mergeable):
+ConstType = TypeVar('ConstType')
+
+
+class Const(Generic[ConstType], Mergeable):
     """A :class:`Mergeable` that is a constant value. Merging simply checks
     that two values are identical.
 
@@ -196,10 +226,10 @@ class Const(Mergeable):
         value: The value to treat as a constant.
     """
 
-    def __init__(self, value):
+    def __init__(self, value: ConstType):
         self.value = value
 
-    def merge(self, other):
+    def merge(self, other: 'Const[ConstType]') -> 'Const[ConstType]':
         """Check that `self==other`.
 
         Raises:
@@ -210,7 +240,7 @@ class Const(Mergeable):
 
         return self
 
-    def __eq__(self, other):
+    def __eq__(self, other: Union[ConstType, 'Const[ConstType]']) -> bool:
         """Returns True if `self.value==other` (or `other.value` if `other` is
         a :class:`Const`).
         """
@@ -218,7 +248,7 @@ class Const(Mergeable):
             other = other.value
         return self.value == other
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.value)
 
 
@@ -230,17 +260,17 @@ class Timestamp:
         self.dtime = datetime.now()
         self.clock = time.clock()
 
-    def timestamp(self):
+    def timestamp(self) -> float:
         """Returns the unix timestamp.
         """
         return self.dtime.timestamp()
 
-    def isoformat(self):
+    def isoformat(self) -> str:
         """Returns the datetime in ISO format.
         """
         return self.dtime.isoformat()
 
-    def __sub__(self, other, minval=0.01):
+    def __sub__(self, other: 'Timestamp', minval: float = 0.01) -> dict:
         """Subtract another timestamp from this one.
 
         Args:
@@ -273,12 +303,12 @@ class Timing(Summarizable):
     def __exit__(self, exception_type, exception_value, traceback):
         self.update()
 
-    def update(self):
+    def update(self) -> None:
         """Set :attr:`self.cur_time` to the current time.
         """
         self.cur_time = Timestamp()
 
-    def summarize(self):
+    def summarize(self) -> dict:
         """Returns a summary dict
         {start=<start_time>, wallclock=<datetime_diff>, cpu=<clock_diff>}.
         """
@@ -292,14 +322,21 @@ class Timing(Summarizable):
         return summary
 
 
-class CountingDict(dict, Mergeable, Summarizable):
+SummaryType = TypeVar('SummaryType')
+
+
+class CountingDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
     """A dictionary that always returns 0 on get of a missing key.
 
     Args:
+        keys: The initial keys to count.
         sort_by: Whether summary is sorted by key (0) or value (1).
+        summary_type:
     """
-
-    def __init__(self, keys=None, sort_by=0, summary_type='dict'):
+    def __init__(
+            self, keys: Iterable = None, sort_by: int = 0,
+            summary_type: Type[SummaryType] = dict
+    ):
         super().__init__()
         self.sort_by = sort_by
         self.summary_type = summary_type
@@ -307,44 +344,42 @@ class CountingDict(dict, Mergeable, Summarizable):
             for key in keys:
                 self.increment(key)
 
-    def __getitem__(self, name):
-        return self.get(name, 0)
+    def __getitem__(self, key) -> int:
+        return self.get(key, 0)
 
-    def increment(self, key, inc=1):
+    def increment(self, key, inc: int = 1) -> None:
         """Increment the count of `key` by `inc`.
         """
         self[key] += inc
 
-    def merge(self, other):
+    def merge(self, other: 'CountingDict') -> 'CountingDict':
         if not isinstance(other, CountingDict):
-            raise ValueError("Cannot merge object of type {}".format(type(other)))
-
+            raise ValueError(f"Cannot merge object of type {type(other)}")
         for key, value in other.items():
             self[key] += value
         return self
 
-    def get_sorted_items(self):
+    def get_sorted_items(self) -> Iterable[Tuple[Any, int]]:
         """Returns an iterable of (key, value) sorted according to this
         CountingDict's `sort_by` param.
         """
         return sorted(self.items(), key=lambda item: item[self.sort_by])
 
-    def summarize(self):
+    def summarize(self) -> SummaryType:
         """Returns an OrderedDict of sorted items.
         """
-        summary_func = ordered_dict if self.summary_type == 'dict' else tuple
+        summary_func = ordered_dict if self.summary_type == dict else tuple
         return summary_func(self.get_sorted_items())
 
 
-class Histogram(CountingDict):
+class Histogram(CountingDict[dict]):
     """Counting dict that returns a summary dict that contains summary stats.
     """
-
-    def summarize(self):
+    def summarize(self) -> dict:
         hist = super().summarize()
         return dict(hist=hist, summary=self.get_summary_stats())
 
-    def get_summary_stats(self):
+    def get_summary_stats(self) -> dict:
         """Returns dict with mean, median, and modes of histogram.
         """
         values = tuple(self.keys())
@@ -358,26 +393,24 @@ class Histogram(CountingDict):
         )
 
 
-class NestedDict(dict, Mergeable, Summarizable):
+class NestedDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
     """A dict that initalizes :class:`CountingDict`s for missing keys.
 
     Args:
-        shape: The flattened shape: 'long' or 'wide'.
+        summary_type: The flattened shape: list or dict.
     """
-
-    def __init__(self, shape="wide"):
+    def __init__(self, summary_type: Type[SummaryType] = dict):
         super().__init__()
-        self.shape = shape
+        self.summary_type = summary_type
 
-    def __getitem__(self, name):
-        if name not in self:
-            self[name] = CountingDict()
-        return self.get(name)
+    def __getitem__(self, key) -> CountingDict:
+        if key not in self:
+            self[key] = CountingDict()
+        return self.get(key)
 
-    def merge(self, other):
+    def merge(self, other: 'NestedDict') -> 'NestedDict':
         if not isinstance(other, NestedDict):
             raise ValueError("Cannot merge object of type {}".format(type(other)))
-
         for key, value in other.items():
             if key in self:
                 self[key].merge(value)
@@ -385,7 +418,7 @@ class NestedDict(dict, Mergeable, Summarizable):
                 self[key] = value
         return self
 
-    def summarize(self):
+    def summarize(self) -> SummaryType:
         """Returns a flattened version of the nested dict.
 
         Returns:
@@ -395,13 +428,12 @@ class NestedDict(dict, Mergeable, Summarizable):
                 of keys in the child dicts.
         """
         keys1 = sorted(self.keys())
-        if self.shape == "long":
+        if self.summary_type == list:
             return tuple(
                 (key1, key2, value)
                 for key1 in keys1
                 for key2, value in self[key1].items()
             )
-
         else:
             keys2 = set()
             for child in self.values():
@@ -427,7 +459,7 @@ class MergingDict(OrderedDict, Mergeable):
         return self
 
 
-def merge_dicts(dest, src):
+def merge_dicts(dest: dict, src: dict):
     """Merge corresponding items in `src` into `dest`. Values in `src` missing
     in `dest` are simply added to `dest`. Values that appear in both `src` and
     `dest` are merged using `merge_values`.
@@ -458,14 +490,13 @@ def merge_values(key, v_dest, v_src):
     - Otherwise: Treated as a Const (i.e. must be identical).
 
     Args:
-        key:
+        key: The key being merged.
         v_dest: The dest value.
         v_src: The src value.
 
     Returns:
         The merged value.
     """
-
     def assert_of_type(_type=None):
         if _type is None:
             _type = v_dest.__class__
@@ -504,7 +535,7 @@ def merge_values(key, v_dest, v_src):
     return v_dest
 
 
-def ordered_dict(iterable):
+def ordered_dict(iterable: Iterable) -> OrderedDict:
     """Create an OrderedDict from an iterable of (key, value) tuples.
     """
     ordict = OrderedDict()
@@ -513,19 +544,19 @@ def ordered_dict(iterable):
     return ordict
 
 
-def complement(seq):
+def complement(seq: str) -> str:
     """Returns the complement of nucleotide sequence `seq`.
     """
     return "".join(BASE_COMPLEMENTS[base] for base in seq)
 
 
-def reverse_complement(seq):
+def reverse_complement(seq: str) -> str:
     """Returns the reverse complement of nucleotide sequence `seq`.
     """
     return "".join(BASE_COMPLEMENTS[base] for base in reversed(seq))
 
 
-def sequence_complexity(seq):
+def sequence_complexity(seq: str) -> float:
     """Computes a simple measure of sequence complexity.
 
     Args:
@@ -546,11 +577,11 @@ def sequence_complexity(seq):
     return -term
 
 
-def qual2int(qual, base=33):
+def qual2int(qual: str, base: int = 33) -> int:
     """Convert a quality charater to a phred-scale int.
 
     Args:
-        q: The quality value.
+        qual: The quality value.
         base: The offset of the first quality value (Old Illumina = 64,
             new Illumina = 33).
 
@@ -560,7 +591,7 @@ def qual2int(qual, base=33):
     return ord(qual) - base
 
 
-def quals2ints(quals, base=33):
+def quals2ints(quals: Sequence[str], base: int = 33) -> Sequence[int]:
     """Convert an iterable of quality characters to phred-scale ints.
 
     Args:
@@ -571,16 +602,20 @@ def quals2ints(quals, base=33):
     Returns:
         A tuple of integer qualities.
     """
-    return (ord(q) - base for q in quals)
+    return tuple(ord(q) - base for q in quals)
 
 
-def qual2prob(qchar):
+def qual2prob(qchar: str) -> float:
     """Converts a quality char to a probability.
     """
     return 10 ** (-qual2int(qchar) / 10)
 
 
-def enumerate_range(collection, start, end, step=1):
+T = TypeVar('T')
+
+
+def enumerate_range(
+        collection: Iterable[T], start, end, step=1) -> Iterable[Tuple[int, T]]:
     """Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...
 
     Only up to (start-end+1) items will be yielded.
@@ -601,7 +636,7 @@ def enumerate_range(collection, start, end, step=1):
         idx += step
 
 
-def mean(values):
+def mean(values: Sequence[float]) -> float:
     """Computes the mean of a sequence of numeric values.
 
     Args:
@@ -612,15 +647,15 @@ def mean(values):
     """
     if len(values) == 0:
         raise ValueError("Cannot determine the mode of an empty sequence")
-
     return sum(values) / len(values)
 
 
-def weighted_mean(values, counts):
+def weighted_mean(values: Sequence[float], counts: Sequence[int]) -> float:
     """Computes the mean of a sequence of numeric values weighted by counts.
 
     Args:
         values: Sequence of numeric values.
+        counts: Sequence of counts.
 
     Returns:
         The weighted mean (floating point).
@@ -628,43 +663,61 @@ def weighted_mean(values, counts):
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the mena of an empty sequence")
-
     if datalen != len(counts):
         raise ValueError("'values' and 'counts' must be the same length")
-
     return sum(v * c for v, c in zip(values, counts)) / sum(counts)
 
 
-def stdev(values, mu0=None):
+def stdev(values: Sequence[float], mu0: Optional[float] = None) -> float:
     """Returns standard deviation of values having the specified mean.
+
+    Args:
+        values: The values from which to compute the standard deviation.
+        mu0: The population mean. Computed from `values` if None.
+
+    Returns:
+        The standard deviation (floating point). Note: if `values` is of length 1,
+        typically a ValueError would be raised, but this function returns 0.
+
+    Raises:
+        ValueError: If `values` is empty.
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the stdev of an empty sequence")
-
     if datalen == 1:
         return 0
-
     if mu0 is None:
         mu0 = mean(values)
-
     return math.sqrt(sum((val - mu0) ** 2 for val in values) / (len(values) - 1))
 
 
-def weighted_stdev(values, counts, mu0=None):
+def weighted_stdev(
+        values: Sequence[float], counts: Sequence[int], mu0: Optional[float] = None
+) -> float:
     """Returns standard deviation of values having the specified mean weighted
     by counts.
+
+    Args:
+        values: The values from which to compute the standard deviation.
+        counts: Sequence of counts.
+        mu0: The population mean. Computed from `values` if None.
+
+    Returns:
+        The standard deviation (floating point). Note: if `values` is of length 1,
+        typically a ValueError would be raised, but this function returns 0.
+
+    Raises:
+        ValueError: If `values` is empty or if `values` and `counts` are different
+        lengths.
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the stdev of an empty sequence")
-
     if datalen != len(counts):
         raise ValueError("'values' and 'counts' must be the same length")
-
     if datalen == 1:
         return 0
-
     if mu0 is None:
         mu0 = weighted_mean(values, counts)
     return math.sqrt(
@@ -673,30 +726,31 @@ def weighted_stdev(values, counts, mu0=None):
     )
 
 
-def median(values):
+def median(values: Sequence[float]) -> float:
     """Median function borrowed from python statistics module, and sped up by
     in-place sorting of the array.
 
     Args:
-        data: Sequence of numeric values.
+        values: Sequence of numeric values.
 
     Returns:
         The median (floating point).
+
+    Raises:
+        ValueError if `values` is empty.
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the median of an empty sequence")
-
     values = sorted(values)
     idx = datalen // 2
     if datalen % 2 == 1:
         return values[idx]
-
     else:
         return (values[idx - 1] + values[idx]) / 2
 
 
-def weighted_median(values, counts):
+def weighted_median(values: Sequence[float], counts: Sequence[int]) -> Optional[float]:
     """Compute the median of `values` weighted by `counts`.
 
     Args:
@@ -705,12 +759,14 @@ def weighted_median(values, counts):
             value at the corresponding position appears in the sample.
 
     Returns:
-        The weighted median.
+        The weighted median, or None if the total of `counts` is 0.
+
+    Raises:
+        ValueError if `values` is empty or a different length than `counts`.
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the median of an empty sequence")
-
     if datalen != len(counts):
         raise ValueError("'values' and 'counts' must be the same length")
 
@@ -733,37 +789,52 @@ def weighted_median(values, counts):
     return float(val1 + val2) / 2
 
 
-def modes(values):
+def modes(values: Sequence[float]) -> Sequence[float]:
     """Returns a sorted sequence of the modal (i.e. most frequent) values.
+
+    Args:
+        values: The values for which to find the mode(s).
+
+    Returns:
+        A sequence of the modal value(s).
+
+    Raises:
+        ValueError if `values` is empty.
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the mode of an empty sequence")
-
     elif datalen == 1:
         return values
-
     return _find_modes(CountingDict(values).items())
 
 
-def weighted_modes(values, counts):
+def weighted_modes(values: Sequence[float], counts: Sequence[int]) -> Sequence[float]:
     """Returns a sorted sequence of the modal (i.e. most frequent) values
     weighted by counts.
+
+    Args:
+        values: Sequence of unique values.
+        counts: Sequence of counts, where each count is the number of times the
+            value at the corresponding position appears in the sample.
+
+    Returns:
+        A sequence of the modal value(s).
+
+    Raises:
+        ValueError if `values` is empty or a different length than `counts`.
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the mode of an empty sequence")
-
     if datalen != len(counts):
         raise ValueError("'values' and 'counts' must be the same length")
-
     if datalen == 1:
         return values
-
     return _find_modes(zip(values, counts))
 
 
-def _find_modes(value_count_iter):
+def _find_modes(value_count_iter: Iterable[Tuple[float, int]]) -> Sequence[float]:
     sorted_counts = sorted(value_count_iter, key=lambda x: x[1], reverse=True)
     modal_values = [sorted_counts[0][0]]
     mode_count = sorted_counts[0][1]
@@ -772,23 +843,21 @@ def _find_modes(value_count_iter):
             modal_values.append(value)
         else:
             break
-
     modal_values.sort()
     return modal_values
 
 
-def truncate_string(string, max_len=100):
-    """Shorten string s to at most n characters, appending "..." if necessary.
+def truncate_string(string: str, max_len: int = 100) -> Optional[str]:
+    """Shorten string to at most `max_len` characters, appending "..." if necessary.
     """
     if string is None:
         return None
-
     if len(string) > max_len:
         string = string[:max_len - 3] + '...'
     return string
 
 
-def run_interruptible(func, *args, **kwargs):
+def run_interruptible(func: Callable, *args, **kwargs) -> int:
     """Run a function, gracefully handling keyboard interrupts.
 
     Args:
@@ -797,9 +866,6 @@ def run_interruptible(func, *args, **kwargs):
 
     Returns:
         A (unix-style) return code (0=normal, anything else is an error).
-
-    Raises:
-
     """
     retcode = 0
     try:
@@ -812,11 +878,53 @@ def run_interruptible(func, *args, **kwargs):
             retcode = 1
         else:
             raise
-
     except (AtroposError, EOFError):
         logging.getLogger().error("Atropos error", exc_info=True)
         retcode = 1
-    except Exception:  # pylint: disable=broad-except
+    except:  # pylint: disable=broad-except
         logging.getLogger().error("Unknown error", exc_info=True)
         retcode = 1
     return retcode
+
+
+def create_progress_reader(
+    reader, progress_type="bar", batch_size=1, max_items=None, **kwargs
+):
+    """Wrap an iterable in a progress bar of the specified type.
+
+    Args:
+        reader: The iterable to wrap.
+        progress_type: msg = a custom progress bar that reports via log
+            messages; bar = use a ProgressBar (from the progressbar library)
+            or tqdm.
+        max_items: Max number of items, if known in advance.
+        batch_size: The number of records in each iterable item (iterable is
+            typically a BatchReader).
+        kwargs: Additional arguments to pass to the progress bar constructor.
+
+    Returns:
+        A wrapped iterable. If `progress_type == 'bar'` and neither of the
+        supported libraries are available, a warning is logged and the unwrapped
+        reader is returned.
+    """
+    if progress_type == "msg":
+        pk.set_plugins(['logging'])
+
+    if max_items:
+        widgets = [
+            pk.Widget.COUNTER,
+            pk.Widget.PERCENT,
+            pk.Widget.ELAPSED,
+            pk.Widget.BAR,
+            pk.Widget.ETA
+        ]
+    else:
+        widgets = [
+            pk.Widget.COUNTER,
+            pk.Widget.ELAPSED,
+            pk.Widget.SPINNER
+        ]
+
+    return pk.progress_iter(
+        reader, desc="Processed", size=max_items, unit='records', multiplier=batch_size,
+        style=pk.Style(widgets), **kwargs)

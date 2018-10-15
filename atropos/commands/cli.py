@@ -21,7 +21,7 @@ from xphyle.types import PathType, Permission
 from atropos import __version__
 from atropos.io.compression import splitext_compressed
 from atropos.io.seqio import InputRead
-from atropos.util import MAGNITUDE, ALPHABETS
+from atropos.util import Magnitude, ALPHABETS
 
 
 class BaseCommandParser(metaclass=ABCMeta):
@@ -586,7 +586,7 @@ def int_or_str(arg):
         match = INT_OR_STR_RE.match(arg.upper())
         num, mult = match.groups()
         if mult:
-            return int(float(num) * MAGNITUDE[mult])
+            return int(float(num) * Magnitude[mult].divisor)
 
         else:
             return int(num)

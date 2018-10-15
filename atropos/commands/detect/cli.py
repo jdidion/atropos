@@ -1,6 +1,5 @@
 """Command-line interface for the detect command.
 """
-from atropos.io import STDOUT, STDERR
 from atropos.commands.cli import (
     BaseCommandParser,
     positive,
@@ -9,6 +8,7 @@ from atropos.commands.cli import (
     readwriteable_file,
     probability,
 )
+from xphyle import STDOUT, STDERR
 
 
 class CommandParser(BaseCommandParser):
@@ -175,7 +175,7 @@ you don't know what are the adapter sequences.
 
     def validate_command_options(self, options):
         options.report_file = options.output
-        is_std = options.report_file in (STDOUT, STDERR)
+        is_std = options.report_file in {STDOUT, STDERR}
         if options.fasta:
             if is_std and 'perinput' in options.fasta:
                 self.parser.error("Per-input fasta cannot be written to stdout")

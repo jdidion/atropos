@@ -1,7 +1,7 @@
 """Command-line interface for the error command.
 """
 from atropos.commands.cli import BaseCommandParser, writeable_file
-from atropos.io import STDOUT
+from xphyle import STDOUT
 
 
 class CommandParser(BaseCommandParser):

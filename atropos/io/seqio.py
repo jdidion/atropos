@@ -13,10 +13,12 @@ from pathlib import Path
 import sys
 from textwrap import TextWrapper
 from typing import Tuple, List, Callable, Optional, cast
+
+from xphyle import STDOUT, xopen
 from xphyle.types import PathOrFile, ModeArg
+
 from atropos import AtroposError
 from atropos.align import Match, MatchInfo
-from atropos.io import STDOUT, xopen
 from atropos.io.compression import splitext_compressed
 from atropos.util import Summarizable, truncate_string, ALPHABETS, Alphabet
 

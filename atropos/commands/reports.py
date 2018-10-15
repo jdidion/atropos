@@ -3,7 +3,10 @@
 from enum import Enum
 import importlib
 import os
-from atropos.io import STDOUT, STDERR, open_output
+from pathlib import Path
+
+from xphyle import STDOUT, STDERR, open_
+
 from atropos.io.seqio import InputRead
 
 
@@ -16,7 +19,7 @@ class Serializer(Enum):
         self.name = name
         self.mode = mode
 
-    def serialize(self, obj, outfile, **kwargs) -> None:
+    def serialize(self, obj, outfile: Path, **kwargs) -> None:
         """Serialize a summary dict to a file.
 
         Args:
@@ -25,7 +28,7 @@ class Serializer(Enum):
             kwargs: Additional arguments to pass to the `dump` method.
         """
         mod = importlib.import_module(self.name)
-        with open_output(outfile, 'w' + self.mode) as stream:
+        with open_(outfile, 'w' + self.mode) as stream:
             mod.dump(obj, stream, **kwargs)
 
 
@@ -57,18 +60,18 @@ class BaseReportGenerator:
             self.get_report_args(fmt, options) for fmt in self.report_formats
         )
 
-    def get_report_args(self, fmt, options):
+    def get_report_args(self, fmt, options) -> dict:
         """Returns report-specific options dict.
         """
         return {}
 
-    def generate_reports(self, summary):
+    def generate_reports(self, summary: dict):
         """Generate report(s) from a summary.
 
         Args:
             summary: The summary dict.
         """
-        self.add_derived_data(summary)
+        BaseReportGenerator.add_derived_data(summary)
         for fmt, outfile, kwargs in zip(
             self.report_formats, self.report_files, self.report_args
         ):
@@ -78,7 +81,8 @@ class BaseReportGenerator:
             except KeyError:
                 self.generate_text_report(fmt, summary, outfile, **kwargs)
 
-    def add_derived_data(self, summary):
+    @staticmethod
+    def add_derived_data(summary: dict) -> None:
         """Get some additional fields that are useful in the report.
         """
         derived = {
@@ -111,10 +115,10 @@ class BaseReportGenerator:
 
     def generate_from_template(
         self,
-        fmt,
+        fmt: str,
         summary,
-        outfile,
-        template_name=None,
+        outfile: Path,
+        template_name: str = None,
         template_paths=None,
         template_globals=None,
     ):
@@ -165,10 +169,9 @@ class BaseReportGenerator:
                 outfile.close()
 
 
-def prettyprint_summary(summary, outfile='summary.dump.txt'):
+def prettyprint_summary(summary: dict, outfile: Path = Path('summary.dump.txt')):
     """Pretty-print the summary to a file. Mostly used for debugging.
     """
     from pprint import pprint
-
     with open(outfile, 'w') as out:
         pprint(summary, out)

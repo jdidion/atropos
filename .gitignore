@@ -51,3 +51,4 @@ paper/workflow/results
 *.tar
 .pytest_cache/
 .coverage*
+venv/

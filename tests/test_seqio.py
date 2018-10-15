@@ -8,7 +8,9 @@ import shutil
 from textwrap import dedent
 from tempfile import mkdtemp
 from unittest import skipIf, TestCase
-from atropos.io import xopen, open_output
+
+from xphyle import open_, xopen
+
 from atropos.io.seqio import (
     Sequence,
     ColorspaceSequence,
@@ -29,6 +31,7 @@ from atropos.io.seqio import (
 )
 from atropos.util import ALPHABETS
 from .utils import temporary_path
+
 
 # files tests/data/simple.fast{q,a}
 simple_fastq = [
@@ -300,7 +303,7 @@ class TestFastaWriter(TestCase):
 
     def test(self):
         fmt = FastaFormat()
-        with open_output(self.path, "w") as fw:
+        with open_(self.path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA"))
             fw.write(fmt.format_entry("name2", "HELLO"))
         with open(self.path) as t:
@@ -308,7 +311,7 @@ class TestFastaWriter(TestCase):
 
     def test_linelength(self):
         fmt = FastaFormat(line_length=3)
-        with open_output(self.path, "w") as fw:
+        with open_(self.path, "w") as fw:
             fw.write(fmt.format_entry("r1", "ACG"))
             fw.write(fmt.format_entry("r2", "CCAT"))
             fw.write(fmt.format_entry("r3", "TACCAG"))
@@ -319,7 +322,7 @@ class TestFastaWriter(TestCase):
 
     def test_write_sequence_object(self):
         fmt = FastaFormat()
-        with open_output(self.path, "w") as fw:
+        with open_(self.path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA")))
             fw.write(fmt.format(Sequence("name2", "HELLO")))
         with open(self.path) as t:
@@ -344,7 +347,7 @@ class TestFastqWriter(TestCase):
 
     def test(self):
         fmt = FastqFormat()
-        with open_output(self.path, "w") as fw:
+        with open_(self.path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA", "!#!#!"))
             fw.write(fmt.format_entry("name2", "HELLO", "&&&!&&"))
         with open(self.path) as t:
@@ -352,7 +355,7 @@ class TestFastqWriter(TestCase):
 
     def test_twoheaders(self):
         fmt = FastqFormat()
-        with open_output(self.path, "w") as fw:
+        with open_(self.path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA", "!#!#!", name2="name")))
             fw.write(fmt.format(Sequence("name2", "HELLO", "&&&!&", name2="name2")))
         with open(self.path) as t:

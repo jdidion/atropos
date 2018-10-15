@@ -143,14 +143,10 @@ class BaseCommandRunner(metaclass=ABCMeta):
         """
         if self._progress_options:
             # Wrap iterator in progress bar
-            from atropos.io.progress import create_progress_reader
-
-            itr = create_progress_reader(self, * self._progress_options)
-            # itr may be none if there are no progress bar libraries available
-            if itr is not None:
-                return itr
-
-        return self
+            from atropos.util import create_progress_reader
+            return create_progress_reader(self, * self._progress_options)
+        else:
+            return self
 
     def __iter__(self):
         return self

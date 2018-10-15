@@ -3,6 +3,9 @@
 import logging
 import sys
 from typing import cast
+
+from xphyle import STDOUT, STDERR
+
 from atropos.commands.cli import (
     BaseCommandParser,
     configure_threads,
@@ -18,7 +21,6 @@ from atropos.commands.cli import (
     int_or_str,
 )
 from atropos.commands.stats import StatsMode
-from atropos.io import STDOUT, STDERR
 from atropos.io.seqio import guess_format_from_name
 
 
@@ -375,14 +377,16 @@ standard output.
             "trimming, and only if a minimum of LENGTH bases was not "
             "already removed. (no)",
         )
+        # TODO: the name of this option should be changed to more generally refer to
+        # trimming two-color chemistry artifacts. (--twocolor-trim)
         group.add_argument(
             "--nextseq-trim",
             type=positive(),
             default=None,
             metavar="3'CUTOFF",
             help="NextSeq-specific quality trimming (each read). Trims also "
-            "dark cycles appearing as high-quality G bases "
-            "(EXPERIMENTAL). (no)",
+            "dark cycles appearing as high-quality G bases. Similar to "
+            "'--quality-cutoff' bug G bases are ignored. (no)",
         )
         group.add_argument(
             "--trim-n",
@@ -551,7 +555,7 @@ standard output.
         )
         group.add_argument(
             "--report-formats",
-            type=EnumChoice(StatsMode)
+            type=EnumChoice(StatsMode),
             nargs="*",
             choices=("txt", "json", "yaml", "pickle"),
             default=None,
@@ -862,7 +866,7 @@ standard output.
                         "Note: output SAM files cannot be concatenated; "
                         "use 'samtools merge' instead.")
                 options.use_interleaved_output = True
-            elif not any_output or options.output in (STDOUT, STDERR):
+            elif not any_output or options.output in {STDOUT, STDERR}:
                 # If no output files are specified, write interleaved
                 # output to stdout by default.
                 options.use_interleaved_output = True

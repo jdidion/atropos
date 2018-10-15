@@ -5,9 +5,12 @@ and MultiQC reports.
 """
 import math
 import textwrap
-from atropos.io import open_output
+
+from xphyle import open_
+
 from atropos.util import truncate_string, weighted_median
-from .reports import BaseReportGenerator
+from atropos.commands.reports import BaseReportGenerator
+
 
 INDENT = '  '
 PARAGRAPH = textwrap.TextWrapper()
@@ -16,7 +19,7 @@ INDENTED = textwrap.TextWrapper(initial_indent=INDENT, subsequent_indent=INDENT)
 
 class Printer(object):
     """Manages printing to a file.
-    
+
     Args:
         outfile: The output file.
         kwargs: Additional keyword arguments passed to the print function.
@@ -52,7 +55,7 @@ class Printer(object):
 
 class TitlePrinter(Printer):
     """Printer that formats titles.
-    
+
     Args:
         outfile: The output file.
         levels: The formatting associated with different header levels.
@@ -89,7 +92,7 @@ class TitlePrinter(Printer):
 
 class RowPrinter(Printer):
     """Priter that formats rows in a table.
-    
+
     Args:
         outfile: The output file.
         colwidths: Column widths.
@@ -98,7 +101,7 @@ class RowPrinter(Printer):
         pct: Whether floats should be formatted as percentages.
         default: Default value for None's.
         kwargs: Additional keyword arguments passed to the print function.
-    
+
     colwidths, justification, and indent can be longer or shorter than the
     number of arguments; if shorter, the last value in the list is repeated;
     if longer, the list is truncated.
@@ -124,7 +127,7 @@ class RowPrinter(Printer):
 
     def print_rows(self, *rows, header=None, **kwargs):
         """Print multiple rows. Automatically figures out column widths.
-        
+
         Args:
             rows: Rows to print.
             header: Header row.
@@ -167,7 +170,7 @@ class RowPrinter(Printer):
         **kwargs
     ):
         """Print a row.
-        
+
         Args:
             args: Fields in the row.
             colwidths, justification, indent: Row-specific colwidths,
@@ -245,10 +248,9 @@ class RowPrinter(Printer):
 
 
 class LegacyReportGenerator(BaseReportGenerator):
-
     def generate_text_report(self, fmt, summary, outfile, **kwargs):
         if fmt == 'txt':
-            with open_output(outfile, context_wrapper=True) as out:
+            with open_(outfile, 'wt', context_wrapper=True) as out:
                 generate_report(summary, out)
         else:
             super().generate_from_template(fmt, summary, outfile, **kwargs)
@@ -256,7 +258,7 @@ class LegacyReportGenerator(BaseReportGenerator):
 
 def generate_report(summary, outfile):
     """Generate a report.
-    
+
     Args:
         summary: The summary dict.
         outfile: The output file name/object.
@@ -272,7 +274,7 @@ def generate_report(summary, outfile):
 
 def print_summary_report(summary, outfile):
     """Print the top-level summary report.
-    
+
     Args:
         summary: The summary dict.
         outfile: The output file object.
@@ -313,7 +315,7 @@ def print_summary_report(summary, outfile):
 
 def print_trim_report(summary, outfile):
     """Print the trimming report.
-    
+
     Args:
         summary: Summary dict.
         outfile: Open output stream.
@@ -450,12 +452,12 @@ def print_trim_report(summary, outfile):
 
 def print_adapter_report(adapters, outfile, paired, total_records, max_width):
     """Print details for a adapters.
-    
+
     Args:
         adapters: Sequence of adapter info dicts.
         outfile: The output file
         paired: Whether the data is paired-end.
-        
+
         max_width: Max column width.
     """
     adapter_lenghts = []
@@ -504,7 +506,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
         """Print a histogram. Also, print the no. of reads expected to be
         trimmed by chance (assuming a uniform distribution of nucleotides in
         the reads).
-        
+
         Args:
             data: A dictionary mapping lengths of trimmed sequences to their
                 respective frequency
@@ -564,7 +566,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
         """Print a summary of the bases preceding removed adapter sequences.
         Print a warning if one of the bases is overrepresented and there are
         at least 20 preceding bases available.
-        
+
         Return:
             True if a warning was printed.
         """
@@ -730,7 +732,7 @@ def print_adapter_report(adapters, outfile, paired, total_records, max_width):
 
 def print_pre_trim_report(summary, outfile):
     """Print pre-trimming stats.
-    
+
     Args:
         summary: The summary dict.
         outfile: The output file.
@@ -754,7 +756,7 @@ def print_pre_trim_report(summary, outfile):
 
 def print_post_trim_report(summary, outfile):
     """Print post-trimming stats.
-    
+
     Args:
         summary: The summary dict.
         outfile: The output file.
@@ -780,7 +782,7 @@ def print_post_trim_report(summary, outfile):
 
 def print_stats_report(data, outfile):
     """Print stats.
-    
+
     Args:
         data: The stats dict.
         outfile: The output file.
@@ -926,7 +928,7 @@ def print_stats_report(data, outfile):
 def sizeof(*x, seps=True, prec=1):
     """Returns the largest string size of all objects in x, where x is a
     sequence of string or numeric values.
-    
+
     Args:
         *x: The objects to test.
         seps: Whether to include separators (,.) in the size.

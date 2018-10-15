@@ -117,7 +117,7 @@ cmdclass['sdist'] = SdistCython
 # Define install and test requirements based on python version
 version_info = sys.version_info
 if sys.version_info < (3, 6):
-    sys.stdout.write("At least Python 3.3 is required.\n")
+    sys.stdout.write("At least Python 3.6 is required.\n")
     sys.exit(1)
 
 
@@ -132,6 +132,7 @@ extensions = [
 install_requirements = [
     'Cython>=0.25.2',
     'xphyle>=4.0.0-rc.0',
+    'pokrok>=0.1.0',
 ]
 test_requirements = [
     'pytest',

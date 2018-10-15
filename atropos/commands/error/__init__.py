@@ -7,7 +7,6 @@ from atropos import AtroposError
 from atropos.commands.base import (
     BaseCommandRunner, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin
 )
-from atropos.io import open_output
 from atropos.util import qual2prob, run_interruptible
 
 
@@ -102,7 +101,7 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
     """Re-implementation of the shadow regression method described in:
     Wang et al., "Estimation of sequencing error rates in short reads",
         BMC Bioinformatics 2012 13:185, DOI: 10.1186/1471-2105-13-185
-    
+
     Args:
         method: The differences that are considered in the error rate
             calculation; sub = substitutions, indel = insertions and
@@ -208,7 +207,7 @@ class PairedErrorEstimator(PairedEndPipelineMixin, Pipeline):
 
     def finish(self, summary, **kwargs):
         """Estimate error rates.
-        
+
         Returns:
             Tuple (read1_estimate, read2_estimate).
         """

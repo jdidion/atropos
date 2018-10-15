@@ -3,11 +3,13 @@
 from pathlib import Path
 import sys
 from typing import Sequence, Tuple, Union, Optional
+
+from xphyle import STDOUT, xopen, open_
 from xphyle.types import ModeArg
-from atropos.io import STDOUT, xopen, open_output
+
 from atropos.io.compression import splitext_compressed
 from atropos.io.seqio import create_seq_formatter
-from .filters import NoFilter
+from atropos.commands.trim.filters import NoFilter
 
 
 FileDesc = Union[Path, Tuple[Path, ModeArg]]
@@ -47,7 +49,7 @@ class Writers:
                 real_path = path
             # TODO: test whether O_NONBLOCK allows non-blocking write to NFS
             if compressed:
-                self.writers[path] = open_output(real_path, mode)
+                self.writers[path] = open_(real_path, mode)
             else:
                 self.writers[path] = xopen(real_path, "w")
         return self.writers[path]
@@ -81,7 +83,7 @@ class Writers:
         """
         for path in self.force_create:
             if path not in self.writers and path != STDOUT:
-                with open_output(path, "w"):
+                with open_(path, "w"):
                     pass
         for writer in self.writers.values():
             if writer not in (sys.stdout, sys.stderr):

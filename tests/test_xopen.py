@@ -1,9 +1,9 @@
 # coding: utf-8
-import gzip
 import os
-import random
 import sys
-from atropos.io import xopen, open_output
+
+from xphyle import open_, xopen
+
 from atropos.io.compression import get_compressor
 from .utils import temporary_path
 
@@ -42,12 +42,12 @@ def test_append():
                 os.unlink(path)
             except OSError:
                 pass
-            with open_output(path, mode) as f:
+            with open_(path, mode) as f:
                 f.write(text)
             print(path)
-            with open_output(path, mode) as f:
+            with open_(path, mode) as f:
                 f.write(text)
-            with xopen(path, 'r') as f:
+            with open_(path, 'r') as f:
                 try:
                     reference = reference.decode("utf-8")
                 except AttributeError:

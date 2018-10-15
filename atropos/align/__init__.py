@@ -270,6 +270,9 @@ MatchInfo = namedtuple(
 # including Parasail and BitPal: (alndp.pdf)
 # * Heng's dynamic programming algorithm
 #   https://github.com/jts/nanopolish/tree/master/src/thirdparty
+# 13. Greedy algorithm: http://pipmaker.bx.psu.edu/dist/greedy.pdf
+# 14. NW implementations with affine and linear gap penalties:
+# https://github.com/AYahi/recNW
 # Also think about different sequence encodings that might enable faster alignment
 # https://github.com/hammerlab/kerseq/blob/master/kerseq/sequence_encoding.py
 class InsertAligner(object):
