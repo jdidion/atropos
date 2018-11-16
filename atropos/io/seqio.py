@@ -536,7 +536,7 @@ class SAMReader(SequenceReaderBase):
 
     def __init__(
             self, path, quality_base=33, sequence_class=Sequence,
-            alphabet=None):
+            alphabet=None, pysam_kwargs=None):
         self._close_on_exit = False
         if isinstance(path, str):
             path = xopen(path, 'rb')
@@ -549,6 +549,7 @@ class SAMReader(SequenceReaderBase):
         self.quality_base = quality_base
         self.sequence_class = sequence_class
         self.alphabet = alphabet
+        self.pysam_kwargs = pysam_kwargs or dict(check_sq=False)
 
     @property
     def input_names(self):
@@ -556,7 +557,7 @@ class SAMReader(SequenceReaderBase):
 
     def __iter__(self):
         import pysam
-        return self._iter(pysam.AlignmentFile(self._file))
+        return self._iter(pysam.AlignmentFile(self._file, **self.pysam_kwargs))
 
     def _iter(self, sam):
         """Create an iterator over records in the SAM/BAM file.

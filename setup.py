@@ -16,53 +16,65 @@ from distutils.command.build_ext import build_ext as _build_ext
 
 import versioneer
 
-MIN_CYTHON_VERSION = '0.25.2'
+MIN_CYTHON_VERSION = "0.25.2"
+
 
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
 
-def out_of_date(extensions):
+
+with open(
+    os.path.join(os.path.abspath(os.path.dirname(__file__)), "README.md"),
+    encoding="utf-8"
+) as f:
+    long_description = f.read()
+
+
+def out_of_date(_extensions):
     """
     Check whether any pyx source is newer than the corresponding generated
     C source or whether any C source is missing.
     """
-    for extension in extensions:
+    for extension in _extensions:
         for pyx in extension.sources:
             path, ext = os.path.splitext(pyx)
-            if ext not in ('.pyx', '.py'):
+            if ext not in (".pyx", ".py"):
                 continue
-            if extension.language == 'c++':
-                csource = path + '.cpp'
+            if extension.language == "c++":
+                csource = path + ".cpp"
             else:
-                csource = path + '.c'
+                csource = path + ".c"
             # When comparing modification times, allow five seconds slack:
             # If the installation is being run from pip, modification
             # times are not preserved and therefore depends on the order in
             # which files were unpacked.
             if not os.path.exists(csource) or (
-                os.path.getmtime(pyx) > os.path.getmtime(csource) + 5):
+                os.path.getmtime(pyx) > os.path.getmtime(csource) + 5
+            ):
                 return True
     return False
 
-def no_cythonize(extensions, **_ignore):
+
+def no_cythonize(_extensions, **_ignore):
     """
     Change file extensions from .pyx to .c or .cpp.
 
     Copied from Cython documentation
     """
-    for extension in extensions:
+    for extension in _extensions:
         sources = []
         for sfile in extension.sources:
             path, ext = os.path.splitext(sfile)
-            if ext in ('.pyx', '.py'):
-                if extension.language == 'c++':
-                    ext = '.cpp'
+            if ext in (".pyx", ".py"):
+                if extension.language == "c++":
+                    ext = ".cpp"
                 else:
-                    ext = '.c'
+                    ext = ".c"
                 sfile = path + ext
             sources.append(sfile)
         extension.sources[:] = sources
+
 
 def check_cython_version():
     """Exit if Cython was not found or is too old"""
@@ -75,38 +87,45 @@ def check_cython_version():
         sys.exit(1)
     if LooseVersion(cyversion) < LooseVersion(MIN_CYTHON_VERSION):
         sys.stdout.write(
-            "ERROR: Your Cython is at version '" + str(cyversion) +
-            "', but at least version " + str(MIN_CYTHON_VERSION) + " is required.\n")
+            "ERROR: Your Cython is at version '{}' but at least version '{}' "
+            "is required.\n".format(cyversion, MIN_CYTHON_VERSION))
         sys.exit(1)
 
+
 extensions = [
-    Extension('atropos.align._align', sources=['atropos/align/_align.pyx']),
-    Extension('atropos.commands.trim._qualtrim', sources=['atropos/commands/trim/_qualtrim.pyx']),
-    Extension('atropos.io._seqio', sources=['atropos/io/_seqio.pyx']),
+    Extension("atropos.align._align", sources=["atropos/align/_align.pyx"]),
+    Extension(
+        "atropos.commands.trim._qualtrim",
+        sources=["atropos/commands/trim/_qualtrim.pyx"]
+    ),
+    Extension("atropos.io._seqio", sources=["atropos/io/_seqio.pyx"]),
 ]
 
 cmdclass = versioneer.get_cmdclass()
-versioneer_build_ext = cmdclass.get('build_ext', _build_ext)
-versioneer_sdist = cmdclass.get('sdist', _sdist)
+versioneer_build_ext = cmdclass.get("build_ext", _build_ext)
+versioneer_sdist = cmdclass.get("sdist", _sdist)
 
-class build_ext(versioneer_build_ext):
+
+class BuildExt(versioneer_build_ext):
     def run(self):
         # If we encounter a PKG-INFO file, then this is likely a .tar.gz/.zip
         # file retrieved from PyPI that already includes the pre-cythonized
         # extension modules, and then we do not need to run cythonize().
-        if os.path.exists('PKG-INFO'):
+        if os.path.exists("PKG-INFO"):
             no_cythonize(extensions)
         else:
-            # Otherwise, this is a 'developer copy' of the code, and then the
+            # Otherwise, this is a "developer copy" of the code, and then the
             # only sensible thing is to require Cython to be installed.
             check_cython_version()
             from Cython.Build import cythonize
             self.extensions = cythonize(self.extensions)
         _build_ext.run(self)
 
-cmdclass['build_ext'] = build_ext
 
-class sdist(versioneer_sdist):
+cmdclass["build_ext"] = BuildExt
+
+
+class SDist(versioneer_sdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
@@ -114,34 +133,41 @@ class sdist(versioneer_sdist):
         cythonize(extensions)
         versioneer_sdist.run(self)
 
-cmdclass['sdist'] = sdist
+
+cmdclass["sdist"] = SDist
+
 
 setup(
-    name = 'atropos',
-    version = versioneer.get_version(),
-    cmdclass = cmdclass,
-    author = 'John Didion',
-    author_email = 'john.didion@nih.gov',
-    url = 'https://atropos.readthedocs.org/',
-    description = 'trim adapters from high-throughput sequencing reads',
-    license = 'Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain',
-    ext_modules = extensions,
-    packages = find_packages(),
-    scripts = ['bin/atropos'],
-    package_data = { 'atropos' : [
-        'adapters/*.fa',
-        'commands/**/templates/*'
-    ] },
-    tests_require = ['pytest'], #, 'jinja2', 'pysam'],
-    extras_require = {
-        'progressbar' : ['progressbar2'],
-        'tqdm' : ['tqdm'],
-        'khmer' : ['khmer'],
-        'pysam' : ['pysam'],
-        'jinja' : ['jinja2'],
-        'sra' : ['srastream>=0.1.3']
+    name="atropos",
+    version=versioneer.get_version(),
+    cmdclass=cmdclass,
+    author="John Didion",
+    author_email="john.didion@nih.gov",
+    url="https://atropos.readthedocs.org/",
+    description="trim adapters from high-throughput sequencing reads",
+    long_description=long_description,
+    log_description_content_type="text/markdown",
+    license="Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain",
+    ext_modules=extensions,
+    packages=find_packages(),
+    scripts=["bin/atropos"],
+    package_data={
+        "atropos": [
+            "adapters/*.fa",
+            "commands/**/templates/*"
+        ]
     },
-    classifiers = [
+    install_requires=["cython>={}".format(MIN_CYTHON_VERSION)],
+    tests_require=["pytest"],  # , "jinja2", "pysam"],
+    extras_require={
+        "progressbar": ["progressbar2"],
+        "tqdm": ["tqdm"],
+        "khmer": ["khmer"],
+        "pysam": ["pysam"],
+        "jinja": ["jinja2"],
+        "sra": ["srastream>=0.1.3"]
+    },
+    classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Environment :: Console",
         "Intended Audience :: Science/Research",

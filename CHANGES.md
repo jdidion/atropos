@@ -1,5 +1,9 @@
 # Changes
 
+dev
+---
+* Fix #74: Make pysam open SAM/BAM files with check_sq=False by default
+
 v1.1.19 (2018.05.16)
 --------------------
 * Fix #68: Error when using insert aligner with adapters of different lengths
