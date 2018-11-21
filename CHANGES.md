@@ -1,8 +1,9 @@
 # Changes
 
-dev
----
+v1.1.20 (2018.11.21)
+--------------------
 * Fix #74: Make pysam open SAM/BAM files with check_sq=False by default
+* Fixed setup.py to correctly include README for PyPI.
 
 v1.1.19 (2018.05.16)
 --------------------
