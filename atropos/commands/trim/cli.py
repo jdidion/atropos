@@ -31,14 +31,14 @@ supported and auto-detected from the file name (.gz, .xz, .bz2). Use the file
 name '-' for standard input/output. Without the -o option, output is sent to
 standard output.
 """
-    
+
     def add_command_options(self):
         self.parser.set_defaults(
             zero_cap=None,
             action='trim',
             batch_size=None,
             known_adapter=None)
-        
+
         group = self.add_group(
             "Adapters",
             title="Finding adapters",
@@ -113,9 +113,9 @@ standard output.
             "--gc-content",
             type=probability, default=0.5,
             help="Expected GC content of sequences.")
-        
+
         ## Arguments specific to the choice of aligner
-        
+
         group.add_argument(
             "--aligner",
             choices=('adapter', 'insert'), default='adapter',
@@ -126,11 +126,11 @@ standard output.
                  "insert-based alignment can only be used with paired-end "
                  "reads containing 3' adapters. New algorithms are being "
                  "implemented and the default is likely to change. (adapter)")
-        
+
         # TODO: all the different matching options are pretty confusing. Either
         # explain their usage better in the docs or find a way to simplify the
         # choices.
-        
+
         # Arguments for adapter match
         group.add_argument(
             "-e",
@@ -175,7 +175,7 @@ standard output.
             help="If no minimum overlap (-O) is specified, then adapters are "
                  "only matched when the probabilty of observing k out of n "
                  "matching bases is <= PROB. (1E-6)")
-        
+
         # Arguments for insert match
         group.add_argument(
             "--insert-max-rmp",
@@ -193,7 +193,7 @@ standard output.
             help="Maximum allowed error rate for matching adapters after "
                  "successful insert match (no. of errors divided by the length "
                  "of the matching region). (0.2)")
-        
+
         # Arguments for merging and error correction
         # TODO: add RMP parameter for MergeOverlap
         group.add_argument(
@@ -226,7 +226,7 @@ standard output.
                  "while conservative means to leave it unchanged. 'N' means to "
                  "set the base to N. If exactly one base is ambiguous, the "
                  "non-ambiguous base is always used. (no error correction)")
-        
+
         group = self.add_group(
             "Modifications", title="Additional read modifications")
         group.add_argument(
@@ -299,7 +299,7 @@ standard output.
                  "with the correct length of the trimmed read. For example, "
                  "use --length-tag 'length=' to correct fields like "
                  "'length=123'. (no)")
-        
+
         group = self.add_group(
             "Filtering", title="Filtering of processed reads")
         group.add_argument(
@@ -334,7 +334,7 @@ standard output.
                  "it is treated as the absolute number of N bases. If it is "
                  "between 0 and 1, it is treated as the proportion of N's "
                  "allowed in a read. (no)")
-        
+
         group = self.add_group("Output")
         group.add_argument(
             "-o",
@@ -389,7 +389,7 @@ standard output.
             help="Write report to file rather than stdout/stderr. (no)")
         group.add_argument(
             "--report-formats",
-            nargs="*", choices=("txt", "json", "yaml", "pickle"), default=None, 
+            nargs="*", choices=("txt", "json", "yaml", "pickle"), default=None,
             metavar="FORMAT",
             help="Report type(s) to generate. If multiple, '--report-file' "
                  "is treated as a prefix and the appropriate extensions are "
@@ -410,7 +410,7 @@ standard output.
                  "'pre:tiles=<regexp>' means to use the specified regular "
                  "expression to extract key portions of read names to "
                  "collect the tile statistics.")
-        
+
         group = self.add_group("Colorspace options")
         group.add_argument(
             "-d",
@@ -445,7 +445,7 @@ standard output.
             help="Change negative quality values to zero. This is enabled "
                  "by default when -c/--colorspace is also enabled. Use the "
                  "above option to disable it. (no)")
-        
+
         group = self.add_group(
             "Paired",
             title="Paired-end options",
@@ -455,18 +455,22 @@ standard output.
                 "pair.")
         group.add_argument(
             "-A",
+            "--adapter2",
             action='append', dest='adapters2', default=[], metavar='ADAPTER',
             help="3' adapter to be removed from second read in a pair. (no)")
         group.add_argument(
             "-G",
+            "--front2",
             action='append', dest='front2', default=[], metavar='ADAPTER',
             help="5' adapter to be removed from second read in a pair. (no)")
         group.add_argument(
             "-B",
+            "--anywhere2",
             action='append', dest='anywhere2',  default=[], metavar='ADAPTER',
             help="5'/3 adapter to be removed from second read in a pair. (no)")
         group.add_argument(
             "-U",
+            "--cut2",
             type=int, action='append', dest='cut2', default=[],
             metavar="LENGTH",
             help="Remove LENGTH bases from second read in a pair (see --cut). "
@@ -522,7 +526,7 @@ standard output.
             help="Write second read in a pair to this file if pair is too "
                  "long. Use together with --too-long-output. (no - too long "
                  "reads are discarded)")
-        
+
         group = self.add_group("Method-specific options")
         group = group.add_mutually_exclusive_group()
         group.add_argument(
@@ -543,7 +547,7 @@ standard output.
             "--mirna",
             action="store_true", default=False,
             help="Set default option values for miRNA data. (no)")
-        
+
         group = self.add_group(
             "Parallel", title="Parallel (multi-core) options")
         group.add_argument(
@@ -583,11 +587,11 @@ standard output.
             help="Where data compression should be performed. Defaults to "
                  "'writer' if system-level compression can be used and "
                  "(1 < threads < 8), otherwise defaults to 'worker'.")
-    
+
     def validate_command_options(self, options):
         parser = self.parser
         paired = options.paired
-        
+
         if not paired:
             if not options.output:
                 parser.error("An output file is required")
@@ -622,7 +626,7 @@ standard output.
                     parser.error(
                         "When using --too-long-output with paired-end "
                         "reads, you also need to use --too-long-paired-output")
-            
+
             # Any of these options switch off legacy mode
             if (options.adapters2 or options.front2 or options.anywhere2 or
                     options.cut2 or options.cut_min2 or
@@ -640,18 +644,18 @@ standard output.
                 # -A/-G/-B/-U). This exists for backwards compatibility
                 # ('legacy mode').
                 paired = 'first'
-            
+
             options.paired = paired
-        
+
         # Send report to stderr if main output will be going to stdout
         if options.output is None and options.report_file == STDOUT:
             options.report_file = STDERR
-        
+
         # If the user specifies a max rmp, that is used for determining the
         # minimum overlap and -O is set to 1, otherwise -O is set to the old
         # default of 3.
         # TODO: This is pretty confusing logic - need to simplify
-        
+
         if options.aligner == 'adapter':
             if options.indels and options.indel_cost is None:
                 options.indel_cost = 1
@@ -678,14 +682,14 @@ standard output.
             if options.insert_match_adapter_error_rate is None:
                 options.insert_match_adapter_error_rate = \
                     options.insert_match_error_rate
-                
+
         if options.merge_overlapping:
             if options.merged_output is None:
                 logging.getLogger().warning(
                     "--merge-output is not set; merged reads will be discarded")
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
-        
+
         if options.mirna:
             if not (options.adapters or options.front or options.anywhere):
                 options.adapters = ['TGGAATTCTCGG'] # illumina small RNA adapter
@@ -723,7 +727,7 @@ standard output.
                     except:
                         parser.error(
                             "Invalidate format for bisulfite parameters")
-                
+
                 temp = [
                     parse_bisulfite_params(arg)
                     for arg in options.bisulfite.split(";")]
@@ -733,7 +737,7 @@ standard output.
                     parser.error(
                         "Too many bisulfite parameters for single-end reads")
                 options.bisulfite = temp
-        
+
         if options.overwrite_low_quality:
             if not paired:
                 parser.error(
@@ -742,22 +746,22 @@ standard output.
                     options.overwrite_low_quality[1]):
                 parser.error(
                     "For --overwrite-low-quality, LOWQ must be <= HIGHQ")
-        
+
         if options.quality_cutoff:
             if all(c <= 0 for c in options.quality_cutoff):
                 options.quality_cutoff = None
             elif len(options.quality_cutoff) == 1:
                 options.quality_cutoff = [0] + options.quality_cutoff
-        
+
         if options.pair_filter is None:
             options.pair_filter = 'any'
-        
+
         if ((options.discard_trimmed or options.discard_untrimmed) and
                 (options.untrimmed_output is not None)):
             parser.error(
                 "Only one of the --discard-trimmed, --discard-untrimmed "
                 "and --untrimmed-output options can be used at the same time.")
-        
+
         if options.output is not None and '{name}' in options.output:
             if options.discard_trimmed:
                 parser.error(
@@ -765,19 +769,19 @@ standard output.
             if paired:
                 parser.error(
                     "Demultiplexing not supported for paired-end files, yet.")
-        
+
         if options.maq:
             options.colorspace = True
             options.double_encode = True
             options.trim_primer = True
             options.suffix = "/1"
-        
+
         if options.strip_f3 or options.maq:
             options.strip_suffix.append('_F3')
-        
+
         if options.zero_cap is None:
             options.zero_cap = options.colorspace
-        
+
         if options.colorspace:
             if options.anywhere:
                 parser.error(
@@ -793,36 +797,36 @@ standard output.
                     "Trimming the primer makes only sense in colorspace.")
             if options.double_encode:
                 parser.error("Double-encoding makes only sense in colorspace.")
-        
+
         if options.error_rate is None:
             options.error_rate = 0.1
-        
+
         if options.cut:
             if len(options.cut) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if len(options.cut) == 2 and options.cut[0] * options.cut[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
-        
+
         if options.cut_min:
             if len(options.cut_min) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if (len(options.cut_min) == 2 and
                     options.cut_min[0] * options.cut_min[1] > 0):
                 parser.error("You cannot remove bases from the same end twice.")
-        
+
         if paired == 'both' and options.cut2:
             if len(options.cut2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if len(options.cut2) == 2 and options.cut2[0] * options.cut2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
-        
+
         if paired == 'both' and options.cut_min2:
             if len(options.cut_min2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if (len(options.cut_min2) == 2 and
                     options.cut_min2[0] * options.cut_min2[1] > 0):
                 parser.error("You cannot remove bases from the same end twice.")
-        
+
         if not options.stats or options.stats == 'none':
             options.stats = None
         else:
@@ -836,10 +840,10 @@ standard output.
                 else:
                     stats[name] = args
             options.stats = stats
-        
+
         if options.threads is not None:
             threads = configure_threads(options, parser)
-            
+
             if options.compression is None:
                 # Our tests show that with 8 or more threads, worker compression
                 # is more efficient.
@@ -861,7 +865,7 @@ standard output.
                         "Writer compression requires > 2 threads; using "
                         "worker compression instead")
                     options.compression = "worker"
-            
+
             # Set queue sizes if necessary.
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
@@ -872,7 +876,7 @@ standard output.
                     options.read_queue_size > 0 and
                     options.read_queue_size < threads):
                 parser.error("Read queue size must be >= 'threads'")
-            
+
             if options.result_queue_size is None:
                 options.result_queue_size = (
                     threads * (100 if options.compression == "worker" else 500))
@@ -880,7 +884,7 @@ standard output.
                     options.result_queue_size > 0 and
                     options.result_queue_size < threads):
                 parser.error("Result queue size must be >= 'threads'")
-            
+
             max_queue_size = options.read_queue_size + options.result_queue_size
             if options.batch_size is None:
                 options.batch_size = max(1000, max_queue_size / 10e6)
@@ -889,6 +893,6 @@ standard output.
                     "Combination of batch size %d and total queue size %d "
                     "may lead to excessive memory usage",
                     options.batch_size, max_queue_size)
-        
+
         if options.batch_size is None:
             options.batch_size = 1000

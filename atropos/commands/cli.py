@@ -134,7 +134,7 @@ class BaseCommandParser(object):
             "-pe1",
             "--input1",
             type=readable_file, default=None, metavar="FILE1",
-            help="The first (and possibly only) input file.")
+            help="The first input file.")
         group.add_argument(
             "-pe2",
             "--input2",
@@ -165,7 +165,7 @@ class BaseCommandParser(object):
             "-sra",
             "--sra-accession",
             default=None, metavar="ACCN",
-            help="Accesstion to stream from SRA (requires optional NGS "
+            help="Accession to stream from SRA (requires optional NGS "
                  "dependency to be installed).")
         group.add_argument(
             "-f",
@@ -197,7 +197,7 @@ class BaseCommandParser(object):
         group.add_argument(
             "--subsample-seed",
             type=int, default=None, metavar="SEED",
-            help="The seed to use for the pseudorandom number generator. Using"
+            help="The seed to use for the pseudorandom number generator. Using "
                  "the same seed will result in the same subsampling of reads.")
         group.add_argument(
             "--batch-size",
