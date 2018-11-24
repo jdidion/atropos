@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.21 (2018.11.24)
+--------------------
+* Added long options for paired adapter parameters.
+
 v1.1.20 (2018.11.21)
 --------------------
 * Fix #74: Make pysam open SAM/BAM files with check_sq=False by default
