@@ -14,7 +14,7 @@ class AtroposError(Exception):
     pass
 
 def check_importability():  # pragma: no cover
-    """Check that cython modules haev been compile.
+    """Check that cython modules have been compiled.
     """
     try:
         import atropos.align._align # pylint: disable=unused-variable
