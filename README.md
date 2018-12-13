@@ -1,4 +1,4 @@
-[![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=master)](https://travis-ci.org/jdidion/atropos)
+[![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=1.1)](https://travis-ci.org/jdidion/atropos)
 [![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
 
