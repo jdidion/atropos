@@ -19,8 +19,7 @@ test:
 	$(TEST)
 
 docs:
-	make -C docs api
-	make -C docs html
+	make -C doc html
 
 readme:
 	pandoc --from=markdown --to=rst --output=README.rst README.md
