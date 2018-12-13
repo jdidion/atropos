@@ -46,7 +46,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'atropos'
-copyright = u'Original Cutadapt code: 2010-2014, Marcel Martin; Atropos modifications and improvements: 2015-2016, John P Didion'
+copyright = u'Original Cutadapt code: 2010-2014, Marcel Martin; Atropos modifications and improvements: 2015-2018, John P Didion'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -208,8 +208,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'atropos.tex', u'atropos Documentation',
-   u'Marcel Martin', 'manual'),
+  ('index', 'atropos.tex', u'Atropos Documentation', u'John Didion', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -238,8 +237,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'atropos', u'atropos Documentation',
-     [u'Marcel Martin'], 1)
+    ('index', 'atropos', u'Atropos Documentation', [u'John Didion'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -252,9 +250,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'atropos', u'atropos Documentation',
-   u'Marcel Martin', 'atropos', 'One line description of project.',
-   'Miscellaneous'),
+  ('index', 'atropos', u'atropos Documentation', u'John Didion', 'atropos',
+   'General purpose NGS read manipulation tool.', 'Read manipulation'),
 ]
 
 # Documents to append as an appendix to all manuals.
