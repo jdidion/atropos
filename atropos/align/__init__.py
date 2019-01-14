@@ -212,6 +212,12 @@ MatchInfo = namedtuple("MatchInfo", (
 # * http://www.combio.pl/alfree/tools/
 # * http://www.combio.pl/alfree
 # * http://bioinformatics.org.au/tools/decaf+py/
+# 12. https://github.com/sdu-hpcl/BGSA
+# 13. Train a NN to approximate the pairwise alignment distance
+# https://academic.oup.com/bioinformatics/advance-article-abstract/doi/10.1093/bioinformatics/bty887/5140215?redirectedFrom=fulltext
+# 14. Nucl2vec: https://github.com/prakharg24/Nucl2vec (local alignment only - could
+# it be adapted to semi-global?)
+# * Can re-implement in SpaCy? https://spacy.io/usage/vectors-similarity
 
 class InsertAligner(object):
     """Implementation of an insert matching algorithm.

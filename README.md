@@ -127,6 +127,8 @@ The citation for the original Cutadapt paper is:
 * Provide option for RNA-seq data that will trim polyA sequence.
 * Add formal config file support (#53)
 * Automate crash reporting using [sentry](https://github.com/getsentry/raven-python).
+* Look at [NGMerge] for improving read merging: https://github.com/harvardinformatics/NGmerge
+* Look at replacing pysam with [pybam](https://github.com/JohnLonginotto/pybam)
 
 ### 1.4
 
