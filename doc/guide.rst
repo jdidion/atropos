@@ -657,10 +657,10 @@ been removed. For example, if the following sequence is in reads.fastq::
     ACGTACGTACGTADAP
 
 The following command will first trim the ``ADAP`` part of the adapter
-off the end. Then, since only 4 bases were trimmed, the ``-i 5`` option
+off the end. Then, since only 4 bases were trimmed, the ``-i -5`` option
 will cause a 5th base to be removed.
 
-    atropos -A ADAPTER -i 5 -o trimmed.fastq -se reads.fastq
+    atropos -A ADAPTER -i -5 -o trimmed.fastq -se reads.fastq
 
 .. _quality-trimming:
 
