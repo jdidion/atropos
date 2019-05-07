@@ -135,6 +135,7 @@ The citation for the original Cutadapt paper is:
 * Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
 * Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
 * Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
+    * Also look at using HTSeq instead: https://github.com/simon-anders/htseq
 * General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
 * Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
 
@@ -171,8 +172,10 @@ The citation for the original Cutadapt paper is:
 ### 2.0
 
 * Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
+
 * Consider adding additional report formats
-    * https://github.com/marcelm/cutadapt/issues/112
+* Add fuzzy matching: https://github.com/Daniel-Liu-c0deb0t/Java-Fuzzy-Search
+* https://github.com/marcelm/cutadapt/issues/112
 * Performance enhancements using
     * http://numba.pydata.org/
     * https://github.com/undefx/vecpy
