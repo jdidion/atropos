@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.22 (dev)
+-------------
+* Documentation fixes (#79)
+
 v1.1.21 (2018.11.24)
 --------------------
 * Added long options for paired adapter parameters.
