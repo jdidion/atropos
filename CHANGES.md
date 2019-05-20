@@ -3,6 +3,7 @@
 v1.1.22 (dev)
 -------------
 * Documentation fixes (#79)
+* Fix for index error when running `detect` command (#80)
 
 v1.1.21 (2018.11.24)
 --------------------
