@@ -57,7 +57,7 @@ release:
 	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
-	python setup.py sdist upload
+	python setup.py sdist upload -r pypi
 	git push origin --tags
 	$(github_release)
 	$(docker)
