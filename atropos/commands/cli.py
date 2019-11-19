@@ -29,18 +29,19 @@ class BaseCommandParser(metaclass=ABCMeta):
 
     Subclasses must define name, description, and usage members.
     """
-    name = ''
+
+    name = ""
     preamble = "Atropos version {version}"
     usage = "atropos {command} [options]"
-    description = ''
-    details = ''
+    description = ""
+    details = ""
 
     def __init__(self):
         self.groups = {}
         self.create_parser()
         self.add_common_options()
         self.add_command_options()
-        self.parser: ArgumentParser = None
+        self.parser: Optional[ArgumentParser] = None
 
     def parse(self, args: Sequence[str]):
         """Parse args using the conifgured ArgumentParser.
@@ -63,21 +64,26 @@ class BaseCommandParser(metaclass=ABCMeta):
         """
         format_args = dict(name=self.name, version=__version__)
         self.parser = ArgumentParser(
+            prog="atropos {}".format(self.name),
             usage=self.usage.format(**format_args),
             description=self.get_description(**format_args),
-            formatter_class=ParagraphHelpFormatter
+            formatter_class=ParagraphHelpFormatter,
         )
 
     def get_description(self, **kwargs) -> str:
         description = "{}\n\n{}\n\n{}".format(
-            * (part.strip() for part in (self.preamble, self.description, self.details))
+            *(part.strip() for part in (self.preamble, self.description, self.details))
         )
         return description.format(**kwargs)
 
     def add_group(
-            self, name: str, title: Optional[str] = None,
-            description: Optional[str] = None, mutex: bool = False,
-            required: bool = False):
+        self,
+        name: str,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        mutex: bool = False,
+        required: bool = False,
+    ):
         """Add a group to the parser. The group will be stored under `name`
         and can later be retrieved via `get_group`.
         """
@@ -115,26 +121,26 @@ class BaseCommandParser(metaclass=ABCMeta):
         )
         self.parser.add_argument(
             "--debug",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Print debugging information. (no)",
         )
         self.parser.add_argument(
             "--progress",
-            choices=('bar', 'msg'),
+            choices=("bar", "msg"),
             default=None,
             help="Show progress. bar = show progress bar; msg = show a status "
             "message. (no)",
         )
         self.parser.add_argument(
             "--quiet",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Print only error messages. (no)",
         )
         self.parser.add_argument(
             "--log-level",
-            choices=('DEBUG', 'INFO', 'WARN', 'ERROR'),
+            choices=("DEBUG", "INFO", "WARN", "ERROR"),
             default=None,
             help="Logging level. (ERROR when --quiet else INFO)",
         )
@@ -145,6 +151,12 @@ class BaseCommandParser(metaclass=ABCMeta):
             metavar="FILE",
             help="File to write logging info. (stdout)",
         )
+        self.parser.add_argument(
+            "--version",
+            action="version",
+            version=__version__,
+            help="Show version information and exit.",
+        )
         group = self.add_group("Input")
         group.add_argument(
             "-pe1",
@@ -152,7 +164,7 @@ class BaseCommandParser(metaclass=ABCMeta):
             type=readable_file,
             default=None,
             metavar="FILE1",
-            help="The first (and possibly only) input file.",
+            help="The first input file.",
         )
         group.add_argument(
             "-pe2",
@@ -181,7 +193,7 @@ class BaseCommandParser(metaclass=ABCMeta):
         group.add_argument(
             "--single-input-read",
             type=int,
-            dest='input_read',
+            dest="input_read",
             choices=(1, 2),
             default=None,
             help="When treating an interleaved FASTQ or paired-end SAM/BAM "
@@ -201,13 +213,13 @@ class BaseCommandParser(metaclass=ABCMeta):
             "--sra-accession",
             default=None,
             metavar="ACCN",
-            help="Accesstion to stream from SRA (requires optional NGS "
+            help="Accession to stream from SRA (requires optional NGS "
             "dependency to be installed).",
         )
         group.add_argument(
             "-f",
             "--input-format",
-            choices=('fasta', 'fastq', 'sra-fastq', 'sam', 'bam'),
+            choices=("fasta", "fastq", "sra-fastq", "sam", "bam"),
             default=None,
             help="Input file format. Ignored when reading csfasta/qual files. "
             "(auto-detect from file name extension)",
@@ -224,7 +236,7 @@ class BaseCommandParser(metaclass=ABCMeta):
         group.add_argument(
             "-c",
             "--colorspace",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Enable colorspace mode: Also trim the color that is adjacent "
             "to the found adapter. (no)",
@@ -248,7 +260,7 @@ class BaseCommandParser(metaclass=ABCMeta):
             type=int,
             default=None,
             metavar="SEED",
-            help="The seed to use for the pseudorandom number generator. Using"
+            help="The seed to use for the pseudorandom number generator. Using "
             "the same seed will result in the same subsampling of reads.",
         )
         group.add_argument(
@@ -301,7 +313,7 @@ class BaseCommandParser(metaclass=ABCMeta):
             else:
                 handler = logging.FileHandler(options.log_file)
             handler.setFormatter(
-                logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+                logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
             )
             handler.setLevel(level)
             logging.getLogger().setLevel(level)
@@ -319,17 +331,17 @@ class BaseCommandParser(metaclass=ABCMeta):
         # TODO: unit tests for SRA streaming
         # TODO: add srastream to pypi
         if options.sra_accession:
-            if options.input_format not in ('fastq', 'sam', 'bam', None):
+            if options.input_format not in ("fastq", "sam", "bam", None):
                 raise ValueError(
-                    f"Invalid file format for SRA accession: {options.input_format}")
+                    f"Invalid file format for SRA accession: {options.input_format}"
+                )
 
-            options.input_format = 'fastq'
+            options.input_format = "fastq"
             logging.getLogger().debug(
                 "Opening reader for SRA Accession {}".format(options.sra_accession)
             )
             try:
                 from ngstream import SraReader
-
                 options.sra_reader = SraReader(
                     options.sra_accession, batch_size=options.batch_size or 1000
                 )
@@ -339,9 +351,7 @@ class BaseCommandParser(metaclass=ABCMeta):
                 logging.getLogger().exception(
                     f"Error while fetching accession {options.sra_accession} from SRA"
                 )
-                parser.error(
-                    f"Unable to read from accession {options.sra_accession}"
-                )
+                parser.error(f"Unable to read from accession {options.sra_accession}")
         elif options.single_input:
             if options.input1 or options.input2 or options.interleaved_input:
                 parser.error("Cannot use -se together with -pe1, -pe2, or -l")
@@ -352,9 +362,8 @@ class BaseCommandParser(metaclass=ABCMeta):
             options.input1 = options.interleaved_input
             options.paired = False
         else:
-            if (
-                not options.interleaved_input and
-                (not options.input1 or not options.input2)
+            if not options.interleaved_input and (
+                not options.input1 or not options.input2
             ):
                 parser.error(
                     "Both '-pe1' and '-pe2' are required for paired-end "
@@ -364,7 +373,8 @@ class BaseCommandParser(metaclass=ABCMeta):
             options.paired = True
         if options.input_read is None:
             options.input_read = (
-                InputRead.PAIRED if options.paired else InputRead.SINGLE)
+                InputRead.PAIRED if options.paired else InputRead.SINGLE
+            )
         # Set sample ID from the input file name(s)
         if options.sample_id is None:
             if options.sra_reader:
@@ -380,7 +390,7 @@ class BaseCommandParser(metaclass=ABCMeta):
                                 name = name[:i]
                                 break
 
-                if name.endswith('.'):
+                if name.endswith("."):
                     name = name[:-1]
                 options.sample_id = name
         if options.quiet:
@@ -409,7 +419,7 @@ class ParagraphHelpFormatter(HelpFormatter):
     """
 
     def _fill_text(self, text, width, indent):
-        text = re.sub('[ \t]{2,}', ' ', text)
+        text = re.sub("[ \t]{2,}", " ", text)
         paragraphs = [
             textwrap.fill(p, width, initial_indent=indent, subsequent_indent=indent)
             for p in re.split("\n\n", text)
@@ -417,7 +427,7 @@ class ParagraphHelpFormatter(HelpFormatter):
         return "\n\n".join(paragraphs)
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class CompositeType:
@@ -437,14 +447,16 @@ class CompositeType:
 class ComparisonValidator(Generic[T]):
     """Validator that compares an argument against an expected value.
     """
+
     def __init__(self, rhs: T, oper: Callable[[T, T], bool], expected: bool = True):
         self.rhs = rhs
         self.oper = oper
         self.expected = expected
 
     def _do_call(self, lhs: T):
-        assert self.oper(lhs, self.rhs) == self.expected, \
-            f"{self.oper}({lhs}, {self.rhs}) != {self.expected}"
+        assert (
+            self.oper(lhs, self.rhs) == self.expected
+        ), f"{self.oper}({lhs}, {self.rhs}) != {self.expected}"
 
 
 class CharList:
@@ -464,6 +476,7 @@ class CharList:
 class Delimited(Generic[T]):
     """Splits a string argument using a delimiter.
     """
+
     def __init__(
         self,
         delim: str = ",",
@@ -508,6 +521,7 @@ class EnumChoice(Generic[T]):
 class AccessiblePath:
     """Test that a path is accessible.
     """
+
     def __init__(self, path_type: PathType, mode: Permission):
         self.path_type = path_type
         self.mode = mode
@@ -524,6 +538,7 @@ class AccessiblePath:
 class ReadwriteableFile(object):
     """Validator for a file argument that must be both readable and writeable.
     """
+
     def __init__(self):
         self.read_type = AccessiblePath(PathType.FILE, Permission.READ)
         self.write_type = AccessiblePath(PathType.FILE, Permission.WRITE)
@@ -545,7 +560,8 @@ def existing_path(path: Union[str, os.PathLike]) -> Path:
 
 
 readable_file = CompositeType(
-    existing_path, AccessiblePath(PathType.FILE, Permission.READ))
+    existing_path, AccessiblePath(PathType.FILE, Permission.READ)
+)
 """Test that a file exists and is readable."""
 writeable_file = AccessiblePath(PathType.FILE, Permission.WRITE)
 """Test that a file 1) exists and is writelable, or 2) does not exist but
@@ -562,10 +578,10 @@ def readable_url(url):
         url: The URL to validate.
     """
     parsed = urlparse(url)
-    scheme = parsed.scheme or 'file'
-    if scheme == 'file':
+    scheme = parsed.scheme or "file"
+    if scheme == "file":
         filename = readable_file(parsed.path)
-        return 'file:' + filename
+        return "file:" + filename
 
     else:
         return url
@@ -603,7 +619,7 @@ def positive(type_=int, inclusive=False):
     return CompositeType(type_, ComparisonValidator(0, oper))
 
 
-N = TypeVar('N', bound=Number)
+N = TypeVar("N", bound=Number)
 
 
 def between(min_val: N = None, max_val: N = None, type_: Type[N] = int):
@@ -639,8 +655,8 @@ def parse_stat_args(args_str):
     """Parse the optional value to the '--stat' option.
     """
     args = {}
-    for arg in args_str.split(';'):
-        arg_parts = arg.split('=')
+    for arg in args_str.split(";"):
+        arg_parts = arg.split("=")
         if len(arg_parts) == 1:
             args[arg_parts[0]] = True
         else:

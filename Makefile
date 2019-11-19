@@ -1,30 +1,24 @@
 tests = tests
 module = atropos
-#pytestops = "--full-trace"
-#pytestops = "-v -s"
+#pytestops = --full-trace
+#pytestops = -v -s
 repo = jdidion/$(module)
 desc = Release $(version)
 
-BUILD = python setup.py build_ext -i && python setup.py install $(installargs)
-TEST = py.test -m "not perf" --cov --cov-report term-missing $(pytestops) $(tests)
+all: clean install test
 
-all:
-	$(BUILD)
-	$(TEST)
+build:
+	python setup.py build_ext -i
+	python setup.py sdist bdist_wheel
 
-install:
-	$(BUILD)
+install: clean build
+	python setup.py install $(installargs)
 
 test:
-	$(TEST)
+	py.test $(pytestops) $(tests)
 
 docs:
-	make -C docs api
-	make -C docs html
-
-readme:
-	pandoc --from=markdown --to=rst --output=README.rst README.md
-	pandoc --from=markdown --to=rst --output=CHANGES.rst CHANGES.md
+	make -C doc html
 
 lint:
 	pylint $(module)
@@ -46,8 +40,7 @@ docker:
 	# add alternate tags
 	docker tag $(repo):$(version) $(repo):latest
 	# push to Docker Hub
-	docker login -u jdidion && \
-	docker push $(repo)
+	docker login && docker push $(repo)
 
 release:
 	$(clean)
@@ -58,12 +51,18 @@ release:
 	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
-	python setup.py sdist upload
+	python setup.py sdist upload -r pypi
 	git push origin --tags
 	$(github_release)
 	$(docker)
 
-github_release:
+tag:
+	git tag $(version)
+
+release: clean tag install test
+	python setup.py sdist upload -r pypi
+	git push origin --tags
+	# github release
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \
 		-H "Authorization: token $(token)" \

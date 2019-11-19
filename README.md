@@ -1,7 +1,7 @@
-[![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=master)](https://travis-ci.org/jdidion/atropos])
+[![Travis CI](https://travis-ci.org/jdidion/atropos.svg?branch=develop)](https://travis-ci.org/jdidion/atropos)
 [![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
-[![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
+[![Coverage Status](https://img.shields.io/coveralls/jdidion/atropos/master.svg)](https://coveralls.io/github/jdidion/atropos?branch=develop)
 
 # Atropos
 
@@ -79,6 +79,10 @@ atropos --aligner insert -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCC
 
 See the [Documentation](https://atropos.readthedocs.org/) for more complete usage information.
 
+## Using Atropos as a library
+
+While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break).
+
 ## Publications
 
 Atropos is [published](https://peerj.com/articles/3720/) in PeerJ.
@@ -93,7 +97,6 @@ The citation for the original Cutadapt paper is:
 
 > Marcel Martin. "Cutadapt removes adapter sequences from high-throughput sequencing reads." EMBnet.Journal, 17(1):10-12, May 2011. http://dx.doi.org/10.14806/ej.17.1.200
 
-
 ## Links
 
 * [Documentation](https://atropos.readthedocs.org/)
@@ -101,125 +104,3 @@ The citation for the original Cutadapt paper is:
 * [Report an issue](https://github.com/jdidion/atropos/issues)
 * [Code of conduct](https://github.com/jdidion/atropos/CODE_OF_CONDUCT.md)
 * [Contributing](https://github.com/jdidion/atropos/CONTRIUBTING.md)
-
-## Roadmap
-
-### 1.2.x
-
-* Pending backports to 1.1.x branch
-  * Fix for #36
-
-* Migrate to [xphyle](https://github.com/jdidion/xphyle) for file management.
-  * List of commits to migrate from xphyle branch:
-    * 349c215
-    * 7641c8d
-    * 77781ff
-    * 268d390
-  * List of commits to migrate from 1.1 branch
-    * 014bd56
-    * c9412b9
-
-* Migrate to [pokrok](https://github.com/jdidion/pokrok) for progress bar management.
-* Adapter detection:
-    * Parallelize adapter detection for multiple input files.
-    * Implement new detector for paired-end data that detects adapter sequences based on overhangs of aligned inserts.
-* Implement new trimming mode that blindly trims overhangs of aligned inserts.
-* Support SAM output (including #33).
-* Direct streaming and trimming of reads from SRA and htsget using [ngstream](https://github.com/jdidion/ngstream).
-* Read "cropping" (#50)
-* Support for ThruPlex-style adapters (in which barcode is part of query sequence; #55)
-* Accessibility:
-    * Create recipe for homebrew.
-    * Automatically update conda and homebrew recipes for each release.
-    * Create Galaxy tool description using [argparse2tool](https://github.com/erasche/argparse2tool#cwl-specific-functionality).
-* Improve documentation (#24)
-* Port over improvements in latest versions of Cutadapt https://cutadapt.readthedocs.io/en/stable/
-* Migrate dependency management to Pipfile (using pipenv).
-
-### 1.3.x
-
-* Currently, InsertAligner requires a single 3' adapter for each end. Adapter trimming will later be generalized so that A) the InsertAligner can handle multiple matched pairs of adapters and/or B) multiple different aligners can be used for different adapters.
-* Migrate to seqio (https://github.com/jdidion/seqio) for reading/writing sequence files.
-* Provide PacBio- and nanopore-specific options
-    * https://github.com/marcelm/cutadapt/issues/120
-    * https://github.com/hyeshik/poreplex
-* Provide option for RNA-seq data that will trim polyA sequence.
-    * https://github.com/ibest/seqyclean
-* Add formal config file support (#53)
-* Automate crash reporting using [sentry](https://github.com/getsentry/raven-python).
-* Enable user to define custom read structure: https://github.com/nh13/read-structure-examples
-* Support for paired-end demultiplexing
-* Demultiplexing based on barcodes: https://github.com/marcelm/cutadapt/issues/118.
-* Add a ClipOverlapping modifier that will remove read overlaps (as opposed to merging).
-* General-purpose read filtering based on read ID: https://github.com/marcelm/cutadapt/issues/107.
-
-### 1.4.x
-
-* Integrate with [AdapterBase](https://github.com/NCBI-Hackathons/OnlineAdapterDatabase) for improved matching of detected contaminants to known adapters, automated trimming of datasets with known adapters, and (opt-in) submission of adapter information for novel datasets.
-* Currently, SAM/BAM input files must be name sorted; add an option to 1) pre-sort reads inline using samtools or sambamba, or 2) cache each read in memory until its mate is found.
-* Provide more user control over anchoring of adapters: https://github.com/marcelm/cutadapt/issues/53.
-* Consider supporting different error rates for read1 vs read2.
-* Look more closely at providing solutions to the Illumina two-color chemistry issue:
-    * Provide and option to exempt G calls from the assessment of quality
-    * Trim 3′ Gs from reads
-* Also look at addressing any issues with one-color chemistry (iSeq).
-* Consider whether to support trimming/QC of raw IonTorrent data.
-* Add option to estimate bisulfite conversion rate from filled-in cytosine methylation status in reads that were MspI-digested.
-
-### 1.5.x
-
-* Switch to using Click for CLI.
-* Implement a public plugin API.
-* Add more logging and convert log messages from old-style to new-style format strings.
-* CPU and memory profiling. Try out:
-    * https://github.com/nvdv/vprof
-    * https://github.com/what-studio/profiling
-    * https://github.com/fabianp/memory_profiler
-    * https://github.com/rkern/line_profiler#line-profiler
-* Look at some new trimming/qc programs; decide whether to add to benchmarks and/or incorporate any of their features
-    * http://tagcleaner.sourceforge.net/
-    * https://github.com/mdshw5/fastqp/blob/master/README.md
-
-### 2.0
-
-* Simplification of command line options, perhaps by further splitting functionality up into different sub-commands, but also by more intelligent choices for default option values based on context.
-* Consider use of prompt-toolkit for autocompletion of command line options https://github.com/jonathanslenders/python-prompt-toolkit
-* Consider adding additional report formats
-    * https://github.com/marcelm/cutadapt/issues/112
-* Performance enhancements using
-    * http://numba.pydata.org/
-    * https://github.com/undefx/vecpy
-    * https://github.com/serge-sans-paille/pythran
-    * https://github.com/IntelLabs/hpat
-    * https://github.com/cupy/cupy
-* >90% test coverage
-* Fuzz testing using AFL
-    * http://lcamtuf.coredump.cx/afl/
-    * https://github.com/jwilk/python-afl
-
-### Beyond 2.0
-
-* Implement additional alternate alignment algorithms.
-* Implement the error detection algorithm in ADEPT: https://github.com/LANL-Bioinformatics/ADEPT
-* Implement additional error correction approaches:
-  * https://www.ncbi.nlm.nih.gov/pubmed/25161220
-  * https://github.com/Malfoy/BCOOL
-* Explore new quality trimming algorithms
-  * UrQt: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4450468/
-  * InfoTrim: github.com/JacobPorter/InfoTrim
-* Scythe is an interesting new trimmer. Depending on how the benchmarks look in the forthcoming paper, we will add it to the list of tools we compare against Atropos, and perhaps implement their Bayesian approach for adapter match.
-* Experiment with replacing the multicore implementation with an asyncio-based implementation (using ProcessPoolExecutor and uvloop).
-* Automatic adaptive tuning of queue sizes to maximize the balance between memory usage and latency.
-* Potential performance improvements in BAM reading: https://www.biostars.org/p/186732/
-* Multithreaded writing to single output may be possible. This would be implemented in xphyle.
-* Any way to incorporate protocol-specific trimming https://github.com/lh3/pre-pe
-
-While we consider the command-line interface to be stable, the internal code organization of Atropos is likely to change. At this time, we recommend to not directly interface with Atropos as a library (or to be prepared for your code to break). The internal code organization will be stabilized as of version 2.0, which is planned for sometime in 2018.
-
-If you would like to suggest additional enhancements, you can submit issues and/or pull requests at our GitHub page.
-
-## Unit test needs
-
-* Compressed file handling, including
-    * new --compression-format option
-    * Default use of stdout with single-end and interleaved input

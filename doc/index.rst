@@ -1,5 +1,3 @@
-.. include:: ./readme.rst
-
 =================
 Table of contents
 =================
@@ -11,13 +9,12 @@ Table of contents
    guide
    colorspace
    recipes
-   changes
 
 
 ..
    Indices and tables
    ==================
-   
+
    * :ref:`genindex`
    * :ref:`modindex`
    * :ref:`search`

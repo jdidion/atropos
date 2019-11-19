@@ -537,10 +537,8 @@ class PairedSequenceReader(SequenceReaderBase):
                         "Reads are improperly paired. There are more reads in "
                         "file 2 than in file 1."
                     )
-
                 except StopIteration:
-                    pass
-                break
+                    break
 
             try:
                 read2 = next(it2)
@@ -643,16 +641,19 @@ class SAMReader(SequenceReaderBase):
             are supported.
         sequence_class: The class to use when creating new sequence objects.
     """
-    file_format = 'SAM'
+    file_format = "SAM"
     delivers_qualities = True
     interleaved = False
     has_qualfile = False
     colorspace = False
 
     def __init__(
-            self, path: PathOrFile, quality_base: int = 33,
-            sequence_class: Callable[..., Sequence] = Sequence,
-            alphabet: Alphabet = None):
+        self, path: PathOrFile,
+        quality_base: int = 33,
+        sequence_class: Callable[..., Sequence] = Sequence,
+        alphabet: Alphabet = None,
+        pysam_kwargs: Optional[dict] = None
+    ):
         self._close_on_exit = is_path = isinstance(path, Path)
         self.quality_base = quality_base
         self.sequence_class = sequence_class
@@ -672,7 +673,9 @@ class SAMReader(SequenceReaderBase):
             self._file = path
 
         parser_class = BAMParser if is_bam else SAMParser
-        self._sam_iter = parser_class(self._file)
+        if pysam_kwargs is None:
+            pysam_kwargs = {"check_sq": False}
+        self._sam_iter = parser_class(self._file, **pysam_kwargs)
 
     @property
     def input_names(self):
@@ -1231,9 +1234,11 @@ def open_reader(
                 file1, quality_base=quality_base, alphabet=alphabet
             )
 
+    if file_format is None:
+        file_format = "<Undetected>"
     raise UnknownFileType(
-        "File format {0!r} is unknown (expected 'sra-fastq' (only for "
-        "colorspace), 'fasta', 'fastq', 'sam', or 'bam').".format(file_format)
+        f"File format {file_format!r} is unknown (expected 'sra-fastq' (only for "
+        f"colorspace), 'fasta', 'fastq', 'sam', or 'bam')."
     )
 
 

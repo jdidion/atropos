@@ -25,7 +25,7 @@ from atropos.io.seqio import guess_format_from_name
 
 
 class CommandParser(BaseCommandParser):
-    name = 'trim'
+    name = "trim"
     usage = """
 atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
 atropos trim -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq \
@@ -52,7 +52,7 @@ standard output.
     def add_command_options(self):
         self.parser.set_defaults(
             zero_cap=None,
-            action='trim',
+            action="trim",
             batch_size=None,
             known_adapter=None,
             use_interleaved_output=False,
@@ -126,7 +126,7 @@ standard output.
         group.add_argument(
             "--adapter-cache-file",
             type=readwriteable_file,
-            default='.adapters',
+            default=".adapters",
             help="File where adapter sequences will be cached, unless "
             "--no-cache-adapters is set.",
         )
@@ -140,17 +140,17 @@ standard output.
         )
         group.add_argument(
             "--no-trim",
-            action='store_const',
-            dest='action',
+            action="store_const",
+            dest="action",
             const=None,
             help="Match and redirect reads to output/untrimmed-output as "
             "usual, but do not remove adapters. (no)",
         )
         group.add_argument(
             "--mask-adapter",
-            action='store_const',
-            dest='action',
-            const='mask',
+            action="store_const",
+            dest="action",
+            const="mask",
             help="Mask adapters with 'N' characters instead of trimming " "them. (no)",
         )
         group.add_argument(
@@ -162,8 +162,8 @@ standard output.
         # Arguments specific to the choice of aligner
         group.add_argument(
             "--aligner",
-            choices=('adapter', 'insert'),
-            default='adapter',
+            choices=("adapter", "insert"),
+            default="adapter",
             help="Which alignment algorithm to use for identifying adapters. "
             "Currently, you can choose between the semi-global alignment "
             "strategy used in Cutdapt ('adapter') or the more accurate "
@@ -194,8 +194,8 @@ standard output.
         )
         group.add_argument(
             "--no-indels",
-            action='store_false',
-            dest='indels',
+            action="store_false",
+            dest="indels",
             default=True,
             help="Allow only mismatches in alignments. (allow both mismatches "
             "and indels)",
@@ -218,7 +218,7 @@ standard output.
             "-N",
             "--no-match-adapter-wildcards",
             action="store_false",
-            dest='match_adapter_wildcards',
+            dest="match_adapter_wildcards",
             default=True,
             help="Do not interpret IUPAC wildcards in adapters. (no)",
         )
@@ -245,7 +245,7 @@ standard output.
         group.add_argument(
             "--insert-max-rmp",
             type=probability,
-            default=1E-6,
+            default=1e-6,
             metavar="PROB",
             help="Overlapping inserts only match when the probablity of "
             "observing k of n matching bases is <= PROB. (1E-6)",
@@ -310,7 +310,7 @@ standard output.
             "--read1_umi",
             type=int,
             default=None,
-            metavar='N',
+            metavar="N",
             help="Clip N UMI bases from the 5' end of read 1 and append them "
             "to the read name. (default: 0)",
         )
@@ -318,19 +318,19 @@ standard output.
             "--read2_umi",
             type=int,
             default=None,
-            metavar='N',
+            metavar="N",
             help="Clip N UMI bases from the 5' end of read 2 and append them "
             "to the read name. (default: 0)",
         )
         group.add_argument(
             "--umi-delim",
-            default=':',
-            metavar='CHAR',
+            default=":",
+            metavar="CHAR",
             help="Delimiter for separating UMI from read ID. (default: ':')",
         )
         group.add_argument(
             "--op-order",
-            type=CharList(choices=('A', 'C', 'G', 'Q', 'W')),
+            type=CharList(choices=("A", "C", "G", "Q", "W")),
             default="CGQAW",
             help="The order in which trimming operations are be applied. This "
             "is a string of 1-5 of the following characters: A = adapter "
@@ -345,7 +345,7 @@ standard output.
             "-u",
             "--cut",
             type=int,
-            action='append',
+            action="append",
             default=[],
             metavar="LENGTH",
             help="Remove bases from each read (first read only if paired). "
@@ -370,7 +370,7 @@ standard output.
             "-i",
             "--cut-min",
             type=int,
-            action='append',
+            action="append",
             default=[],
             metavar="LENGTH",
             help="Similar to -u, except that cutting is done AFTER adapter "
@@ -390,26 +390,26 @@ standard output.
         )
         group.add_argument(
             "--trim-n",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Trim N's on ends of reads. (no)",
         )
         group.add_argument(
             "-x",
             "--prefix",
-            default='',
+            default="",
             help="Add this prefix to read names. Use {name} to insert the name "
             "of the matching adapter. (no)",
         )
         group.add_argument(
             "-y",
             "--suffix",
-            default='',
+            default="",
             help="Add this suffix to read names; can also include {name}. (no)",
         )
         group.add_argument(
             "--strip-suffix",
-            action='append',
+            action="append",
             default=[],
             help="Remove this suffix from read names if present. Can be given "
             "multiple times. (no)",
@@ -427,7 +427,7 @@ standard output.
         group.add_argument(
             "--discard-trimmed",
             "--discard",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Discard reads that contain an adapter. Also use -O to avoid "
             "discarding too many randomly matching reads! (no)",
@@ -435,7 +435,7 @@ standard output.
         group.add_argument(
             "--discard-untrimmed",
             "--trimmed-only",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Discard reads that do not contain the adapter. (no)",
         )
@@ -484,7 +484,7 @@ standard output.
         )
         group.add_argument(
             "--output-format",
-            choices=('fasta', 'fastq', 'sam'),
+            choices=("fasta", "fastq", "sam"),
             metavar="FORMAT",
             default=None,
             help="The format of the output file. If not specified, the output "
@@ -586,36 +586,36 @@ standard output.
         group.add_argument(
             "-d",
             "--double-encode",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Double-encode colors (map 0,1,2,3,4 to A,C,G,T,N). (no)",
         )
         group.add_argument(
             "-t",
             "--trim-primer",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Trim primer base and the first color (which is the "
             "transition to the first nucleotide). (no)",
         )
         group.add_argument(
             "--strip-f3",
-            action='store_true',
+            action="store_true",
             default=False,
             help="Strip the _F3 suffix of read names. (no)",
         )
         group.add_argument(
             "--maq",
             "--bwa",
-            action='store_true',
+            action="store_true",
             default=False,
             help="MAQ- and BWA-compatible colorspace output. This enables -c, "
             "-d, -t, --strip-f3 and -y '/1'. (no)",
         )
         group.add_argument(
             "--no-zero-cap",
-            dest='zero_cap',
-            action='store_false',
+            dest="zero_cap",
+            action="store_false",
             help="Do not change negative quality values to zero in colorspace "
             "data. By default, they are since many tools have problems "
             "with negative qualities. (no)",
@@ -623,7 +623,7 @@ standard output.
         group.add_argument(
             "-z",
             "--zero-cap",
-            action='store_true',
+            action="store_true",
             help="Change negative quality values to zero. This is enabled "
             "by default when -c/--colorspace is also enabled. Use the "
             "above option to disable it. (no)",
@@ -637,33 +637,37 @@ standard output.
         )
         group.add_argument(
             "-A",
-            action='append',
-            dest='adapters2',
+            "--adapter2",
+            action="append",
+            dest="adapters2",
             default=[],
-            metavar='ADAPTER',
+            metavar="ADAPTER",
             help="3' adapter to be removed from second read in a pair. (no)",
         )
         group.add_argument(
             "-G",
-            action='append',
-            dest='front2',
+            "--front2",
+            action="append",
+            dest="front2",
             default=[],
-            metavar='ADAPTER',
+            metavar="ADAPTER",
             help="5' adapter to be removed from second read in a pair. (no)",
         )
         group.add_argument(
             "-B",
-            action='append',
-            dest='anywhere2',
+            "--anywhere2",
+            action="append",
+            dest="anywhere2",
             default=[],
-            metavar='ADAPTER',
+            metavar="ADAPTER",
             help="5'/3 adapter to be removed from second read in a pair. (no)",
         )
         group.add_argument(
             "-U",
+            "--cut2",
             type=int,
-            action='append',
-            dest='cut2',
+            action="append",
+            dest="cut2",
             default=[],
             metavar="LENGTH",
             help="Remove LENGTH bases from second read in a pair (see --cut). " "(no)",
@@ -672,7 +676,7 @@ standard output.
             "-I",
             "--cut-min2",
             type=int,
-            action='append',
+            action="append",
             default=[],
             metavar="LENGTH",
             help="Similar to -U, except that cutting is done AFTER adapter "
@@ -709,7 +713,7 @@ standard output.
             "--pair-filter",
             choices=("any", "both"),
             default=None,
-            metavar='(any|both)',
+            metavar="(any|both)",
             help="Which of the reads in a paired-end read have to match the "
             "filtering criterion in order for it to be filtered. (any)",
         )
@@ -829,16 +833,16 @@ standard output.
 
         # Any of these options imply paired-end and siable legacy mode
         paired_both = (
-            options.adapters2 or
-            options.front2 or
-            options.anywhere2 or
-            options.cut2 or
-            options.cut_min2 or
-            options.interleaved_output or
-            options.pair_filter or
-            options.overwrite_low_quality or
-            options.too_short_paired_output or
-            options.too_long_paired_output
+            options.adapters2
+            or options.front2
+            or options.anywhere2
+            or options.cut2
+            or options.cut_min2
+            or options.interleaved_output
+            or options.pair_filter
+            or options.overwrite_low_quality
+            or options.too_short_paired_output
+            or options.too_long_paired_output
         )
 
         # If any of the options in the "paired" group are set, we implicitly
@@ -858,13 +862,14 @@ standard output.
                 if any_output:
                     parser.error("Cannot specify both interleaved and paired output.")
                 options.use_interleaved_output = True
-            elif options.output_format == 'sam':
+            elif options.output_format == "sam":
                 if any_output:
                     parser.error("SAM output must be specified using the -l option")
                 if options.no_writer_process:
                     logging.getLogger().warning(
                         "Note: output SAM files cannot be concatenated; "
-                        "use 'samtools merge' instead.")
+                        "use 'samtools merge' instead."
+                    )
                 options.use_interleaved_output = True
             elif not any_output or options.output in {STDOUT, STDERR}:
                 # If no output files are specified, write interleaved
@@ -882,27 +887,24 @@ standard output.
                         "output file needs to be specified via -p "
                         "(--paired-output)."
                     )
-                if (
-                    bool(options.untrimmed_output) !=
-                    bool(options.untrimmed_paired_output)
+                if bool(options.untrimmed_output) != bool(
+                    options.untrimmed_paired_output
                 ):
                     parser.error(
                         "When trimming paired-end reads, you must use "
                         "either none or both of the --untrimmed-output/"
                         "--untrimmed-paired-output options."
                     )
-                if (
-                    bool(options.too_short_output) !=
-                    bool(options.too_short_paired_output)
+                if bool(options.too_short_output) != bool(
+                    options.too_short_paired_output
                 ):
                     parser.error(
                         "When using --too-short-output with paired-end "
                         "reads, you also need to use "
                         "--too-short-paired-output"
                     )
-                if (
-                    bool(options.too_long_output) !=
-                    bool(options.too_long_paired_output)
+                if bool(options.too_long_output) != bool(
+                    options.too_long_paired_output
                 ):
                     parser.error(
                         "When using --too-long-output with paired-end "
@@ -914,12 +916,12 @@ standard output.
                 # Full paired-end trimming when both -p and -A/-G/-B/-U given
                 # Read modifications (such as quality trimming) are applied also
                 # to second read.
-                paired = 'both'
+                paired = "both"
             else:
                 # Modify first read only, keep second in sync (-p given, but not
                 # -A/-G/-B/-U). This exists for backwards compatibility
                 # ('legacy mode').
-                paired = 'first'
+                paired = "first"
 
             options.paired = paired
 
@@ -937,7 +939,7 @@ standard output.
         # minimum overlap and -O is set to 1, otherwise -O is set to the old
         # default of 3.
         # TODO: This is pretty confusing logic - need to simplify
-        if options.aligner == 'adapter':
+        if options.aligner == "adapter":
             if options.indels and options.indel_cost is None:
                 options.indel_cost = 1
             if options.overlap is None:
@@ -945,8 +947,8 @@ standard output.
                     options.overlap = 3
                 else:
                     options.overlap = 1
-        elif options.aligner == 'insert':
-            if paired != 'both':
+        elif options.aligner == "insert":
+            if paired != "both":
                 parser.error("Insert aligner only works with paired-end reads")
             # TODO: should also be checking that there is exactly one 3'
             # adapter for each read
@@ -957,12 +959,13 @@ standard output.
             if options.overlap is None:
                 options.overlap = 1
                 if options.adapter_max_rmp is None:
-                    options.adapter_max_rmp = 1E-6
+                    options.adapter_max_rmp = 1e-6
             if options.insert_match_error_rate is None:
                 options.insert_match_error_rate = options.error_rate or 0.2
             if options.insert_match_adapter_error_rate is None:
-                options.insert_match_adapter_error_rate = \
+                options.insert_match_adapter_error_rate = (
                     options.insert_match_error_rate
+                )
 
         if options.merge_overlapping:
             if options.merged_output is None:
@@ -974,7 +977,7 @@ standard output.
 
         if options.mirna:
             if not (options.adapters or options.front or options.anywhere):
-                options.adapters = ['TGGAATTCTCGG']  # illumina small RNA adapter
+                options.adapters = ["TGGAATTCTCGG"]  # illumina small RNA adapter
             if options.quality_cutoff is None:
                 options.quality_cutoff = [20, 20]
             if options.minimum_length is None:
@@ -1048,18 +1051,17 @@ standard output.
                 options.quality_cutoff = [0] + options.quality_cutoff
 
         if options.pair_filter is None:
-            options.pair_filter = 'any'
+            options.pair_filter = "any"
 
-        if (
-            (options.discard_trimmed or options.discard_untrimmed) and
-            (options.untrimmed_output is not None)
+        if (options.discard_trimmed or options.discard_untrimmed) and (
+            options.untrimmed_output is not None
         ):
             parser.error(
                 "Only one of the --discard-trimmed, --discard-untrimmed "
                 "and --untrimmed-output options can be used at the same time."
             )
 
-        if options.output is not None and '{name}' in options.output:
+        if options.output is not None and "{name}" in options.output:
             if options.discard_trimmed:
                 parser.error("Do not use --discard-trimmed when demultiplexing.")
             if paired:
@@ -1072,7 +1074,7 @@ standard output.
             options.suffix = "/1"
 
         if options.strip_f3 or options.maq:
-            options.strip_suffix.append('_F3')
+            options.strip_suffix.append("_F3")
 
         if options.zero_cap is None:
             options.zero_cap = options.colorspace
@@ -1085,7 +1087,7 @@ standard output.
                     "author)."
                 )
             if options.match_read_wildcards:
-                parser.error('IUPAC wildcards not supported in colorspace')
+                parser.error("IUPAC wildcards not supported in colorspace")
             options.match_adapter_wildcards = False
         else:
             if options.trim_primer:
@@ -1106,36 +1108,36 @@ standard output.
             if len(options.cut_min) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if (
-                len(options.cut_min) == 2 and
-                options.cut_min[0] * options.cut_min[1] > 0
+                len(options.cut_min) == 2
+                and options.cut_min[0] * options.cut_min[1] > 0
             ):
                 parser.error("You cannot remove bases from the same end twice.")
 
-        if paired == 'both' and options.cut2:
+        if paired == "both" and options.cut2:
             if len(options.cut2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if len(options.cut2) == 2 and options.cut2[0] * options.cut2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
 
-        if paired == 'both' and options.cut_min2:
+        if paired == "both" and options.cut_min2:
             if len(options.cut_min2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
             if (
-                len(options.cut_min2) == 2 and
-                options.cut_min2[0] * options.cut_min2[1] > 0
+                len(options.cut_min2) == 2
+                and options.cut_min2[0] * options.cut_min2[1] > 0
             ):
                 parser.error("You cannot remove bases from the same end twice.")
 
-        if not options.stats or options.stats == 'none':
+        if not options.stats or options.stats == "none":
             options.stats = None
         else:
             stats = {}
             for stat_spec in options.stats:
-                parts = stat_spec.split(':')
+                parts = stat_spec.split(":")
                 name = parts[0]
                 args = {} if len(parts) == 1 else parse_stat_args(parts[1])
-                if name == 'both':
-                    stats['pre'] = stats['post'] = args
+                if name == "both":
+                    stats["pre"] = stats["post"] = args
                 else:
                     stats[name] = args
             options.stats = stats
@@ -1171,15 +1173,15 @@ standard output.
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
             if options.read_queue_size is None:
-                options.read_queue_size = (
-                    threads * (100 if options.compression_mode == "writer" else 500)
+                options.read_queue_size = threads * (
+                    100 if options.compression_mode == "writer" else 500
                 )
             elif 0 < options.read_queue_size < threads:
                 parser.error("Read queue size must be >= 'threads'")
 
             if options.result_queue_size is None:
-                options.result_queue_size = (
-                    threads * (100 if options.compression_mode == "worker" else 500)
+                options.result_queue_size = threads * (
+                    100 if options.compression_mode == "worker" else 500
                 )
             elif 0 < options.result_queue_size < threads:
                 parser.error("Result queue size must be >= 'threads'")

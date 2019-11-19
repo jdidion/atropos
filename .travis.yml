@@ -1,11 +1,13 @@
 sudo: false
+dist: xenial
 language: python
 cache:
   directories:
   - "$HOME/.cache/pip"
 python:
 - 3.6
-- "3.7-dev"
+- 3.7
+- 3.8
 install:
 - pip install --upgrade pip wheel
 - pip install Cython
@@ -17,19 +19,3 @@ script:
 after_success:
 - coveralls
 - pylint atropos
-# push Docker images for full releases
-- > 
-    test -n "$TRAVIS_TAG" && 
-    docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS &&
-    export REPO=jdidion/atropos &&
-    docker build -f Dockerfile -t $REPO:$TRAVIS_TAG . &&
-    docker tag $REPO:$TRAVIS_TAG $REPO:latest &&
-    docker tag $REPO:$TRAVIS_TAG $REPO:$COMMIT &&
-    docker tag $REPO:$TRAVIS_TAG $REPO:travis-$TRAVIS_BUILD_NUMBER &&
-    docker push $REPO
-env:
-  global:
-  - secure: BQFHrr0r2qmehz3uVcKsEV3G4ollqYoSqyxF02W9OsApiAihry14Gi3yFKU8knZsqCzXPHlYShHahqiVTIU9QqGi8xlYSVJ8P0cV7xqapgO1HJhKd/quiRRpwGOHXf3yCbEJvGq/9PQ0bRkT3+4Khu8GHKLWrCfepT6LPpNYCzAQTEhsRCAO1MhOEM3x0Req82UMp5fndJfAnla+XcbhCsurZCaNoxmfm5i4Jv3tAUozWipL1vy2E65P/whyvz9U19CxaO+hvuFWTwHivMRtTVoF4fInvKWcf7XxgJ0tOFeDQBQWxTLS852kPq1W3uDbg084CwmlM89tt/zhCMNFSs6nOfO1TysN+FGFRvP7dW8bq7ht+Vzj+sFR62DaPJn48KU3X1TBqYm+/k9xMnPe+njNPioMp4aDKarSV8mVm1NGCQhJ6Feg7ebpKtcSeBCzUEUHUd3YM7xoV06OLNi4D+qClYYLPP91Z/c0/yGcT/rLo8cX+PdeDQiQ13lSIfWi00mdUdW/mdYnpwgJ9JPe2eS6/8+G3bXDCazGuFjlNDlkw/jDiG/tC6Wbgr5rUN2xLC6ZJB9LCP3JhtCZLR/IHIEOVAQHk/awqgKIK+8V9JFhKc753unFpMFnuL3KreGiVEjX/6UdChnMt0OdadaCU/a8CCtNxnSSlyJ+rEy++Fc= # DOCKER_EMAIL
-  - secure: dDu/K3lqfEmHYGiJO7rdp+RUHqhv76c26u3/I/La3Li9VHuF7rEye3/b7D7PLCZsh49V7VuZ6XVsgVN0mfSkFQV/U+51cmRPDx9poj4IPmUP0Nda04BKWuHjJ7izDZby7aWHPZx6psdLaaBnpw+7zEWiPvDo3Q4Qo8o0ZeD4k3BWQWXh+vSz6TlWWKY0gj6ex/sx+EX/3c/6QRBNYl8IApmOgmUyCzkaXq4sBrjoU4Pm69fSlHge/LU44cvM3++HMYkcaI4M6WUOPuwdjeRZ8wRW/uOJZ5xXV0LQQscB/D82z9OwRirmYVS+O/UXD3r440HIWDm8KPpCFhW1+W3tRytZKt0xm/MeAHEJuvLb3XHa4Tto69SOmgxvLs3CDnJraq4Q8x5T07KYatea/1ChAmiS6mqf6bhcDMNyGaanMTmtfVtnBdTEbvl24rAiu5pxfyW4tHGvptwaSlB8PCH/cLjSJZa5XdiPimld2pbL1MKKplG8JgxHJ8nS/RD9GlT95/nGekOOs49w/zzZZ8wMdoBHOqL/Ln3AwidSC/wxCbOGERm7LyT7lCdQBFA75smQUO43Fmrdjf8mlVZtO6QCAAgyjzOyPaCw9Hhf3bDEEreMIi4g9kBsl+ZWd4W3i1rD64dPNDo24THzxWKqtWI5ufTialA5N+iqms4vjXAs7W4= # DOCKER_USER
-  - secure: r/IVzZCA/wFZlS7nPEbiv7UGpH1e88egGmKLPfOqx1zWy8B5UH+hEjP8nZQo8mTN5vQpWz3FhCLvS3Dg6FMAci+VpUNdjLfbwgPXw5ukioQHaVaX/4+aut4XqWTsWsgcQ+8zL7I7/GR5hL55VnZrX2R7vh6iEPV3942P2dNiaJ4PDx6XKQeSrfEwQGjRxTK4jfaZZDMr8QpWZuVY4KqynfDnY4UTG+udqJaJi2AYbh39JKN1aGpo7QXj1+kXK7T+XOR5YW+a2hC8d2f6INHothjLG5r/SdgZS8Ma3lGuVq+llEiqJnAW6C4ldSvkk9H54R1T5tO0HhBiiOi4bhglxzD0F976nsxbzV6SAKoOAANR+TR5par1BUlnFO2uIrIVvdhvj806M/dz1ZLkMnHSpF+Fs5z+uwZwJIWjw8I2+R/DiZL/fbUx6Smvqw8ZHYlXjXZG1PhSxyyu00EQfFCjPHGtW1N9CcEoexNuXj+qjY/e/rs9kCYaBczLV8X41807BvxSkwyXUH5DUjTMraW/6b7tParp754cw2jGAvSG5ceqZHKqoZXa+OAY7Bck7oP5nu/xNfG1upv2vjgzCaJ5gErOBP4e/4wrBnmcZkAgLVFtz9yNuL0zBaE3ubnoN+8DyHTsXQVO9f/p6x6ODAH4N2MS6PWYWvLssKKh7DrOPVQ= # DOCKER_PASS
-  - COMMIT=${TRAVIS_COMMIT::8}

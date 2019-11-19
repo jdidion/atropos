@@ -18,9 +18,10 @@ Batch = Tuple[dict, SequenceType[Sequence]]
 class Summary(MergingDict):
     """Contains summary information.
     """
+
     @property
     def has_exception(self) -> bool:
-        return 'exception' in self
+        return "exception" in self
 
     def finish(self) -> None:
         """Replaces Summarizable members with their summaries, and computes
@@ -41,9 +42,9 @@ class Summary(MergingDict):
             if isinstance(value, dict):
                 self._post_process_dict(value)
             elif (
-                isinstance(value, SequenceCollection) and
-                len(value) > 0 and
-                all(val is None or isinstance(val, dict) for val in value)
+                isinstance(value, SequenceCollection)
+                and len(value) > 0
+                and all(val is None or isinstance(val, dict) for val in value)
             ):
                 for val in value:
                     self._post_process_dict(val)
@@ -62,6 +63,7 @@ class BaseCommandRunner(metaclass=ABCMeta):
     Args:
         options: Command-line options.
     """
+
     def __init__(self, options, summary_class: Callable[..., Summary] = Summary):
         self.options = options
         self.summary = summary_class()
@@ -122,7 +124,10 @@ class BaseCommandRunner(metaclass=ABCMeta):
         self.iterable = enumerate(reader, 1)
         if options.progress:
             self._progress_options = (
-                options.progress, self.size, self.max_reads, options.counter_magnitude
+                options.progress,
+                self.size,
+                self.max_reads,
+                options.counter_magnitude,
             )
         self.init_summary()
 
@@ -144,7 +149,8 @@ class BaseCommandRunner(metaclass=ABCMeta):
         if self._progress_options:
             # Wrap iterator in progress bar
             from atropos.util import create_progress_reader
-            return create_progress_reader(self, * self._progress_options)
+
+            return create_progress_reader(self, *self._progress_options)
         else:
             return self
 
@@ -198,15 +204,15 @@ class BaseCommandRunner(metaclass=ABCMeta):
     def init_summary(self) -> None:
         """Initialize the summary dict with general information.
         """
-        self.summary['program'] = 'Atropos'
-        self.summary['version'] = __version__
-        self.summary['python'] = platform.python_version()
-        self.summary['command'] = self.name
-        self.summary['options'] = self.options.__dict__.copy()
-        self.summary['timing'] = self.timing
-        self.summary['sample_id'] = self.options.sample_id
-        self.summary['input'] = self.reader.summarize()
-        self.summary['input'].update(
+        self.summary["program"] = "Atropos"
+        self.summary["version"] = __version__
+        self.summary["python"] = platform.python_version()
+        self.summary["command"] = self.name
+        self.summary["options"] = self.options.__dict__.copy()
+        self.summary["timing"] = self.timing
+        self.summary["sample_id"] = self.options.sample_id
+        self.summary["input"] = self.reader.summarize()
+        self.summary["input"].update(
             batch_size=self.size, max_reads=self.max_reads, batches=self.batches
         )
 
@@ -221,7 +227,7 @@ class BaseCommandRunner(metaclass=ABCMeta):
             try:
                 self.return_code = self()
             except Exception as err:  # pylint: disable=broad-except
-                self.summary['exception'] = dict(
+                self.summary["exception"] = dict(
                     message=str(err), details=sys.exc_info()
                 )
                 self.return_code = 1
@@ -259,7 +265,7 @@ class BaseCommandRunner(metaclass=ABCMeta):
             adapter_cache.load_default()
         if self.options.known_adapter:
             for known in self.options.known_adapter:
-                name, seq = known.split('=')
+                name, seq = known.split("=")
                 adapter_cache.add(name, seq)
         if self.options.known_adapters_file:
             for known_file in self.options.known_adapters_file:
@@ -272,13 +278,14 @@ class BaseCommandRunner(metaclass=ABCMeta):
 class Pipeline(metaclass=ABCMeta):
     """Base class for analysis pipelines.
     """
+
     def __init__(self):
         self.record_counts = {}
         self.bp_counts = {}
 
     def __call__(
-            self, command_runner: BaseCommandRunner, raise_on_error: bool = False,
-            **kwargs) -> None:
+        self, command_runner: BaseCommandRunner, raise_on_error: bool = False, **kwargs
+    ) -> None:
         """
 
         Args:
@@ -297,7 +304,7 @@ class Pipeline(metaclass=ABCMeta):
             if raise_on_error:
                 raise
             else:
-                command_runner.summary['exception'] = dict(
+                command_runner.summary["exception"] = dict(
                     message=str(err), details=sys.exc_info()
                 )
         finally:
@@ -317,12 +324,12 @@ class Pipeline(metaclass=ABCMeta):
         """
         batch_meta, records = batch
         context = batch_meta.copy()
-        if not context['source'] in self.record_counts:
-            self.record_counts[context['source']] = 0
-        self.record_counts[context['source']] += context['size']
-        if not context['source'] in self.bp_counts:
-            self.bp_counts[context['source']] = [0, 0]
-        context['bp'] = self.bp_counts[context['source']]
+        if not context["source"] in self.record_counts:
+            self.record_counts[context["source"]] = 0
+        self.record_counts[context["source"]] += context["size"]
+        if not context["source"] in self.bp_counts:
+            self.bp_counts[context["source"]] = [0, 0]
+        context["bp"] = self.bp_counts[context["source"]]
         self.add_to_context(context)
         self.handle_records(context, records)
 
@@ -347,7 +354,7 @@ class Pipeline(metaclass=ABCMeta):
             except Exception as err:
                 raise AtroposError(
                     "An error occurred at record {} of batch {}".format(
-                        idx, context['index']
+                        idx, context["index"]
                     )
                 ) from err
 
@@ -362,7 +369,9 @@ class Pipeline(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def handle_reads(self, context: dict, read1: Sequence, read2: Sequence = None):
+    def handle_reads(
+        self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
+    ):
         """Handle a read or read-pair.
 
         Args:
@@ -378,7 +387,7 @@ class Pipeline(metaclass=ABCMeta):
         Args:
             summary: Summary dict to update.
         """
-        total_bp_counts = tuple(sum(b) for b in zip(* self.bp_counts.values()))
+        total_bp_counts = tuple(sum(b) for b in zip(*self.bp_counts.values()))
         summary.update(
             record_counts=self.record_counts,
             total_record_count=sum(self.record_counts.values()),
@@ -391,17 +400,19 @@ class Pipeline(metaclass=ABCMeta):
 class SingleEndPipelineMixin:
     """Mixin for pipelines that implements `handle_record` for single-end data.
     """
+
     def handle_record(self, context: dict, record: Sequence):
-        context['bp'][0] += len(record)
+        context["bp"][0] += len(record)
         return self.handle_reads(context, record)
 
 
 class PairedEndPipelineMixin:
     """Mixin for pipelines that implements `handle_record` for paired-end data.
     """
+
     def handle_record(self, context: dict, record: Sequence):
         read1, read2 = record
-        bps = context['bp']
+        bps = context["bp"]
         bps[0] += len(read1.sequence)
         bps[1] += len(read2.sequence)
         return self.handle_reads(context, read1, read2)
