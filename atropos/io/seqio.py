@@ -1045,16 +1045,16 @@ def get_format(
         elif qualities is False:
             # Same, but we know that we want to write reads without qualities.
             file_format = 'fasta'
+        else:
+            raise UnknownFileType("Could not determine file type.")
 
-    if file_format is None:
-        raise UnknownFileType("Could not determine file type.")
+    file_format = file_format.lower()
 
     if file_format == 'fastq' and qualities is False:
         raise ValueError(
             "Output format cannot be FASTQ since no quality values are "
             "available.")
 
-    file_format = file_format.lower()
     if file_format == 'fasta':
         if colorspace:
             return ColorspaceFastaFormat(line_length)

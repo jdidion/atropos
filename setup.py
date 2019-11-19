@@ -147,7 +147,7 @@ setup(
     description="trim adapters from high-throughput sequencing reads",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    license="Original Cutadapt code is under MIT license; improvements and additions are in the Public Domain",
+    license="MIT",
     ext_modules=extensions,
     packages=find_packages(),
     scripts=["bin/atropos"],

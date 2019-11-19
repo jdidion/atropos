@@ -1,22 +1,24 @@
 tests = tests
 module = atropos
-#pytestops = "--full-trace"
-#pytestops = "-v -s"
+#pytestops = --full-trace
+#pytestops = -v -s
 repo = jdidion/$(module)
 desc = Release $(version)
 
-BUILD = python setup.py build_ext -i && python setup.py install $(installargs)
-TEST = py.test $(pytestops) $(tests)
+BUILD =
+TEST =
 
-all:
-	$(BUILD)
-	$(TEST)
+all: clean install test
 
-install:
-	$(BUILD)
+build:
+	python setup.py build_ext -i
+	python setup.py sdist bdist_wheel
+
+install: clean build
+	python setup.py install $(installargs)
 
 test:
-	$(TEST)
+	py.test $(pytestops) $(tests)
 
 docs:
 	make -C doc html
@@ -48,21 +50,14 @@ docker:
 	docker login -u jdidion && \
 	docker push $(repo)
 
-release:
-	$(clean)
-	# tag
+tag:
 	git tag $(version)
-	# build
-	$(BUILD)
-	$(TEST)
-	python setup.py sdist bdist_wheel
-	# release
+
+release: clean tag install test
 	python setup.py sdist upload -r pypi
 	git push origin --tags
-	$(github_release)
-	$(docker)
 
-github_release:
+	# github release
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \
 		-H "Authorization: token $(token)" \
