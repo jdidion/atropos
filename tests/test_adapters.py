@@ -1,21 +1,28 @@
 # coding: utf-8
-from pytest import raises
 from atropos.adapters import (
-    Adapter, Match, ColorspaceAdapter, FRONT, BACK, parse_braces, LinkedAdapter
+    Adapter,
+    Match,
+    ColorspaceAdapter,
+    FRONT,
+    BACK,
+    parse_braces,
+    LinkedAdapter,
 )
 from atropos.io.seqio import Sequence
+
+from pytest import raises
 
 
 def test_issue_52():
     adapter = Adapter(
-        sequence='GAACTCCAGTCACNNNNN',
+        sequence="GAACTCCAGTCACNNNNN",
         where=BACK,
         max_error_rate=0.12,
         min_overlap=5,
         read_wildcards=False,
         adapter_wildcards=True,
     )
-    read = Sequence(name="abc", sequence='CCCCAGAACTACAGTCCCGGC')
+    read = Sequence(name="abc", sequence="CCCCAGAACTACAGTCCCGGC")
     am = Match(
         astart=0,
         astop=17,
@@ -27,7 +34,7 @@ def test_issue_52():
         adapter=adapter,
         read=read,
     )
-    assert am.wildcards() == 'GGC'
+    assert am.wildcards() == "GGC"
     """
     The result above should actually be 'CGGC' since the correct
     alignment is this one:
@@ -69,66 +76,66 @@ def test_issue_80():
 
 
 def test_str():
-    a = Adapter('ACGT', where=BACK, max_error_rate=0.1)
+    a = Adapter("ACGT", where=BACK, max_error_rate=0.1)
     str(a)
-    str(a.match_to(Sequence(name='seq', sequence='TTACGT')))
-    ca = ColorspaceAdapter('0123', where=BACK, max_error_rate=0.1)
+    str(a.match_to(Sequence(name="seq", sequence="TTACGT")))
+    ca = ColorspaceAdapter("0123", where=BACK, max_error_rate=0.1)
     str(ca)
 
 
 def test_color():
     with raises(ValueError):
-        ColorspaceAdapter('0123', where=FRONT, max_error_rate=0.1)
+        ColorspaceAdapter("0123", where=FRONT, max_error_rate=0.1)
 
 
 def test_parse_braces():
-    assert parse_braces('') == ''
-    assert parse_braces('A') == 'A'
-    assert parse_braces('A{0}') == ''
-    assert parse_braces('A{1}') == 'A'
-    assert parse_braces('A{2}') == 'AA'
-    assert parse_braces('A{2}C') == 'AAC'
-    assert parse_braces('ACGTN{3}TGACCC') == 'ACGTNNNTGACCC'
-    assert parse_braces('ACGTN{10}TGACCC') == 'ACGTNNNNNNNNNNTGACCC'
-    assert parse_braces('ACGTN{3}TGA{4}CCC') == 'ACGTNNNTGAAAACCC'
-    assert parse_braces('ACGTN{0}TGA{4}CCC') == 'ACGTTGAAAACCC'
+    assert parse_braces("") == ""
+    assert parse_braces("A") == "A"
+    assert parse_braces("A{0}") == ""
+    assert parse_braces("A{1}") == "A"
+    assert parse_braces("A{2}") == "AA"
+    assert parse_braces("A{2}C") == "AAC"
+    assert parse_braces("ACGTN{3}TGACCC") == "ACGTNNNTGACCC"
+    assert parse_braces("ACGTN{10}TGACCC") == "ACGTNNNNNNNNNNTGACCC"
+    assert parse_braces("ACGTN{3}TGA{4}CCC") == "ACGTNNNTGAAAACCC"
+    assert parse_braces("ACGTN{0}TGA{4}CCC") == "ACGTTGAAAACCC"
 
 
 def test_parse_braces_fail():
     for expression in [
-        '{',
-        '}',
-        '{}',
-        '{5',
-        '{1}',
-        'A{-7}',
-        'A{',
-        'A{1',
-        'N{7',
-        'AN{7',
-        'A{4{}',
-        'A{4}{3}',
-        'A{b}',
-        'A{6X}',
-        'A{X6}',
+        "{",
+        "}",
+        "{}",
+        "{5",
+        "{1}",
+        "A{-7}",
+        "A{",
+        "A{1",
+        "N{7",
+        "AN{7",
+        "A{4{}",
+        "A{4}{3}",
+        "A{b}",
+        "A{6X}",
+        "A{X6}",
     ]:
         with raises(ValueError):
             parse_braces(expression)
 
 
 def test_linked_adapter():
-    linked_adapter = LinkedAdapter('AAAA', 'TTTT')
-    sequence = Sequence(name='seq', sequence='AAAACCCCCTTTT')
+    linked_adapter = LinkedAdapter("AAAA", "TTTT")
+    sequence = Sequence(name="seq", sequence="AAAACCCCCTTTT")
     match = linked_adapter.match_to(sequence)
     trimmed = linked_adapter.trimmed(match)
-    assert trimmed.name == 'seq'
-    assert trimmed.sequence == 'CCCCC'
+    assert trimmed.name == "seq"
+    assert trimmed.sequence == "CCCCC"
 
 
 def test_random_match_probabilities():
-    a = Adapter('A', BACK)
+    a = Adapter("A", BACK)
     rmp = a.random_match_probabilities()
     assert rmp == [1.0, 0.25]
-    a = Adapter('AC', BACK, gc_content=0.4)
+    a = Adapter("AC", BACK, gc_content=0.4)
     rmp = a.random_match_probabilities()
     assert rmp == [1.0, 0.3, 0.06]

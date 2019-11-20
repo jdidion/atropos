@@ -37,11 +37,11 @@ First install dependencies:
     * pysam (SAM/BAM support)
     * khmer 2.0+ (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
-    * ngstream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
+    * srastream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
 
 Pip can be used to install atropos and optional dependencies, e.g.:
 
-pip install atropos[tqdm,pysam,ngstream]
+pip install atropos[tqdm,pysam,srastream]
 
 ## Conda
 

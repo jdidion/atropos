@@ -341,7 +341,7 @@ class BaseCommandParser(metaclass=ABCMeta):
                 "Opening reader for SRA Accession {}".format(options.sra_accession)
             )
             try:
-                from ngstream import SraReader
+                from srastream import SraReader
                 options.sra_reader = SraReader(
                     options.sra_accession, batch_size=options.batch_size or 1000
                 )

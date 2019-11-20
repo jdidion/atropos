@@ -847,7 +847,7 @@ def _find_modes(value_count_iter: Iterable[Tuple[float, int]]) -> Sequence[float
     return modal_values
 
 
-def truncate_string(string: str, max_len: int = 100) -> Optional[str]:
+def truncate_string(string: Optional[str], max_len: int = 100) -> Optional[str]:
     """Shorten string to at most `max_len` characters, appending "..." if necessary.
     """
     if string is None:

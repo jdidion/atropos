@@ -1,9 +1,9 @@
 # Tests for internal components of the atropos commands
-from pytest import raises
+import os
+import tempfile
+
 from atropos.commands.trim.multicore import OrderPreservingWriterResultHandler
 from atropos.commands.trim.writers import Writers
-import tempfile
-import os
 
 
 def test_order_preserving_writer():
@@ -21,7 +21,7 @@ def test_order_preserving_writer():
         handler.write_result(1, {path: result1})
         handler.finish(total_batches=3)
         # check that the results are in the right order
-        with open(path, 'rt') as inp:
+        with open(path, "rt") as inp:
             assert inp.read() == (result1 + result2 + result3)
     finally:
         os.remove(path)

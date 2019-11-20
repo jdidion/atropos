@@ -1,6 +1,5 @@
 # coding: utf-8
 from atropos.adapters import *
-from atropos.align import MatchInfo
 from atropos.commands.trim.modifiers import *
 from atropos.io.seqio import Sequence
 from atropos.util import reverse_complement as rc
@@ -27,7 +26,7 @@ def front_match(read):
         2,
         2,
     )
-    return (match, [match_info])
+    return match, [match_info]
 
 
 def back_match(read):
@@ -49,39 +48,38 @@ def back_match(read):
         2,
         2,
     )
-    return (match, [match_info])
+    return match, [match_info]
 
 
 def test_unconditional_cutter():
-    uc = UnconditionalCutter(lengths=[5])
-    s = Sequence("read1", 'abcdefg')
-    assert UnconditionalCutter(lengths=[2])(s).sequence == 'cdefg'
-    assert UnconditionalCutter(lengths=[-2])(s).sequence == 'abcde'
-    assert UnconditionalCutter(lengths=[100])(s).sequence == ''
-    assert UnconditionalCutter(lengths=[-100])(s).sequence == ''
+    s = Sequence("read1", "abcdefg")
+    assert UnconditionalCutter(lengths=[2])(s).sequence == "cdefg"
+    assert UnconditionalCutter(lengths=[-2])(s).sequence == "abcde"
+    assert UnconditionalCutter(lengths=[100])(s).sequence == ""
+    assert UnconditionalCutter(lengths=[-100])(s).sequence == ""
 
 
 def test_nend_trimmer():
     trimmer = NEndTrimmer()
-    seqs = ['NNNNAAACCTTGGNNN', 'NNNNAAACNNNCTTGGNNN', 'NNNNNN']
-    trims = ['AAACCTTGG', 'AAACNNNCTTGG', '']
+    seqs = ["NNNNAAACCTTGGNNN", "NNNNAAACNNNCTTGGNNN", "NNNNNN"]
+    trims = ["AAACCTTGG", "AAACNNNCTTGG", ""]
     for seq, trimmed in zip(seqs, trims):
-        _seq = Sequence('read1', seq, qualities='#' * len(seq))
-        _trimmed = Sequence('read1', trimmed, qualities='#' * len(trimmed))
+        _seq = Sequence("read1", seq, qualities="#" * len(seq))
+        _trimmed = Sequence("read1", trimmed, qualities="#" * len(trimmed))
         assert trimmer(_seq) == _trimmed
 
 
 def test_quality_trimmer():
-    read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
+    read = Sequence("read1", "ACGTTTACGTA", "##456789###")
     qt = QualityTrimmer(10, 10, 33)
-    assert qt(read) == Sequence('read1', 'GTTTAC', '456789')
+    assert qt(read) == Sequence("read1", "GTTTAC", "456789")
     qt = QualityTrimmer(0, 10, 33)
-    assert qt(read) == Sequence('read1', 'ACGTTTAC', '##456789')
+    assert qt(read) == Sequence("read1", "ACGTTTAC", "##456789")
     qt = QualityTrimmer(10, 0, 33)
-    assert qt(read) == Sequence('read1', 'GTTTACGTA', '456789###')
+    assert qt(read) == Sequence("read1", "GTTTACGTA", "456789###")
 
 
-def test_Modifiers_single():
+def test_modifiers_single():
     m = SingleEndModifiers()
     m.add_modifier(UnconditionalCutter, lengths=[5])
     mod1 = m.get_modifiers(read=1)
@@ -90,23 +88,23 @@ def test_Modifiers_single():
     assert isinstance(mod1[0], UnconditionalCutter)
     assert len(mod2) == 0
     # test single-end
-    read = Sequence('read1', 'ACGTTTACGTA', '##456789###')
+    read = Sequence("read1", "ACGTTTACGTA", "##456789###")
     mod_read = m.modify(read)
     assert len(mod_read) == 1
-    assert mod_read[0].sequence == 'TACGTA'
+    assert mod_read[0].sequence == "TACGTA"
 
 
-def test_Modifiers_paired_legacy():
+def test_modifiers_paired_legacy():
     m = PairedEndModifiers(paired="first")
     m.add_modifier(UnconditionalCutter, lengths=[5])
-    read1 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
-    read2 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
+    read1 = Sequence("read1", "ACGTTTACGTA", "##456789###")
+    read2 = Sequence("read1", "ACGTTTACGTA", "##456789###")
     mod_read1, mod_read2 = m.modify(read1, read2)
-    assert mod_read1.sequence == 'TACGTA'
-    assert mod_read2.sequence == 'ACGTTTACGTA'
+    assert mod_read1.sequence == "TACGTA"
+    assert mod_read2.sequence == "ACGTTTACGTA"
 
 
-def test_Modifiers_paired_both():
+def test_modifiers_paired_both():
     m = PairedEndModifiers(paired="both")
     m.add_modifier(UnconditionalCutter, read=1 | 2, lengths=[5])
     mod1 = m.get_modifiers(read=1)
@@ -115,18 +113,18 @@ def test_Modifiers_paired_both():
     assert len(mod2) == 1
     assert isinstance(mod1[0], UnconditionalCutter)
     assert isinstance(mod2[0], UnconditionalCutter)
-    read1 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
-    read2 = Sequence('read1', 'ACGTTTACGTA', '##456789###')
+    read1 = Sequence("read1", "ACGTTTACGTA", "##456789###")
+    read2 = Sequence("read1", "ACGTTTACGTA", "##456789###")
     mod_read1, mod_read2 = m.modify(read1, read2)
-    assert mod_read1.sequence == 'TACGTA'
-    assert mod_read2.sequence == 'TACGTA'
+    assert mod_read1.sequence == "TACGTA"
+    assert mod_read2.sequence == "TACGTA"
 
 
-def test_min_cutter_T_T():
+def test_min_cutter_t_t():
     unconditional_before = UnconditionalCutter((2, -2))
     unconditional_after = UnconditionalCutter((1, -1))
     min_trimmer = MinCutter((5, -5), True, True)
-    read1 = Sequence('read1', "CAATCGATCGAACGTACCGAT")
+    read1 = Sequence("read1", "CAATCGATCGAACGTACCGAT")
     assert read1.clipped == [0, 0, 0, 0], str(read1.clipped)
     read1 = unconditional_before(read1)
     assert read1.sequence == "ATCGATCGAACGTACCG"
@@ -149,11 +147,11 @@ def test_min_cutter_T_T():
     assert read5.clipped == [2, 2, 1, 1], read5.clipped
 
 
-def test_min_cutter_F_T():
+def test_min_cutter_f_t():
     unconditional_before = UnconditionalCutter((2, -2))
     unconditional_after = UnconditionalCutter((1, -1))
     min_trimmer = MinCutter((5, -5), False, True)
-    read1 = Sequence('read1', "CAATCGATCGAACGTACCGAT")
+    read1 = Sequence("read1", "CAATCGATCGAACGTACCGAT")
     read1 = unconditional_before(read1)
     assert read1.sequence == "ATCGATCGAACGTACCG"
     assert read1.clipped == [2, 2, 0, 0]
@@ -175,10 +173,10 @@ def test_min_cutter_F_T():
     assert read5.clipped == [2, 2, 5, 1]
 
 
-def test_min_cutter_T_F():
+def test_min_cutter_t_f():
     unconditional_before = UnconditionalCutter((2, -2))
     min_trimmer = MinCutter((4, -4), True, False)
-    read1 = Sequence('read1', "CAATCGATCGAACGTACCGAT")
+    read1 = Sequence("read1", "CAATCGATCGAACGTACCGAT")
     read1 = unconditional_before(read1)
     assert read1.sequence == "ATCGATCGAACGTACCG"
     assert read1.clipped == [2, 2, 0, 0]
@@ -188,26 +186,25 @@ def test_min_cutter_T_F():
 
 def test_non_directional_bisulfite_trimmer():
     trimmer = NonDirectionalBisulfiteTrimmer(rrbs=True)
-    read1 = Sequence('read1', "CAATCGATCGA")
-    read2 = Sequence('read2', "CTATCGATC")
+    read2 = Sequence("read2", "CTATCGATC")
     read2.match, read2.match_info = back_match(read2)
-    read3 = Sequence('read3', "CTATCGATCCA")
+    read3 = Sequence("read3", "CTATCGATCCA")
     # assert trimmer(read1).sequence == "ATCGATC"
     assert trimmer(read2).sequence == "CTATCGA"
     assert trimmer(read3).sequence == "CTATCGATCCA"
 
 
-def test_TruSeq_trimmer():
+def test_truseq_trimmer():
     trimmer = TruSeqBisulfiteTrimmer()
-    read1 = Sequence('read1', "CTATCGATCCACGAGACTAAC")
+    read1 = Sequence("read1", "CTATCGATCCACGAGACTAAC")
     assert trimmer(read1).sequence == "ATCCACGAGACTAAC"
 
 
-def test_Swift_trimmer():
+def test_swift_trimmer():
     trimmer = SwiftBisulfiteTrimmer()
     seq = "".join(["ACGT"] * 30)
-    read1 = Sequence('read1', seq)
-    read2 = Sequence('read2', seq)
+    read1 = Sequence("read1", seq)
+    read2 = Sequence("read2", seq)
     trimmed = trimmer(read1, read2)
     assert trimmed[0].sequence == seq[:-10]
     assert trimmed[1].sequence == seq[10:]
@@ -215,21 +212,21 @@ def test_Swift_trimmer():
 
 def test_overlapping():
     trimmer = MergeOverlapping(min_overlap=10, error_rate=0.1)
-    a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = reverse_complement('AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA')
-    frag = 'CCAAGCAGACATTCACTCAGATTGCA'
+    a1 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC"
+    a2 = reverse_complement("AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA")
+    frag = "CCAAGCAGACATTCACTCAGATTGCA"
     r1 = (frag + a1)[0:40]
-    q1 = '#' * 40
+    q1 = "#" * 40
     r2 = reverse_complement(a2 + frag)[0:40]
-    q2 = '!' * 40
+    q2 = "!" * 40
     parser = AdapterParser()
     adapter1 = parser.parse_from_spec(a1)
     adapter2 = parser.parse_from_spec(a2)
     cutter = AdapterCutter([adapter1, adapter2])
-    read1 = Sequence('foo', r1, q1)
+    read1 = Sequence("foo", r1, q1)
     read1 = cutter(read1)
     assert len(read1) == 26
-    read2 = Sequence('foo', r2, q2)
+    read2 = Sequence("foo", r2, q2)
     read2 = cutter(read2)
     assert len(read2) == 26
     # complete overlap
@@ -251,8 +248,8 @@ def test_overlapping():
     assert read1_merged.merged
     assert read2_merged is None
     assert len(read1_merged) == 26
-    assert read1_merged.sequence == 'CCAAGCAGACATTCACTCAGATTGCA'
-    assert read1_merged.qualities == ('#' * 24) + ('!' * 2)
+    assert read1_merged.sequence == "CCAAGCAGACATTCACTCAGATTGCA"
+    assert read1_merged.qualities == ("#" * 24) + ("!" * 2)
     # errors
     # round(0.1 * 24) = 2, so 2 errors should pass but 3 should not
     read1.merged = False
@@ -264,8 +261,8 @@ def test_overlapping():
     assert read1_merged.merged
     assert read2_merged is None
     assert len(read1_merged) == 26
-    assert read1_merged.sequence == 'CCAAGCAGACTTTCACTCAGTTTGCA'
-    assert read1_merged.qualities == ('#' * 24) + ('!' * 2)
+    assert read1_merged.sequence == "CCAAGCAGACTTTCACTCAGTTTGCA"
+    assert read1_merged.qualities == ("#" * 24) + ("!" * 2)
     # too few overlapping bases
     read1.merged = False
     r1_seq[15] = reverse_complement(r1_seq[15])
@@ -277,19 +274,19 @@ def test_overlapping():
 
 def test_overlapping_with_error_correction():
     trimmer = MergeOverlapping(
-        min_overlap=10, error_rate=0.1, mismatch_action='liberal'
+        min_overlap=10, error_rate=0.1, mismatch_action=MismatchAction.LIBERAL
     )
-    r1 = 'AGATCGGAAGACCGTCATGTAGGGAAAGAGTGTAGATCTC'
-    q1 = 'FFFFFFFFFFF#FFFFFFFFFFFFFFFFFFFFF#######'
-    r2 = reverse_complement('AGATCGGTAGAGCGTCGTGTAGGGAAATAGTGTAGATCTC')
-    q2 = ''.join(reversed('FFFFFFFFFFFFFFFF#FFFFFFFFFF#FFFFFFFFFFFF'))
-    read1 = Sequence('foo', r1, q1)
-    read2 = Sequence('foo', r2, q2)
+    r1 = "AGATCGGAAGACCGTCATGTAGGGAAAGAGTGTAGATCTC"
+    q1 = "FFFFFFFFFFF#FFFFFFFFFFFFFFFFFFFFF#######"
+    r2 = reverse_complement("AGATCGGTAGAGCGTCGTGTAGGGAAATAGTGTAGATCTC")
+    q2 = "".join(reversed("FFFFFFFFFFFFFFFF#FFFFFFFFFF#FFFFFFFFFFFF"))
+    read1 = Sequence("foo", r1, q1)
+    read2 = Sequence("foo", r2, q2)
     read1_merged, read2_merged = trimmer(read1, read2)
     assert read1_merged.merged
     assert read2_merged is None
-    assert read1_merged.sequence == 'AGATCGGTAGAGCGTCATGTAGGGAAAGAGTGTAGATCTC'
-    assert read1_merged.qualities == 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF#######'
+    assert read1_merged.sequence == "AGATCGGTAGAGCGTCATGTAGGGAAAGAGTGTAGATCTC"
+    assert read1_merged.qualities == "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF#######"
 
 
 def test_mismatched_adapter_overlaps():
@@ -302,10 +299,12 @@ def test_mismatched_adapter_overlaps():
     actual rc                          TATGTTCTTTCCCTTCACGTCTCTCTTCGGATCTTTATTGTGATGAGTTGAAAATAAAGGTTAAGTATAGATAAAAAAGTTATTATAGTTTAGAGGGTAAGTGTATGATGGAGTAAAATATTGGT
     adapter rc AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT
     """
-    r1 = 'TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGTAGATCGGAAGAGCACACGTCTGAACTTCAGTCAC'
-    r2 = 'ACCAATATTTTACTCCATCATACACTTACCCTCTAAACTATAATAACTTTTTTATCTATACTTAACCTTTATTTTCAACTCATCACAATAAAGATCCGAAGAGAGACGTGAAGGGAAAGAACATA'
-    a1 = "GATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG"  # TruSeq index 7
-    a2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"  # TruSeq universal
+    r1 = "TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGTAGATCGGAAGAGCACACGTCTGAACTTCAGTCAC"
+    r2 = "ACCAATATTTTACTCCATCATACACTTACCCTCTAAACTATAATAACTTTTTTATCTATACTTAACCTTTATTTTCAACTCATCACAATAAAGATCCGAAGAGAGACGTGAAGGGAAAGAACATA"
+    # TruSeq index 7
+    a1 = "GATCGGAAGAGCACACGTCTGAACTCCAGTCACCAGATCATCTCGTATGCCGTCTTCTGCTTG"
+    # TruSeq universal
+    a2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
     parser = AdapterParser()
     adapter1 = parser.parse_from_spec(a1)
     adapter2 = parser.parse_from_spec(a2)
@@ -313,44 +312,46 @@ def test_mismatched_adapter_overlaps():
     cutter = InsertAdapterCutter(
         adapter1, adapter2, max_insert_mismatch_frac=0.3, max_adapter_mismatch_frac=0.3
     )
-    read1 = Sequence('foo', r1, '#' * 125)
-    read2 = Sequence('foo', r2, '#' * 125)
+    read1 = Sequence("foo", r1, "#" * 125)
+    read2 = Sequence("foo", r2, "#" * 125)
     new_read1, new_read2 = cutter(read1, read2)
     assert (len(new_read1)) == 91
     assert (len(new_read2)) == 91
     assert (
-        new_read1.sequence ==
-        'TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGT'
+        new_read1.sequence
+        == "TTGTTTTTATGGAGAGAGTTTTAAGGTTTATTTTAGTTTTAAAGGATATTGTAGGTTAGAGGGAAAGTGTATGATGAAGGTATATATTGGT"
     )
 
 
 def test_error_correction():
-    a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
-    frag = 'CCAAGCAGACATTCACTCAGATTGCA'
-    correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
+    a1 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC"
+    a2 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA"
+    frag = "CCAAGCAGACATTCACTCAGATTGCA"
+    correct_frag = "CCAAGTAGACATTCGCTCAGATTGCA"
     r1 = list(frag)
     # C>T at pos 6
-    r1[5] = 'T'
-    q1 = ['#'] * 40
+    r1[5] = "T"
+    q1 = ["#"] * 40
     # quality of read1 > quality of read2 at pos 6
-    q1[5] = 'A'
-    r1 = (''.join(r1) + a1)[0:40]
-    q1 = ''.join(q1)
+    q1[5] = "A"
+    r1 = ("".join(r1) + a1)[0:40]
+    q1 = "".join(q1)
     r2 = list(frag)
     # A>G at pos 15
-    r2[14] = 'G'
-    q2 = ['#'] * 40
+    r2[14] = "G"
+    q2 = ["#"] * 40
     # quality of read2 > quality of read1 at pos 11
-    q2[len(frag) - 15] = 'A'
-    r2 = reverse_complement(reverse_complement(a2) + ''.join(r2))[0:40]
-    q2 = ''.join(q2)
-    read1 = Sequence('foo', r1, q1)
-    read2 = Sequence('foo', r2, q2)
+    q2[len(frag) - 15] = "A"
+    r2 = reverse_complement(reverse_complement(a2) + "".join(r2))[0:40]
+    q2 = "".join(q2)
+    read1 = Sequence("foo", r1, q1)
+    read2 = Sequence("foo", r2, q2)
     parser = AdapterParser()
     adapter1 = parser.parse_from_spec(a1)
     adapter2 = parser.parse_from_spec(a2)
-    cutter = InsertAdapterCutter(adapter1, adapter2, mismatch_action='liberal')
+    cutter = InsertAdapterCutter(
+        adapter1, adapter2, mismatch_action=MismatchAction.LIBERAL
+    )
     new_read1, new_read2 = cutter(read1, read2)
     assert len(new_read1) == 26
     assert new_read1.insert_overlap
@@ -361,29 +362,29 @@ def test_error_correction():
 
 
 def test_error_correction_no_insert_match_one_adapter_match():
-    a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
-    a2_mod = 'ACATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
-    frag = 'CCAAGCAGACATTCACTCAGATTGCA'
-    correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
+    a1 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC"
+    a2 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA"
+    a2_mod = "ACATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA"
+    frag = "CCAAGCAGACATTCACTCAGATTGCA"
+    correct_frag = "CCAAGTAGACATTCGCTCAGATTGCA"
     r1 = list(frag)
     # C>T at pos 6
-    r1[5] = 'T'
-    q1 = ['#'] * 40
+    r1[5] = "T"
+    q1 = ["#"] * 40
     # quality of read1 > quality of read2 at pos 6
-    q1[5] = 'A'
-    r1 = (''.join(r1) + a1)[0:40]
-    q1 = ''.join(q1)
+    q1[5] = "A"
+    r1 = ("".join(r1) + a1)[0:40]
+    q1 = "".join(q1)
     r2 = list(frag)
     # A>G at pos 15
-    r2[14] = 'G'
-    q2 = ['#'] * 40
+    r2[14] = "G"
+    q2 = ["#"] * 40
     # quality of read2 > quality of read1 at pos 11
-    q2[len(frag) - 15] = 'A'
-    r2 = reverse_complement(reverse_complement(a2_mod) + ''.join(r2))[0:40]
-    q2 = ''.join(q2)
-    read1 = Sequence('foo', r1, q1)
-    read2 = Sequence('foo', r2, q2)
+    q2[len(frag) - 15] = "A"
+    r2 = reverse_complement(reverse_complement(a2_mod) + "".join(r2))[0:40]
+    q2 = "".join(q2)
+    read1 = Sequence("foo", r1, q1)
+    read2 = Sequence("foo", r2, q2)
     parser1 = AdapterParser()
     adapter1 = parser1.parse_from_spec(a1)
     # Allow zero mismatches to prevent adapter alignment
@@ -391,7 +392,10 @@ def test_error_correction_no_insert_match_one_adapter_match():
     adapter2 = parser2.parse_from_spec(a2)
     # Allow zero mismatches to prevent insert alignment
     cutter = InsertAdapterCutter(
-        adapter1, adapter2, mismatch_action='liberal', max_insert_mismatch_frac=0
+        adapter1,
+        adapter2,
+        mismatch_action=MismatchAction.LIBERAL,
+        max_insert_mismatch_frac=0,
     )
     new_read1, new_read2 = cutter(read1, read2)
     assert len(new_read1) == 26
@@ -403,34 +407,37 @@ def test_error_correction_no_insert_match_one_adapter_match():
 
 
 def test_error_correction_no_insert_match_two_adapter_matches():
-    a1 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC'
-    a2 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA'
-    frag = 'CCAAGCAGACATTCACTCAGATTGCA'
-    correct_frag = 'CCAAGTAGACATTCGCTCAGATTGCA'
+    a1 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTC"
+    a2 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACGAGTTA"
+    frag = "CCAAGCAGACATTCACTCAGATTGCA"
+    correct_frag = "CCAAGTAGACATTCGCTCAGATTGCA"
     r1 = list(frag)
     # C>T at pos 6
-    r1[5] = 'T'
-    q1 = ['#'] * 40
+    r1[5] = "T"
+    q1 = ["#"] * 40
     # quality of read1 > quality of read2 at pos 6
-    q1[5] = 'A'
-    r1 = (''.join(r1) + a1)[0:40]
-    q1 = ''.join(q1)
+    q1[5] = "A"
+    r1 = ("".join(r1) + a1)[0:40]
+    q1 = "".join(q1)
     r2 = list(frag)
     # A>G at pos 15
-    r2[14] = 'G'
-    q2 = ['#'] * 40
+    r2[14] = "G"
+    q2 = ["#"] * 40
     # quality of read2 > quality of read1 at pos 11
-    q2[len(frag) - 15] = 'A'
-    r2 = reverse_complement(reverse_complement(a2) + ''.join(r2))[0:40]
-    q2 = ''.join(q2)
-    read1 = Sequence('foo', r1, q1)
-    read2 = Sequence('foo', r2, q2)
+    q2[len(frag) - 15] = "A"
+    r2 = reverse_complement(reverse_complement(a2) + "".join(r2))[0:40]
+    q2 = "".join(q2)
+    read1 = Sequence("foo", r1, q1)
+    read2 = Sequence("foo", r2, q2)
     parser = AdapterParser()
     adapter1 = parser.parse_from_spec(a1)
     adapter2 = parser.parse_from_spec(a2)
     # Allow zero mismatches to prevent insert alignment
     cutter = InsertAdapterCutter(
-        adapter1, adapter2, mismatch_action='liberal', max_insert_mismatch_frac=0
+        adapter1,
+        adapter2,
+        mismatch_action=MismatchAction.LIBERAL,
+        max_insert_mismatch_frac=0,
     )
     new_read1, new_read2 = cutter(read1, read2)
     assert len(new_read1) == 26
@@ -444,46 +451,46 @@ def test_error_correction_no_insert_match_two_adapter_matches():
 def test_error_correction_unequal_read_lengths():
     # Test case for issue #51
     read1 = Sequence(
-        'read1',
-        'TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA',
-        'CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0',
+        "read1",
+        "TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA",
+        "CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0",
     )
     read2 = Sequence(
-        'read1',
-        'ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT',
-        'CCCCCG@FCFGGCFGGGGFEFGFGGFCFGGGFGFGGGGGGGGGGGGGGGGGGGGGGGGGGG9FGGGGGGGFGDFFGGGGGGGGGGGGGGGGG8;>@?@FEGGGGGGGGGGGGGGGGGGGGG=DDFAEFFFGF>B>EA):DFFBDFFB6CDEDDD9=99DD>55)580:A5)*)*;DD>**51:0118):)4))1***0:*)*)((***0*.(((((*)/.)1/(6((()1.)(((6).-----8<:C<73',
+        "read1",
+        "ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT",
+        "CCCCCG@FCFGGCFGGGGFEFGFGGFCFGGGFGFGGGGGGGGGGGGGGGGGGGGGGGGGGG9FGGGGGGGFGDFFGGGGGGGGGGGGGGGGG8;>@?@FEGGGGGGGGGGGGGGGGGGGGG=DDFAEFFFGF>B>EA):DFFBDFFB6CDEDDD9=99DD>55)580:A5)*)*;DD>**51:0118):)4))1***0:*)*)((***0*.(((((*)/.)1/(6((()1.)(((6).-----8<:C<73",
     )
     aligner = InsertAligner(
-        'AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG',
-        'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+        "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG",
+        "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT",
     )
     insert_match, adapter_match1, adapter_match2 = aligner.match_insert(
         read1.sequence, read2.sequence
     )
-    ec = ErrorCorrectorMixin('N')
+    ec = ErrorCorrectorMixin(MismatchAction.N)
     ec.correct_errors(read1, read2, insert_match, truncate_seqs=True)
     assert read1.corrected == 3
     assert read2.corrected == 3
     for i in (80, 86, 104):
-        assert read1.sequence[i] == 'N', 'Read 1 not corrected to N at {}'.format(i)
-        assert read2.sequence[104 - i] == 'N', 'Read 2 not corrected to N at {}'.format(
+        assert read1.sequence[i] == "N", "Read 1 not corrected to N at {}".format(i)
+        assert read2.sequence[104 - i] == "N", "Read 2 not corrected to N at {}".format(
             104 - i
         )
 
 
 def ints2quals(ints):
-    return ''.join(chr(i + 33) for i in ints)
+    return "".join(chr(i + 33) for i in ints)
 
 
 def test_overwrite_read():
     overwrite = OverwriteRead(20, 40, 10)
-    lowseq = 'ACGT' * 5
-    highseq = 'TCAG' * 5
+    lowseq = "ACGT" * 5
+    highseq = "TCAG" * 5
     # mean lowq > 20, mean highq > 40
     lowq = (11, 31, 16, 24, 16, 20, 17, 19, 21, 28) * 2
     highq = (22, 62, 32, 48, 32, 40, 34, 38, 42, 56) * 2
-    read1 = Sequence('foo', lowseq, ints2quals(lowq))
-    read2 = Sequence('foo', highseq, ints2quals(highq))
+    read1 = Sequence("foo", lowseq, ints2quals(lowq))
+    read2 = Sequence("foo", highseq, ints2quals(highq))
     new_read1, new_read2 = overwrite(read1, read2)
     assert new_read1.sequence == lowseq
     assert new_read1.qualities == ints2quals(lowq)
@@ -492,7 +499,7 @@ def test_overwrite_read():
     assert new_read1.corrected == new_read2.corrected == 0
     # mean lowq < 20, mean highq > 40
     lowq = tuple(i - 1 for i in lowq)
-    read1 = Sequence('foo', lowseq, ints2quals(lowq))
+    read1 = Sequence("foo", lowseq, ints2quals(lowq))
     new_read1, new_read2 = overwrite(read1, read2)
     assert new_read1.sequence == rc(highseq)
     assert new_read1.qualities == ints2quals(reversed(highq))
@@ -501,7 +508,7 @@ def test_overwrite_read():
     assert new_read1.corrected == new_read2.corrected == 1
     # mean lowq < 20, mean highq < 40
     highq = tuple(i - 1 for i in highq)
-    read2 = Sequence('foo', highseq, ints2quals(highq))
+    read2 = Sequence("foo", highseq, ints2quals(highq))
     new_read1, new_read2 = overwrite(read1, read2)
     assert new_read1.sequence == lowseq
     assert new_read1.qualities == ints2quals(lowq)
@@ -510,64 +517,79 @@ def test_overwrite_read():
     assert new_read1.corrected == new_read2.corrected == 0
 
 
-def test_UMI_trim_pair():
-    seq1 = 'TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
-    qual1 = 'CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0'
-    seq2 = 'ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT'
-    qual2 = 'CCCCCG@FCFGGCFGGGGFEFGFGGFCFGGGFGFGGGGGGGGGGGGGGGGGGGGGGGGGGG9FGGGGGGGFGDFFGGGGGGGGGGGGGGGGG8;>@?@FEGGGGGGGGGGGGGGGGGGGGG=DDFAEFFFGF>B>EA):DFFBDFFB6CDEDDD9=99DD>55)580:A5)*)*;DD>**51:0118):)4))1***0:*)*)((***0*.(((((*)/.)1/(6((()1.)(((6).-----8<:C<73'
-    ##  5 bases UMI from both reads
-    read1 = Sequence('read1', seq1, qual1)
+def test_umi_trim_pair():
+    seq1 = "TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA"
+    qual1 = "CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0"
+    seq2 = "ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT"
+    qual2 = "CCCCCG@FCFGGCFGGGGFEFGFGGFCFGGGFGFGGGGGGGGGGGGGGGGGGGGGGGGGGG9FGGGGGGGFGDFFGGGGGGGGGGGGGGGGG8;>@?@FEGGGGGGGGGGGGGGGGGGGGG=DDFAEFFFGF>B>EA):DFFBDFFB6CDEDDD9=99DD>55)580:A5)*)*;DD>**51:0118):)4))1***0:*)*)((***0*.(((((*)/.)1/(6((()1.)(((6).-----8<:C<73"
+
+    # 5 bases UMI from both reads
+    read1 = Sequence("read1", seq1, qual1)
     trimmer = UmiTrimmer(number_of_bases=5)
     trimmed_read1 = trimmer(read1)
-    assert trimmed_read1.sequence == 'AGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
-    assert trimmed_read1.umi == 'TTTGC'
-    read2 = Sequence('read2', seq2, qual2)
+    assert (
+        trimmed_read1.sequence
+        == "AGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA"
+    )
+    assert trimmed_read1.umi == "TTTGC"
+    read2 = Sequence("read2", seq2, qual2)
     trimmed_read2 = trimmer(read2)
-    assert trimmed_read2.sequence == 'CTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT'
-    assert trimmed_read2.umi == 'ATAGG'
-    umi_to_name = SyncUmi(delim='_')
+    assert (
+        trimmed_read2.sequence
+        == "CTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT"
+    )
+    assert trimmed_read2.umi == "ATAGG"
+    umi_to_name = SyncUmi(delim="_")
     new_read1, new_read2 = umi_to_name(trimmed_read1, trimmed_read2)
-    assert new_read1.name == 'read1_TTTGC_ATAGG'
-    assert new_read2.name == 'read2_TTTGC_ATAGG'
-    ## 5 bases from read1, 0 from read2
-    read1 = Sequence('read1', seq1, qual1)
+    assert new_read1.name == "read1_TTTGC_ATAGG"
+    assert new_read2.name == "read2_TTTGC_ATAGG"
+
+    # 5 bases from read1, 0 from read2
+    read1 = Sequence("read1", seq1, qual1)
     trimmer = UmiTrimmer(number_of_bases=5)
     trimmed_read1 = trimmer(read1)
-    read2 = Sequence('read2', seq2, qual2)
+    read2 = Sequence("read2", seq2, qual2)
     trimmer = UmiTrimmer(number_of_bases=0)
     untrim_read2 = trimmer(read2)
-    assert untrim_read2.sequence == 'ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT'
+    assert (
+        untrim_read2.sequence
+        == "ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT"
+    )
     assert untrim_read2.umi is None
-    umi_to_name = SyncUmi(delim='_')
+    umi_to_name = SyncUmi(delim="_")
     new_read1, new_read2 = umi_to_name(trimmed_read1, untrim_read2)
-    assert new_read1.name == 'read1_TTTGC'
-    assert new_read2.name == 'read2_TTTGC'
-    ## 0 bases from read1, 5 from read2
-    read1 = Sequence('read1', seq1, qual1)
+    assert new_read1.name == "read1_TTTGC"
+    assert new_read2.name == "read2_TTTGC"
+
+    # 0 bases from read1, 5 from read2
+    read1 = Sequence("read1", seq1, qual1)
     trimmer = UmiTrimmer(number_of_bases=0)
     untrim_read1 = trimmer(read1)
-    read2 = Sequence('read2', seq2, qual2)
+    read2 = Sequence("read2", seq2, qual2)
     trimmer = UmiTrimmer(number_of_bases=5)
     trimmed_read2 = trimmer(read2)
-    umi_to_name = SyncUmi(delim='_')
+    umi_to_name = SyncUmi(delim="_")
     new_read1, new_read2 = umi_to_name(untrim_read1, trimmed_read2)
-    assert new_read1.name == 'read1_ATAGG'
-    assert new_read2.name == 'read2_ATAGG'
+    assert new_read1.name == "read1_ATAGG"
+    assert new_read2.name == "read2_ATAGG"
 
 
-def test_UMI_trim_single():
-    seq1 = 'TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
-    qual1 = 'CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0'
-    ##  5 bases UMI from read1
-    read1 = Sequence('read1', seq1, qual1)
+def test_umi_trim_single():
+    seq1 = "TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA"
+    qual1 = "CCCCCFCGGGGGBFFAFC<?BEADCCF<FFFFGFFDFDFFGGGGCFGGC?DFFFEC;,===??DG==DDDFFFFG8DDD7+5;;DF*=)))10885D**58>6=0"
+    # 5 bases UMI from read1
+    read1 = Sequence("read1", seq1, qual1)
     trimmer = UmiTrimmer(number_of_bases=5)
     trimmed_read1 = trimmer(read1)
-    assert trimmed_read1.sequence == 'AGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA'
-    assert trimmed_read1.umi == 'TTTGC'
-    addUMI = AddUmi(delim="_")
-    assert addUMI(trimmed_read1).name == 'read1_TTTGC'
-    read1 = Sequence('read1', seq1, qual1)
+    assert (
+        trimmed_read1.sequence
+        == "AGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA"
+    )
+    assert trimmed_read1.umi == "TTTGC"
+    add_umi = AddUmi(delim="_")
+    assert add_umi(trimmed_read1).name == "read1_TTTGC"
+    read1 = Sequence("read1", seq1, qual1)
     trimmer = UmiTrimmer(number_of_bases=0)
     trimmed_read1 = trimmer(read1)
-    assert addUMI(trimmed_read1).umi is None
-    assert addUMI(trimmed_read1).name == "read1"
+    assert add_umi(trimmed_read1).umi is None
+    assert add_umi(trimmed_read1).name == "read1"

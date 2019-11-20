@@ -157,7 +157,7 @@ extra_requirements = {
     "khmer": ["khmer"],
     "pysam": ["pysam"],
     "jinja": ["jinja2"],
-    "sra": ["ngstream"],
+    "sra": ["sratream"],
 }
 
 setup(

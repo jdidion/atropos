@@ -8,18 +8,16 @@ def test_cs_5p():
     read = ColorspaceSequence("name", "0123", "DEFG", "T")
     adapter = ColorspaceAdapter("CG", PREFIX, 0.1)
     cutter = AdapterCutter([adapter])
-    trimmed_read = cutter(read)
-
-
+    cutter(read)
 
 
 # no assertion here, just make sure the above code runs without
 # an exception
 def test_statistics():
-    read = Sequence('name', 'AAAACCCCAAAA')
-    adapters = [Adapter('CCCC', BACK, 0.1)]
+    read = Sequence("name", "AAAACCCCAAAA")
+    adapters = [Adapter("CCCC", BACK, 0.1)]
     cutter = AdapterCutter(adapters, times=3)
-    trimmed_read = cutter(read)
+    cutter(read)
     # TODO make this a lot simpler
     trimmed_bp = 0
     for adapter in adapters:
