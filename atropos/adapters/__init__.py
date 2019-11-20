@@ -1,7 +1,4 @@
 # coding: utf-8
-"""
-Adapters
-"""
 import itertools
 import logging
 import os
@@ -9,25 +6,26 @@ import pickle
 import re
 from urllib.error import URLError
 from urllib.request import urlopen
+
 from atropos import align
 from atropos.align import Match
 from atropos.io.seqio import FastaReader
 from atropos.util import (
-    IUPAC_BASES,
+    ALPHABETS,
     GC_BASES,
+    IUPAC_BASES,
+    Const,
+    CountingDict,
     MergingDict,
     NestedDict,
-    CountingDict,
-    Const,
     reverse_complement,
-    ALPHABETS,
 )
 from atropos.util import colorspace as cs
 
 
 class AdapterType(object):
     """Struct for adapter type information.
-    
+
     Args:
         name: Adapter type name.
         desc: Adapter type description.
@@ -97,7 +95,7 @@ DEFAULT_ADAPTERS_PATH = os.path.join(
 class AdapterParser(object):
     """Factory for Adapter classes that all use the same parameters (error rate,
     indels etc.). The given **kwargs will be passed to the Adapter constructors.
-    
+
     Args:
         colorspace: Whether the adapter sequences are in colorspace.
         cache: The AdapterCache to use for fetching/storing named adapters.
@@ -115,14 +113,14 @@ class AdapterParser(object):
         5' and 3' adapters is supported. If the name parameter is None, then
         an attempt is made to extract the name from the specification
         (If spec is 'name=ADAPTER', name will be 'name'.)
-        
+
         Args:
             spec: The adapter spec.
             cmdline_type: describes which commandline parameter was used (``-a``
                 is 'back', ``-b`` is 'anywhere', and ``-g`` is 'front').
-        
+
         TODO: describe the adapter spec format
-        
+
         Returns:
             An :class:`Adapter` instance.
         """
@@ -236,12 +234,12 @@ class AdapterParser(object):
         """Parse all three types of commandline options that can be used to
         specify adapters. back, anywhere and front are lists of strings,
         corresponding to the respective commandline types (-a, -b, -g).
-        
+
         Args:
             back: Back-adapter specs.
             anywhere: Anywhere-adapter specs.
             front: Front-adapter specs.
-        
+
         Return:
             A list of appropriate Adapter classes.
         """
@@ -260,7 +258,7 @@ class AdapterParser(object):
 class Adapter(object):
     """An adapter knows how to match itself to a read. In particular, it knows
     where it should be within the read and how to interpret wildcard characters.
-    
+
     Args:
         sequence: The adapter sequence as string. Will be converted to
             uppercase. Also, Us will be converted to Ts.
@@ -384,10 +382,10 @@ class Adapter(object):
 
     def match_to(self, read):
         """Attempt to match this adapter to the given read.
-        
+
         Args:
             read: A :class:`Sequence` instance.
-        
+
         Returns:
             A :class:`Match` instance if a match was found; return None if no
             match was found given the matching criteria (minimum overlap length,
@@ -457,7 +455,7 @@ class Adapter(object):
 
     def _trimmed_anywhere(self, match):
         """Trims an adapter from either the front or back of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -469,7 +467,7 @@ class Adapter(object):
 
     def _trimmed_front(self, match):
         """Trims an adapter from the front of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -480,7 +478,7 @@ class Adapter(object):
 
     def _trimmed_back(self, match):
         """Trims an adapter from the back of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -496,7 +494,7 @@ class Adapter(object):
         return len(self.sequence)
 
     def random_match_probabilities(self):
-        """Estimate probabilities that this adapter matches a random sequence. 
+        """Estimate probabilities that this adapter matches a random sequence.
         Indels are not taken into account.
 
         Returns:
@@ -559,7 +557,7 @@ class Adapter(object):
 
 class ColorspaceAdapter(Adapter):
     """An adapter for a colorspace sequence.
-    
+
     Args:
         args, kwargs: Arguments to pass to :class:`Adapter` constructor.
     """
@@ -585,10 +583,10 @@ class ColorspaceAdapter(Adapter):
 
     def match_to(self, read):
         """Attempt to match this adapter to the given read.
-        
+
         Args:
             read: A :class:`Sequence` instance.
-        
+
         Returns:
             A :class:`Match` instance if a match was found; return None if no
             match was found given the matching criteria (minimum overlap length,
@@ -634,7 +632,7 @@ class ColorspaceAdapter(Adapter):
 
     def _trimmed_front(self, match):
         """Trims an adapter from the front of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -661,7 +659,7 @@ class ColorspaceAdapter(Adapter):
 
     def _trimmed_back(self, match):
         """Trims an adapter from the back of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -680,7 +678,7 @@ class ColorspaceAdapter(Adapter):
 # TODO Consolidate Match and a LinkedMatch class.
 class LinkedMatch(object):
     """Represent a match of a LinkedAdapter.
-    
+
     Args:
         front_match: The match to the front of the sequence.
         back_match: The match to the back of the sequence.
@@ -705,7 +703,7 @@ class LinkedMatch(object):
 
 class LinkedAdapter(object):
     """An adapter with linked front and back sequences.
-    
+
     Args:
         front_sequence: Front adapter sequence.
         back_sequence: Back adapter sequence.
@@ -744,10 +742,10 @@ class LinkedAdapter(object):
     def match_to(self, read):
         """Match the linked adapters against the given read. If the 'front'
         adapter is not found, the 'back' adapter is not searched for.
-        
+
         Args:
             read: A :class:`Sequence` instance.
-        
+
         Returns:
             A :class:`Match` instance if a match was found; return None if no
             match was found given the matching criteria (minimum overlap length,
@@ -766,10 +764,10 @@ class LinkedAdapter(object):
     def trimmed(self, match):
         """Returns the read trimmed with the front and/or back adapter
         trimmer(s).
-        
+
         Args:
             match: The match to trim.
-        
+
         Returns:
             The trimmed read.
         """
@@ -822,7 +820,7 @@ class LinkedAdapter(object):
 
 class AdapterCache(object):
     """Cache for known adapters.
-    
+
     Args:
         path: Path to file where cache is written.
         auto_reverse_complement: Whether adapter reverse-complements should
@@ -854,7 +852,7 @@ class AdapterCache(object):
 
     def add(self, name, seq):
         """Add a sequence to the cache.
-        
+
         Args:
             name: Adapter name.
             seq: Adapter sequence.
@@ -871,7 +869,7 @@ class AdapterCache(object):
 
     def load_from_file(self, path=DEFAULT_ADAPTERS_PATH):
         """Load cached data from a file.
-        
+
         Args:
             path: Path from which to load.
         """
@@ -880,7 +878,7 @@ class AdapterCache(object):
 
     def load_from_url(self, url=DEFAULT_ADAPTERS_URL):
         """Load adapter data from a URL.
-        
+
         Args:
             url: URL from which to load.
         """
@@ -896,7 +894,7 @@ class AdapterCache(object):
 
     def load_from_fasta(self, fasta):
         """Load adapter data from a FASTA file.
-        
+
         Args:
             fasta: FASTA file.
         """
@@ -958,7 +956,7 @@ class AdapterCache(object):
 
     def has_name(self, name):
         """Returns whether this cache contains the specified name.
-        
+
         Args:
             name: The adapter name.
         """
@@ -966,10 +964,10 @@ class AdapterCache(object):
 
     def get_for_name(self, name):
         """Returns the sequence associated with a name.
-        
+
         Args:
             name: The name to fetch.
-        
+
         Returns:
             The sequence.
         """
@@ -977,10 +975,10 @@ class AdapterCache(object):
 
     def has_seq(self, seq):
         """Tests whether a sequence is in the cache.
-        
+
         Args:
             seq: The sequence to check.
-        
+
         Returns:
             True if the sequence is in the cache.
         """
@@ -988,10 +986,10 @@ class AdapterCache(object):
 
     def get_for_seq(self, seq):
         """Returns the name associated with a given sequence.
-        
+
         Args:
             seq: The sequence to fetch.
-        
+
         Returns:
             The name associated with the sequence.
         """
@@ -1011,7 +1009,7 @@ class AdapterCache(object):
 def parse_braces(sequence):
     """Replace all occurrences of ``x{n}`` (where x is any character) with n
     occurrences of x. Raise ValueError if the expression cannot be parsed.
-    
+
     Examples:
         >>> parse_braces('TGA{5}CT')
         TGAAAAACT
@@ -1058,10 +1056,10 @@ def parse_braces(sequence):
 def _extract_name_from_spec(spec):
     """Parse an adapter specification given as 'name=adapt' into 'name'
     and 'adapt'.
-    
+
     Args:
         spec: Adapter spec.
-    
+
     Returns:
         (name, spec)
     """

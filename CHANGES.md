@@ -11,7 +11,7 @@
   executable.
 * Fix #32: SAM output.
 * Fix #36: Progress bars don't increment correctly when batch size > 1 used.
-* Moved all file management code to use xphyle
+* Moved all file management code to use [xphyle](https://github.com/jdidion/atropos/tree/xphyle)
 * Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
 * Added --output-format option to manually specify output format instead of determining the format from the output file name.
 * Enabled output to stdout by default with single-end and interleaved reads.

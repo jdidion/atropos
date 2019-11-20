@@ -7,10 +7,17 @@ import sys
 import textwrap
 from typing import Dict, Optional
 from atropos.commands.base import (
-    BaseCommandRunner, Summary, Pipeline, SingleEndPipelineMixin, PairedEndPipelineMixin
+    BaseCommandRunner,
+    Summary,
+    Pipeline,
+    SingleEndPipelineMixin,
+    PairedEndPipelineMixin,
 )
 from atropos.commands.stats import (
-    StatsMode, SingleEndReadStatistics, PairedEndReadStatistics)
+    StatsMode,
+    SingleEndReadStatistics,
+    PairedEndReadStatistics,
+)
 from atropos.adapters import AdapterParser, BACK
 from atropos.io.seqio import Sequence
 from atropos.util import RandomMatchProbability, run_interruptible
@@ -38,7 +45,7 @@ from .modifiers import (
     SwiftBisulfiteTrimmer,
     UnconditionalCutter,
     ZeroCapper,
-    Modifiers
+    Modifiers,
 )
 from .filters import (
     FilterFactory,
@@ -50,10 +57,14 @@ from .filters import (
     TooShortReadFilter,
     TrimmedFilter,
     UntrimmedFilter,
-    Filters
+    Filters,
 )
 from .writers import (
-    Formatters, InfoFormatter, RestFormatter, WildcardFormatter, Writers
+    Formatters,
+    InfoFormatter,
+    RestFormatter,
+    WildcardFormatter,
+    Writers,
 )
 from xphyle import STDOUT
 
@@ -61,18 +72,20 @@ from xphyle import STDOUT
 class RecordHandler:
     """Base class for record handlers.
     """
+
     def __init__(self, modifiers: Modifiers, filters: Filters, formatters: Formatters):
         self.modifiers = modifiers
         self.filters = filters
         self.formatters = formatters
 
     def handle_record(
-            self, context: dict, read1: Sequence, read2: Optional[Sequence] = None):
+        self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
+    ):
         """Handle a pair of reads.
         """
         reads = self.modifiers.modify(read1, read2)
         dest = self.filters.filter(*reads)
-        self.formatters.format(context['results'], dest, *reads)
+        self.formatters.format(context["results"], dest, *reads)
         return dest, reads
 
     def summarize(self) -> dict:
@@ -101,8 +114,12 @@ class StatsRecordHandlerWrapper:
     """
 
     def __init__(
-            self, record_handler: RecordHandler, paired: bool,
-            stats_args: Dict[StatsMode, dict], **kwargs):
+        self,
+        record_handler: RecordHandler,
+        paired: bool,
+        stats_args: Dict[StatsMode, dict],
+        **kwargs
+    ):
         self.record_handler = record_handler
         self.read_statistics_class = (
             PairedEndReadStatistics if paired else SingleEndReadStatistics
@@ -117,8 +134,7 @@ class StatsRecordHandlerWrapper:
             self.post_kwargs = kwargs.copy()
             self.post_kwargs.update(stats_args[StatsMode.POST])
 
-    def handle_record(
-            self, context, read1: Sequence, read2: Optional[Sequence] = None):
+    def handle_record(self, context, read1: Sequence, read2: Optional[Sequence] = None):
         """Handle a pair of reads.
 
         Args:
@@ -127,19 +143,17 @@ class StatsRecordHandlerWrapper:
             read2:
         """
         if self.pre is not None:
-            self.collect(self.pre, context['source'], read1, read2, ** self.pre_kwargs)
+            self.collect(self.pre, context["source"], read1, read2, **self.pre_kwargs)
         dest, reads = self.record_handler.handle_record(context, read1, read2)
         if self.post is not None:
             if dest not in self.post:
                 self.post[dest] = {}
-            self.collect(
-                self.post[dest], context['source'], *reads, ** self.post_kwargs
-            )
+            self.collect(self.post[dest], context["source"], *reads, **self.post_kwargs)
         return (dest, reads)
 
     def collect(
-            self, stats, source, read1: Sequece, read2: Optional[Sequence] = None,
-            **kwargs):
+        self, stats, source, read1: Sequece, read2: Optional[Sequence] = None, **kwargs
+    ):
         """Collect stats on a pair of reads.
 
         Args:
@@ -158,13 +172,13 @@ class StatsRecordHandlerWrapper:
         """
         summary = self.record_handler.summarize()
         if self.pre is not None:
-            summary['pre'] = dict(
+            summary["pre"] = dict(
                 (source, stats.summarize()) for source, stats in self.pre.items()
             )
         if self.post is not None:
-            summary['post'] = {}
+            summary["post"] = {}
             for dest, stats_dict in self.post.items():
-                summary['post'][dest.name] = dict(
+                summary["post"][dest.name] = dict(
                     (source, stats.summarize()) for source, stats in stats_dict.items()
                 )
         return summary
@@ -282,11 +296,11 @@ class TrimPipeline(Pipeline, metaclass=ABCMeta):
         self.result_handler.start(worker)
 
     def add_to_context(self, context):
-        context['results'] = {}
+        context["results"] = {}
 
     def handle_records(self, context, records):
         super().handle_records(context, records)
-        self.result_handler.write_result(context['index'], context['results'])
+        self.result_handler.write_result(context["index"], context["results"])
 
     def handle_reads(self, context, read1, read2=None):
         return self.record_handler.handle_record(context, read1, read2)
@@ -316,22 +330,22 @@ class TrimSummary(Summary):
             return (val / total) if val and total != 0 else 0
 
         if isinstance(key, str):
-            if key.startswith('records_'):
+            if key.startswith("records_"):
                 frac_key = "fraction_{}".format(key)
-                total_records = self['total_record_count']
+                total_records = self["total_record_count"]
                 if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [frac(val, total_records) for val in value]
                     total = sum(val for val in value if val)
                     dict_val["total_{}".format(key)] = total
                 else:
                     dict_val[frac_key] = frac(value, total_records)
-            elif key.startswith('bp_'):
+            elif key.startswith("bp_"):
                 frac_key = "fraction_{}".format(key)
-                sum_total_bp = self['sum_total_bp_count']
+                sum_total_bp = self["sum_total_bp_count"]
                 if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [
                         frac(val, bps)
-                        for val, bps in zip(value, self['total_bp_counts'])
+                        for val, bps in zip(value, self["total_bp_counts"])
                     ]
                     total = sum(val for val in value if val)
                     dict_val["total_{}".format(key)] = total
@@ -343,7 +357,7 @@ class TrimSummary(Summary):
 
 
 class CommandRunner(BaseCommandRunner):
-    name = 'trim'
+    name = "trim"
 
     def __init__(self, options):
         super().__init__(options, TrimSummary)
@@ -371,7 +385,7 @@ class CommandRunner(BaseCommandRunner):
                 alphabet=options.alphabet,
             )
             if options.adapter_max_rmp:
-                parser_args['max_rmp'] = options.adapter_max_rmp
+                parser_args["max_rmp"] = options.adapter_max_rmp
             adapter_parser = AdapterParser(**parser_args)
             if has_adapters1:
                 adapters1 = adapter_parser.parse_multi(
@@ -386,29 +400,25 @@ class CommandRunner(BaseCommandRunner):
         # Create Modifiers
         # TODO: can this be replaced with an argparse required group?
         if (
-            not adapters1 and
-            not adapters2 and
-            not options.quality_cutoff and
-            options.nextseq_trim is None and
-            options.cut == [] and
-            options.cut2 == [] and
-            options.cut_min == [] and
-            options.cut_min2 == [] and
-            (options.minimum_length is None or options.minimum_length <= 0) and
-            options.maximum_length == sys.maxsize and
-            not options.trim_n and
-            not self.has_qualfile and
-            options.max_n is None and
-            (not options.paired or options.overwrite_low_quality is None)
+            not adapters1
+            and not adapters2
+            and not options.quality_cutoff
+            and options.nextseq_trim is None
+            and options.cut == []
+            and options.cut2 == []
+            and options.cut_min == []
+            and options.cut_min2 == []
+            and (options.minimum_length is None or options.minimum_length <= 0)
+            and options.maximum_length == sys.maxsize
+            and not options.trim_n
+            and not self.has_qualfile
+            and options.max_n is None
+            and (not options.paired or options.overwrite_low_quality is None)
         ):
             raise ValueError("You need to provide at least one adapter sequence.")
 
-        if (
-            options.aligner == 'insert' and
-            any(
-                not a or len(a) != 1 or a[0].where != BACK
-                for a in (adapters1, adapters2)
-            )
+        if options.aligner == "insert" and any(
+            not a or len(a) != 1 or a[0].where != BACK for a in (adapters1, adapters2)
         ):
             raise ValueError(
                 "Insert aligner requires a single 3' adapter for each read"
@@ -432,7 +442,7 @@ class CommandRunner(BaseCommandRunner):
             else:
                 modifiers.add_modifier(AddUmi, delim=options.umi_delim)
         for oper in options.op_order:
-            if oper == 'W' and options.overwrite_low_quality:
+            if oper == "W" and options.overwrite_low_quality:
                 lowq, highq, window = options.overwrite_low_quality
                 modifiers.add_modifier(
                     OverwriteRead,
@@ -441,14 +451,14 @@ class CommandRunner(BaseCommandRunner):
                     window_size=window,
                     base=options.quality_base,
                 )
-            elif oper == 'A' and (adapters1 or adapters2):
+            elif oper == "A" and (adapters1 or adapters2):
                 # TODO: generalize this using some kind of factory class
-                if options.aligner == 'insert':
+                if options.aligner == "insert":
                     # Use different base probabilities if we're trimming
                     # bisulfite data.
                     # TODO: this doesn't seem to help things, so commenting it
                     # out for now
-                    #if options.bisulfite:
+                    # if options.bisulfite:
                     #   base_probs = dict(match_prob=0.33, mismatch_prob=0.67)
                     # else:
                     #   base_probs = dict(match_prob=0.25, mismatch_prob=0.75)
@@ -466,26 +476,38 @@ class CommandRunner(BaseCommandRunner):
                         adapter_wildcards=options.match_adapter_wildcards,
                     )
                 else:
-                    a1_args = dict(
-                        adapters=adapters1, times=options.times, action=options.action
-                    ) if adapters1 else None
-                    a2_args = dict(
-                        adapters=adapters2, times=options.times, action=options.action
-                    ) if adapters2 else None
+                    a1_args = (
+                        dict(
+                            adapters=adapters1,
+                            times=options.times,
+                            action=options.action,
+                        )
+                        if adapters1
+                        else None
+                    )
+                    a2_args = (
+                        dict(
+                            adapters=adapters2,
+                            times=options.times,
+                            action=options.action,
+                        )
+                        if adapters2
+                        else None
+                    )
                     modifiers.add_modifier_pair(AdapterCutter, a1_args, a2_args)
-            elif oper == 'C' and (options.cut or options.cut2):
+            elif oper == "C" and (options.cut or options.cut2):
                 modifiers.add_modifier_pair(
                     UnconditionalCutter,
                     dict(lengths=options.cut),
                     dict(lengths=options.cut2),
                 )
-            elif oper == 'G' and (options.nextseq_trim is not None):
+            elif oper == "G" and (options.nextseq_trim is not None):
                 modifiers.add_modifier(
                     NextseqQualityTrimmer,
                     cutoff=options.nextseq_trim,
                     base=options.quality_base,
                 )
-            elif oper == 'Q' and options.quality_cutoff:
+            elif oper == "Q" and options.quality_cutoff:
                 modifiers.add_modifier(
                     QualityTrimmer,
                     cutoff_front=options.quality_cutoff[0],
@@ -503,15 +525,15 @@ class CommandRunner(BaseCommandRunner):
                     modifiers.add_modifier(RRBSTrimmer)
                 elif options.bisulfite in ("epignome", "truseq"):
                     # Trimming leads to worse results
-                    #modifiers.add_modifier(TruSeqBisulfiteTrimmer)
+                    # modifiers.add_modifier(TruSeqBisulfiteTrimmer)
                     pass
                 elif options.bisulfite == "swift":
                     modifiers.add_modifier(SwiftBisulfiteTrimmer)
             else:
                 if options.bisulfite[0]:
-                    modifiers.add_modifier(MinCutter, read=1, ** (options.bisulfite[0]))
+                    modifiers.add_modifier(MinCutter, read=1, **(options.bisulfite[0]))
                 if len(options.bisulfite) > 1 and options.bisulfite[1]:
-                    modifiers.add_modifier(MinCutter, read=2, ** (options.bisulfite[1]))
+                    modifiers.add_modifier(MinCutter, read=2, **(options.bisulfite[1]))
         if options.trim_n:
             modifiers.add_modifier(NEndTrimmer)
         if options.cut_min or options.cut_min2:
@@ -540,7 +562,7 @@ class CommandRunner(BaseCommandRunner):
                 mismatch_action=options.correct_mismatches,
             )
         # Create Filters and Formatters
-        min_affected = 2 if options.pair_filter == 'both' else 1
+        min_affected = 2 if options.pair_filter == "both" else 1
         filters = Filters(FilterFactory(options.paired, min_affected))
         output1 = output2 = None
         interleaved = False
@@ -552,9 +574,9 @@ class CommandRunner(BaseCommandRunner):
             output2 = options.paired_output
         if options.output_format is None:
             if self.delivers_qualities:
-                options.output_format = 'fastq'
+                options.output_format = "fastq"
             else:
-                options.output_format = 'fasta'
+                options.output_format = "fasta"
         formatters = Formatters(
             output1,
             dict(
@@ -604,7 +626,7 @@ class CommandRunner(BaseCommandRunner):
             filters.add_filter(UntrimmedFilter)
         if not options.discard_untrimmed:
             if formatters.multiplexed:
-                untrimmed = options.untrimmed_output or output1.format(name='unknown')
+                untrimmed = options.untrimmed_output or output1.format(name="unknown")
                 formatters.add_seq_formatter(UntrimmedFilter, untrimmed)
                 formatters.add_seq_formatter(NoFilter, untrimmed)
             elif options.untrimmed_output:
@@ -638,41 +660,38 @@ class CommandRunner(BaseCommandRunner):
         logger.info(
             "Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
             num_adapters,
-            's' if num_adapters > 1 else '',
+            "s" if num_adapters > 1 else "",
             options.error_rate * 100,
-            {False: 'single-end', 'first': 'paired-end legacy', 'both': 'paired-end'}[
+            {False: "single-end", "first": "paired-end legacy", "both": "paired-end"}[
                 options.paired
-            ]
+            ],
         )
-        if (
-            options.paired == 'first' and
-            (
-                len(record_handler.modifiers.get_modifiers(read=2)) > 0 or
-                options.quality_cutoff
-            )
+        if options.paired == "first" and (
+            len(record_handler.modifiers.get_modifiers(read=2)) > 0
+            or options.quality_cutoff
         ):
             logger.warning(
-                '\n'.join(
+                "\n".join(
                     textwrap.wrap(
-                        'Requested read modifications are applied only to the '
-                        'first read since backwards compatibility mode is enabled. '
-                        'To modify both reads, also use any of the -A/-B/-G/-U '
-                        'options. Use a dummy adapter sequence when necessary: '
-                        '-A XXX'
+                        "Requested read modifications are applied only to the "
+                        "first read since backwards compatibility mode is enabled. "
+                        "To modify both reads, also use any of the -A/-B/-G/-U "
+                        "options. Use a dummy adapter sequence when necessary: "
+                        "-A XXX"
                     )
                 )
             )
         if options.threads is None:
             # Run single-threaded version
             result_handler = WorkerResultHandler(WriterResultHandler(writers))
-            pipeline_class = type('TrimPipelineImpl', (mixin_class, TrimPipeline), {})
+            pipeline_class = type("TrimPipelineImpl", (mixin_class, TrimPipeline), {})
             pipeline = pipeline_class(record_handler, result_handler)
-            self.summary.update(mode='serial', threads=1)
+            self.summary.update(mode="serial", threads=1)
             return run_interruptible(pipeline, self, raise_on_error=True)
 
         else:
             # Run multiprocessing version
-            self.summary.update(mode='parallel', threads=options.threads)
+            self.summary.update(mode="parallel", threads=options.threads)
             return self.run_parallel(record_handler, writers, mixin_class)
 
     def run_parallel(self, record_handler, writers, mixin_class):
@@ -739,7 +758,7 @@ class CommandRunner(BaseCommandRunner):
         # run_parallel method to avoid extra work if only running in serial
         # mode.
         from multiprocessing import Queue
-        from atropos.commands.multicore import (ParallelPipelineMixin, RETRY_INTERVAL)
+        from atropos.commands.multicore import ParallelPipelineMixin, RETRY_INTERVAL
         from atropos.commands.trim.multicore import (
             Done,
             Killed,
@@ -793,7 +812,7 @@ class CommandRunner(BaseCommandRunner):
                 WriterResultHandler(writers, use_suffix=True)
             )
         pipeline_class = type(
-            'TrimPipelineImpl', (ParallelPipelineMixin, mixin_class, TrimPipeline), {}
+            "TrimPipelineImpl", (ParallelPipelineMixin, mixin_class, TrimPipeline), {}
         )
         pipeline = pipeline_class(record_handler, worker_result_handler)
         runner = ParallelTrimPipelineRunner(self, pipeline, threads, writer_manager)
