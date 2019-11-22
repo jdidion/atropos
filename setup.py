@@ -6,6 +6,7 @@ Cython is run when
 * or the pre-generated C sources are out of date,
 * or when --cython is given on the command line.
 """
+import codecs
 import os.path
 import sys
 
@@ -22,13 +23,6 @@ MIN_CYTHON_VERSION = "0.25.2"
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
-
-
-with open(
-    os.path.join(os.path.abspath(os.path.dirname(__file__)), "README.md"),
-    encoding="utf-8"
-) as f:
-    long_description = f.read()
 
 
 def out_of_date(_extensions):
@@ -145,7 +139,14 @@ setup(
     author_email="john.didion@nih.gov",
     url="https://atropos.readthedocs.org/",
     description="trim adapters from high-throughput sequencing reads",
-    long_description=long_description,
+    long_description=codecs.open(
+        os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "README.md"
+        ),
+        "rb",
+        "utf-8"
+    ).read(),
     long_description_content_type="text/markdown",
     license="MIT",
     ext_modules=extensions,

@@ -54,7 +54,7 @@ tag:
 	git tag $(version)
 
 release: clean tag install test
-	python setup.py sdist upload -r pypi
+	twine upload dist/*
 	git push origin --tags
 
 	# github release
