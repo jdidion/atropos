@@ -19,14 +19,15 @@ from xphyle.types import PathOrFile, ModeArg
 
 from atropos import AtroposError
 from atropos.align import Match, MatchInfo
-from atropos.io import splitext_compressed
-from atropos.util import Summarizable, truncate_string, ALPHABETS, Alphabet
+from atropos.util import (
+    ALPHABETS, Alphabet, Summarizable, splitext_compressed, truncate_string
+)
 
 
 class InputRead(IntFlag):
+    SINGLE = 0
     READ1 = 1
     READ2 = 2
-    SINGLE = 1
     PAIRED = 1 | 2
 
 
