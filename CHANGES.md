@@ -1,10 +1,11 @@
 # Changes
 
-v1.1.23 (dev)
+v1.1.23 (2019.11.22)
 
 * Set minimum Python version to 3.4.5
+* Fixed #86 - no trimming performed for single-end BAM file
 
-v1.1.22 (2019.05.)
+v1.1.22 (2019.05.20)
 
 * Documentation fixes (#79)
 * Fix for index error when running `detect` command (#80)
