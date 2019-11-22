@@ -324,7 +324,7 @@ class Pipeline(metaclass=ABCMeta):
         """
         batch_meta, records = batch
         context = batch_meta.copy()
-        if not context["source"] in self.record_counts:
+        if context["source"] not in self.record_counts:
             self.record_counts[context["source"]] = 0
         self.record_counts[context["source"]] += context["size"]
         if not context["source"] in self.bp_counts:

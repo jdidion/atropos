@@ -1,11 +1,19 @@
 """Implementation of the 'trim' command.
 """
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
+from argparse import Namespace
 from collections import Sequence as SequenceCollection
 import logging
+from multiprocessing import Process
 import sys
 import textwrap
-from typing import Dict, Optional
+from typing import (
+    Dict, Iterable, Optional, Sequence as SequenceType, Tuple, Type, Union
+)
+
+import xphyle
+
+from atropos.adapters import AdapterParser, BACK
 from atropos.commands.base import (
     BaseCommandRunner,
     Summary,
@@ -13,15 +21,13 @@ from atropos.commands.base import (
     SingleEndPipelineMixin,
     PairedEndPipelineMixin,
 )
+from atropos.commands.multicore import WorkerProcess
 from atropos.commands.stats import (
     StatsMode,
     SingleEndReadStatistics,
     PairedEndReadStatistics,
 )
-from atropos.adapters import AdapterParser, BACK
-from atropos.io.seqio import Sequence
-from atropos.util import RandomMatchProbability, run_interruptible
-from .modifiers import (
+from atropos.commands.trim.modifiers import (
     AdapterCutter,
     DoubleEncoder,
     InsertAdapterCutter,
@@ -47,7 +53,8 @@ from .modifiers import (
     ZeroCapper,
     Modifiers,
 )
-from .filters import (
+from atropos.commands.trim.filters import (
+    Filter,
     FilterFactory,
     Filters,
     MergedReadFilter,
@@ -57,16 +64,16 @@ from .filters import (
     TooShortReadFilter,
     TrimmedFilter,
     UntrimmedFilter,
-    Filters,
 )
-from .writers import (
+from atropos.commands.trim.writers import (
     Formatters,
     InfoFormatter,
     RestFormatter,
     WildcardFormatter,
     Writers,
 )
-from xphyle import STDOUT
+from atropos.io.seqio import Sequence
+from atropos.util import RandomMatchProbability, run_interruptible
 
 
 class RecordHandler:
@@ -80,7 +87,7 @@ class RecordHandler:
 
     def handle_record(
         self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
-    ):
+    ) -> Tuple[Type[Filter], Tuple[Sequence, Optional[Sequence]]]:
         """Handle a pair of reads.
         """
         reads = self.modifiers.modify(read1, read2)
@@ -134,7 +141,9 @@ class StatsRecordHandlerWrapper:
             self.post_kwargs = kwargs.copy()
             self.post_kwargs.update(stats_args[StatsMode.POST])
 
-    def handle_record(self, context, read1: Sequence, read2: Optional[Sequence] = None):
+    def handle_record(
+        self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
+    ) -> Tuple[Type[Filter], Tuple[Sequence, Optional[Sequence]]]:
         """Handle a pair of reads.
 
         Args:
@@ -149,12 +158,18 @@ class StatsRecordHandlerWrapper:
             if dest not in self.post:
                 self.post[dest] = {}
             self.collect(self.post[dest], context["source"], *reads, **self.post_kwargs)
-        return (dest, reads)
+        return dest, reads
 
     def collect(
-        self, stats, source, read1: Sequece, read2: Optional[Sequence] = None, **kwargs
+        self,
+        stats: dict,
+        source: Union[str, Tuple[str, str]],
+        read1: Sequence,
+        read2: Optional[Sequence] = None,
+        **kwargs
     ):
-        """Collect stats on a pair of reads.
+        """
+        Collect stats on a pair of reads.
 
         Args:
             stats: The :class:`ReadStatistics` object.
@@ -167,7 +182,7 @@ class StatsRecordHandlerWrapper:
             stats[source] = self.read_statistics_class(**kwargs)
         stats[source].collect(read1, read2)
 
-    def summarize(self):
+    def summarize(self) -> dict:
         """Returns a summary dict.
         """
         summary = self.record_handler.summarize()
@@ -184,16 +199,16 @@ class StatsRecordHandlerWrapper:
         return summary
 
 
-class ResultHandler(object):
+class ResultHandler(metaclass=ABCMeta):
     """Base class for result handlers.
     """
 
-    def start(self, worker=None):
+    def start(self, worker: Optional[Process] = None):
         """Start the result handler.
         """
         pass
 
-    def finish(self, total_batches=None):
+    def finish(self, total_batches: Optional[int] = None):
         """Finish the result handler.
 
         Args:
@@ -201,30 +216,31 @@ class ResultHandler(object):
         """
         pass
 
-    def write_result(self, batch_num, result):
+    @abstractmethod
+    def write_result(self, batch_num: int, result: dict):
         """Write a batch of results to output.
 
         Args:
             batch_num: The batch number.
             result: The result to write.
         """
-        raise NotImplementedError()
+        pass
 
 
 class ResultHandlerWrapper(ResultHandler):
     """Wraps a ResultHandler.
     """
 
-    def __init__(self, handler):
+    def __init__(self, handler: ResultHandler):
         self.handler = handler
 
-    def start(self, worker):
+    def start(self, worker: Optional[Process] = None):
         self.handler.start(worker)
 
-    def write_result(self, batch_num, result):
+    def write_result(self, batch_num: int, result: dict):
         self.handler.write_result(batch_num, result)
 
-    def finish(self, total_batches=None):
+    def finish(self, total_batches: Optional[int] = None):
         self.handler.finish(total_batches=total_batches)
 
 
@@ -232,7 +248,7 @@ class WorkerResultHandler(ResultHandlerWrapper):
     """Wraps a ResultHandler and compresses results prior to writing.
     """
 
-    def write_result(self, batch_num, result):
+    def write_result(self, batch_num: int, result: dict):
         """Given a dict mapping files to lists of strings, join the strings and
         compress them (if necessary) and then return the property formatted
         result dict.
@@ -241,17 +257,18 @@ class WorkerResultHandler(ResultHandlerWrapper):
             batch_num, dict(self.prepare_file(*item) for item in result.items())
         )
 
-    def prepare_file(self, path, strings):
+    def prepare_file(self, path: str, strings: Iterable[str]):
         """Prepare data for writing.
 
         Returns:
             Tuple (path, data).
         """
-        return (path, "".join(strings))
+        return path, "".join(strings)
 
 
 class WriterResultHandler(ResultHandler):
-    """ResultHandler that writes results to disk.
+    """
+    ResultHandler that writes results to disk.
 
     Args:
         writers: :class:`Writers` object.
@@ -260,27 +277,29 @@ class WriterResultHandler(ResultHandler):
             parallel-write mode.
     """
 
-    def __init__(self, writers, compressed=False, use_suffix=False):
+    def __init__(
+         self, writers: Writers, compressed: bool = False, use_suffix: bool = False
+    ):
         self.writers = writers
         self.compressed = compressed
         self.use_suffix = use_suffix
 
-    def start(self, worker=None):
+    def start(self, worker: Optional[Process] = None):
         if self.use_suffix:
             if worker is None:
-                raise ValueError("")
-
+                raise ValueError("worker must not be None")
             self.writers.suffix = ".{}".format(worker.index)
 
-    def write_result(self, batch_num, result):
+    def write_result(self, batch_num: int, result: dict):
         self.writers.write_result(result, self.compressed)
 
-    def finish(self, total_batches=None):
+    def finish(self, total_batches: Optional[int] = None):
         self.writers.close()
 
 
 class TrimPipeline(Pipeline, metaclass=ABCMeta):
-    """Base trimming pipeline.
+    """
+    Base trimming pipeline.
 
     Args:
         record_handler:
@@ -292,20 +311,22 @@ class TrimPipeline(Pipeline, metaclass=ABCMeta):
         self.record_handler = record_handler
         self.result_handler = result_handler
 
-    def start(self, worker=None):
+    def start(self, worker: Optional[Process] = None):
         self.result_handler.start(worker)
 
-    def add_to_context(self, context):
+    def add_to_context(self, context: dict):
         context["results"] = {}
 
-    def handle_records(self, context, records):
+    def handle_records(self, context: dict, records: SequenceType[Sequence]):
         super().handle_records(context, records)
         self.result_handler.write_result(context["index"], context["results"])
 
-    def handle_reads(self, context, read1, read2=None):
+    def handle_reads(
+        self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
+    ):
         return self.record_handler.handle_record(context, read1, read2)
 
-    def finish(self, summary, **kwargs):
+    def finish(self, summary: Summary, **kwargs):
         self.result_handler.finish()
         super().finish(summary)
         summary.update(self.record_handler.summarize())
@@ -315,19 +336,20 @@ class TrimSummary(Summary):
     """Summary that adds aggregate values for record and bp stats.
     """
 
-    def _post_process_other(self, dict_val, key, value):
-        """For trim stats, any value with a name that starts with 'records_'
-        will have 'fraction_<var>' computed as value / total_records, and any
-        value with a name that starts with 'bp_' will have 'fraction_<var>' and
-        'total_<var>' computed. We also replace any `Const`s with their values.
+    def _post_process_other(self, dict_val: dict, key, value) -> None:
+        """
+        For trim stats, any value with a name that starts with 'records_' will have
+        'fraction_<var>' computed as value / total_records, and any value with a name
+        that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>' computed.
+        We also replace any `Const`s with their values.
         """
         if self.has_exception:
             return
 
-        def frac(val, total):
+        def frac(val: int, _total: int):
             """Compute fraction of total.
             """
-            return (val / total) if val and total != 0 else 0
+            return (val / _total) if val and _total != 0 else 0
 
         if isinstance(key, str):
             if key.startswith("records_"):
@@ -359,12 +381,13 @@ class TrimSummary(Summary):
 class CommandRunner(BaseCommandRunner):
     name = "trim"
 
-    def __init__(self, options):
+    def __init__(self, options: Namespace):
         super().__init__(options, TrimSummary)
 
     def __call__(self):
         options = self.options
         match_probability = RandomMatchProbability()
+
         # Create Adapters
         has_adapters1 = options.adapters or options.anywhere or options.front
         has_adapters2 = options.adapters2 or options.anywhere2 or options.front2
@@ -397,6 +420,7 @@ class CommandRunner(BaseCommandRunner):
                 )
             if options.cache_adapters:
                 adapter_cache.save()
+
         # Create Modifiers
         # TODO: can this be replaced with an argparse required group?
         if (
@@ -427,10 +451,12 @@ class CommandRunner(BaseCommandRunner):
         if options.debug:
             for adapter in adapters1 + adapters2:
                 adapter.enable_debug()
+
         if options.paired:
             modifiers = PairedEndModifiers(options.paired)
         else:
             modifiers = SingleEndModifiers()
+
         if options.read1_umi or options.read2_umi:
             modifiers.add_modifier_pair(
                 UmiTrimmer,
@@ -441,6 +467,7 @@ class CommandRunner(BaseCommandRunner):
                 modifiers.add_modifier(SyncUmi, delim=options.umi_delim)
             else:
                 modifiers.add_modifier(AddUmi, delim=options.umi_delim)
+
         for oper in options.op_order:
             if oper == "W" and options.overwrite_low_quality:
                 lowq, highq, window = options.overwrite_low_quality
@@ -514,6 +541,7 @@ class CommandRunner(BaseCommandRunner):
                     cutoff_back=options.quality_cutoff[1],
                     base=options.quality_base,
                 )
+
         if options.bisulfite:
             if isinstance(options.bisulfite, str):
                 if "non-directional" in options.bisulfite:
@@ -534,26 +562,35 @@ class CommandRunner(BaseCommandRunner):
                     modifiers.add_modifier(MinCutter, read=1, **(options.bisulfite[0]))
                 if len(options.bisulfite) > 1 and options.bisulfite[1]:
                     modifiers.add_modifier(MinCutter, read=2, **(options.bisulfite[1]))
+
         if options.trim_n:
             modifiers.add_modifier(NEndTrimmer)
+
         if options.cut_min or options.cut_min2:
             modifiers.add_modifier_pair(
                 MinCutter, dict(lengths=options.cut_min), dict(lengths=options.cut_min2)
             )
+
         if options.length_tag:
             modifiers.add_modifier(LengthTagModifier, length_tag=options.length_tag)
+
         if options.strip_suffix:
             modifiers.add_modifier(SuffixRemover, suffixes=options.strip_suffix)
+
         if options.prefix or options.suffix:
             modifiers.add_modifier(
                 PrefixSuffixAdder, prefix=options.prefix, suffix=options.suffix
             )
+
         if options.double_encode:
             modifiers.add_modifier(DoubleEncoder)
+
         if options.zero_cap and self.delivers_qualities:
             modifiers.add_modifier(ZeroCapper, quality_base=options.quality_base)
+
         if options.trim_primer:
             modifiers.add_modifier(PrimerTrimmer)
+
         if options.merge_overlapping:
             modifiers.add_modifier(
                 MergeOverlapping,
@@ -561,10 +598,9 @@ class CommandRunner(BaseCommandRunner):
                 error_rate=options.merge_error_rate,
                 mismatch_action=options.correct_mismatches,
             )
-        # Create Filters and Formatters
-        min_affected = 2 if options.pair_filter == "both" else 1
-        filters = Filters(FilterFactory(options.paired, min_affected))
-        output1 = output2 = None
+
+        # Create Formatters
+        output2 = None
         interleaved = False
         if options.interleaved_output:
             output1 = options.interleaved_output
@@ -572,11 +608,13 @@ class CommandRunner(BaseCommandRunner):
         else:
             output1 = options.output
             output2 = options.paired_output
+
         if options.output_format is None:
             if self.delivers_qualities:
                 options.output_format = "fastq"
             else:
                 options.output_format = "fasta"
+
         formatters = Formatters(
             output1,
             dict(
@@ -586,11 +624,17 @@ class CommandRunner(BaseCommandRunner):
                 interleaved=interleaved,
             ),
         )
+
+        # Create filters
+        min_affected = 2 if options.pair_filter == "both" else 1
+        filters = Filters(FilterFactory(options.paired, min_affected))
         force_create = []
+
         if options.merge_overlapping:
             filters.add_filter(MergedReadFilter)
             if options.merged_output:
                 formatters.add_seq_formatter(MergedReadFilter, options.merged_output)
+
         if options.minimum_length is not None and options.minimum_length > 0:
             filters.add_filter(TooShortReadFilter, options.minimum_length)
             if options.too_short_output:
@@ -599,6 +643,7 @@ class CommandRunner(BaseCommandRunner):
                     options.too_short_output,
                     options.too_short_paired_output,
                 )
+
         if options.maximum_length < sys.maxsize:
             filters.add_filter(TooLongReadFilter, options.maximum_length)
             if options.too_long_output is not None:
@@ -607,23 +652,28 @@ class CommandRunner(BaseCommandRunner):
                     options.too_long_output,
                     options.too_long_paired_output,
                 )
+
         if options.max_n is not None:
             filters.add_filter(NContentFilter, options.max_n)
+
         if options.discard_trimmed:
             filters.add_filter(TrimmedFilter)
+
         if not formatters.multiplexed:
             if output1 is not None:
                 formatters.add_seq_formatter(NoFilter, output1, output2)
-                if output1 != STDOUT and options.writer_process:
+                if output1 != xphyle.STDOUT and options.writer_process:
                     force_create.append(output1)
                     if output2 is not None:
                         force_create.append(output2)
             elif not (options.discard_trimmed and options.untrimmed_output):
                 formatters.add_seq_formatter(NoFilter, options.default_outfile)
-                if options.default_outfile != STDOUT and options.writer_process:
+                if options.default_outfile != xphyle.STDOUT and options.writer_process:
                     force_create.append(options.default_outfile)
+
         if options.discard_untrimmed or options.untrimmed_output:
             filters.add_filter(UntrimmedFilter)
+
         if not options.discard_untrimmed:
             if formatters.multiplexed:
                 untrimmed = options.untrimmed_output or output1.format(name="unknown")
@@ -635,17 +685,25 @@ class CommandRunner(BaseCommandRunner):
                     options.untrimmed_output,
                     options.untrimmed_paired_output,
                 )
+
         if options.rest_file:
             formatters.add_info_formatter(RestFormatter(options.rest_file))
+
         if options.info_file:
             formatters.add_info_formatter(InfoFormatter(options.info_file))
+
         if options.wildcard_file:
             formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
+
         if options.paired:
             mixin_class = PairedEndPipelineMixin
         else:
             mixin_class = SingleEndPipelineMixin
+
+        # Create writers
         writers = Writers(force_create)
+
+        # Create record handler
         record_handler = RecordHandler(modifiers, filters, formatters)
         if options.stats:
             record_handler = StatsRecordHandlerWrapper(
@@ -655,6 +713,7 @@ class CommandRunner(BaseCommandRunner):
                 qualities=self.delivers_qualities,
                 quality_base=self.quality_base,
             )
+
         logger = logging.getLogger()
         num_adapters = sum(len(a) for a in modifiers.get_adapters())
         logger.info(
@@ -681,6 +740,7 @@ class CommandRunner(BaseCommandRunner):
                     )
                 )
             )
+
         if options.threads is None:
             # Run single-threaded version
             result_handler = WorkerResultHandler(WriterResultHandler(writers))
@@ -688,14 +748,17 @@ class CommandRunner(BaseCommandRunner):
             pipeline = pipeline_class(record_handler, result_handler)
             self.summary.update(mode="serial", threads=1)
             return run_interruptible(pipeline, self, raise_on_error=True)
-
         else:
             # Run multiprocessing version
             self.summary.update(mode="parallel", threads=options.threads)
             return self.run_parallel(record_handler, writers, mixin_class)
 
-    def run_parallel(self, record_handler, writers, mixin_class):
-        """Parallel implementation of run_atropos. Works as follows:
+    def run_parallel(
+        self, record_handler: RecordHandler, writers: Writers,
+        mixin_class: Type[Union[SingleEndPipelineMixin, PairedEndPipelineMixin]]
+    ):
+        """
+        Parallel implementation of run_atropos. Works as follows:
 
         1. Main thread creates N worker processes (where N is the number of
         threads to be allocated) and (optionally) one writer process.
@@ -706,20 +769,19 @@ class CommandRunner(BaseCommandRunner):
         (if using a writer process) or write the results to disk. Each result is
         a dict mapping output file names to strings, where each string is a
         concatenation of reads (with appropriate line endings) to be written.
-        A parameter also controls whether data compression is done by the
-        workers or the writer.
+        A parameter also controls whether data compression is done by the workers or
+        the writer.
         4. If using a writer process, it takes results from the result queue and
         writes each string to its corresponding file.
         5. When the main process finishes loading reads from the input file(s),
         it sends a signal to the worker processes that they should complete when
         the input queue is empty. It also singals the writer process how many
-        total batches to expect, and the writer process exits after it has
-        processed that many batches.
+        total batches to expect, and the writer process exits after it has processed
+        that many batches.
         6. When a worker process completes, it adds a summary of its activity to
         the summary queue.
         7. The main process reads summaries from the summary queue and merges
-        them to create the complete summary, which is used to generate the
-        report.
+        them to create the complete summary, which is used to generate the report.
 
         There are several possible points of failure:
 
@@ -755,8 +817,7 @@ class CommandRunner(BaseCommandRunner):
             The return code.
         """
         # We do all the multicore imports and class definitions within the
-        # run_parallel method to avoid extra work if only running in serial
-        # mode.
+        # run_parallel method to avoid extra work if only running in serial mode.
         from multiprocessing import Queue
         from atropos.commands.multicore import ParallelPipelineMixin, RETRY_INTERVAL
         from atropos.commands.trim.multicore import (
@@ -769,7 +830,6 @@ class CommandRunner(BaseCommandRunner):
             ResultProcess,
             WriterManager,
         )
-        from atropos.io.compression import can_use_system_compression
 
         # Main process
         timeout = max(self.process_timeout, RETRY_INTERVAL)
@@ -787,10 +847,15 @@ class CommandRunner(BaseCommandRunner):
         compression_mode = self.compression_mode
         if compression_mode is None:
             compression_mode = "worker"
-            if self.writer_process and can_use_system_compression():
+            # TODO: this is a bit of a hack - we don't know what types of files we'll
+            #  be compressing yet, so we make our guess based on the most commonly used
+            #  compression format.
+            gzip = xphyle.get_compressor("gzip")
+            if self.writer_process and gzip.can_use_system_compression:
                 compression_mode = "writer"
         if compression_mode == "writer" and threads > 2:
             threads -= 1
+
         # Queue by which results are sent from the worker processes to the
         # writer process
         result_queue = Queue(self.result_queue_size)
@@ -811,6 +876,7 @@ class CommandRunner(BaseCommandRunner):
             worker_result_handler = WorkerResultHandler(
                 WriterResultHandler(writers, use_suffix=True)
             )
+
         pipeline_class = type(
             "TrimPipelineImpl", (ParallelPipelineMixin, mixin_class, TrimPipeline), {}
         )

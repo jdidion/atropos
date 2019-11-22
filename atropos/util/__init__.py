@@ -9,12 +9,25 @@ import functools
 import logging
 import math
 from numbers import Number
+import os
 import time
 from typing import (
-    Dict, Sequence, Tuple, Union, Optional, Generic, TypeVar, Type, Any, Callable
+    Dict,
+    Sequence,
+    Tuple,
+    Union,
+    Optional,
+    Generic,
+    TypeVar,
+    Type,
+    Any,
+    Callable,
 )
+
 from atropos import AtroposError
+
 import pokrok as pk
+from xphyle.formats import FORMATS
 
 
 class NotInAlphabetError(Exception):
@@ -25,8 +38,8 @@ class NotInAlphabetError(Exception):
 
 class Alphabet:
     def __init__(
-            self, valid_characters: Sequence[str],
-            default_character: Optional[str] = None):
+        self, valid_characters: Sequence[str], default_character: Optional[str] = None
+    ):
         if not isinstance(valid_characters, set):
             valid_characters = set(valid_characters)
         if default_character not in valid_characters:
@@ -68,9 +81,7 @@ class Alphabet:
 
 
 ALPHABETS = dict(
-    dna=Alphabet('ACGT', 'N'),
-    iso=None,  # TODO
-    colorspace=Alphabet('0123', None)
+    dna=Alphabet("ACGT", "N"), iso=None, colorspace=Alphabet("0123", None)  # TODO
 )
 
 
@@ -81,15 +92,15 @@ def build_iso_nucleotide_table() -> Dict[str, str]:
     TODO: the nucleotide table should be implemented as an alphabet.
     """
     nuc = {
-        'A': 'T',
-        'C': 'G',
-        'R': 'Y',
-        'S': 'S',
-        'W': 'W',
-        'K': 'M',
-        'B': 'V',
-        'D': 'H',
-        'N': 'N',
+        "A": "T",
+        "C": "G",
+        "R": "Y",
+        "S": "S",
+        "W": "W",
+        "K": "M",
+        "B": "V",
+        "D": "H",
+        "N": "N",
     }
     for base, comp in tuple(nuc.items()):
         nuc[comp] = base
@@ -99,9 +110,9 @@ def build_iso_nucleotide_table() -> Dict[str, str]:
 
 
 BASE_COMPLEMENTS = build_iso_nucleotide_table()
-IUPAC_BASES = frozenset(('X',) + tuple(BASE_COMPLEMENTS.keys()))
+IUPAC_BASES = frozenset(("X",) + tuple(BASE_COMPLEMENTS.keys()))
 """Valid IUPAC bases, plus 'X'"""
-GC_BASES = frozenset('CGRYSKMBDHVN')
+GC_BASES = frozenset("CGRYSKMBDHVN")
 """IUPAC bases that include C or G."""
 LOG2 = math.log(2)
 
@@ -109,9 +120,10 @@ LOG2 = math.log(2)
 class Magnitude(Enum):
     """Enumeration of some common number scales.
     """
-    G = ('billion', 'giga', 1E9)
-    M = ('million', 'mega', 1E6)
-    K = ('thousand', 'kilo', 1E3)
+
+    G = ("billion", "giga", 1e9)
+    M = ("million", "mega", 1e6)
+    K = ("thousand", "kilo", 1e3)
 
     def __init__(self, label, prefix, divisor):
         self.label = label
@@ -134,8 +146,11 @@ class RandomMatchProbability:
         self.cur_array_size = init_size
 
     def __call__(
-            self, matches: int, size: int, match_prob: float = 0.25,
-            mismatch_prob: float = 0.75
+        self,
+        matches: int,
+        size: int,
+        match_prob: float = 0.25,
+        mismatch_prob: float = 0.75,
     ) -> float:
         """Computes the random-match probability for a given sequence size and
         number of matches.
@@ -198,6 +213,7 @@ class RandomMatchProbability:
 class Mergeable(metaclass=ABCMeta):
     """Base class for objects that can merge themselves with another.
     """
+
     @abstractmethod
     def merge(self, other):
         """Merges `other` with `self` and returns the merged value.
@@ -208,6 +224,7 @@ class Mergeable(metaclass=ABCMeta):
 class Summarizable(metaclass=ABCMeta):
     """Base class for objects that can summarize themselves.
     """
+
     @abstractmethod
     def summarize(self):
         """Returns a summary dict.
@@ -215,7 +232,7 @@ class Summarizable(metaclass=ABCMeta):
         pass
 
 
-ConstType = TypeVar('ConstType')
+ConstType = TypeVar("ConstType")
 
 
 class Const(Generic[ConstType], Mergeable):
@@ -229,7 +246,7 @@ class Const(Generic[ConstType], Mergeable):
     def __init__(self, value: ConstType):
         self.value = value
 
-    def merge(self, other: 'Const[ConstType]') -> 'Const[ConstType]':
+    def merge(self, other: "Const[ConstType]") -> "Const[ConstType]":
         """Check that `self==other`.
 
         Raises:
@@ -240,7 +257,7 @@ class Const(Generic[ConstType], Mergeable):
 
         return self
 
-    def __eq__(self, other: Union[ConstType, 'Const[ConstType]']) -> bool:
+    def __eq__(self, other: Union[ConstType, "Const[ConstType]"]) -> bool:
         """Returns True if `self.value==other` (or `other.value` if `other` is
         a :class:`Const`).
         """
@@ -270,7 +287,7 @@ class Timestamp:
         """
         return self.dtime.isoformat()
 
-    def __sub__(self, other: 'Timestamp', minval: float = 0.01) -> dict:
+    def __sub__(self, other: "Timestamp", minval: float = 0.01) -> dict:
         """Subtract another timestamp from this one.
 
         Args:
@@ -316,13 +333,14 @@ class Timing(Summarizable):
             self.update()
         if self.start_time is None:
             raise AtroposError(
-                'Timing instance must be started before it can be summarized')
+                "Timing instance must be started before it can be summarized"
+            )
         summary = dict(start=self.start_time.isoformat())
         summary.update(self.cur_time - self.start_time)
         return summary
 
 
-SummaryType = TypeVar('SummaryType')
+SummaryType = TypeVar("SummaryType")
 
 
 class CountingDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
@@ -333,9 +351,12 @@ class CountingDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
         sort_by: Whether summary is sorted by key (0) or value (1).
         summary_type:
     """
+
     def __init__(
-            self, keys: Iterable = None, sort_by: int = 0,
-            summary_type: Type[SummaryType] = dict
+        self,
+        keys: Iterable = None,
+        sort_by: int = 0,
+        summary_type: Type[SummaryType] = dict,
     ):
         super().__init__()
         self.sort_by = sort_by
@@ -352,7 +373,7 @@ class CountingDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
         """
         self[key] += inc
 
-    def merge(self, other: 'CountingDict') -> 'CountingDict':
+    def merge(self, other: "CountingDict") -> "CountingDict":
         if not isinstance(other, CountingDict):
             raise ValueError(f"Cannot merge object of type {type(other)}")
         for key, value in other.items():
@@ -375,6 +396,7 @@ class CountingDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
 class Histogram(CountingDict[dict]):
     """Counting dict that returns a summary dict that contains summary stats.
     """
+
     def summarize(self) -> dict:
         hist = super().summarize()
         return dict(hist=hist, summary=self.get_summary_stats())
@@ -399,6 +421,7 @@ class NestedDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
     Args:
         summary_type: The flattened shape: list or dict.
     """
+
     def __init__(self, summary_type: Type[SummaryType] = dict):
         super().__init__()
         self.summary_type = summary_type
@@ -408,7 +431,7 @@ class NestedDict(dict, Mergeable, Summarizable, Generic[SummaryType]):
             self[key] = CountingDict()
         return self.get(key)
 
-    def merge(self, other: 'NestedDict') -> 'NestedDict':
+    def merge(self, other: "NestedDict") -> "NestedDict":
         if not isinstance(other, NestedDict):
             raise ValueError("Cannot merge object of type {}".format(type(other)))
         for key, value in other.items():
@@ -497,12 +520,14 @@ def merge_values(key, v_dest, v_src):
     Returns:
         The merged value.
     """
+
     def assert_of_type(_type=None):
         if _type is None:
             _type = v_dest.__class__
         if not all(isinstance(o, _type) for o in (v_src, v_dest)):
             raise TypeError(
-                f"When merging {key}, source and/or dest were not of type {_type}")
+                f"When merging {key}, source and/or dest were not of type {_type}"
+            )
         return _type
 
     def assert_equal():
@@ -510,7 +535,8 @@ def merge_values(key, v_dest, v_src):
         if v_dest != v_src:
             raise ValueError(
                 f"When merging, objects of type {_type} must be equal; "
-                f"{v_src} != {v_dest}")
+                f"{v_src} != {v_dest}"
+            )
 
     if isinstance(v_dest, Mergeable):
         v_dest = v_dest.merge(v_src)
@@ -569,7 +595,7 @@ def sequence_complexity(seq: str) -> float:
     seq = seq.upper()
     seqlen = float(len(seq))
     term = 0
-    for base in ('A', 'C', 'G', 'T'):
+    for base in ("A", "C", "G", "T"):
         count = seq.count(base)
         if count > 0:
             frac = count / seqlen
@@ -611,11 +637,12 @@ def qual2prob(qchar: str) -> float:
     return 10 ** (-qual2int(qchar) / 10)
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def enumerate_range(
-        collection: Iterable[T], start, end, step=1) -> Iterable[Tuple[int, T]]:
+    collection: Iterable[T], start, end, step=1
+) -> Iterable[Tuple[int, T]]:
     """Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...
 
     Only up to (start-end+1) items will be yielded.
@@ -693,7 +720,7 @@ def stdev(values: Sequence[float], mu0: Optional[float] = None) -> float:
 
 
 def weighted_stdev(
-        values: Sequence[float], counts: Sequence[int], mu0: Optional[float] = None
+    values: Sequence[float], counts: Sequence[int], mu0: Optional[float] = None
 ) -> float:
     """Returns standard deviation of values having the specified mean weighted
     by counts.
@@ -721,8 +748,8 @@ def weighted_stdev(
     if mu0 is None:
         mu0 = weighted_mean(values, counts)
     return math.sqrt(
-        sum(((val - mu0) ** 2) * count for val, count in zip(values, counts)) /
-        (sum(counts) - 1)
+        sum(((val - mu0) ** 2) * count for val, count in zip(values, counts))
+        / (sum(counts) - 1)
     )
 
 
@@ -853,8 +880,31 @@ def truncate_string(string: Optional[str], max_len: int = 100) -> Optional[str]:
     if string is None:
         return None
     if len(string) > max_len:
-        string = string[:max_len - 3] + '...'
+        string = string[: max_len - 3] + "..."
     return string
+
+
+def splitext_compressed(name: str) -> Tuple[str, str, str]:
+    """
+    Split the filename and extensions of a file that potentially has two extensions -
+    one for the file type (e.g. 'fq') and one for the compression type (e.g. 'gz').
+
+    Args:
+        name: The filename.
+
+    Returns:
+        A tuple (name, ext1, ext2), where ext1 is the filetype extension and
+        ext2 is the compression type extension, or None.
+    """
+    ext2 = None
+    for ext in FORMATS.list_compression_formats(with_sep=True):
+        if name.endswith(ext):
+            ext2 = ext
+            name = name[: -len(ext)]
+            break
+
+    name, ext1 = os.path.splitext(name)
+    return name, ext1, ext2
 
 
 def run_interruptible(func: Callable, *args, **kwargs) -> int:
@@ -908,7 +958,7 @@ def create_progress_reader(
         reader is returned.
     """
     if progress_type == "msg":
-        pk.set_plugins(['logging'])
+        pk.set_plugins(["logging"])
 
     if max_items:
         widgets = [
@@ -916,15 +966,17 @@ def create_progress_reader(
             pk.Widget.PERCENT,
             pk.Widget.ELAPSED,
             pk.Widget.BAR,
-            pk.Widget.ETA
+            pk.Widget.ETA,
         ]
     else:
-        widgets = [
-            pk.Widget.COUNTER,
-            pk.Widget.ELAPSED,
-            pk.Widget.SPINNER
-        ]
+        widgets = [pk.Widget.COUNTER, pk.Widget.ELAPSED, pk.Widget.SPINNER]
 
     return pk.progress_iter(
-        reader, desc="Processed", size=max_items, unit='records', multiplier=batch_size,
-        style=pk.Style(widgets), **kwargs)
+        reader,
+        desc="Processed",
+        size=max_items,
+        unit="records",
+        multiplier=batch_size,
+        style=pk.Style(widgets),
+        **kwargs,
+    )

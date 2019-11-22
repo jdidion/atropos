@@ -1,5 +1,3 @@
-"""Trim command line interface.
-"""
 import logging
 import sys
 from typing import cast

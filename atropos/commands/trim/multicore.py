@@ -1,22 +1,28 @@
 import logging
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 import os
-from atropos.commands.trim import (
-    ResultHandler, WorkerResultHandler, WriterResultHandler
-)
+from typing import Dict, Iterable, Optional
+
+import xphyle
+from xphyle.formats import CompressionFormat
+
 from atropos.commands.multicore import (
+    CONTROL_ACTIVE,
+    CONTROL_ERROR,
     Control,
+    MulticoreError,
     PendingQueue,
     ParallelPipelineRunner,
-    MulticoreError,
-    wait_on_process,
+    WorkerProcess,
     enqueue,
     dequeue,
     kill,
-    CONTROL_ACTIVE,
-    CONTROL_ERROR,
+    wait_on_process,
 )
-from atropos.io.compression import get_compressor
+from atropos.commands.trim import (
+    ResultHandler, WorkerResultHandler, WriterResultHandler, TrimPipeline, CommandRunner
+)
+from atropos.commands.trim.writers import Writers
 
 
 class Done(MulticoreError):
@@ -31,11 +37,72 @@ class Killed(MulticoreError):
     pass
 
 
+class WriterManager:
+    """Manager for a writer process and control variable.
+    """
+
+    def __init__(
+        self,
+        writers: Writers,
+        compression: str,
+        preserve_order: bool,
+        result_queue: Queue,
+        timeout: int
+    ):
+        # result handler
+        if preserve_order:
+            writer_result_handler = OrderPreservingWriterResultHandler(
+                writers, compressed=compression == "worker"
+            )
+        else:
+            writer_result_handler = WriterResultHandler(
+                writers, compressed=compression == "worker"
+            )
+        self.timeout = timeout
+        # Shared variable for communicating with writer thread
+        self.writer_control = Control(CONTROL_ACTIVE)
+        # writer process
+        self.writer_process = ResultProcess(
+            writer_result_handler, result_queue, self.writer_control, timeout
+        )
+        self.writer_process.start()
+
+    def is_active(self) -> bool:
+        """Returns True if the writer process is alive and the control
+        value is CONTROL_ACTIVE.
+        """
+        return (
+            self.writer_process.is_alive() and
+            self.writer_control.check_value(CONTROL_ACTIVE)
+        )
+
+    def set_num_batches(self, num_batches: int):
+        """Set the number of batches to the control variable.
+        """
+        self.writer_control.set_value(num_batches)
+
+    def wait(self):
+        """Wait for the writer process to terminate.
+        """
+        wait_on_process(self.writer_process, self.timeout)
+
+    def terminate(self, retcode: int):
+        """Force the writer process to terminate.
+        """
+        kill(self.writer_process, retcode, self.timeout)
+
+
 class ParallelTrimPipelineRunner(ParallelPipelineRunner):
     """ParallelPipelineRunner for a TrimPipeline.
     """
 
-    def __init__(self, command_runner, pipeline, threads, writer_manager=None):
+    def __init__(
+        self,
+        command_runner: CommandRunner,
+        pipeline: TrimPipeline,
+        threads: int,
+        writer_manager: Optional[WriterManager] = None
+    ):
         super().__init__(command_runner, pipeline, threads)
         self.writer_manager = writer_manager
 
@@ -54,7 +121,7 @@ class ParallelTrimPipelineRunner(ParallelPipelineRunner):
             # Wait for writer to complete
             self.writer_manager.wait()
 
-    def terminate(self, retcode):
+    def terminate(self, retcode: int):
         super().terminate(retcode)
         if self.writer_manager:
             self.writer_manager.terminate(retcode)
@@ -64,16 +131,18 @@ class QueueResultHandler(ResultHandler):
     """ResultHandler that writes results to the output queue.
     """
 
-    def __init__(self, queue):
+    def __init__(self, queue: Queue):
         self.queue = queue
         self.message = None
         self.timeout = None
 
-    def start(self, worker):
+    def start(self, worker: Optional[WorkerProcess] = None):
+        if worker is None:
+            raise RuntimeError("worker must not be None")
         self.message = "{} waiting to queue result {{}}".format(worker.name)
         self.timeout = worker.timeout
 
-    def write_result(self, batch_num, result):
+    def write_result(self, batch_num: int, result: dict):
         enqueue(
             self.queue,
             (batch_num, result),
@@ -88,27 +157,27 @@ class CompressingWorkerResultHandler(WorkerResultHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.file_compressors = None
+        self.file_compressors: Optional[Dict[str, CompressionFormat]] = None
 
-    def start(self, worker):
+    def start(self, worker: Optional[WorkerProcess] = None):
         super().start(worker)
         self.file_compressors = {}
 
-    def prepare_file(self, path, strings):
+    def prepare_file(self, path: str, strings: Iterable[str]):
         compressor = self.get_compressor(path)
         if compressor:
             return (
-                (path, 'wb'), compressor.compress(b''.join(s.encode() for s in strings))
+                (path, 'wb'),
+                compressor.compress(b''.join(s.encode() for s in strings))
             )
-
         else:
-            return ((path, 'wt'), "".join(strings))
+            return (path, 'wt'), "".join(strings)
 
-    def get_compressor(self, filename):
+    def get_compressor(self, filename: str) -> CompressionFormat:
         """Returns the file compressor based on the file extension.
         """
         if filename not in self.file_compressors:
-            self.file_compressors[filename] = get_compressor(filename)
+            self.file_compressors[filename] = xphyle.get_compressor(filename)
         return self.file_compressors[filename]
 
 
@@ -122,12 +191,12 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
         self.pending = None
         self.cur_batch = None
 
-    def start(self, worker=None):
+    def start(self, worker: Optional[WorkerProcess] = None):
         super().start(worker)
         self.pending = PendingQueue()
         self.cur_batch = 1
 
-    def write_result(self, batch_num, result):
+    def write_result(self, batch_num: int, result: dict):
         if batch_num == self.cur_batch:
             self.writers.write_result(result, self.compressed)
             self.cur_batch += 1
@@ -135,7 +204,7 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
         else:
             self.pending.push(batch_num, result)
 
-    def finish(self, total_batches=None):
+    def finish(self, total_batches: Optional[int] = None):
         if total_batches is not None:
             self.consume_pending()
             if self.cur_batch != total_batches + 1:
@@ -159,12 +228,12 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
 
 
 class ResultProcess(Process):
-    """Thread that accepts results from the worker threads and process
-    them using a ResultHandler. Each batch is expected to be
-    (batch_num, path, records), where path is the destination file and
-    records is a string. Not guaranteed to preserve the original order
-    of sequence records.
-    
+    """
+    Thread that accepts results from the worker threads and process them using a
+    ResultHandler. Each batch is expected to be (batch_num, path, records),
+    where path is the destination file and records is a string. Not guaranteed to
+    preserve the original order of sequence records.
+
     Args:
         result_handler: A ResultHandler object.
         queue: Input queue.
@@ -172,7 +241,13 @@ class ResultProcess(Process):
         timeout: Seconds to wait for next batch before complaining.
     """
 
-    def __init__(self, result_handler, queue, control, timeout=60):
+    def __init__(
+        self,
+        result_handler: ResultHandler,
+        queue: Queue,
+        control: Control,
+        timeout: int = 60
+    ):
         super().__init__(name="Result process")
         self.result_handler = result_handler
         self.queue = queue
@@ -187,10 +262,9 @@ class ResultProcess(Process):
         )
 
         def fail_callback():
-            """Raises Done if the expected number of batches has been
-            seen.
+            """Raises Done if the expected number of batches has been seen.
             """
-            if (self.num_batches is None and self.control.check_value_positive()):
+            if self.num_batches is None and self.control.check_value_positive():
                 self.num_batches = self.control.get_value()
             if (
                 self.num_batches is not None and
@@ -213,14 +287,13 @@ class ResultProcess(Process):
             """Dequeue and yield batches.
             """
             while True:
-                batch = dequeue(
+                yield dequeue(
                     self.queue,
                     wait_message="Result process waiting on result {}",
                     timeout=self.timeout,
                     fail_callback=fail_callback,
                     timeout_callback=timeout_callback,
                 )
-                yield batch
 
         try:
             self.result_handler.start(self)
@@ -239,51 +312,3 @@ class ResultProcess(Process):
         finally:
             num_batches = self.control.get_value(lock=True)
             self.result_handler.finish(num_batches if num_batches > 0 else None)
-
-
-class WriterManager(object):
-    """Manager for a writer process and control variable.
-    """
-
-    def __init__(self, writers, compression, preserve_order, result_queue, timeout):
-        # result handler
-        if preserve_order:
-            writer_result_handler = OrderPreservingWriterResultHandler(
-                writers, compressed=compression == "worker"
-            )
-        else:
-            writer_result_handler = WriterResultHandler(
-                writers, compressed=compression == "worker"
-            )
-        self.timeout = timeout
-        # Shared variable for communicating with writer thread
-        self.writer_control = Control(CONTROL_ACTIVE)
-        # writer process
-        self.writer_process = ResultProcess(
-            writer_result_handler, result_queue, self.writer_control, timeout
-        )
-        self.writer_process.start()
-
-    def is_active(self):
-        """Returns True if the writer process is alive and the control
-        value is CONTROL_ACTIVE.
-        """
-        return (
-            self.writer_process.is_alive() and
-            self.writer_control.check_value(CONTROL_ACTIVE)
-        )
-
-    def set_num_batches(self, num_batches):
-        """Set the number of batches to the control variable.
-        """
-        self.writer_control.set_value(num_batches)
-
-    def wait(self):
-        """Wait for the writer process to terminate.
-        """
-        wait_on_process(self.writer_process, self.timeout)
-
-    def terminate(self, retcode):
-        """Force the writer process to terminate.
-        """
-        kill(self.writer_process, retcode, self.timeout)

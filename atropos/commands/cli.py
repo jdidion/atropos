@@ -16,16 +16,19 @@ import sys
 import textwrap
 from typing import Callable, Sequence, List, Type, TypeVar, Generic, Union, Optional
 from urllib.parse import urlparse
+
 from xphyle.paths import STDOUT, STDERR, check_path, as_path, resolve_path
 from xphyle.types import PathType, Permission
+
 from atropos import __version__
-from atropos.io.compression import splitext_compressed
+from atropos.io import splitext_compressed
 from atropos.io.seqio import InputRead
 from atropos.util import Magnitude, ALPHABETS
 
 
 class BaseCommandParser(metaclass=ABCMeta):
-    """Base class for Atropos sub-commands.
+    """
+    Base class for Atropos sub-commands.
 
     Subclasses must define name, description, and usage members.
     """
@@ -342,6 +345,7 @@ class BaseCommandParser(metaclass=ABCMeta):
             )
             try:
                 from srastream import SraReader
+
                 options.sra_reader = SraReader(
                     options.sra_accession, batch_size=options.batch_size or 1000
                 )

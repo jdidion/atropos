@@ -145,8 +145,8 @@ extensions = [
 # TODO: load these from requirements*.txt file
 install_requirements = [
     f"Cython>={MIN_CYTHON_VERSION}",
-    "xphyle>=4.0.0-rc.0",
-    "pokrok>=0.1.0"
+    "xphyle>=4.2.0",
+    "pokrok>=0.2.0"
 ]
 test_requirements = [
     "pytest",  # 'jinja2', 'pysam',

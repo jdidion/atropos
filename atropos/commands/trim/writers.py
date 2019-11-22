@@ -7,7 +7,7 @@ from typing import Sequence, Tuple, Union, Optional
 from xphyle import STDOUT, xopen, open_
 from xphyle.types import ModeArg
 
-from atropos.io.compression import splitext_compressed
+from atropos.io import splitext_compressed
 from atropos.io.seqio import create_seq_formatter
 from atropos.commands.trim.filters import NoFilter
 
@@ -27,8 +27,8 @@ class Writers:
         self.suffix = None
 
     def get_writer(self, file_desc: FileDesc, compressed: bool = False):
-        """Create the writer for a file descriptor if it does not already
-        exist.
+        """
+        Create the writer for a file descriptor if it does not already exist.
 
         Args:
             file_desc: File descriptor. If `compressed==True`, this is a tuple

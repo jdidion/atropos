@@ -11,6 +11,7 @@ determine whether and where to write the read(s) based on whether it was rejecte
 by a filter, and which one.
 """
 from collections import OrderedDict
+from typing import Type
 
 # Constants used when returning from a Filter’s __call__ method to improve
 # readability (it is unintuitive that "return True" means "discard the read").
@@ -18,7 +19,7 @@ DISCARD = True
 KEEP = False
 
 
-class FilterWrapper(object):
+class FilterWrapper:
     """Base wrapper around a filter.
     """
 
@@ -28,7 +29,7 @@ class FilterWrapper(object):
 
     def __call__(self, read1, read2=None):
         """Call the filter function.
-        
+
         Returns:
             DISCARD if the filter function returns True, else KEEP
         """
@@ -74,14 +75,14 @@ class PairedWrapper(FilterWrapper):
     """This is for paired-end reads, using the 'new-style' filtering where both
     reads are inspected. That is, the entire pair is discarded if at least 1 or
     2 of the reads match the filtering criteria.
-    
+
     Args:
         min_affected: values 1 and 2 are allowed.
             1 means: the pair is discarded if any read matches
             2 means: the pair is discarded if both reads match
     """
 
-    def __init__(self, f, min_affected=1):
+    def __init__(self, f, min_affected: int = 1):
         super().__init__(f)
         if min_affected not in (1, 2):
             raise ValueError("min_affected must be 1 or 2")
@@ -100,9 +101,10 @@ class PairedWrapper(FilterWrapper):
         return failures >= self.min_affected
 
 
-class FilterFactory(object):
-    """Factor that creates filters and wraps them in the appropriate
-    (single-end or paired-end) wrapper.
+class FilterFactory:
+    """
+    Factor that creates filters and wraps them in the appropriate (single-end or
+    paired-end) wrapper.
     """
 
     def __init__(self, paired, min_affected):
@@ -120,7 +122,14 @@ class FilterFactory(object):
             return SingleWrapper(fltr)
 
 
-class MergedReadFilter(object):
+class Filter:
+    """
+    Marker type for Filters.
+    """
+    pass
+
+
+class MergedReadFilter(Filter):
     """Returns True if the read was merged.
     """
 
@@ -128,7 +137,7 @@ class MergedReadFilter(object):
         return read.merged
 
 
-class TooShortReadFilter(object):
+class TooShortReadFilter(Filter):
     """Returns True if the read sequence is shorter than `minimum_length`.
     """
     name = "too_short"
@@ -140,7 +149,7 @@ class TooShortReadFilter(object):
         return len(read) < self.minimum_length
 
 
-class TooLongReadFilter(object):
+class TooLongReadFilter(Filter):
     """Returns True if the read sequence is longer than `maximum_length`.
     """
     name = "too_long"
@@ -152,12 +161,12 @@ class TooLongReadFilter(object):
         return len(read) > self.maximum_length
 
 
-class NContentFilter(object):
+class NContentFilter(Filter):
     """Discards a reads that has a number of 'N's over a given threshold. It
     handles both raw counts of Ns as well as proportions. Note, for raw counts,
     it is a greater than comparison, so a cutoff of '1' will keep reads with a
     single N in it.
-    
+
     Args:
         count: If it is below 1.0, it will be considered a proportion, and
             above and equal to 1 will be considered as discarding reads with a
@@ -184,7 +193,7 @@ class NContentFilter(object):
             return n_count > self.cutoff
 
 
-class UntrimmedFilter(object):
+class UntrimmedFilter(Filter):
     """Returns True if read is untrimmed.
     """
 
@@ -192,7 +201,7 @@ class UntrimmedFilter(object):
         return read.match is None
 
 
-class TrimmedFilter(object):
+class TrimmedFilter(Filter):
     """Returns True if read is trimmed.
     """
 
@@ -200,7 +209,7 @@ class TrimmedFilter(object):
         return read.match is not None
 
 
-class NoFilter(object):
+class NoFilter(Filter):
     """Always returns False.
     """
     name = "NoFilter"
@@ -209,9 +218,9 @@ class NoFilter(object):
         return False
 
 
-class Filters(object):
+class Filters:
     """Manages multiple filters.
-    
+
     Args:
         filter_factory: The :class:`FilterFactory` to use for creating new
             filters.
@@ -226,12 +235,12 @@ class Filters(object):
         """
         self.filters[filter_type] = self.filter_factory(filter_type, *args, **kwargs)
 
-    def filter(self, read1, read2=None):
+    def filter(self, read1, read2=None) -> Type[Filter]:
         """Execute filters in the order they were added until one returns True.
-        
+
         Args:
             read1, read2: The read(s) to filter.
-        
+
         Returns:
             The type of the first filter that returned True, or :class:NoFilter
             if none of the filters returned True.

@@ -13,11 +13,16 @@ from typing import Callable, Tuple, List, Iterable, Type, TypeVar, Union, Option
 from atropos import AtroposError
 from atropos.adapters import Adapter
 from atropos.align import (
-    Aligner, Match, MatchInfo, InsertAligner, SEMIGLOBAL, START_WITHIN_SEQ1,
-    STOP_WITHIN_SEQ2
+    Aligner,
+    Match,
+    MatchInfo,
+    InsertAligner,
+    SEMIGLOBAL,
+    START_WITHIN_SEQ1,
+    STOP_WITHIN_SEQ2,
 )
 from atropos.io.seqio import Sequence
-from atropos.util import (BASE_COMPLEMENTS, reverse_complement, mean, quals2ints)
+from atropos.util import BASE_COMPLEMENTS, reverse_complement, mean, quals2ints
 from .qualtrim import quality_trim_index, nextseq_trim_index
 
 
@@ -25,6 +30,7 @@ from .qualtrim import quality_trim_index, nextseq_trim_index
 class Modifier:
     """Base clas for modifiers.
     """
+
     @property
     def name(self) -> str:
         """Modifier name.
@@ -35,7 +41,7 @@ class Modifier:
     def description(self) -> str:
         """Modifier description (for display).
         """
-        return getattr(self, 'display_str', self.name)
+        return getattr(self, "display_str", self.name)
 
     def summarize(self) -> dict:
         """Returns a summary of the modifier's activity as a dict.
@@ -46,6 +52,7 @@ class Modifier:
 class ReadModifier(Modifier, metaclass=ABCMeta):
     """Base class of modifiers that edit a single read.
     """
+
     @abstractmethod
     def __call__(self, read: Sequence) -> Sequence:
         pass
@@ -54,6 +61,7 @@ class ReadModifier(Modifier, metaclass=ABCMeta):
 class ReadPairModifier(Modifier, metaclass=ABCMeta):
     """Base class of modifiers that edit a pair of reads simultaneously.
     """
+
     @abstractmethod
     def __call__(self, read1: Sequence, read2: Sequence) -> Tuple[Sequence, Sequence]:
         pass
@@ -62,6 +70,7 @@ class ReadPairModifier(Modifier, metaclass=ABCMeta):
 class Trimmer(ReadModifier, metaclass=ABCMeta):
     """Base class of modifiers that trim bases from reads.
     """
+
     def __init__(self):
         self.trimmed_bases = 0
 
@@ -105,10 +114,10 @@ class Trimmer(ReadModifier, metaclass=ABCMeta):
 
 
 class TrimAction(Enum):
-    NONE = 'none'
-    TRIM = 'trim'
-    MASK = 'mask'
-    LOWER = 'lower'
+    NONE = "none"
+    TRIM = "trim"
+    MASK = "mask"
+    LOWER = "lower"
 
 
 class AdapterCutter(ReadModifier):
@@ -120,9 +129,13 @@ class AdapterCutter(ReadModifier):
         times: Number of times to trim.
         action: What to do with a found adapter: None, 'trim', or 'mask'
     """
+
     def __init__(
-            self, adapters: List[Adapter] = None, times: int = 1,
-            action: TrimAction = TrimAction.TRIM):
+        self,
+        adapters: List[Adapter] = None,
+        times: int = 1,
+        action: TrimAction = TrimAction.TRIM,
+    ):
         super().__init__()
         self.adapters = adapters or []
         self.times = times
@@ -188,9 +201,9 @@ class AdapterCutter(ReadModifier):
             # add N from last modification
             masked_sequence = trimmed_read.sequence
             for match in sorted(matches, reverse=True, key=lambda m: m.astart):
-                nstr = 'N' * (
-                    len(match.read.sequence) -
-                    len(match.adapter.trimmed(match).sequence)
+                nstr = "N" * (
+                    len(match.read.sequence)
+                    - len(match.adapter.trimmed(match).sequence)
                 )
                 # add N depending on match position
                 if match.front:
@@ -216,10 +229,10 @@ class AdapterCutter(ReadModifier):
 
 
 class MismatchAction(Enum):
-    NONE = 'none'
-    LIBERAL = 'liberal'
-    CONSERVATIVE = 'conservative'
-    N = 'N'
+    NONE = "none"
+    LIBERAL = "liberal"
+    CONSERVATIVE = "conservative"
+    N = "N"
 
 
 class ErrorCorrectorMixin(object):
@@ -235,8 +248,10 @@ class ErrorCorrectorMixin(object):
     """
 
     def __init__(
-            self, mismatch_action: MismatchAction = MismatchAction.NONE,
-            min_qual_difference: int = 1):
+        self,
+        mismatch_action: MismatchAction = MismatchAction.NONE,
+        min_qual_difference: int = 1,
+    ):
         self.mismatch_action = mismatch_action
         self.r1r2_min_qual_difference = min_qual_difference
         self.r2r1_min_qual_difference = -1 * min_qual_difference
@@ -244,8 +259,12 @@ class ErrorCorrectorMixin(object):
         self.corrected_bp = [0, 0]
 
     def correct_errors(
-            self, read1: Sequence, read2: Sequence, insert_match: MatchInfo,
-            truncate_seqs: bool = False):
+        self,
+        read1: Sequence,
+        read2: Sequence,
+        insert_match: MatchInfo,
+        truncate_seqs: bool = False,
+    ):
         """Correct errors in overlapping reads.
 
         Args:
@@ -273,7 +292,9 @@ class ErrorCorrectorMixin(object):
             r1_qual = list(read1.qualities)
             r2_qual = list(read2.qualities)
         elif self.mismatch_action in {
-                MismatchAction.LIBERAL, MismatchAction.CONSERVATIVE}:
+            MismatchAction.LIBERAL,
+            MismatchAction.CONSERVATIVE,
+        }:
             raise ValueError(
                 "Cannot perform quality-based error correction on reads "
                 "lacking quality information"
@@ -303,16 +324,16 @@ class ErrorCorrectorMixin(object):
                 continue
 
             if self.mismatch_action is MismatchAction.N:
-                r1_seq[i] = 'N'
-                r2_seq[j] = 'N'
+                r1_seq[i] = "N"
+                r2_seq[j] = "N"
                 r1_changed += 1
                 r2_changed += 1
-            elif base1 == 'N':
+            elif base1 == "N":
                 r1_seq[i] = base2
                 if has_quals:
                     r1_qual[i] = r2_qual[j]
                 r1_changed += 1
-            elif base2 == 'N':
+            elif base2 == "N":
                 r2_seq[j] = BASE_COMPLEMENTS[base1]
                 if has_quals:
                     r2_qual[j] = r1_qual[i]
@@ -355,14 +376,14 @@ class ErrorCorrectorMixin(object):
             def update_read(read, seq, qual, seq_len, read_num, num_changed):
                 self.corrected_bp[read_num] += num_changed
                 read.corrected = num_changed
-                new_seq = ''.join(seq)
+                new_seq = "".join(seq)
                 partial = truncate_seqs and len(read.sequence) > seq_len
                 if partial:
                     read.sequence = new_seq + read.sequence[seq_len:]
                 else:
                     read.sequence = new_seq
                 if has_quals:
-                    new_qual = ''.join(qual)
+                    new_qual = "".join(qual)
                     if partial:
                         read.qualities = new_qual + read.qualities[seq_len:]
                     else:
@@ -433,24 +454,23 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
             return read1, read2
 
         match = self.aligner.match_insert(read1.sequence, read2.sequence)
-        read1.insert_overlap = read2.insert_overlap = (match is not None)
+        read1.insert_overlap = read2.insert_overlap = match is not None
         insert_match = None
         correct_errors = False
         if match:
             insert_match, adapter_match1, adapter_match2 = match
             correct_errors = (
-                    self.mismatch_action is not MismatchAction.NONE
-                    and insert_match[5] > 0
+                self.mismatch_action is not MismatchAction.NONE and insert_match[5] > 0
             )
         else:
             adapter_match1 = self.adapter1.match_to(read1)
             adapter_match2 = self.adapter2.match_to(read2)
             # If the adapter matches are complementary, perform error correction
             if (
-                self.mismatch_action is not MismatchAction.NONE and
-                adapter_match1 and
-                adapter_match2 and
-                adapter_match1.rstart == adapter_match2.rstart
+                self.mismatch_action is not MismatchAction.NONE
+                and adapter_match1
+                and adapter_match2
+                and adapter_match1.rstart == adapter_match2.rstart
             ):
                 insert_match = (
                     read_lengths[1] - adapter_match1.rstart,
@@ -461,9 +481,10 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
                 correct_errors = True
         # If exactly one of the two alignments failed and symmetric is True,
         # duplicate the good alignment
-        if self.symmetric and sum(
-            bool(m) for m in (adapter_match1, adapter_match2)
-        ) == 1:
+        if (
+            self.symmetric
+            and sum(bool(m) for m in (adapter_match1, adapter_match2)) == 1
+        ):
 
             def create_symmetric_match(_match, read_len):
                 if _match.rstart > read_len:
@@ -475,23 +496,20 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
                 # read length. The 'matches' and 'errors' attributes will be
                 # wrong, but it shouldn't matter.
                 if _match.rstop < read_len:
-                    _match.astop -= (read_len - _match.rstop)
+                    _match.astop -= read_len - _match.rstop
                     _match.rstop = read_len
                 return _match
 
             if adapter_match1:
-                adapter_match2 = create_symmetric_match(
-                    adapter_match1, read_lengths[1]
-                )
+                adapter_match2 = create_symmetric_match(adapter_match1, read_lengths[1])
             else:
-                adapter_match1 = create_symmetric_match(
-                    adapter_match2, read_lengths[0]
-                )
+                adapter_match1 = create_symmetric_match(adapter_match2, read_lengths[0])
             if (
-                    self.mismatch_action is not MismatchAction.NONE
-                    and not insert_match
-                    and adapter_match1
-                    and adapter_match2):
+                self.mismatch_action is not MismatchAction.NONE
+                and not insert_match
+                and adapter_match1
+                and adapter_match2
+            ):
                 # Assume that the symmetric read segments overlap and
                 # perform error correction
                 insert_match = (
@@ -532,7 +550,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
             if self.action == TrimAction.MASK:
                 # add N from last modification
                 masked_sequence = trimmed_read.sequence
-                masked_sequence += 'N' * (len(read) - len(trimmed_read))
+                masked_sequence += "N" * (len(read) - len(trimmed_read))
                 # set masked sequence as sequence with original quality
                 trimmed_read.sequence = masked_sequence
                 trimmed_read.qualities = read.qualities
@@ -604,20 +622,20 @@ class OverwriteRead(ReadPairModifier):
                 "lacking base qualities."
             )
 
-        qual1 = list(quals2ints(read1.qualities[:self.window_size], self.base))
+        qual1 = list(quals2ints(read1.qualities[: self.window_size], self.base))
         summ1 = self.summary_fn(qual1)
-        qual2 = list(quals2ints(read2.qualities[:self.window_size], self.base))
+        qual2 = list(quals2ints(read2.qualities[: self.window_size], self.base))
         summ2 = self.summary_fn(qual2)
         if (
-            summ1 < self.worse_read_min_quality and
-            summ2 >= self.better_read_min_quality
+            summ1 < self.worse_read_min_quality
+            and summ2 >= self.better_read_min_quality
         ):
             # TODO: not sure what the right value is here
             read2.corrected = 1
             read1 = read2.reverse_complement()
         elif (
-            summ2 < self.worse_read_min_quality and
-            summ1 >= self.better_read_min_quality
+            summ2 < self.worse_read_min_quality
+            and summ1 >= self.better_read_min_quality
         ):
             read1.corrected = 1
             read2 = read1.reverse_complement()
@@ -634,6 +652,7 @@ class UnconditionalCutter(Trimmer):
     read. If the length is negative, the bases are removed from the end of the
     read.
     """
+
     display_str = "Cut unconditionally"
 
     def __init__(self, lengths: Optional[Iterable[int]] = None):
@@ -660,11 +679,15 @@ class MinCutter(Trimmer):
         only_trimmed: Only cut read ends if they have already been
             adapter-trimmed.
     """
+
     display_str = "Cut conditionally"
 
     def __init__(
-            self, lengths: Iterable[int] = None, count_trimmed: bool = True,
-            only_trimmed: bool = False):
+        self,
+        lengths: Iterable[int] = None,
+        count_trimmed: bool = True,
+        only_trimmed: bool = False,
+    ):
         super().__init__()
         self.front_length = self.back_length = 0
         if lengths:
@@ -697,7 +720,8 @@ class MinCutter(Trimmer):
                 if read.match:
                     trimmed += sum(
                         i.rsize_total
-                        for i in read.match_info if _is_front == i.is_front
+                        for i in read.match_info
+                        if _is_front == i.is_front
                     )
             elif read.match:
                 trimmed = read.clipped[offset + 2]
@@ -739,6 +763,7 @@ class SuffixRemover(Modifier):
     Args:
         suffixes: Iterable of suffixes to remove.
     """
+
     def __init__(self, suffixes: Optional[Iterable[str]] = None):
         self.suffixes = suffixes or []
 
@@ -746,7 +771,7 @@ class SuffixRemover(Modifier):
         name = read.name
         for suffix in self.suffixes:
             if name.endswith(suffix):
-                name = name[:-len(suffix)]
+                name = name[: -len(suffix)]
         read = read[:]
         read.name = name
         return read
@@ -755,19 +780,20 @@ class SuffixRemover(Modifier):
 class PrefixSuffixAdder(Modifier):
     """Add a suffix and a prefix to read names.
     """
+
     def __init__(self, prefix: str = "", suffix: str = ""):
         self.prefix = prefix
         self.suffix = suffix
 
     def __call__(self, read: Sequence) -> Sequence:
         read = read[:]
-        adapter_name = 'no_adapter'
+        adapter_name = "no_adapter"
         if read.match is not None:
             adapter_name = read.match.adapter.name
-        read.name = self.prefix.replace(
-            '{name}', adapter_name
-        ) + read.name + self.suffix.replace(
-            '{name}', adapter_name
+        read.name = (
+            self.prefix.replace("{name}", adapter_name)
+            + read.name
+            + self.suffix.replace("{name}", adapter_name)
         )
         return read
 
@@ -778,7 +804,7 @@ class DoubleEncoder(Modifier):
     """
 
     def __init__(self):
-        self.double_encode_trans = str.maketrans('0123.', 'ACGTN')
+        self.double_encode_trans = str.maketrans("0123.", "ACGTN")
 
     def __call__(self, read: Sequence) -> Sequence:
         read = read[:]
@@ -793,7 +819,7 @@ class ZeroCapper(Modifier):
     def __init__(self, quality_base: int = 33):
         qbase = quality_base
         self.zero_cap_trans = str.maketrans(
-            ''.join(map(chr, range(qbase))), chr(qbase) * qbase
+            "".join(map(chr, range(qbase))), chr(qbase) * qbase
         )
 
     def __call__(self, read: Sequence) -> Sequence:
@@ -805,11 +831,12 @@ class ZeroCapper(Modifier):
 class PrimerTrimmer(Trimmer):
     """Trims primer base from colorspace reads.
     """
+
     display_str = "Primer-trimmed"
 
     def __call__(self, read: Sequence) -> Sequence:
         read = self.clip(read, 1)
-        read.primer = ''
+        read.primer = ""
         return read
 
 
@@ -819,6 +846,7 @@ class NextseqQualityTrimmer(Trimmer):
     TODO: Change to reflect that this trimmer can be used for data generated by
     two-color chemistry (NextSeq, NovaSeq)
     """
+
     display_str = "Quality trimmed (NextSeq)"
 
     def __init__(self, cutoff: int = 0, base: int = 33):
@@ -837,6 +865,7 @@ class NextseqQualityTrimmer(Trimmer):
 class QualityTrimmer(Trimmer):
     """Trim bases from the start/end of reads based on their qualities.
     """
+
     display_str = "Quality-trimmed"
 
     def __init__(self, cutoff_front: int = 0, cutoff_back: int = 0, base: int = 33):
@@ -858,12 +887,13 @@ class QualityTrimmer(Trimmer):
 class NEndTrimmer(Trimmer):
     """Trims Ns from the 3' and 5' end of reads.
     """
+
     display_str = "End Ns trimmed"
 
     def __init__(self):
         super().__init__()
-        self.start_trim = re.compile(r'^N+')
-        self.end_trim = re.compile(r'N+$')
+        self.start_trim = re.compile(r"^N+")
+        self.end_trim = re.compile(r"N+$")
 
     def __call__(self, read: Sequence) -> Sequence:
         if len(read) == 0:
@@ -901,14 +931,14 @@ class UmiTrimmer(Trimmer):
         """
         if self.umi_bases:
             new_read = self.subseq(read, self.umi_bases, len(read.sequence))
-            umi = read.sequence[:self.umi_bases]
+            umi = read.sequence[: self.umi_bases]
             new_read.umi = umi
             return new_read
         else:
             return read
 
 
-def add_umi_to_read_name(read, umi: str, delim: str = ':'):
+def add_umi_to_read_name(read, umi: str, delim: str = ":"):
     """Add a UMI sequence to a read name.
 
     Args:
@@ -920,11 +950,11 @@ def add_umi_to_read_name(read, umi: str, delim: str = ':'):
         The update read name, of the form
         @{read_name}{delim}{UMI} {DESCRIPTION}.
     """
-    fields = read.name.split(' ')
-    new_name = '{}{}{}'.format(fields[0], delim, umi)
+    fields = read.name.split(" ")
+    new_name = "{}{}{}".format(fields[0], delim, umi)
     if len(fields) > 1:
         fields[0] = new_name
-        new_name = ' '.join(fields)
+        new_name = " ".join(fields)
     read.name = new_name
 
 
@@ -935,7 +965,7 @@ class SyncUmi(ReadPairModifier):
         delim: separator for {read_id}{DELIM}{read1_UMI}{DELIM}{read2_UMI}
     """
 
-    def __init__(self, delim: str = ':'):
+    def __init__(self, delim: str = ":"):
         self.delim = delim
 
     def __call__(self, read1: Sequence, read2: Sequence) -> Tuple[Sequence, Sequence]:
@@ -962,7 +992,7 @@ class AddUmi(Modifier):
         delim: separator for {read_id}{DELIM}{read1_UMI}{DELIM}{read2_UMI}
     """
 
-    def __init__(self, delim: str = ':'):
+    def __init__(self, delim: str = ":"):
         self.delim = delim
 
     def __call__(self, read: Sequence) -> Sequence:
@@ -984,6 +1014,7 @@ class RRBSTrimmer(MinCutter):
     end to remove potential methylation-biased bases from the end-repair
     reaction.
     """
+
     display_str = "RRBS-trimmed"
 
     def __init__(self, trim_5p: int = 0, trim_3p: int = 2):
@@ -1000,6 +1031,7 @@ class NonDirectionalBisulfiteTrimmer(Modifier):
     is not trimmed *and* the read has been adapter-trimmed, a minimum number of
     bases is trimmed from the 3' end.
     """
+
     display_str = "Bisulfite-trimmed (Non-directional)"
     _regex = re.compile(r"^C[AG]A")
 
@@ -1034,6 +1066,7 @@ class NonDirectionalBisulfiteTrimmer(Modifier):
 class TruSeqBisulfiteTrimmer(MinCutter):
     """EpiGnome reads are trimmed at least 6 bp on the 5' end.
     """
+
     display_str = "Bisulfite-trimmed (EpiGnome/TruSeq)"
 
     def __init__(self):
@@ -1044,11 +1077,16 @@ class SwiftBisulfiteTrimmer(ReadPairModifier):
     """For WGBS libraries prepared with the Swift Accel-NGS kit, 10 bp are
     trimmed  off the end of read1 and the beginning of read2.
     """
+
     display_str = "Bisulfite-trimmed (Swift)"
 
     def __init__(
-            self, trim_5p1: int = 0, trim_3p1: int = 10, trim_5p2: int = 10,
-            trim_3p2: int = 0):
+        self,
+        trim_5p1: int = 0,
+        trim_3p1: int = 10,
+        trim_5p2: int = 10,
+        trim_3p2: int = 0,
+    ):
         self._read1_cutter = MinCutter(
             (trim_5p1, -1 * trim_3p1), count_trimmed=False, only_trimmed=False
         )
@@ -1062,7 +1100,8 @@ class SwiftBisulfiteTrimmer(ReadPairModifier):
     def summarize(self) -> dict:
         return dict(
             bp_trimmed=(
-                self._read1_cutter.trimmed_bases, self._read2_cutter.trimmed_bases
+                self._read1_cutter.trimmed_bases,
+                self._read2_cutter.trimmed_bases,
             )
         )
 
@@ -1072,9 +1111,13 @@ class SwiftBisulfiteTrimmer(ReadPairModifier):
 class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
     """Merge overlaping reads. The merged reads are stored in read1.
     """
+
     def __init__(
-            self, min_overlap: float = 0.9, error_rate: float = 0.1,
-            mismatch_action: MismatchAction = MismatchAction.NONE):
+        self,
+        min_overlap: float = 0.9,
+        error_rate: float = 0.1,
+        mismatch_action: MismatchAction = MismatchAction.NONE,
+    ):
         ErrorCorrectorMixin.__init__(self, mismatch_action)
         self.min_overlap = int(min_overlap) if min_overlap > 1 else min_overlap
         self.error_rate = error_rate
@@ -1106,9 +1149,10 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
                 # Only correct errors if we haven't already done correction in
                 # the InsertAligner
                 if (
-                        self.mismatch_action is not MismatchAction.NONE
-                        and errors > 0
-                        and not insert_matched):
+                    self.mismatch_action is not MismatchAction.NONE
+                    and errors > 0
+                    and not insert_matched
+                ):
                     self.correct_errors(read1, read2, alignment)
                 if r2_start == 0 and r2_stop == len2:
                     # r2 is fully contained in r1
@@ -1125,8 +1169,8 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
                     read1.sequence = read2_rc + read1.sequence[r1_stop:]
                     if read1.qualities and read2.qualities:
                         read1.qualities = (
-                            "".join(reversed(read2.qualities)) +
-                            read1.qualities[r1_stop:]
+                            "".join(reversed(read2.qualities))
+                            + read1.qualities[r1_stop:]
                         )
                 else:
                     raise AtroposError(
@@ -1139,7 +1183,7 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
         return read1, read2
 
 
-M = TypeVar('M', bound=Modifier)
+M = TypeVar("M", bound=Modifier)
 
 
 class Modifiers(metaclass=ABCMeta):
@@ -1152,7 +1196,8 @@ class Modifiers(metaclass=ABCMeta):
 
     @abstractmethod
     def add_modifier(
-            self, mod_class: Callable[..., Modifier], read: int = 1 | 2, **kwargs):
+        self, mod_class: Callable[..., Modifier], read: int = 1 | 2, **kwargs
+    ):
         """Add a modifier of the specified type for one or both reads.
 
         Args:
@@ -1164,8 +1209,11 @@ class Modifiers(metaclass=ABCMeta):
 
     @abstractmethod
     def add_modifier_pair(
-            self, mod_class: Callable[..., Modifier], read1_args: Optional[dict] = None,
-            read2_args: Optional[dict] = None):
+        self,
+        mod_class: Callable[..., Modifier],
+        read1_args: Optional[dict] = None,
+        read2_args: Optional[dict] = None,
+    ):
         """Add a modifier for both reads in a pair.
 
         Args:
@@ -1192,7 +1240,8 @@ class Modifiers(metaclass=ABCMeta):
         return mod_class in self.modifier_indexes
 
     def get_modifiers(
-            self, mod_class: Type[Modifier] = None, read: Optional[int] = None):
+        self, mod_class: Type[Modifier] = None, read: Optional[int] = None
+    ):
         """Returns a list of modifiers that have been added.
 
         Args:
@@ -1238,8 +1287,8 @@ class Modifiers(metaclass=ABCMeta):
 
     @abstractmethod
     def modify(
-            self, read1: Sequence, read2: Optional[Sequence] = None
-            ) -> Tuple[Sequence, Optional[Sequence]]:
+        self, read1: Sequence, read2: Optional[Sequence] = None
+    ) -> Tuple[Sequence, Optional[Sequence]]:
         """Apply registered modifiers to a read/pair.
 
         Args:
@@ -1260,12 +1309,14 @@ class Modifiers(metaclass=ABCMeta):
 class SingleEndModifiers(Modifiers):
     """Manages modifiers for single-end data.
     """
+
     def add_modifier(self, mod_class: Type[M], read: int = 1, **kwargs):
         if read != 1:
             raise ValueError("'read' must be 1 for single-end data")
 
         return self._add_modifiers(
-            mod_class, [cast(Callable[..., M], mod_class)(**kwargs), None])
+            mod_class, [cast(Callable[..., M], mod_class)(**kwargs), None]
+        )
 
     def add_modifier_pair(self, mod_class, read1_args=None, read2_args=None):
         if read1_args is not None:
@@ -1274,7 +1325,7 @@ class SingleEndModifiers(Modifiers):
     def modify(self, read1, read2=None) -> Tuple[Sequence]:
         for mods in self.modifiers:
             read1 = mods[0](read1)
-        return tuple(read1,)
+        return tuple(read1)
 
     def summarize(self):
         summary = {}
@@ -1283,7 +1334,7 @@ class SingleEndModifiers(Modifiers):
             summary[mod.name] = dict(
                 (key, (value,)) for key, value in mod.summarize().items()
             )
-            summary[mod.name]['desc'] = mod.description
+            summary[mod.name]["desc"] = mod.description
         return summary
 
 
@@ -1315,8 +1366,11 @@ class PairedEndModifiers(Modifiers):
         return self._add_modifiers(mod_class, mods)
 
     def add_modifier_pair(
-            self, mod_class: Type[M], read1_args: Optional[dict] = None,
-            read2_args: Optional[dict] = None):
+        self,
+        mod_class: Type[M],
+        read1_args: Optional[dict] = None,
+        read2_args: Optional[dict] = None,
+    ):
         mods: List[M] = [None, None]
         if read1_args is not None:
             mods[0] = cast(Callable[..., M], mod_class)(**read1_args)
@@ -1326,8 +1380,8 @@ class PairedEndModifiers(Modifiers):
             return self._add_modifiers(mod_class, mods)
 
     def modify(
-            self, read1: Sequence, read2: Optional[Sequence] = None
-            ) -> Tuple[Sequence, Sequence]:
+        self, read1: Sequence, read2: Optional[Sequence] = None
+    ) -> Tuple[Sequence, Sequence]:
         for mods in self.modifiers:
             if isinstance(mods, ReadPairModifier):
                 read1, read2 = mods(read1, read2)
@@ -1343,7 +1397,7 @@ class PairedEndModifiers(Modifiers):
         for mods in self.modifiers:
             if isinstance(mods, ReadPairModifier):
                 summary[mods.name] = mods.summarize()
-                summary[mods.name]['desc'] = mods.description
+                summary[mods.name]["desc"] = mods.description
             elif any(mods):
                 name = desc = keys = None
                 summ1 = summ2 = {}
@@ -1369,5 +1423,5 @@ class PairedEndModifiers(Modifiers):
                         (key, (summ1.get(key, None), summ2.get(key, None)))
                         for key in keys
                     )
-                    summary[name]['desc'] = desc
+                    summary[name]["desc"] = desc
         return summary

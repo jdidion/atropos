@@ -12,14 +12,14 @@ from enum import IntFlag
 from pathlib import Path
 import sys
 from textwrap import TextWrapper
-from typing import Tuple, List, Callable, Optional, cast
+from typing import Callable, List, IO, Optional, Tuple, cast
 
 from xphyle import STDOUT, xopen
 from xphyle.types import PathOrFile, ModeArg
 
 from atropos import AtroposError
 from atropos.align import Match, MatchInfo
-from atropos.io.compression import splitext_compressed
+from atropos.io import splitext_compressed
 from atropos.util import Summarizable, truncate_string, ALPHABETS, Alphabet
 
 
@@ -32,11 +32,13 @@ class InputRead(IntFlag):
 
 class FormatError(AtroposError):
     """Raised when an input file (FASTA or FASTQ) is malformatted."""
+
     pass
 
 
 class UnknownFileType(AtroposError):
     """Raised when open could not autodetect the file type."""
+
     pass
 
 
@@ -44,7 +46,7 @@ class UnknownFileType(AtroposError):
 
 
 class SequenceReaderBase(Summarizable, metaclass=ABCMeta):  # pylint: disable=no-member
-    file_format = ''  # string, e.g. FASTA, FASTQ, etc.
+    file_format = ""  # string, e.g. FASTA, FASTQ, etc.
     delivers_qualities = False
     has_qualfile = False
     quality_base = 33
@@ -82,9 +84,14 @@ class SequenceReader(SequenceReaderBase):
         alphabet: The alphabet to use to validate sequences. If None, no
             validation is done.
     """
+
     def __init__(
-            self, path: PathOrFile, mode: ModeArg ='r',
-            quality_base: Optional[int] = None, alphabet: Optional[Alphabet] = None):
+        self,
+        path: PathOrFile,
+        mode: ModeArg = "r",
+        quality_base: Optional[int] = None,
+        alphabet: Optional[Alphabet] = None,
+    ):
         self.quality_base = quality_base
         self.alphabet = alphabet
         if isinstance(path, str):
@@ -92,7 +99,7 @@ class SequenceReader(SequenceReaderBase):
             self._file = xopen(path, mode)
             self._close_on_exit = True
         else:
-            if hasattr(path, 'name'):
+            if hasattr(path, "name"):
                 self.name = path.name
             else:
                 # TODO: generate random unique name?
@@ -101,7 +108,7 @@ class SequenceReader(SequenceReaderBase):
 
     @property
     def input_names(self):
-        return (self.name, None)
+        return self.name, None
 
     def close(self) -> None:
         """Close the underlying file.
@@ -132,7 +139,7 @@ class ColorspaceSequence(Sequence):
         sequence: str,
         qualities,
         primer: str = None,
-        name2: str = '',
+        name2: str = "",
         original_length: int = None,
         match: Optional[Match] = None,
         match_info: Optional[MatchInfo] = None,
@@ -173,17 +180,17 @@ class ColorspaceSequence(Sequence):
             alphabet=alphabet,
         )
         # TODO: use 'alphabet' here
-        if self.primer not in {'A', 'C', 'G', 'T'}:
+        if self.primer not in {"A", "C", "G", "T"}:
             raise FormatError(
                 "Primer base is {0!r} in read {1!r}, but it should be one of "
                 "A, C, G, T.".format(self.primer, truncate_string(name))
             )
 
     def __repr__(self):
-        fmt_str = '<ColorspaceSequence(name={0!r}, primer={1!r}, sequence={2!r}{3})>'
-        qstr = ''
+        fmt_str = "<ColorspaceSequence(name={0!r}, primer={1!r}, sequence={2!r}{3})>"
+        qstr = ""
         if self.qualities is not None:
-            qstr = ', qualities={0!r}'.format(truncate_string(self.qualities))
+            qstr = ", qualities={0!r}".format(truncate_string(self.qualities))
         return fmt_str.format(
             truncate_string(self.name),
             self.primer,
@@ -238,6 +245,7 @@ class SraSequenceReader(SequenceReader):
 class SraColorspaceSequenceReader(SraSequenceReader):
     """Reads colorspace sequences from an SRA accession.
     """
+
     colorspace = True
 
     def __init__(self, reader, quality_base=33, alphabet=None):
@@ -263,8 +271,8 @@ class FileWithPrependedLine(object):
     """
 
     def __init__(self, file, line):
-        if not line.endswith('\n'):
-            line += '\n'
+        if not line.endswith("\n"):
+            line += "\n"
         self.first_line = line
         self._file = file
 
@@ -293,14 +301,19 @@ class FastaReader(SequenceReader):
         keep_linebreaks: Whether to keep newline characters in the sequence.
         sequence_class: The class to use when creating new sequence objects.
     """
+
     file_format = "FASTA"
 
     def __init__(
-            self, path, keep_linebreaks=False,
-            sequence_class: Callable[..., Sequence] = Sequence, alphabet=None):
+        self,
+        path,
+        keep_linebreaks=False,
+        sequence_class: Callable[..., Sequence] = Sequence,
+        alphabet=None,
+    ):
         super().__init__(path, alphabet=alphabet)
         self.sequence_class = sequence_class
-        self._delimiter = '\n' if keep_linebreaks else ''
+        self._delimiter = "\n" if keep_linebreaks else ""
 
     def __iter__(self):
         """Read next entry from the file (single entry at a time).
@@ -313,7 +326,7 @@ class FastaReader(SequenceReader):
             if not line:
                 continue
 
-            if line and line[0] == '>':
+            if line and line[0] == ">":
                 if name is not None:
                     yield self.sequence_class(
                         name, self._delimiter.join(seq), None, alphabet=self.alphabet
@@ -321,7 +334,7 @@ class FastaReader(SequenceReader):
 
                 name = line[1:]
                 seq = []
-            elif line and line[0] == '#':
+            elif line and line[0] == "#":
                 continue
 
             elif name is not None:
@@ -345,6 +358,7 @@ class ColorspaceFastaReader(FastaReader):
         path: The file to read.
         keep_linebreaks: Whether to keep linebreaks in wrapped sequences.
     """
+
     colorspace = True
 
     def __init__(self, path, keep_linebreaks=False, alphabet=None):
@@ -356,6 +370,7 @@ class ColorspaceFastaReader(FastaReader):
 class ColorspaceFastqReader(FastqReader):
     """Reads colorspace sequences from a FASTQ.
     """
+
     colorspace = True
 
     def __init__(self, path, quality_base=33, alphabet=None):
@@ -370,6 +385,7 @@ class ColorspaceFastqReader(FastqReader):
 class SRAColorspaceFastqReader(FastqReader):
     """Reads SRA-formatted colorspace sequences from a FASTQ.
     """
+
     colorspace = True
 
     def __init__(self, path, quality_base=33, alphabet=None):
@@ -389,6 +405,7 @@ class FastaQualReader(SequenceReaderBase):
             If a filename is used, then .gz files are recognized.
         sequence_class: The class to use when creating new sequence objects.
     """
+
     file_format = "FastaQual"
     delivers_qualities = True
     has_qualfile = True
@@ -430,7 +447,7 @@ class FastaQualReader(SequenceReaderBase):
                 )
 
             try:
-                qualities = ''.join(
+                qualities = "".join(
                     [conv[value] for value in qualread.sequence.split()]
                 )
             except KeyError as err:
@@ -465,6 +482,7 @@ class ColorspaceFastaQualReader(FastaQualReader):
         fastafile, qualfile: FASTA files that contain the sequences and
             qualities, respectively.
     """
+
     colorspace = True
 
     def __init__(self, fastafile, qualfile, quality_base=33, alphabet=None):
@@ -486,6 +504,7 @@ class PairedSequenceReader(SequenceReaderBase):
         colorspace: Whether the sequences are in colorspace.
         file_format: A file_format instance.
     """
+
     input_read = InputRead.PAIRED
     interleaved = False
 
@@ -577,6 +596,7 @@ class InterleavedSequenceReader(SequenceReaderBase):
         colorspace: Whether the sequences are in colorspace.
         file_format: A file_format instance.
     """
+
     input_read = InputRead.PAIRED
     interleaved = True
 
@@ -641,6 +661,7 @@ class SAMReader(SequenceReaderBase):
             are supported.
         sequence_class: The class to use when creating new sequence objects.
     """
+
     file_format = "SAM"
     delivers_qualities = True
     interleaved = False
@@ -648,11 +669,12 @@ class SAMReader(SequenceReaderBase):
     colorspace = False
 
     def __init__(
-        self, path: PathOrFile,
+        self,
+        path: PathOrFile,
         quality_base: int = 33,
         sequence_class: Callable[..., Sequence] = Sequence,
         alphabet: Alphabet = None,
-        pysam_kwargs: Optional[dict] = None
+        pysam_kwargs: Optional[dict] = None,
     ):
         self._close_on_exit = is_path = isinstance(path, Path)
         self.quality_base = quality_base
@@ -664,10 +686,10 @@ class SAMReader(SequenceReaderBase):
         else:
             self.name = path.name
 
-        is_bam = self.name.endswith('.bam')
+        is_bam = self.name.endswith(".bam")
 
         if is_path:
-            mode = 'rb' if is_bam else 'rt'
+            mode = "rb" if is_bam else "rt"
             self._file = xopen(path, mode)
         else:
             self._file = path
@@ -715,18 +737,18 @@ class SAMReader(SequenceReaderBase):
 
 
 SAMRead = namedtuple(
-    'SAMRead', (
-        'query_name', 'query_sequence', 'query_qualities',
-        'is_read1', 'is_read2'))
+    "SAMRead",
+    ("query_name", "query_sequence", "query_qualities", "is_read1", "is_read2"),
+)
 
 
 class SAMParser:
     def __init__(self, sam_file):
-        self._reader = csv.reader(sam_file, delimiter='\t')
+        self._reader = csv.reader(sam_file, delimiter="\t")
         line = None
         for line in self._reader:
             # skip header lines
-            if not line[0].startswith('@'):
+            if not line[0].startswith("@"):
                 break
         self._next_line = line
 
@@ -739,8 +761,12 @@ class SAMParser:
 
         is_read1 = (int(self._next_line[1]) & 64) > 0
         read = SAMRead(
-            self._next_line[0], self._next_line[9], self._next_line[10],
-            is_read1, not is_read1)
+            self._next_line[0],
+            self._next_line[9],
+            self._next_line[10],
+            is_read1,
+            not is_read1,
+        )
 
         try:
             self._next_line = next(self._reader)
@@ -753,6 +779,7 @@ class SAMParser:
 class BAMParser:
     def __init__(self, bam_file: Path):
         import pysam
+
         self._reader = pysam.AlignmentFile(str(bam_file))
 
     def __iter__(self):
@@ -761,14 +788,18 @@ class BAMParser:
     def __next__(self):
         read = next(self._reader)
         return SAMRead(
-            read.query_name, read.query_sequence,
-            ''.join(chr(33 + q) for q in read.query_qualities),
-            read.is_read1, read.is_read2)
+            read.query_name,
+            read.query_sequence,
+            "".join(chr(33 + q) for q in read.query_qualities),
+            read.is_read1,
+            read.is_read2,
+        )
 
 
 class SingleEndSAMReader(SAMReader):
     """Reader for single-end SAM/BAM files.
     """
+
     input_read = InputRead.SINGLE
 
     def _iter(self, sam):
@@ -780,6 +811,7 @@ class Read1SingleEndSAMReader(SAMReader):
     """Reads a paired-end SAM/BAM file as if it were single-end, yielding
     only the first read from each pair.
     """
+
     input_read = InputRead.READ1
 
     def _iter(self, sam):
@@ -792,6 +824,7 @@ class Read2SingleEndSAMReader(SAMReader):
     """Reads a paired-end SAM/BAM file as if it were single-end, yielding
     only the second read from each pair.
     """
+
     input_read = InputRead.READ2
 
     def _iter(self, sam):
@@ -803,6 +836,7 @@ class Read2SingleEndSAMReader(SAMReader):
 class PairedEndSAMReader(SAMReader):
     """Reads pairs of reads from a SAM/BAM file. The file must be name-sorted.
     """
+
     input_read = InputRead.PAIRED
     interleaved = True
 
@@ -829,6 +863,7 @@ class PairedEndSAMReader(SAMReader):
 class SequenceFileFormat:
     """Base class for sequence formatters.
     """
+
     @abstractmethod
     def format(self, read):
         """Format a Sequence as a string.
@@ -890,7 +925,7 @@ class FastqFormat(SequenceFileFormat):
     def format_entry(self, name, sequence, qualities, name2=""):
         """Convert a sequence record to a string.
         """
-        return "".join(('@', name, '\n', sequence, '\n+', name2, '\n', qualities, '\n'))
+        return "".join(("@", name, "\n", sequence, "\n+", name2, "\n", qualities, "\n"))
 
 
 class ColorspaceFastqFormat(FastqFormat):
@@ -914,11 +949,11 @@ class SAMFormat(SequenceFileFormat):
                 read.name,
                 "\t",
                 self.flag,
-                '\t*\t0\t0\t*\t*\t0\t0\t',
+                "\t*\t0\t0\t*\t*\t0\t0\t",
                 read.sequence,
-                '\t',
+                "\t",
                 read.qualities,
-                '\n',
+                "\n",
             )
         )
 
@@ -1003,7 +1038,8 @@ class InterleavedFormatter(Formatter):
 
     def format(self, result, read1, read2=None):
         result_list = self._get_result_list(
-            result, self.file1, self.seq_format1, self.seq_format2)
+            result, self.file1, self.seq_format1, self.seq_format2
+        )
         result_list.append(self.seq_format1.format(read1))
         result_list.append(self.seq_format2.format(read2))
         self.written += 1
@@ -1018,10 +1054,7 @@ class PairedEndFormatter(Formatter):
 
     def __init__(self, file1, file2, seq_format1, seq_format2=None):
         super().__init__()
-        self.data = [
-            (file1, seq_format1),
-            (file2, seq_format2 or seq_format1)
-        ]
+        self.data = [(file1, seq_format1), (file2, seq_format2 or seq_format1)]
 
     def format(self, result, read1, read2):
         for read, (path, seq_format) in zip((read1, read2), self.data):
@@ -1033,13 +1066,11 @@ class PairedEndFormatter(Formatter):
 
 
 class SingleEndSAMFormatter(SingleEndFormatter):
-
     def __init__(self, file1):
         super().__init__(file1, SAMFormat(0))
 
 
 class PairedEndSAMFormatter(InterleavedFormatter):
-
     def __init__(self, file1):
         super().__init__(file1, SAMFormat(65), SAMFormat(129))
 
@@ -1068,7 +1099,7 @@ def sequence_names_match(read1, read2):
     """
     name1 = read1.name.split(None, 1)[0]
     name2 = read2.name.split(None, 1)[0]
-    if name1[-1:] in '12' and name2[-1:] in '12':
+    if name1[-1:] in "12" and name2[-1:] in "12":
         name1 = name1[:-1]
         name2 = name2[:-1]
     return name1 == name2
@@ -1164,21 +1195,21 @@ def open_reader(
         if file1 == STDOUT:
             file1 = sys.stdin
         for line in file1:
-            if line.startswith('#'):
+            if line.startswith("#"):
                 # Skip comment lines (needed for csfasta)
                 continue
 
-            if line.startswith('>'):
-                file_format = 'fasta'
-            elif line.startswith('@'):
-                file_format = 'fastq'
+            if line.startswith(">"):
+                file_format = "fasta"
+            elif line.startswith("@"):
+                file_format = "fastq"
             # TODO: guess SAM/BAM from data
             file1 = FileWithPrependedLine(file1, line)
             break
 
     if file_format is not None:
         file_format = file_format.lower()
-        if file_format in ('sam', 'bam'):
+        if file_format in ("sam", "bam"):
             if colorspace:
                 raise ValueError(
                     "SAM/BAM format is not currently supported for colorspace " "reads"
@@ -1221,15 +1252,15 @@ def open_reader(
             else:
                 return reader
 
-        elif file_format == 'fasta':
+        elif file_format == "fasta":
             fasta_handler = ColorspaceFastaReader if colorspace else FastaReader
             return fasta_handler(file1, alphabet=alphabet)
 
-        elif file_format == 'fastq':
+        elif file_format == "fastq":
             fastq_handler = ColorspaceFastqReader if colorspace else FastqReader
             return fastq_handler(file1, quality_base=quality_base, alphabet=alphabet)
 
-        elif file_format == 'sra-fastq' and colorspace:
+        elif file_format == "sra-fastq" and colorspace:
             return SRAColorspaceFastqReader(
                 file1, quality_base=quality_base, alphabet=alphabet
             )
@@ -1298,13 +1329,13 @@ def guess_format_from_name(path, raise_on_failure=False):
     if name:
         name, ext1, _ = splitext_compressed(name)
         ext = ext1.lower()
-        if ext in ['.fasta', '.fa', '.fna', '.csfasta', '.csfa']:
-            return 'fasta'
+        if ext in [".fasta", ".fa", ".fna", ".csfasta", ".csfa"]:
+            return "fasta"
 
-        elif ext in ['.fastq', '.fq'] or (ext == '.txt' and name.endswith('_sequence')):
-            return 'fastq'
+        elif ext in [".fastq", ".fq"] or (ext == ".txt" and name.endswith("_sequence")):
+            return "fastq"
 
-        elif ext in ('.sam', '.bam'):
+        elif ext in (".sam", ".bam"):
             return ext[1:]
 
     if raise_on_failure:
@@ -1358,22 +1389,22 @@ def create_seq_formatter(
         if qualities is True:
             # Format not recognized, but know we want to write reads with
             # qualities.
-            file_format = 'fastq'
+            file_format = "fastq"
         elif qualities is False:
             # Same, but we know that we want to write reads without qualities.
-            file_format = 'fasta'
+            file_format = "fasta"
         else:
             raise UnknownFileType("Could not determine file type.")
 
     else:
         file_format = file_format.lower()
-    if file_format in ('sam', 'fastq') and qualities is False:
+    if file_format in ("sam", "fastq") and qualities is False:
         raise ValueError(
             "Output format cannot be {} since no quality values are "
             "available.".format(file_format)
         )
 
-    if file_format == 'sam':
+    if file_format == "sam":
         if file2 is not None:
             raise ValueError("Only one output file allowed for SAM format")
 
@@ -1384,12 +1415,12 @@ def create_seq_formatter(
             return SingleEndSAMFormatter(file1)
 
     else:
-        if file_format == 'fasta':
+        if file_format == "fasta":
             if colorspace:
                 fmt = ColorspaceFastaFormat(line_length)
             else:
                 fmt = FastaFormat(line_length)
-        elif file_format == 'fastq':
+        elif file_format == "fastq":
             if colorspace:
                 fmt = ColorspaceFastqFormat()
             else:
