@@ -11,9 +11,9 @@ from atropos.io import STDOUT, xopen
 from atropos.io.compression import splitext_compressed
 from atropos.util import Summarizable, truncate_string, ALPHABETS
 
+SINGLE = 0
 READ1 = 1
 READ2 = 2
-SINGLE = READ1
 PAIRED = 1|2
 
 class FormatError(AtroposError):
