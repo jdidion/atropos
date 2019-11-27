@@ -275,7 +275,7 @@ class Timestamp:
 
     def __init__(self):
         self.dtime = datetime.now()
-        self.clock = time.clock()
+        self.process_time = time.process_time()
 
     def timestamp(self) -> float:
         """Returns the unix timestamp.
@@ -299,7 +299,7 @@ class Timestamp:
         """
         return dict(
             wallclock=max(minval, self.timestamp() - other.timestamp()),
-            cpu=max(minval, self.clock - other.clock),
+            cpu=max(minval, self.process_time - other.process_time),
         )
 
 
