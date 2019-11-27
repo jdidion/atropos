@@ -25,23 +25,23 @@ class Alphabet():
             valid_characters.add(default_character)
         self.valid_characters = valid_characters
         self.default_character = default_character
-    
+
     def __contains__(self, character):
         return character in self.valid_characters
-    
+
     def validate(self, character):
         """Raises NotInAlphabetError if the character is not in the alphabet.
         """
         if not character in self:
             raise NotInAlphabetError(character)
-    
+
     def validate_string(self, string):
         """Raises NotInAlphabetError if any character in 'string' is not in the
         alphabet.
         """
         for character in string:
             self.validate(character)
-        
+
     def resolve(self, character):
         """Returns 'character' if it's in the alphabet, otherwise the
         alphabet's default character.
@@ -50,7 +50,7 @@ class Alphabet():
             return character
         else:
             return self.default_character
-    
+
     def resolve_string(self, string):
         """Returns a new string with any non-alphabet characters replaced
         with the default character.
@@ -103,7 +103,7 @@ LOG2 = math.log(2)
 class RandomMatchProbability(object):
     """Class for computing random match probability for DNA sequences based on
     binomial expectation. Maintains a cache of factorials to speed computation.
-    
+
     Args:
         init_size: Initial cache size.
     """
@@ -112,15 +112,15 @@ class RandomMatchProbability(object):
         self.factorials = [1] * init_size
         self.max_n = 1
         self.cur_array_size = init_size
-    
+
     def __call__(self, matches, size, match_prob=0.25, mismatch_prob=0.75):
         """Computes the random-match probability for a given sequence size and
         number of matches.
-        
+
         Args:
             match_prob: Probability of two random bases matching.
             mismatch_prob: Probability of two random bases not matcing.
-        
+
         Returns:
             The probability.
         """
@@ -129,17 +129,17 @@ class RandomMatchProbability(object):
         prob = self.cache.get(key, None)
         if prob:
             return prob
-        
+
         # When there are no mismatches, the probability is
         # just that of observing a specific sequence of the
         # given length by chance.
         if matches == size:
             prob = match_prob ** matches
-        
+
         else:
             nfac = self.factorial(size)
             prob = 0.0
-            
+
             for i in range(matches, size+1):
                 j = size - i
                 # use integer division in the case that the numbers are too
@@ -149,10 +149,10 @@ class RandomMatchProbability(object):
                 except OverflowError:
                     div = nfac // self.factorial(i) // self.factorial(j)
                 prob += (mismatch_prob ** j) * (match_prob ** i) * div
-        
+
         self.cache[key] = prob
         return prob
-    
+
     def factorial(self, num):
         """Returns `num`!.
         """
@@ -191,23 +191,23 @@ class Summarizable(object):
 class Const(Mergeable):
     """A :class:`Mergeable` that is a constant value. Merging simply checks
     that two values are identical.
-    
+
     Args:
         value: The value to treat as a constant.
     """
     def __init__(self, value):
         self.value = value
-    
+
     def merge(self, other):
         """Check that `self==other`.
-        
+
         Raises:
             ValueError
         """
         if self != other:
             raise ValueError("{} != {}".format(self, other))
         return self
-    
+
     def __eq__(self, other):
         """Returns True if `self.value==other` (or `other.value` if `other` is
         a :class:`Const`).
@@ -215,7 +215,7 @@ class Const(Mergeable):
         if isinstance(other, Const):
             other = other.value
         return self.value == other
-    
+
     def __repr__(self):
         return str(self.value)
 
@@ -224,31 +224,31 @@ class Timestamp(object):
     """
     def __init__(self):
         self.dtime = datetime.now()
-        self.clock = time.clock()
-    
+        self.process_time = time.process_time()
+
     def timestamp(self):
         """Returns the unix timestamp.
         """
         return self.dtime.timestamp()
-    
+
     def isoformat(self):
         """Returns the datetime in ISO format.
         """
         return self.dtime.isoformat()
-    
+
     def __sub__(self, other, minval=0.01):
         """Subtract another timestamp from this one.
-        
+
         Args:
             other: The other timestamp.
             minval: The minimum difference.
-        
+
         Returns:
             A dict of {wallclock=<datetime_diff>, cpu=<clock_diff>}.
         """
         return dict(
             wallclock=max(minval, self.timestamp() - other.timestamp()),
-            cpu=max(minval, self.clock - other.clock))
+            cpu=max(minval, self.process_time - other.clock))
 
 class Timing(Summarizable):
     """Context manager that maintains timing information using
@@ -258,19 +258,19 @@ class Timing(Summarizable):
     def __init__(self):
         self.start_time = None
         self.cur_time = None
-    
+
     def __enter__(self):
         self.start_time = Timestamp()
         return self
-    
+
     def __exit__(self, exception_type, exception_value, traceback):
         self.update()
-    
+
     def update(self):
         """Set :attr:`self.cur_time` to the current time.
         """
         self.cur_time = Timestamp()
-    
+
     def summarize(self):
         """Returns a summary dict
         {start=<start_time>, wallclock=<datetime_diff>, cpu=<clock_diff>}.
@@ -284,7 +284,7 @@ class Timing(Summarizable):
 
 class CountingDict(dict, Mergeable, Summarizable):
     """A dictionary that always returns 0 on get of a missing key.
-    
+
     Args:
         sort_by: Whether summary is sorted by key (0) or value (1).
     """
@@ -295,15 +295,15 @@ class CountingDict(dict, Mergeable, Summarizable):
         if keys:
             for key in keys:
                 self.increment(key)
-    
+
     def __getitem__(self, name):
         return self.get(name, 0)
-    
+
     def increment(self, key, inc=1):
         """Increment the count of `key` by `inc`.
         """
         self[key] += inc
-    
+
     def merge(self, other):
         if not isinstance(other, CountingDict):
             raise ValueError(
@@ -311,13 +311,13 @@ class CountingDict(dict, Mergeable, Summarizable):
         for key, value in other.items():
             self[key] += value
         return self
-    
+
     def get_sorted_items(self):
         """Returns an iterable of (key, value) sorted according to this
         CountingDict's `sort_by` param.
         """
         return sorted(self.items(), key=lambda item: item[self.sort_by])
-    
+
     def summarize(self):
         """Returns an OrderedDict of sorted items.
         """
@@ -332,7 +332,7 @@ class Histogram(CountingDict):
         return dict(
             hist=hist,
             summary=self.get_summary_stats())
-    
+
     def get_summary_stats(self):
         """Returns dict with mean, median, and modes of histogram.
         """
@@ -347,19 +347,19 @@ class Histogram(CountingDict):
 
 class NestedDict(dict, Mergeable, Summarizable):
     """A dict that initalizes :class:`CountingDict`s for missing keys.
-    
+
     Args:
         shape: The flattened shape: 'long' or 'wide'.
     """
     def __init__(self, shape="wide"):
         super().__init__()
         self.shape = shape
-    
+
     def __getitem__(self, name):
         if name not in self:
             self[name] = CountingDict()
         return self.get(name)
-    
+
     def merge(self, other):
         if not isinstance(other, NestedDict):
             raise ValueError(
@@ -370,10 +370,10 @@ class NestedDict(dict, Mergeable, Summarizable):
             else:
                 self[key] = value
         return self
-    
+
     def summarize(self):
         """Returns a flattened version of the nested dict.
-        
+
         Returns:
             When `shape=='long'`, a list of (key1, key2, value) tuples.
             When `shape=='wide'`, a dict of
@@ -410,11 +410,11 @@ def merge_dicts(dest, src):
     """Merge corresponding items in `src` into `dest`. Values in `src` missing
     in `dest` are simply added to `dest`. Values that appear in both `src` and
     `dest` are merged using `merge_values`.
-    
+
     Args:
         dest: The dict to merge into.
         src: The dict to merge from.
-    
+
     Raises:
         ValueError if a value is not one of the accepted types.
     """
@@ -426,7 +426,7 @@ def merge_dicts(dest, src):
 
 def merge_values(v_dest, v_src):
     """Merge two values based on their types, as follows:
-    
+
     - Mergeable: merging is done by the dest object's merge function.
     - dict: merge_dicts is called recursively.
     - Number: values are summed.
@@ -434,11 +434,11 @@ def merge_values(v_dest, v_src):
     they must be the same length. Then, corresponding values are handled as
     above. The value is returned as a list.
     - Otherwise: Treated as a Const (i.e. must be identical).
-    
+
     Args:
         v_dest: The dest value.
         v_src: The src value.
-    
+
     Returns:
         The merged value.
     """
@@ -482,10 +482,10 @@ def reverse_complement(seq):
 
 def sequence_complexity(seq):
     """Computes a simple measure of sequence complexity.
-    
+
     Args:
         seq: The sequence to measure.
-    
+
     Returns:
         Complexity, as a value [0,2], where 0 = a homopolymer and
         2 = completely random.
@@ -502,12 +502,12 @@ def sequence_complexity(seq):
 
 def qual2int(qual, base=33):
     """Convert a quality charater to a phred-scale int.
-    
+
     Args:
         q: The quality value.
         base: The offset of the first quality value (Old Illumina = 64,
             new Illumina = 33).
-    
+
     Returns:
         The integer quality.
     """
@@ -515,12 +515,12 @@ def qual2int(qual, base=33):
 
 def quals2ints(quals, base=33):
     """Convert an iterable of quality characters to phred-scale ints.
-    
+
     Args:
         quals: The qualities.
         base: The offset of the first quality value (Old Illumina = 64,
             new Illumina = 33).
-    
+
     Returns:
         A tuple of integer qualities.
     """
@@ -533,14 +533,14 @@ def qual2prob(qchar):
 
 def enumerate_range(collection, start, end):
     """Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...
-    
+
     Only up to (start-end+1) items will be yielded.
-    
+
     Args:
         collection: The collection to enumerate.
         start: The starting index.
         end: The ending index.
-    
+
     Yields:
         (index, item) tuples.
     """
@@ -552,10 +552,10 @@ def enumerate_range(collection, start, end):
 
 def mean(values):
     """Computes the mean of a sequence of numeric values.
-    
+
     Args:
         values: Sequence of numeric values.
-    
+
     Returns:
         The mean (floating point).
     """
@@ -565,10 +565,10 @@ def mean(values):
 
 def weighted_mean(values, counts):
     """Computes the mean of a sequence of numeric values weighted by counts.
-    
+
     Args:
         values: Sequence of numeric values.
-    
+
     Returns:
         The weighted mean (floating point).
     """
@@ -606,26 +606,26 @@ def weighted_stdev(values, counts, mu0=None):
         mu0 = weighted_mean(values, counts)
     return math.sqrt(
         sum(
-            ((val - mu0) ** 2) * count 
-            for val, count in zip(values, counts)) / 
+            ((val - mu0) ** 2) * count
+            for val, count in zip(values, counts)) /
         sum(counts))
 
 def median(values):
     """Median function borrowed from python statistics module, and sped up by
     in-place sorting of the array.
-    
+
     Args:
         data: Sequence of numeric values.
-    
+
     Returns:
         The median (floating point).
     """
     datalen = len(values)
     if datalen == 0:
         raise ValueError("Cannot determine the median of an empty sequence")
-    
+
     values.sort()
-    
+
     idx = datalen // 2
     if datalen % 2 == 1:
         return values[idx]
@@ -634,12 +634,12 @@ def median(values):
 
 def weighted_median(values, counts):
     """Compute the median of `values` weighted by `counts`.
-    
+
     Args:
         values: Sequence of unique values.
         counts: Sequence of counts, where each count is the number of times the
             value at the corresponding position appears in the sample.
-    
+
     Returns:
         The weighted median.
     """
@@ -711,16 +711,16 @@ def truncate_string(string, max_len=100):
 
 def run_interruptible(func, *args, **kwargs):
     """Run a function, gracefully handling keyboard interrupts.
-    
+
     Args:
         func: The function to execute.
         args, kwargs: Positional and keyword arguments to pass to `func`.
-    
+
     Returns:
         A (unix-style) return code (0=normal, anything else is an error).
-    
+
     Raises:
-        
+
     """
     retcode = 0
     try:
