@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.24 (2019.11.27)
+
+* Fix #87 - Python 3.8 compatibility, time.clock removed
+
 v1.1.23 (2019.11.22)
 
 * Set minimum Python version to 3.4.5

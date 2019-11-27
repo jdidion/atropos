@@ -248,7 +248,7 @@ class Timestamp(object):
         """
         return dict(
             wallclock=max(minval, self.timestamp() - other.timestamp()),
-            cpu=max(minval, self.process_time - other.clock))
+            cpu=max(minval, self.process_time - other.process_time))
 
 class Timing(Summarizable):
     """Context manager that maintains timing information using
