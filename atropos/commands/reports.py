@@ -1,177 +1,190 @@
 """Interface to report generation.
 """
-from enum import Enum
-import importlib
-import os
+from abc import ABCMeta, abstractmethod
+from importlib import import_module
 from pathlib import Path
+from typing import Dict, IO, Optional, Sequence, Type
 
 from xphyle import STDOUT, STDERR, open_
 
 from atropos.io.seqio import InputRead
 
 
-class Serializer(Enum):
-    JSON = ('json', 't')
-    YAML = ('yaml', 't')
-    PICKLE = ('pickle', 'b')
+class ReportWriter(metaclass=ABCMeta):
+    def __init__(self, output_file: Path, options=None, **kwargs):
+        self.output_file = output_file
 
-    def __init__(self, name: str, mode: str):
+    def __call__(self, summary: dict):
+        with open_(self.output_file, "wt") as stream:
+            self.serialize(summary, stream)
+
+    @abstractmethod
+    def serialize(self, summary: dict, stream: IO):
+        pass
+
+
+class ReportWriterFactory:
+    def __init__(
+        self,
+        name: str,
+        cls: Type[ReportWriter],
+        ext: Optional[str] = None,
+        default: bool = False,
+        **kwargs
+    ):
         self.name = name
-        self.mode = mode
+        self.cls = cls
+        self.ext = ext if ext is not None else name
+        self.default = default
+        self.kwargs = kwargs
 
-    def serialize(self, obj, outfile: Path, **kwargs) -> None:
-        """Serialize a summary dict to a file.
+    def __call__(self, output_file: Path, options):
+        return self.cls(output_file, name=self.name, options=options, **self.kwargs)
 
-        Args:
-            obj: The summary dict.
-            outfile: The output file.
-            kwargs: Additional arguments to pass to the `dump` method.
+
+class TemplateReportWriter(ReportWriter):
+    """
+    Args:
+        output_file: Where to write the report.
+        name: Report format. Must match the file extension on a discoverable
+            template.
+        template_name: A template name to use, rather than auto-discover.
+        template_paths: Sequence of paths to search for templates.
+        template_globals: Dict of additional globals to add to the template
+            environment.
+    """
+    def __init__(
+        self,
+        output_file: Path,
+        name: str = "txt",
+        template_name: Optional[str] = None,
+        template_paths: Sequence[Path] = None,
+        template_globals: Optional[dict] = None,
+        **_
+    ):
+        super().__init__(output_file)
+        self.name = name
+        self.template_name = template_name
+        self.template_paths = template_paths
+        self.template_globals = template_globals
+
+    def serialize(self, summary: dict, stream: IO):
         """
-        mod = importlib.import_module(self.name)
-        with open_(outfile, 'w' + self.mode) as stream:
-            mod.dump(obj, stream, **kwargs)
+        Generate a report using Jinja2.
+        """
+        import jinja2
+
+        template_name = self.template_name or f"template.{self.name}"
+        template_paths = self.template_paths or []
+        if hasattr(self, "template_path"):
+            template_paths.append(self.template_path)
+
+        try:
+            env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_paths))
+            if self.template_globals:
+                env.globals.update(self.template_globals)
+            template = env.get_template(template_name)
+        except:
+            raise IOError(f"Could not load template file '{template_name}'")
+
+        stream.write(template.render(summary=summary))
+
+
+class DumpReportWriter(ReportWriter):
+    def __init__(self, output_file: Path, name: str, options, **kwargs):
+        super().__init__(output_file)
+        self.mod_name = name
+        self.kwargs = kwargs
+
+    def serialize(self, summary: dict, stream: IO):
+        mod = import_module(self.mod_name)
+        mod.dump(summary, stream, **self.kwargs)
 
 
 class BaseReportGenerator:
-    """Base class for command report generators.
+    """
+    Base class for command report generators.
 
     Args:
         options: Command-line options.
     """
 
-    def __init__(self, options):
+    def __init__(self, options, available_formats: Dict[str, ReportWriterFactory]):
         report_file = options.report_file
         report_formats = options.report_formats
-        if report_file in (STDOUT, STDERR):
-            self.report_formats = report_formats or ('txt',)
-            self.report_files = (report_file,) * len(self.report_formats)
-        else:
-            file_parts = os.path.splitext(report_file)
-            self.report_formats = (
-                report_formats or (file_parts[1][1:] if file_parts[1] else 'txt',)
-            )
-            if len(self.report_formats) == 1:
-                self.report_files = (report_file,)
-            else:
-                self.report_files = (
-                    '{}.{}'.format(report_file, fmt) for fmt in self.report_formats
-                )
-        self.report_args = tuple(
-            self.get_report_args(fmt, options) for fmt in self.report_formats
-        )
+        default_formats = [
+            fmt for fmt, factory in available_formats.items() if factory.default
+        ]
 
-    def get_report_args(self, fmt, options) -> dict:
-        """Returns report-specific options dict.
-        """
-        return {}
+        if report_file in (STDOUT, STDERR):
+            if not report_formats:
+                report_formats = default_formats
+            self.report_formats = [
+                available_formats[fmt](report_file, options)
+                for fmt in report_formats
+            ]
+        else:
+            if not report_formats:
+                ext = report_file.suffix
+                if ext:
+                    report_formats = (ext[1:],)
+                else:
+                    report_formats = default_formats
+
+            if len(report_formats) == 1:
+                self.report_formats = [
+                    available_formats[report_formats[0]](report_file, options)
+                ]
+            else:
+                self.report_formats = [
+                    factory(Path(f"{report_file}.{factory.ext}"), options)
+                    for factory in (available_formats[fmt] for fmt in report_formats)
+                ]
 
     def generate_reports(self, summary: dict):
-        """Generate report(s) from a summary.
+        """
+        Generate report(s) from a summary.
 
         Args:
             summary: The summary dict.
         """
-        BaseReportGenerator.add_derived_data(summary)
-        for fmt, outfile, kwargs in zip(
-            self.report_formats, self.report_files, self.report_args
-        ):
-            try:
-                serializer = Serializer[fmt.upper]
-                serializer.serialize(summary, outfile, **kwargs)
-            except KeyError:
-                self.generate_text_report(fmt, summary, outfile, **kwargs)
+        self.add_derived_data(summary)
+        for fmt in self.report_formats:
+            fmt(summary)
 
     @staticmethod
     def add_derived_data(summary: dict) -> None:
-        """Get some additional fields that are useful in the report.
+        """
+        Get some additional fields that are useful in the report.
         """
         derived = {
-            'mean_sequence_lengths': tuple(
-                None if bp is None else bp / summary['total_record_count']
-                for bp in summary['total_bp_counts']
+            "mean_sequence_lengths": tuple(
+                None if bp is None else bp / summary["total_record_count"]
+                for bp in summary["total_bp_counts"]
             )
         }
-        inp = summary['input']
-        fmt = inp['file_format']
-        if inp['input_read'] == InputRead.PAIRED:
-            fmt += ', Paired'
+        inp = summary["input"]
+        fmt = inp["file_format"]
+        if inp["input_read"] == InputRead.PAIRED:
+            fmt += ", Paired"
         else:
-            fmt += ', Read {}'.format(inp['input_read'])
-        if inp['colorspace']:
-            fmt += ', Colorspace'
-        if inp['interleaved']:
-            fmt += ', Interleaved'
-        if inp['delivers_qualities']:
-            fmt += ', w/ Qualities'
+            fmt += ", Read {}".format(inp["input_read"])
+        if inp["colorspace"]:
+            fmt += ", Colorspace"
+        if inp["interleaved"]:
+            fmt += ", Interleaved"
+        if inp["delivers_qualities"]:
+            fmt += ", w/ Qualities"
         else:
-            fmt += ', w/o Qualities'
-        derived['input_format'] = fmt
-        summary['derived'] = derived
-
-    def generate_text_report(self, fmt, summary, outfile, **kwargs):
-        """Generate a text report. By default, calls generate_from_template.
-        """
-        self.generate_from_template(fmt, summary, outfile, **kwargs)
-
-    def generate_from_template(
-        self,
-        fmt: str,
-        summary,
-        outfile: Path,
-        template_name: str = None,
-        template_paths=None,
-        template_globals=None,
-    ):
-        """Generate a report using Jinja2.
-
-        Args:
-            fmt: Report format. Must match the file extension on a discoverable
-                template.
-            summary: The summary dict.
-            outfile: The output file name/prefix.
-            template_name: A template name to use, rather than auto-discover.
-            template_paths: Sequence of paths to search for templates.
-            template_globals: Dict of additional globals to add to the template
-                environment.
-        """
-        import jinja2
-
-        if not template_name:
-            template_name = 'template.{}'.format(fmt)
-        if not template_paths:
-            template_paths = []
-        if hasattr(self, 'template_path'):
-            template_paths.append(self.template_path)
-        # Load the report template
-        try:
-            env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_paths))
-            if template_globals:
-                env.globals.update(template_globals)
-            template = env.get_template(template_name)
-        except:
-            raise IOError(f"Could not load template file '{template_name}'")
-
-        # Render the template
-        report_output = template.render(summary=summary)
-        # Write to output
-        is_path = isinstance(outfile, str)
-        if is_path:
-            outfile = open(outfile, 'wt', encoding='utf-8')
-        else:
-            report_output = report_output.encode('utf-8')
-        try:
-            print(report_output, file=outfile)
-        except IOError as err:
-            raise IOError("Could not print report to '{}' - {}".format(outfile, err))
-
-        finally:
-            if is_path:
-                outfile.close()
+            fmt += ", w/o Qualities"
+        derived["input_format"] = fmt
+        summary["derived"] = derived
 
 
-def prettyprint_summary(summary: dict, outfile: Path = Path('summary.dump.txt')):
+def prettyprint_summary(summary: dict, outfile: Path = Path("summary.dump.txt")):
     """Pretty-print the summary to a file. Mostly used for debugging.
     """
     from pprint import pprint
-    with open(outfile, 'w') as out:
+
+    with open_(outfile, "w") as out:
         pprint(summary, out)

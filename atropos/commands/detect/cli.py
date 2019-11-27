@@ -12,7 +12,7 @@ from xphyle import STDOUT, STDERR
 
 
 class CommandParser(BaseCommandParser):
-    name = 'detect'
+    name = "detect"
     usage = """
 atropos detect -se input.fastq
 atropos detect -pe1 in1.fq -pe2 in2.fq
@@ -30,10 +30,9 @@ you don't know what are the adapter sequences.
         group.add_argument(
             "-d",
             "--detector",
-            choices=('known', 'heuristic', 'khmer'),
+            choices=("known", "heuristic", "khmer"),
             default=None,
-            help="Which detector to use. (automatically choose based on other "
-            "options)",
+            help="Which detector to use. (automatically choose based on other options)",
         )
         group.add_argument(
             "-k",
@@ -46,28 +45,27 @@ you don't know what are the adapter sequences.
             "-e",
             "--past-end-bases",
             nargs="*",
-            default=('A',),
-            help="On Illumina, long runs of A (and sometimes other bases) "
-            "can signify that the sequencer has read past the end of a "
-            "fragment that is shorter than the read length + adapter "
-            "length. Those bases will be removed from any sequencers "
-            "before looking for matching contaminants. Can also be a "
+            default=("A",),
+            help="On Illumina, long runs of A (and sometimes other bases) can signify "
+            "that the sequencer has read past the end of a fragment that is shorter "
+            "than the read length + adapter length. Those bases will be removed from "
+            "any sequencers before looking for matching contaminants. Can also be a "
             "regular expression.",
         )
         group.add_argument(
             "-i",
             "--include-contaminants",
-            choices=('all', 'known', 'unknown'),
-            default='all',
+            choices=("all", "known", "unknown"),
+            default="all",
             help="What conaminants to search for: all, only known "
-            "adapters/contaminants ('known'), or only unknown "
-            "contaminants ('unknown'). (all)",
+            "adapters/contaminants ('known'), or only unknown contaminants "
+            "('unknown'). (all)",
         )
         group.add_argument(
             "-x",
             "--known-contaminant",
             action="append",
-            dest='known_adapter',
+            dest="known_adapter",
             default=None,
             help="Pass known contaminants in on the commandline as "
             "'name=sequence'. Can be specified multiple times.",
@@ -77,7 +75,7 @@ you don't know what are the adapter sequences.
             "--known-contaminants-file",
             type=readable_url,
             action="append",
-            dest='known_adapters_file',
+            dest="known_adapters_file",
             default=None,
             help="Points to FASTA File or URL with known contaminants.",
         )
@@ -92,8 +90,8 @@ you don't know what are the adapter sequences.
         group.add_argument(
             "--contaminant-cache-file",
             type=readwriteable_file,
-            dest='adapter_cache_file',
-            default='.adapters',
+            dest="adapter_cache_file",
+            default=".adapters",
             help="File where known contaminant sequences will be cached, "
             "unless --no-cache-contaminants is set.",
         )
@@ -134,7 +132,7 @@ you don't know what are the adapter sequences.
             type=writeable_file,
             default=STDOUT,
             metavar="FILE",
-            help="File in which to write the summary of detected adapters. " "(stdout)",
+            help="File in which to write the summary of detected adapters. (stdout)",
         )
         group.add_argument(
             "-O",
@@ -144,14 +142,12 @@ you don't know what are the adapter sequences.
             default=None,
             metavar="FORMAT",
             dest="report_formats",
-            help="Report type(s) to generate. If multiple, '--output' "
-            "is treated as a prefix and the appropriate extensions are "
-            "appended. If unspecified, the format is guessed from the "
-            "file extension. Supported formats are: txt, json, yaml, "
-            "pickle, fasta. Additional arguments for fasta output are "
-            "provided via the '--fasta' option. See the documentation "
-            "for a full description of the structured output "
-            "(json/yaml/pickle formats).",
+            help="Report type(s) to generate. If multiple, '--output' is treated as a "
+            "prefix and the appropriate extensions are appended. If unspecified, the "
+            "format is guessed from the file extension. Supported formats are: txt, "
+            "json, yaml, pickle, fasta. Additional arguments for fasta output are "
+            "provided via the '--fasta' option. See the documentation for a full "
+            "description of the structured output (json/yaml/pickle formats).",
         )
         group.add_argument(
             "--fasta",
@@ -159,29 +155,28 @@ you don't know what are the adapter sequences.
             choices=("union", "perinput"),
             default=None,
             metavar="OPTIONS",
-            help="Additional arguments for fasta output. Adds 'fasta' to the "
-            "list of output formats if not already specified. Options "
-            "are: perinput=generate one output file per input file, "
-            "union=generate a single output file with all sequences "
-            "merged.",
+            help="Additional arguments for fasta output. Adds 'fasta' to the list of "
+            "output formats if not already specified. Options are: perinput=generate "
+            "one output file per input file, union=generate a single output file with "
+            "all sequences merged.",
         )
         group.add_argument(
             "-m",
             "--max-adapters",
             type=positive(),
             default=None,
-            help="The maximum number of candidate adapters to report. " "(report all)",
+            help="The maximum number of candidate adapters to report. (report all)",
         )
 
     def validate_command_options(self, options):
         options.report_file = options.output
         is_std = options.report_file in {STDOUT, STDERR}
         if options.fasta:
-            if is_std and 'perinput' in options.fasta:
+            if is_std and "perinput" in options.fasta:
                 self.parser.error("Per-input fasta cannot be written to stdout")
             if not options.report_formats:
-                options.report_formats = ['fasta']
-            elif 'fasta' not in options.report_formats:
-                options.report_formats = list(options.report_formats) + ['fasta']
-        elif is_std and options.report_formats and 'fasta' in options.report_formats:
-            options.fasta = ['union']
+                options.report_formats = ["fasta"]
+            elif "fasta" not in options.report_formats:
+                options.report_formats = list(options.report_formats) + ["fasta"]
+        elif is_std and options.report_formats and "fasta" in options.report_formats:
+            options.fasta = ["union"]

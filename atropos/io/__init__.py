@@ -175,6 +175,13 @@ class ColorspaceSequence(Sequence):
             sequence = sequence[1:]
         else:
             self.primer = primer
+
+        if self.primer not in ("A", "C", "G", "T"):
+            raise FormatError(
+                "Primer base is {0!r} in read {1!r}, but it should be one of "
+                "A, C, G, T.".format(self.primer, truncate_string(name))
+            )
+
         if qualities is not None and len(sequence) != len(qualities):
             rname = truncate_string(name)
             raise FormatError(
@@ -182,6 +189,7 @@ class ColorspaceSequence(Sequence):
                 "sequence ({1}) and length of read ({2}) do not match (primer "
                 "is: {3!r})".format(rname, len(qualities), len(sequence), self.primer)
             )
+
         super().__init__(
             name,
             sequence,
@@ -195,11 +203,6 @@ class ColorspaceSequence(Sequence):
             merged,
             corrected,
         )
-        if not self.primer in ("A", "C", "G", "T"):
-            raise FormatError(
-                "Primer base is {0!r} in read {1!r}, but it should be one of "
-                "A, C, G, T.".format(self.primer, truncate_string(name))
-            )
 
     def __repr__(self):
         fmt_str = "<ColorspaceSequence(name={0!r}, primer={1!r}, sequence={2!r}{3})>"

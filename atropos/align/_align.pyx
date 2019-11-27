@@ -194,8 +194,16 @@ cdef class Aligner:
     cdef bytes _reference  # TODO rename to translated_reference or so
     cdef str str_reference
 
-    def __cinit__(self, str reference, double max_error_rate, int flags=SEMIGLOBAL, bint wildcard_ref=False,
-                  bint wildcard_query=False, int min_overlap=1, int indel_cost=1):
+    def __cinit__(
+        self,
+        str reference,
+        double max_error_rate,
+        int flags=SEMIGLOBAL,
+        bint wildcard_ref=False,
+        bint wildcard_query=False,
+        int min_overlap=1,
+        int indel_cost=1
+    ):
         self.max_error_rate = max_error_rate
         self.flags = flags
         self.wildcard_ref = wildcard_ref
@@ -206,7 +214,7 @@ cdef class Aligner:
         self.indel_cost = indel_cost
         self.debug = False
         self._dpmatrix = None
-    
+
     property min_overlap:
         def __get__(self):
             return self._min_overlap
@@ -420,15 +428,15 @@ cdef class Aligner:
                     column[i].cost = cost
                     column[i].origin = origin
                     column[i].matches = matches
-                
+
                 if self.debug:
                     with gil:
                         for i in range(last + 1):
                             self._dpmatrix.set_entry(i, j, column[i].cost)
-                
+
                 while last >= 0 and column[last].cost > k:
                     last -= 1
-                
+
                 # last can be -1 here, but will be incremented next.
                 # TODO if last is -1, can we stop searching?
                 if last < m:
@@ -468,7 +476,7 @@ cdef class Aligner:
                     best.origin = column[i].origin
                     best.ref_stop = i
                     best.query_stop = n
-        
+
         if best.cost == m + n:
             # best.cost was initialized with this value.
             # If it is unchanged, no alignment was found that has
@@ -554,14 +562,14 @@ cdef class MultiAligner:
     cdef int _min_overlap
     cdef int _num_cols
     cdef int _num_matches
-    
+
     def __cinit__(self, double max_error_rate, int flags=SEMIGLOBAL, int min_overlap=1):
         self.max_error_rate = max_error_rate
         self.flags = flags
         self._min_overlap = min_overlap
         self._num_cols = 0
         self._num_matches = 0
-    
+
     def _resize_matrix(self, size):
         if size > self._num_cols:
             mem = <_Entry*> PyMem_Realloc(self.column, (size + 1) * sizeof(_Entry))
@@ -569,7 +577,7 @@ cdef class MultiAligner:
                 raise MemoryError()
             self.column = mem
             self._num_cols = size
-    
+
     def _resize_matches(self, size):
         if size > self._num_matches:
             mem = <_Match*> PyMem_Realloc(self.match_array, (size + 1) * sizeof(_Match))
@@ -577,7 +585,7 @@ cdef class MultiAligner:
                 raise MemoryError()
             self.match_array = mem
             self._num_matches = size
-    
+
     def locate(self, str reference, str query, int max_matches=100):
         """
         locate(query) -> (refstart, refstop, querystart, querystop, matches, errors)
@@ -593,22 +601,22 @@ cdef class MultiAligner:
         The alignment itself is not returned.
         """
         cdef int m = len(reference)
-        
+
         self._resize_matrix(m)
         self._resize_matches(max_matches)
-        
+
         cdef bytes reference_bytes = reference.encode('ascii')
         cdef char* s1 = reference_bytes
-        
+
         cdef bytes query_bytes = query.encode('ascii')
         cdef char* s2 = query_bytes
         cdef int n = len(query)
-        
+
         cdef _Match* match_array = self.match_array
         cdef int num_matches = 0
         cdef int exact_match = -1
         cdef int max_cost = m + n
-        
+
         cdef _Entry* column = self.column
         cdef double max_error_rate = self.max_error_rate
         cdef bint start_in_ref = self.flags & START_WITHIN_SEQ1
@@ -667,19 +675,19 @@ cdef class MultiAligner:
             for j in range(min_n + 1, max_n + 1):
                 # remember first entry
                 tmp_entry = column[0]
-                
+
                 # fill in first entry in this column
                 if start_in_query:
                     column[0].origin = j
                 else:
                     column[0].cost = j * OVERHANG_MULTIPLIER
-                
+
                 for i in range(1, last + 1):
                     characters_equal = (s1[i-1] == s2[j-1])
-                    
+
                     # TODO: this is where we can do qulity-based weighting
                     # (i.e., add some transformation of Q, rather than 1)
-                    
+
                     if characters_equal:
                         # Characters match: This cannot be an indel.
                         cost = tmp_entry.cost
@@ -690,17 +698,17 @@ cdef class MultiAligner:
                         cost = tmp_entry.cost + 1
                         origin = tmp_entry.origin
                         matches = tmp_entry.matches
-                    
+
                     # remember current cell for next iteration
                     tmp_entry = column[i]
-                    
+
                     column[i].cost = cost
                     column[i].origin = origin
                     column[i].matches = matches
-                                
+
                 while last >= 0 and column[last].cost > k:
                     last -= 1
-                
+
                 # last can be -1 here, but will be incremented next.
                 # TODO if last is -1, can we stop searching?
                 if last < m:
@@ -711,17 +719,17 @@ cdef class MultiAligner:
                     cost = column[m].cost
                     if cost > max_cost:
                         continue
-                    
+
                     length = m + min(column[m].origin, 0)
                     if length >= self._min_overlap and cost <= length * max_error_rate:
                         matches = column[m].matches
-                        
+
                         match_array[num_matches].ref_stop = m
                         match_array[num_matches].query_stop = j
                         match_array[num_matches].cost = cost
                         match_array[num_matches].origin = column[m].origin
                         match_array[num_matches].matches = matches
-                        
+
                         if cost == 0 and matches == m:
                             # exact match, stop early
                             exact_match = num_matches
@@ -739,7 +747,7 @@ cdef class MultiAligner:
                         cost = column[i].cost
                         if cost > max_cost:
                             continue
-                        
+
                         length = i + min(column[i].origin, 0)
                         if length >= self._min_overlap and cost <= length * max_error_rate:
                             # update best
@@ -749,14 +757,14 @@ cdef class MultiAligner:
                             match_array[num_matches].origin = column[i].origin
                             match_array[num_matches].matches = column[i].matches
                             num_matches += 1
-        
+
         if num_matches == 0:
             result = None
         elif exact_match >= 0:
             result = [self._create_match(match_array[exact_match])]
         else:
             result = [self._create_match(match_array[i]) for i in range(num_matches)]
-        
+
         return result
 
     def _create_match(self, _Match _match):

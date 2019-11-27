@@ -1,12 +1,12 @@
 # coding: utf-8
-from atropos.adapters import Adapter, ColorspaceAdapter, PREFIX, BACK
+from atropos.adapters import Adapter, AdapterType, ColorspaceAdapter
 from atropos.commands.trim.modifiers import AdapterCutter
 from atropos.io.seqio import ColorspaceSequence, Sequence
 
 
 def test_cs_5p():
     read = ColorspaceSequence("name", "0123", "DEFG", "T")
-    adapter = ColorspaceAdapter("CG", PREFIX, 0.1)
+    adapter = ColorspaceAdapter("CG", AdapterType.PREFIX, 0.1)
     cutter = AdapterCutter([adapter])
     cutter(read)
 
@@ -15,7 +15,7 @@ def test_cs_5p():
 # an exception
 def test_statistics():
     read = Sequence("name", "AAAACCCCAAAA")
-    adapters = [Adapter("CCCC", BACK, 0.1)]
+    adapters = [Adapter("CCCC", AdapterType.BACK, 0.1)]
     cutter = AdapterCutter(adapters, times=3)
     cutter(read)
     # TODO make this a lot simpler

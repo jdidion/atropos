@@ -13,7 +13,7 @@ from typing import (
 
 import xphyle
 
-from atropos.adapters import AdapterParser, BACK
+from atropos.adapters import AdapterParser, AdapterType
 from atropos.commands.base import (
     BaseCommandRunner,
     Summary,

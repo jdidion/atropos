@@ -4,7 +4,7 @@ from atropos.commands.trim.modifiers import *
 from atropos.io.seqio import Sequence
 from atropos.util import reverse_complement as rc
 
-DUMMY_ADAPTER = Adapter("ACGT", FRONT)
+DUMMY_ADAPTER = Adapter("ACGT", AdapterType.FRONT)
 
 
 def front_match(read):

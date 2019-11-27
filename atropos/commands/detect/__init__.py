@@ -1,17 +1,20 @@
 """Detect adapter sequences directly from reads based on kmer frequency.
 """
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from enum import IntFlag
 import logging
 import math
 import re
-from typing import Optional
+from typing import Iterable, Optional, Sequence as SequenceType, Union
 
 from atropos.align import Aligner, SEMIGLOBAL
 from atropos.commands.base import (
     BaseCommandRunner,
     Pipeline,
-    SingleEndPipelineMixin,
     PairedEndPipelineMixin,
+    SingleEndPipelineMixin,
+    Summary
 )
 from atropos.io.seqio import Sequence
 from atropos.util import (
@@ -64,14 +67,17 @@ class CommandRunner(BaseCommandRunner):
         kmer_size = self.kmer_size or 12
         n_reads = self.max_reads
         overrep_cutoff = 100
-        include = self.include_contaminants or "all"
+        if self.include_contaminants:
+            include = Include(self.include_contaminants.upper())
+        else:
+            include = Include.ALL
         known_contaminants = None
-        if include != "unknown":
+        if include != Include.UNKNOWN:
             known_contaminants = self.load_known_adapters()
 
         detector = self.detector
         if not detector:
-            if known_contaminants and include == "known":
+            if known_contaminants and include == Include.KNOWN:
                 detector = "known"
             elif n_reads <= 50000:
                 detector = "heuristic"
@@ -134,126 +140,6 @@ class CommandRunner(BaseCommandRunner):
         return run_interruptible(detector, self, raise_on_error=True)
 
 
-class Match(object):
-    """A contaminant match.
-
-    Args:
-        seq_or_contam: The matched sequence.
-        count: The number of matches.
-        names: The name(s) of matching contaminant(s).
-        match_frac: The fraction of contaminant kmers that match.
-        match_frac2: The fraction of sequence kmers that match.
-        reads: The number of reads with the contaminant.
-    """
-
-    def __init__(
-        self,
-        seq_or_contam,
-        count=0,
-        names=None,
-        match_frac=None,
-        match_frac2=None,
-        abundance=None,
-        reads=None,
-    ):
-        if isinstance(seq_or_contam, ContaminantMatcher):
-            self.seq = seq_or_contam.seq
-            self.count = int(seq_or_contam.matches)
-            self.names = tuple(seq_or_contam.names)
-            self.known_seqs = [seq_or_contam.seq]
-        else:
-            self.seq = seq_or_contam
-            self.count = count
-            self.names = tuple(names) if names else None
-            self.known_seqs = None
-        self.match_frac = match_frac
-        self.match_frac2 = match_frac2
-        self.abundance = abundance
-        self.longest_match = None
-        if reads:
-            self.set_longest_match(reads)
-
-    def __len__(self):
-        return len(self.seq)
-
-    def __repr__(self):
-        if self.is_known:
-            return "{} => {} ({}))".format(self.seq, self.names, self.known_seqs)
-
-        else:
-            return self.seq
-
-    @property
-    def seq_complexity(self):
-        """The complexity of the sequence (0=homopolymer, 2=random).
-        """
-        return sequence_complexity(self.seq)
-
-    @property
-    def count_is_frequency(self):
-        """Whether `self.count` represents a frequency.
-        """
-        return isinstance(self.count, float)
-
-    def set_contaminant(self, contam, match_frac, match_frac2=None):
-        """Set the known contaminant from a :class:`ContaminantMatcher`.
-        """
-        self.set_known(contam.names, [contam.seq], match_frac, match_frac2)
-
-    def set_known(self, names, seqs, match_frac, match_frac2=None):
-        """Set the known contaminant.
-        """
-        self.names = tuple(names) if names else None
-        self.known_seqs = seqs
-        self.match_frac = match_frac
-        self.match_frac2 = match_frac2
-
-    @property
-    def is_known(self):
-        """Whether the matching sequence is a known contaminant.
-        """
-        return self.known_seqs is not None
-
-    def set_longest_match(self, sequences):
-        """Set the longest matching sequence from a set of sequences.
-        """
-        for seq in sequences:
-            idx = seq.index(self.seq)
-            seqlen = len(self.seq) - idx
-            if self.longest_match is None or self.longest_match[1] < seqlen:
-                self.longest_match = (seq[idx:], seqlen)
-
-    def estimate_abundance(self, read_sequences):
-        """Determine whether this match's sequence is within 'seq' by simple
-        exact string comparison.
-        """
-        self.abundance = sum(1 for read_seq in read_sequences if self.seq in read_seq)
-
-    def summarize(self):
-        summary = dict(
-            longest_kmer=self.seq,
-            kmer_freq=self.count,
-            kmer_freq_type="frequency" if self.count_is_frequency else "count",
-            abundance=self.abundance,
-            is_known=self.is_known,
-            known_to_contaminant_match_frac=None,
-            contaminant_to_known_match_frac=None,
-            longest_match=None,
-            known_names=None,
-            known_seqs=None,
-        )
-        if self.longest_match:
-            summary.update(longest_match=self.longest_match[0])
-        if self.is_known:
-            summary.update(
-                known_to_contaminant_match_frac=self.match_frac,
-                contaminant_to_known_match_frac=self.match_frac2,
-                known_names=self.names,
-                known_seqs=self.known_seqs,
-            )
-        return summary
-
-
 class ContaminantMatcher(object):
     """Matches a known contaminant against other sequences.
 
@@ -263,7 +149,23 @@ class ContaminantMatcher(object):
         kmer_size: kmer size.
     """
 
-    def __init__(self, seq, names, kmer_size):
+    @staticmethod
+    def create(contaminants, kmer_size) -> SequenceType["ContaminantMatcher"]:
+        """Create :class:`ContaminantMatcher`s from sequences.
+
+        Args:
+            contaminants: A dict of {seq:names}.
+            kmer_size: The kmer size.
+
+        Returns:
+            A list of :class:`ContaminantMatcher`s.
+        """
+        return [
+            ContaminantMatcher(seq, names, kmer_size)
+            for seq, names in contaminants.sequence_name_pairs
+        ]
+
+    def __init__(self, seq: str, names, kmer_size: int):
         self.seq = seq
         self.names = names
         self.kmers = set(
@@ -311,24 +213,150 @@ class ContaminantMatcher(object):
         return match_frac1, match_frac2, compare_seq
 
 
-def create_contaminant_matchers(contaminants, kmer_size):
-    """Create :class:`ContaminantMatcher`s from sequences.
+class Match:
+    """A contaminant match.
 
     Args:
-        contaminants: A dict of {seq:names}.
-        kmer_size: The kmer size.
-
-    Returns:
-        A list of :class:`ContaminantMatcher`s.
+        seq_or_contam: The matched sequence.
+        count: The number of matches.
+        names: The name(s) of matching contaminant(s).
+        match_frac: The fraction of contaminant kmers that match.
+        match_frac2: The fraction of sequence kmers that match.
+        reads: The number of reads with the contaminant.
     """
-    return [
-        ContaminantMatcher(seq, names, kmer_size)
-        for seq, names in contaminants.iter_sequences()
-    ]
+
+    def __init__(
+        self,
+        seq_or_contam: Union[str, ContaminantMatcher],
+        count: int = 0,
+        names: Optional[Sequence[str]] = None,
+        match_frac: Optional[float] = None,
+        match_frac2: Optional[float] = None,
+        abundance: Optional[float] = None,
+        reads: Optional[Iterable[str]] = None,
+    ):
+        if isinstance(seq_or_contam, ContaminantMatcher):
+            self.seq = seq_or_contam.seq
+            self.count = int(seq_or_contam.matches)
+            self.names = tuple(seq_or_contam.names)
+            self.known_seqs = [seq_or_contam.seq]
+        else:
+            self.seq = seq_or_contam
+            self.count = count
+            self.names = tuple(names) if names else None
+            self.known_seqs = None
+        self.match_frac = match_frac
+        self.match_frac2 = match_frac2
+        self.abundance = abundance
+        self.longest_match = None
+        if reads:
+            self.set_longest_match(reads)
+
+    def __len__(self) -> int:
+        return len(self.seq)
+
+    def __repr__(self) -> str:
+        if self.is_known:
+            return "{} => {} ({}))".format(self.seq, self.names, self.known_seqs)
+
+        else:
+            return self.seq
+
+    @property
+    def seq_complexity(self) -> float:
+        """
+        The complexity of the sequence (0=homopolymer, 2=random).
+        """
+        return sequence_complexity(self.seq)
+
+    @property
+    def count_is_frequency(self) -> bool:
+        """Whether `self.count` represents a frequency.
+        """
+        return isinstance(self.count, float)
+
+    def set_contaminant(
+        self,
+        contam: ContaminantMatcher,
+        match_frac: float,
+        match_frac2: Optional[float] = None
+    ):
+        """
+        Set the known contaminant from a :class:`ContaminantMatcher`.
+        """
+        self.set_known(contam.names, [contam.seq], match_frac, match_frac2)
+
+    def set_known(
+        self,
+        names: Iterable[str],
+        seqs: Sequence[str],
+        match_frac: float,
+        match_frac2: Optional[float] = None
+    ):
+        """
+        Sets the known contaminant.
+        """
+        self.names = tuple(names) if names else None
+        self.known_seqs = seqs
+        self.match_frac = match_frac
+        self.match_frac2 = match_frac2
+
+    @property
+    def is_known(self) -> bool:
+        """Whether the matching sequence is a known contaminant.
+        """
+        return self.known_seqs is not None
+
+    def set_longest_match(self, sequences: Iterable[str]):
+        """
+        Set the longest matching sequence from a set of sequences.
+        """
+        for seq in sequences:
+            idx = seq.index(self.seq)
+            seqlen = len(self.seq) - idx
+            if self.longest_match is None or self.longest_match[1] < seqlen:
+                self.longest_match = (seq[idx:], seqlen)
+
+    def estimate_abundance(self, read_sequences: Iterable[str]):
+        """Determine whether this match's sequence is within 'seq' by simple
+        exact string comparison.
+        """
+        self.abundance = sum(1 for read_seq in read_sequences if self.seq in read_seq)
+
+    def summarize(self) -> dict:
+        summary = dict(
+            longest_kmer=self.seq,
+            kmer_freq=self.count,
+            kmer_freq_type="frequency" if self.count_is_frequency else "count",
+            abundance=self.abundance,
+            is_known=self.is_known,
+            known_to_contaminant_match_frac=None,
+            contaminant_to_known_match_frac=None,
+            longest_match=None,
+            known_names=None,
+            known_seqs=None,
+        )
+        if self.longest_match:
+            summary.update(longest_match=self.longest_match[0])
+        if self.is_known:
+            summary.update(
+                known_to_contaminant_match_frac=self.match_frac,
+                contaminant_to_known_match_frac=self.match_frac2,
+                known_names=self.names,
+                known_seqs=self.known_seqs,
+            )
+        return summary
 
 
-class Detector(SingleEndPipelineMixin, Pipeline):
-    """Base class for contaminant detectors.
+class Include(IntFlag):
+    KNOWN = 1
+    UNKNOWN = 2
+    ALL = KNOWN | UNKNOWN
+
+
+class Detector(SingleEndPipelineMixin, Pipeline, metaclass=ABCMeta):
+    """
+    Base class for contaminant detectors.
 
     Args:
         kmer_size: Size of kmers to match.
@@ -345,12 +373,12 @@ class Detector(SingleEndPipelineMixin, Pipeline):
 
     def __init__(
         self,
-        kmer_size=12,
-        n_reads=10000,
-        overrep_cutoff=100,
-        include="all",
+        kmer_size: int = 12,
+        n_reads: int = 10000,
+        overrep_cutoff: int = 100,
+        include: Include = Include.ALL,
         known_contaminants=None,
-        past_end_bases=("A",),
+        past_end_bases: SequenceType[str] = ("A",),
     ):
         super().__init__()
         self.kmer_size = kmer_size
@@ -373,30 +401,37 @@ class Detector(SingleEndPipelineMixin, Pipeline):
                 )
 
     @property
+    @abstractmethod
     def min_report_freq(self):
-        """The minimum contaminant frequency required for a contaminant to be
-        reported.
         """
-        raise NotImplementedError()
+        The minimum contaminant frequency required for a contaminant to be reported.
+        """
+        pass
 
-    def set_read_length(self, record):
-        assert self._read_length is None
+    def set_read_length(self, record: Sequence):
+        if self._read_length is not None:
+            raise RuntimeError("Cannot set read length once it has already been set")
         self._read_length = len(record.sequence)
 
-    def handle_records(self, context, records):
+    def handle_records(
+        self, context: dict, records: SequenceType[Sequence]
+    ):
         if context["size"] == 0:
             return
 
         if self._read_length is None:
             self.set_read_length(records[0])
+
         super().handle_records(context, records)
 
-    def handle_reads(self, context, read1, read2=None):
+    def handle_reads(
+        self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
+    ):
         seq = self._filter_seq(read1.sequence)
         if seq:
             self._read_sequences.add(seq)
 
-    def _filter_seq(self, seq):
+    def _filter_seq(self, seq: str) -> Optional[str]:
         if sequence_complexity(seq) <= 1.0:
             return None
 
@@ -404,22 +439,29 @@ class Detector(SingleEndPipelineMixin, Pipeline):
             match = self._past_end_regexp.search(seq)
             if match:
                 seq = seq[: match.start()]
+
         if len(seq) < self.kmer_size:
             return None
 
         return seq
 
     def matches(self, **kwargs):
-        """Returns the current set of matches.
+        """
+        Returns the current set of matches.
         """
         if self._matches is None or len(kwargs) > 0:
             self._filter_and_sort(**kwargs)
         return self._matches
 
     def _filter_and_sort(
-        self, min_len=None, min_complexity=1.1, min_match_frac=0.1, limit=20
+        self,
+        min_len: Optional[int] = None,
+        min_complexity: float = 1.1,
+        min_match_frac: float = 0.1,
+        limit: int = 20
     ):
-        """Identify, filter, and sort contaminants.
+        """
+        Identify, filter, and sort contaminants.
 
         Args:
             min_len: Minimum contaminant length.
@@ -429,11 +471,12 @@ class Detector(SingleEndPipelineMixin, Pipeline):
         """
         if min_len is None:
             min_len = self.kmer_size
+
         matches = self._get_contaminants()
         for match in matches:
             match.estimate_abundance(self._read_sequences)
 
-        def _filter(_match):
+        def _filter(_match: Match):
             if _match.count < self.min_report_freq:
                 logging.getLogger().debug(
                     "Filtering {} because frequency {} < {}".format(
@@ -448,7 +491,6 @@ class Detector(SingleEndPipelineMixin, Pipeline):
                         _match.seq, min_len
                     )
                 )
-                print("too short")
                 return False
 
             if min_complexity and _match.seq_complexity < min_complexity:
@@ -471,7 +513,11 @@ class Detector(SingleEndPipelineMixin, Pipeline):
                 )
                 return False
 
-            if min_match_frac and _match.is_known and _match.match_frac < min_match_frac:
+            if (
+                min_match_frac and
+                _match.is_known and
+                _match.match_frac < min_match_frac
+            ):
                 logging.getLogger().debug(
                     "Filtering {} because its match_frac {} < {}".format(
                         _match.seq, _match.match_frac, min_match_frac
@@ -481,21 +527,26 @@ class Detector(SingleEndPipelineMixin, Pipeline):
 
             return True
 
-        matches = list(filter(_filter, matches))
-        matches.sort(key=lambda x: len(x) * math.log(x.count), reverse=True)
+        matches = list(sorted(
+            filter(_filter, matches),
+            key=lambda x: len(x) * math.log(x.count),
+            reverse=True
+        ))
         if limit is not None:
             matches = matches[:limit]
         self._matches = matches
 
-    def _get_contaminants(self):
-        """Implemention of contaminant matching.
+    @abstractmethod
+    def _get_contaminants(self) -> Iterable[Match]:
+        """
+        Implemention of contaminant matching.
 
         Returns:
             A list of :class:`Match`es.
         """
-        raise NotImplementedError()
+        pass
 
-    def finish(self, summary, **kwargs):
+    def finish(self, summary: Summary, **kwargs):
         super().finish(summary)
         summary["detect"]["matches"] = (
             [match.summarize() for match in self.matches(**kwargs)],
@@ -566,12 +617,13 @@ class KnownContaminantDetector(Detector):
 
         return None
 
-    def _get_contaminants(self):
-        contaminant_matchers = create_contaminant_matchers(
+    def _get_contaminants(self) -> Sequence[Match]:
+        contaminant_matchers = ContaminantMatcher.create(
             self.known_contaminants, self.kmer_size
         )
         counts = defaultdict(int)
         max_match_fracs = defaultdict(int)
+
         for seq in self._read_sequences:
             seqrc = reverse_complement(seq)
             for contam in contaminant_matchers:
@@ -580,12 +632,14 @@ class KnownContaminantDetector(Detector):
                     counts[contam] += 1
                     if match[0] > max_match_fracs[contam]:
                         max_match_fracs[contam] = match[0]
+
         min_count = math.ceil(
             self.n_reads
             * (self._read_length - self._min_k + 1)
             * self.overrep_cutoff
             / float(4 ** self._min_k)
         )
+
         return [
             Match(
                 c[0],
@@ -603,7 +657,9 @@ class HeuristicDetector(Detector):
     """
 
     def __init__(
-        self, min_frequency: float = 0.001, min_contaminant_match_frac: float = 0.9,
+        self,
+        min_frequency: float = 0.001,
+        min_contaminant_match_frac: float = 0.9,
         **kwargs
     ):
         super(HeuristicDetector, self).__init__(**kwargs)
@@ -611,18 +667,19 @@ class HeuristicDetector(Detector):
         self.min_contaminant_match_frac = min_contaminant_match_frac
 
     @property
-    def min_report_freq(self):
+    def min_report_freq(self) -> float:
         return 0.1 * self.n_reads
 
     def _get_contaminants(self):
         def _min_count(_kmer_size: int):
             return math.ceil(
-                self.n_reads
-                * max(
+                self.n_reads * max(
                     self.min_frequency,
-                    (self._read_length - _kmer_size + 1)
-                    * self.overrep_cutoff
-                    / float(4 ** _kmer_size),
+                    (
+                        (self._read_length - _kmer_size + 1)
+                        * self.overrep_cutoff
+                        / float(4 ** _kmer_size)
+                    )
                 )
             )
 
@@ -718,7 +775,7 @@ class HeuristicDetector(Detector):
 
         if self.known_contaminants:
             # Match to known sequences
-            contaminants = create_contaminant_matchers(
+            contaminants = ContaminantMatcher.create(
                 self.known_contaminants, self.kmer_size
             )
             known = {}
@@ -803,10 +860,10 @@ class KhmerDetector(Detector):
     """
 
     @property
-    def min_report_freq(self):
+    def min_report_freq(self) -> float:
         return 0.0001
 
-    def _get_contaminants(self):
+    def _get_contaminants(self) -> Iterable[Match]:
         from khmer import Countgraph, khmer_args
 
         # assuming all sequences are same length
@@ -843,7 +900,7 @@ class KhmerDetector(Detector):
                     seen.add(_kmer)
                 return freq
 
-            for seq, names in self.known_contaminants.iter_sequences():
+            for seq, names in self.known_contaminants.sequence_name_pairs:
                 seqlen = len(seq)
                 if seqlen < self.kmer_size:
                     print(

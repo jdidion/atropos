@@ -1,12 +1,6 @@
 # coding: utf-8
 from atropos.adapters import (
-    Adapter,
-    Match,
-    ColorspaceAdapter,
-    FRONT,
-    BACK,
-    parse_braces,
-    LinkedAdapter,
+    Adapter, AdapterType, ColorspaceAdapter, LinkedAdapter, Match, parse_braces
 )
 from atropos.io.seqio import Sequence
 
@@ -16,7 +10,7 @@ from pytest import raises
 def test_issue_52():
     adapter = Adapter(
         sequence="GAACTCCAGTCACNNNNN",
-        where=BACK,
+        where=AdapterType.BACK,
         max_error_rate=0.12,
         min_overlap=5,
         read_wildcards=False,
@@ -61,7 +55,7 @@ def test_issue_80():
     # indels would have only two errors.
     adapter = Adapter(
         sequence="TCGTATGCCGTCTTC",
-        where=BACK,
+        where=AdapterType.BACK,
         max_error_rate=0.2,
         min_overlap=3,
         read_wildcards=False,
@@ -76,16 +70,16 @@ def test_issue_80():
 
 
 def test_str():
-    a = Adapter("ACGT", where=BACK, max_error_rate=0.1)
+    a = Adapter("ACGT", where=AdapterType.BACK, max_error_rate=0.1)
     str(a)
     str(a.match_to(Sequence(name="seq", sequence="TTACGT")))
-    ca = ColorspaceAdapter("0123", where=BACK, max_error_rate=0.1)
+    ca = ColorspaceAdapter("0123", where=AdapterType.BACK, max_error_rate=0.1)
     str(ca)
 
 
 def test_color():
     with raises(ValueError):
-        ColorspaceAdapter("0123", where=FRONT, max_error_rate=0.1)
+        ColorspaceAdapter("0123", where=AdapterType.FRONT, max_error_rate=0.1)
 
 
 def test_parse_braces():
@@ -133,9 +127,9 @@ def test_linked_adapter():
 
 
 def test_random_match_probabilities():
-    a = Adapter("A", BACK)
+    a = Adapter("A", AdapterType.BACK)
     rmp = a.random_match_probabilities()
     assert rmp == [1.0, 0.25]
-    a = Adapter("AC", BACK, gc_content=0.4)
+    a = Adapter("AC", AdapterType.BACK, gc_content=0.4)
     rmp = a.random_match_probabilities()
     assert rmp == [1.0, 0.3, 0.06]

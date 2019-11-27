@@ -346,7 +346,7 @@ class Pipeline(metaclass=ABCMeta):
             records: The sequence of records.
 
         Raises:
-
+            AtroposError
         """
         for idx, record in enumerate(records):
             try:

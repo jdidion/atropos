@@ -1,7 +1,7 @@
 # coding: utf-8
 from .utils import approx_equal
 
-from atropos.adapters import BACK
+from atropos.adapters import AdapterType
 from atropos.align import (
     locate,
     compare_prefixes,
@@ -9,18 +9,17 @@ from atropos.align import (
     Aligner,
     InsertAligner,
 )
-from atropos.util import RandomMatchProbability
 
 
 class TestAligner:
     def test(self):
         reference = "CTCCAGCTTAGACATATC"
-        aligner = Aligner(reference, 0.1, flags=BACK)
+        aligner = Aligner(reference, 0.1, flags=AdapterType.BACK)
         aligner.locate("CC")
 
     def test_100_percent_error_rate(self):
         reference = "GCTTAGACATATC"
-        aligner = Aligner(reference, 1.0, flags=BACK)
+        aligner = Aligner(reference, 1.0, flags=AdapterType.BACK)
         aligner.locate("CAA")
 
 
@@ -104,10 +103,10 @@ def test_compare_suffixes():
 def test_wildcards_in_adapter():
     r = "CATCTGTCC" + WILDCARD_SEQUENCES[0] + "GCCAGGGTTGATTCGGCTGATCTGGCCG"
     for a in WILDCARD_SEQUENCES:
-        result = locate(a, r, 0.0, BACK, wildcard_ref=True)
+        result = locate(a, r, 0.0, AdapterType.BACK, wildcard_ref=True)
         assert result == (0, 10, 9, 19, 10, 0), result
     a = "CCCXTTXATC"
-    result = locate(a, r, 0.0, BACK, wildcard_ref=True)
+    result = locate(a, r, 0.0, AdapterType.BACK, wildcard_ref=True)
     assert result is None
 
 
@@ -115,7 +114,7 @@ def test_wildcards_in_read():
     a = WILDCARD_SEQUENCES[0]
     for s in WILDCARD_SEQUENCES:
         r = "CATCTGTCC" + s + "GCCAGGGTTGATTCGGCTGATCTGGCCG"
-        result = locate(a, r, 0.0, BACK, wildcard_query=True)
+        result = locate(a, r, 0.0, AdapterType.BACK, wildcard_query=True)
         if "X" in s:
             assert result is None
         else:
@@ -129,12 +128,12 @@ def test_wildcards_in_both():
                 continue
 
             r = "CATCTGTCC" + s + "GCCAGGGTTGATTCGGCTGATCTGGCCG"
-            result = locate(a, r, 0.0, BACK, wildcard_ref=True, wildcard_query=True)
+            result = locate(a, r, 0.0, AdapterType.BACK, wildcard_ref=True, wildcard_query=True)
             assert result == (0, 10, 9, 19, 10, 0), result
 
 
 def test_no_match():
-    a = locate("CTGATCTGGCCG", "AAAAGGG", 0.1, BACK)
+    a = locate("CTGATCTGGCCG", "AAAAGGG", 0.1, AdapterType.BACK)
     assert a is None, a
 
 

@@ -342,7 +342,7 @@ class InsertAligner:
         seq2_rc = reverse_complement(seq2)
 
         def _match(
-            _insert_match, _offset, _insert_match_size: int
+            _insert_match: MatchTuple, _offset: int, _insert_match_size: int
         ) -> Optional[InsertMatchResult]:
             if offset < self.min_adapter_overlap:
                 # The reads are mostly overlapping, to the point where
