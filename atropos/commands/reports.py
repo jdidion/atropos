@@ -75,8 +75,6 @@ class TemplateReportWriter(BaseReportWriter):
 
         template_name = self.template_name or f"template.{self.name}"
         template_paths = self.template_paths or []
-        if hasattr(self, "template_path"):
-            template_paths.append(self.template_path)
 
         try:
             env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_paths))

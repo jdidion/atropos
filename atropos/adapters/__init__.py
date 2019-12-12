@@ -26,7 +26,7 @@ from atropos.aligners import GapRule
 from atropos.io.seqio import ColorspaceSequence, FastaReader, Sequence
 from atropos.utils import colorspace
 from atropos.utils.collections import Const, CountingDict, MergingDict, NestedDict
-from atropos.utils.stats import RandomMatchProbability
+from atropos.utils.statistics import RandomMatchProbability
 from atropos.utils.ngs import (
     ALPHABETS, GC_BASES, IUPAC_BASES, Alphabet, reverse_complement
 )

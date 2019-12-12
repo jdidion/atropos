@@ -3,7 +3,7 @@ import errno
 import os
 from pathlib import Path
 import sys
-from typing import Callable, Iterable, Iterator, Optional, Tuple, TypeVar
+from typing import Callable, Iterable, Iterator, Optional, Tuple, TypeVar, Union
 
 from loguru import logger
 import pokrok as pk
@@ -122,7 +122,7 @@ def truncate_string(string: Optional[str], max_len: int = 100) -> Optional[str]:
     return string
 
 
-def splitext_compressed(name: str) -> Tuple[str, str, str]:
+def splitext_compressed(name: Union[str, Path]) -> Tuple[str, str, str]:
     """
     Splits the filename and extensions of a file that potentially has two extensions -
     one for the file type (e.g. 'fq') and one for the compression type (e.g. 'gz').
@@ -134,15 +134,18 @@ def splitext_compressed(name: str) -> Tuple[str, str, str]:
         A tuple (name, ext1, ext2), where ext1 is the filetype extension and
         ext2 is the compression type extension, or None.
     """
+    name_str = str(name)
     ext2 = None
+
     for ext in FORMATS.list_compression_formats(with_sep=True):
-        if name.endswith(ext):
+        if name_str.endswith(ext):
             ext2 = ext
-            name = name[: -len(ext)]
+            name_str = name_str[:-len(ext)]
             break
 
-    name, ext1 = os.path.splitext(name)
-    return name, ext1, ext2
+    name_str, ext1 = os.path.splitext(name_str)
+
+    return name_str, ext1, ext2
 
 
 def run_interruptible(func: Callable, *args, **kwargs) -> ReturnCode:

@@ -2,60 +2,90 @@ import logging
 import sys
 from typing import cast
 
+from loguru import logger
 from xphyle import STDOUT, STDERR
 
-from atropos.commands.cli import (
-    BaseCommandParser,
+from atropos.commands.console import (
+    BaseCommandConsole,
+    add_common_options,
     configure_threads,
-    parse_stat_args,
-    readable_file,
-    readwriteable_file,
-    writeable_file,
-    positive,
-    probability,
+    parse_metrics_args,
+    validate_common_options,
+)
+from atropos.commands.legacy_reports import LegacyReportGenerator
+from atropos.commands.metrics import MetricsMode
+from atropos.commands.trim import TrimCommand
+from atropos.io.seqio import guess_format_from_name
+from atropos.utils import classproperty
+from atropos.utils.argparse import (
+    AtroposArgumentParser,
     CharList,
     Delimited,
     EnumChoice,
+    Namespace,
     int_or_str,
+    positive,
+    probability,
+    readable_file,
+    readwriteable_file,
+    writeable_file,
 )
-from atropos.commands.stats import StatsMode
-from atropos.io.seqio import guess_format_from_name
 
 
-class CommandParser(BaseCommandParser):
-    name = "trim"
-    usage = """
-atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
-atropos trim -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq \
-  -pe1 in1.fastq -pe2 in2.fastq
-"""
-    description = """
-Trim adapters and low-quality bases, and perform other NGS preprocessing. This
-command provides most of Atropos' functionality.
-"""
-    details = """
-Replace "ADAPTER" with the actual sequence of your 3' adapter. IUPAC wildcard
-characters are supported. The reverse complement is *not* automatically
-searched. All reads from input.fastq will be written to output.fastq with the
-adapter sequence removed. Adapter matching is error-tolerant. Multiple adapter
-sequences can be given (use further -a options), but only the best-matching
-adapter will be removed.
+class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole):
+    @classproperty
+    def description(cls) -> str:
+        return """
+        Trim adapters and low-quality bases, and perform other NGS preprocessing. This
+        command provides most of Atropos' functionality.
+        """
 
-Input may also be in FASTA, SAM, or BAM format. Compressed input and output is
-supported and auto-detected from the file name (.gz, .xz, .bz2). Use the file
-name '-' for standard input/output. Without the -o option, output is sent to
-standard output.
-"""
+    @classproperty
+    def details(cls) -> str:
+        return """
+        Replace "ADAPTER" with the actual sequence of your 3' adapter. IUPAC wildcard
+        characters are supported. The reverse complement is *not* automatically
+        searched. All reads from input.fastq will be written to output.fastq with the
+        adapter sequence removed. Adapter matching is error-tolerant. Multiple adapter
+        sequences can be given (use further -a options), but only the best-matching
+        adapter will be removed.
+        
+        Input may also be in FASTA, SAM, or BAM format. Compressed input and output is
+        supported and auto-detected from the file name (.gz, .xz, .bz2). Use the file
+        name '-' for standard input/output. Without the -o option, output is sent to
+        standard output.
+        """
 
-    def add_command_options(self):
-        self.parser.set_defaults(
+    @classproperty
+    def usage(cls) -> str:
+        return """
+        atropos trim -a ADAPTER [options] [-o output.fastq] -se input.fastq
+        atropos trim -a ADAPT1 -A ADAPT2 [options] -o out1.fastq -p out2.fastq \
+          -pe1 in1.fastq -pe2 in2.fastq
+        """
+
+    @classmethod
+    def _add_arguments(cls, parser: AtroposArgumentParser) -> None:
+        add_common_options(parser)
+        cls._add_trim_options(parser)
+
+    @classmethod
+    def _validate_options(
+        cls, options: Namespace, parser: AtroposArgumentParser
+    ) -> None:
+        validate_common_options(options, parser)
+        cls._validate_trim_options(options, parser)
+
+    @staticmethod
+    def _add_trim_options(parser: AtroposArgumentParser):
+        parser.set_defaults(
             zero_cap=None,
             action="trim",
             batch_size=None,
             known_adapter=None,
             use_interleaved_output=False,
         )
-        group = self.add_group(
+        group = parser.add_group(
             "Adapters",
             title="Finding adapters",
             description="Parameters -a, -g, -b specify adapters to be removed from "
@@ -303,7 +333,7 @@ standard output.
             "set the base to N. If exactly one base is ambiguous, the "
             "non-ambiguous base is always used. (no error correction)",
         )
-        group = self.add_group("Modifications", title="Additional read modifications")
+        group = parser.add_group("Modifications", title="Additional read modifications")
         group.add_argument(
             "--read1_umi",
             type=int,
@@ -421,7 +451,7 @@ standard output.
             "use --length-tag 'length=' to correct fields like "
             "'length=123'. (no)",
         )
-        group = self.add_group("Filtering", title="Filtering of processed reads")
+        group = parser.add_group("Filtering", title="Filtering of processed reads")
         group.add_argument(
             "--discard-trimmed",
             "--discard",
@@ -469,7 +499,7 @@ standard output.
             "between 0 and 1, it is treated as the proportion of N's "
             "allowed in a read. (no)",
         )
-        group = self.add_group("Output")
+        group = parser.add_group("Output")
         group.add_argument(
             "-o",
             "--output",
@@ -553,7 +583,7 @@ standard output.
         )
         group.add_argument(
             "--report-formats",
-            type=EnumChoice(StatsMode),
+            type=EnumChoice(MetricsMode),
             nargs="*",
             choices=("txt", "json", "yaml", "pickle"),
             default=None,
@@ -580,7 +610,7 @@ standard output.
             "expression to extract key portions of read names to "
             "collect the tile statistics.",
         )
-        group = self.add_group("Colorspace options")
+        group = parser.add_group("Colorspace options")
         group.add_argument(
             "-d",
             "--double-encode",
@@ -626,7 +656,7 @@ standard output.
             "by default when -c/--colorspace is also enabled. Use the "
             "above option to disable it. (no)",
         )
-        group = self.add_group(
+        group = parser.add_group(
             "Paired",
             title="Paired-end options",
             description="The -A/-G/-B/-U/-I options work like their -a/-b/-g/-u/-i "
@@ -743,7 +773,7 @@ standard output.
             "long. Use together with --too-long-output. (no - too long "
             "reads are discarded)",
         )
-        group = self.add_group("Method-specific options")
+        group = parser.add_group("Method-specific options")
         group = group.add_mutually_exclusive_group()
         group.add_argument(
             "--bisulfite",
@@ -767,7 +797,7 @@ standard output.
             default=False,
             help="Set default option values for miRNA data. (no)",
         )
-        group = self.add_group("Parallel", title="Parallel (multi-core) options")
+        group = parser.add_group("Parallel", title="Parallel (multi-core) options")
         group.add_argument(
             "-T",
             "--threads",
@@ -825,8 +855,8 @@ standard output.
             "(1 < threads < 8), otherwise defaults to 'worker'.",
         )
 
-    def validate_command_options(self, options):
-        parser = self.parser
+    @staticmethod
+    def _validate_trim_options(options: Namespace, parser: AtroposArgumentParser):
         paired = options.paired
 
         # Any of these options imply paired-end and siable legacy mode
@@ -859,15 +889,18 @@ standard output.
             if options.interleaved_output:
                 if any_output:
                     parser.error("Cannot specify both interleaved and paired output.")
+
                 options.use_interleaved_output = True
             elif options.output_format == "sam":
                 if any_output:
                     parser.error("SAM output must be specified using the -l option")
+
                 if options.no_writer_process:
                     logging.getLogger().warning(
                         "Note: output SAM files cannot be concatenated; "
                         "use 'samtools merge' instead."
                     )
+
                 options.use_interleaved_output = True
             elif not any_output or options.output in {STDOUT, STDERR}:
                 # If no output files are specified, write interleaved
@@ -885,6 +918,7 @@ standard output.
                         "output file needs to be specified via -p "
                         "(--paired-output)."
                     )
+
                 if bool(options.untrimmed_output) != bool(
                     options.untrimmed_paired_output
                 ):
@@ -893,6 +927,7 @@ standard output.
                         "either none or both of the --untrimmed-output/"
                         "--untrimmed-paired-output options."
                     )
+
                 if bool(options.too_short_output) != bool(
                     options.too_short_paired_output
                 ):
@@ -901,6 +936,7 @@ standard output.
                         "reads, you also need to use "
                         "--too-short-paired-output"
                     )
+
                 if bool(options.too_long_output) != bool(
                     options.too_long_paired_output
                 ):
@@ -922,7 +958,6 @@ standard output.
                 paired = "first"
 
             options.paired = paired
-
         elif options.untrimmed_paired_output:
             parser.error(
                 "Option --untrimmed-paired-output can only be used when "
@@ -940,6 +975,7 @@ standard output.
         if options.aligner == "adapter":
             if options.indels and options.indel_cost is None:
                 options.indel_cost = 1
+
             if options.overlap is None:
                 if options.adapter_max_rmp is None:
                     options.overlap = 3
@@ -948,18 +984,23 @@ standard output.
         elif options.aligner == "insert":
             if paired != "both":
                 parser.error("Insert aligner only works with paired-end reads")
+
             # TODO: should also be checking that there is exactly one 3'
-            # adapter for each read
+            #  adapter for each read
             # TODO: have the aligner tell us whether it can be used based on
-            # options?
+            #  options?
+
             if options.indels and options.indel_cost is None:
                 options.indel_cost = 3
+
             if options.overlap is None:
                 options.overlap = 1
                 if options.adapter_max_rmp is None:
                     options.adapter_max_rmp = 1e-6
+
             if options.insert_match_error_rate is None:
                 options.insert_match_error_rate = options.error_rate or 0.2
+
             if options.insert_match_adapter_error_rate is None:
                 options.insert_match_adapter_error_rate = (
                     options.insert_match_error_rate
@@ -970,16 +1011,20 @@ standard output.
                 logging.getLogger().warning(
                     "--merge-output is not set; merged reads will be discarded"
                 )
+
             if options.merge_error_rate is None:
                 options.merge_error_rate = options.error_rate or 0.2
 
         if options.mirna:
             if not (options.adapters or options.front or options.anywhere):
                 options.adapters = ["TGGAATTCTCGG"]  # illumina small RNA adapter
+
             if options.quality_cutoff is None:
                 options.quality_cutoff = [20, 20]
+
             if options.minimum_length is None:
                 options.minimum_length = 16
+
             if options.error_rate is None:
                 options.error_rate = 0.12
         elif options.bisulfite:
@@ -999,14 +1044,17 @@ standard output.
                 "swift",
                 "non-directional-rrbs",
             ):
-
                 def parse_bisulfite_params(arg):
-                    """Parse bisulfite trimming command line arguments into
-                    arguments to the Modifiers.
+                    """
+                    Parses bisulfite trimming command line arguments into arguments
+                    to the Modifiers.
                     """
                     try:
                         bsparts = [int(part) for part in arg.split(",")]
-                        assert len(bsparts) == 4
+
+                        if len(bsparts) != 4:
+                            raise ValueError(f"Invalid 'bisulfite' argument: {arg}")
+
                         if bsparts[0] <= 0 and bsparts[1] <= 0:
                             return None
 
@@ -1020,18 +1068,21 @@ standard output.
                                 ),
                             )
                         )
-
                     except:
-                        parser.error("Invalidate format for bisulfite parameters")
+                        parser.error(
+                            f"Invalid format for bisulfite parameters: {arg}"
+                        )
 
                 temp = [
                     parse_bisulfite_params(arg)
                     for arg in cast(str, options.bisulfite).split(";")
                 ]
+
                 if paired == "both" and len(temp) == 1:
                     temp = [temp[0], temp[0]]
                 elif paired != "both" and len(temp) > 1:
                     parser.error("Too many bisulfite parameters for single-end reads")
+
                 options.bisulfite = temp
 
         if options.overwrite_low_quality:
@@ -1039,6 +1090,7 @@ standard output.
                 parser.error(
                     "--overwrite-low-quality is not valid for single-end reads"
                 )
+
             if options.overwrite_low_quality[0] > options.overwrite_low_quality[1]:
                 parser.error("For --overwrite-low-quality, LOWQ must be <= HIGHQ")
 
@@ -1062,6 +1114,7 @@ standard output.
         if options.output is not None and "{name}" in options.output:
             if options.discard_trimmed:
                 parser.error("Do not use --discard-trimmed when demultiplexing.")
+
             if paired:
                 parser.error("Demultiplexing not supported for paired-end files, yet.")
 
@@ -1084,12 +1137,15 @@ standard output.
                     "supported (if you think this may be useful, contact the "
                     "author)."
                 )
+
             if options.match_read_wildcards:
                 parser.error("IUPAC wildcards not supported in colorspace")
+
             options.match_adapter_wildcards = False
         else:
             if options.trim_primer:
                 parser.error("Trimming the primer makes only sense in colorspace.")
+
             if options.double_encode:
                 parser.error("Double-encoding makes only sense in colorspace.")
 
@@ -1099,12 +1155,14 @@ standard output.
         if options.cut:
             if len(options.cut) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
+
             if len(options.cut) == 2 and options.cut[0] * options.cut[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
 
         if options.cut_min:
             if len(options.cut_min) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
+
             if (
                 len(options.cut_min) == 2
                 and options.cut_min[0] * options.cut_min[1] > 0
@@ -1114,12 +1172,14 @@ standard output.
         if paired == "both" and options.cut2:
             if len(options.cut2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
+
             if len(options.cut2) == 2 and options.cut2[0] * options.cut2[1] > 0:
                 parser.error("You cannot remove bases from the same end twice.")
 
         if paired == "both" and options.cut_min2:
             if len(options.cut_min2) > 2:
                 parser.error("You cannot remove bases from more than two ends.")
+
             if (
                 len(options.cut_min2) == 2
                 and options.cut_min2[0] * options.cut_min2[1] > 0
@@ -1129,19 +1189,22 @@ standard output.
         if not options.stats or options.stats == "none":
             options.stats = None
         else:
-            stats = {}
-            for stat_spec in options.stats:
-                parts = stat_spec.split(":")
+            metrics = {}
+
+            for metric_spec in options.stats:
+                parts = metric_spec.split(":")
                 name = parts[0]
-                args = {} if len(parts) == 1 else parse_stat_args(parts[1])
+                args = {} if len(parts) == 1 else parse_metrics_args(parts[1])
                 if name == "both":
-                    stats["pre"] = stats["post"] = args
+                    metrics["pre"] = metrics["post"] = args
                 else:
-                    stats[name] = args
-            options.stats = stats
+                    metrics[name] = args
+
+            options.stats = metrics
 
         if options.threads is not None:
             threads = configure_threads(options, parser)
+
             if options.compression_mode is None:
                 if options.writer_process and 2 < threads < 8:
                     # Our tests show that with 8 or more threads, worker compression
@@ -1185,14 +1248,13 @@ standard output.
                 parser.error("Result queue size must be >= 'threads'")
 
             max_queue_size = options.read_queue_size + options.result_queue_size
+
             if options.batch_size is None:
-                options.batch_size = max(1000, max_queue_size / 10e6)
+                options.batch_size = max(1000, int(max_queue_size / 10e6))
             elif options.batch_size * max_queue_size > 10e6:
-                logging.getLogger().warning(
-                    "Combination of batch size %d and total queue size %d "
-                    "may lead to excessive memory usage",
-                    options.batch_size,
-                    max_queue_size,
+                logger.warning(
+                    "Combination of batch size {options.batch_size} and total queue "
+                    "size {max_queue_size} may lead to excessive memory usage"
                 )
 
         if options.batch_size is None:

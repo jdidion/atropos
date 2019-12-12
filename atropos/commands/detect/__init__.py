@@ -16,14 +16,14 @@ from atropos.commands import (
     SingleEndPipelineMixin,
     Summary,
 )
-from atropos.commands.detect.console import add_detect_options, validate_detect_options
 from atropos.io.seqio import Sequence
-from atropos.utils import run_interruptible, ReturnCode
+from atropos.utils import ReturnCode, classproperty, run_interruptible
 from atropos.utils.collections import Summarizable
 from atropos.utils.ngs import reverse_complement, sequence_complexity
 
 
 class DetectCommand(BaseCommand):
+    @classproperty
     def name(cls) -> str:
         return "detect"
 

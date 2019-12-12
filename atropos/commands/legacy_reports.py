@@ -1,17 +1,12 @@
-# coding: utf-8
-"""Routines for printing a text report. This is the legacy code for generating
-text-based reports. This will eventually be deprecated in favor of the Jinja2
-and MultiQC reports.
-"""
+from argparse import Namespace
+
 import math
 import textwrap
-from typing import Any, IO, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, IO, Optional, Sequence, Tuple, TypeVar, Union, cast
 
-from xphyle import open_
-
-from atropos.commands.reports import BaseReportGenerator
+from atropos.commands.reports import BaseReportGenerator, BaseReportWriter, ReportWriter
 from atropos.utils import truncate_string
-from atropos.utils.stats import weighted_median
+from atropos.utils.statistics import weighted_median
 
 
 INDENT = " " * 2
@@ -28,19 +23,19 @@ class Printer:
         kwargs: Additional keyword arguments passed to the print function.
     """
 
-    def __init__(self, outfile: IO, indent: Optional[str] = None, **kwargs):
+    def __init__(self, outfile: IO, indent: str = "", **kwargs):
         self.outfile = outfile
         self.indent = indent
         self.print_args = kwargs
 
-    def __call__(self, *args, indent=None, **kwargs):
+    def __call__(self, *args, indent: Union[int, str] = None, **kwargs):
         if isinstance(indent, int):
-            indent = self.indent * indent
+            indent_str = self.indent * cast(int, indent)
         else:
-            indent = indent or self.indent
+            indent_str = cast(str, indent) or self.indent
 
-        if indent:
-            self._print(indent, end="")
+        if indent_str:
+            self._print(indent_str, end="")
 
         self._print(*args, **kwargs)
 
@@ -118,9 +113,9 @@ class RowPrinter(Printer):
     def __init__(
         self,
         outfile: IO,
-        colwidths: Union[int, Sequence[int]] = 10,
-        justification: Union[str, Sequence[str]] = ("<", ">"),
-        indent: Union[str, Sequence[str]] = "",
+        colwidths: Union[int, Tuple[int, ...]] = 10,
+        justification: Union[str, Tuple[str, ...]] = ("<", ">"),
+        indent: Union[str, Tuple[str, ...]] = "",
         pct: bool = False,
         default: int = 0,
         **kwargs
@@ -147,7 +142,12 @@ class RowPrinter(Printer):
         self.pct = pct
         self.default = default
 
-    def print_rows(self, *rows, header=None, **kwargs):
+    def print_rows(
+        self,
+        *rows,
+        header: Optional[Sequence[Union[str, Tuple[str, str]]]] = None,
+        **kwargs
+    ):
         """
         Prints multiple rows. Automatically figures out column widths.
 
@@ -184,12 +184,12 @@ class RowPrinter(Printer):
     def __call__(
         self,
         *args,
-        colwidths: Optional[Tuple[int]] = None,
-        extra_width: Optional[Tuple[int]] = None,
-        justification: Optional[Tuple[str]] = None,
-        extra_justification: Optional[Tuple[str]] = None,
-        indent: Optional[Tuple[str]] = None,
-        extra_indent: Optional[Tuple[str]] = None,
+        colwidths: Optional[Tuple[int, ...]] = None,
+        extra_width: Optional[int] = None,
+        justification: Optional[Tuple[str, ...]] = None,
+        extra_justification: Optional[str] = None,
+        indent: Optional[Tuple[str, ...]] = None,
+        extra_indent: Optional[str] = None,
         header: bool = False,
         underline: str = "-",
         pct: Optional[bool] = None,
@@ -223,7 +223,9 @@ class RowPrinter(Printer):
         if pct is None:
             pct = self.pct
 
-        def adjust(tup, extra=None):
+        T = TypeVar("T")
+
+        def adjust(tup: Tuple[T, ...], extra: Optional[T] = None) -> Tuple[T, ...]:
             """
             Adjust a tuple. If longer than the number of columns, truncate; if
             shorter, fill in by repeating the last element.
@@ -247,6 +249,7 @@ class RowPrinter(Printer):
                 (extra_width, extra_justification, extra_indent),
             )
         )
+
         # adjust colwidths if this is a header
         if header:
             colwidths = tuple(max(w, len(str(a))) for w, a in zip(colwidths, args))
@@ -281,691 +284,775 @@ class RowPrinter(Printer):
             self._print(sepline, **kwargs)
 
 
-class LegacyReportGenerator(BaseReportGenerator):
-    def generate_text_report(self, fmt, summary, outfile, **kwargs):
-        if fmt == "txt":
-            with open_(outfile, "wt", context_wrapper=True) as out:
-                generate_report(summary, out)
-        else:
-            super().generate_from_template(fmt, summary, outfile, **kwargs)
+class LegacyTextReportWriter(BaseReportWriter):
+    def __init__(self, options: Namespace):
+        super().__init__("txt", options)
 
+    def serialize(self, summary: dict, stream: IO) -> None:
+        self._print_summary_report(summary, stream)
+        if "trim" in summary:
+            self._print_trim_report(summary, stream)
+        if "pre" in summary:
+            self._print_pre_trim_report(summary, stream)
+        if "post" in summary:
+            self._print_post_trim_report(summary, stream)
 
-def generate_report(summary, outfile):
-    """Generate a report.
+    @classmethod
+    def _print_summary_report(cls, summary: dict, stream: IO):
+        """
+        Prints the top-level summary report.
 
-    Args:
-        summary: The summary dict.
-        outfile: The output file name/object.
-    """
-    print_summary_report(summary, outfile)
-    if "trim" in summary:
-        print_trim_report(summary, outfile)
-    if "pre" in summary:
-        print_pre_trim_report(summary, outfile)
-    if "post" in summary:
-        print_post_trim_report(summary, outfile)
-
-
-def print_summary_report(summary, outfile):
-    """Print the top-level summary report.
-
-    Args:
-        summary: The summary dict.
-        outfile: The output file object.
-    """
-    _print_title = TitlePrinter(outfile)
-    _print = Printer(outfile)
-    _print_title("Atropos", level=0)
-    _print("Atropos version: {}".format(summary["version"]))
-    _print("Python version: {}".format(summary["python"]))
-    _print(
-        "Command line parameters: {} {}".format(
-            summary["command"], " ".join(summary["options"]["orig_args"])
-        )
-    )
-    _print()
-    _print("Sample ID: {}".format(summary["sample_id"]))
-    _print("Input format: {}".format(summary["derived"]["input_format"]))
-    _print("Input files:")
-    for infile in summary["input"]["input_names"]:
-        if infile is not None:
-            _print(infile, indent=INDENT)
-    _print()
-    timing = summary["timing"]
-    total = summary["total_record_count"]
-    wctime = ["Wallclock time: {:.2F} s".format(timing["wallclock"])]
-    if total > 0:
-        wctime.append(
-            "({0:.0F} us/read; {1:.2F} M reads/minute)".format(
-                1e6 * timing["wallclock"] / total,
-                total / timing["wallclock"] * 60 / 1e6,
+        Args:
+            summary: The summary dict.
+            stream: The output file object.
+        """
+        _print_title = TitlePrinter(stream)
+        _print = Printer(stream)
+        _print_title("Atropos", level=0)
+        _print("Atropos version: {}".format(summary["version"]))
+        _print("Python version: {}".format(summary["python"]))
+        _print(
+            "Command line parameters: {} {}".format(
+                summary["command"], " ".join(summary["options"]["orig_args"])
             )
         )
-    _print("Start time: {}".format(timing["start"]))
-    _print(*wctime)
-    _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
-    _print()
+        _print()
+        _print("Sample ID: {}".format(summary["sample_id"]))
+        _print("Input format: {}".format(summary["derived"]["input_format"]))
+        _print("Input files:")
 
+        for infile in summary["input"]["input_names"]:
+            if infile is not None:
+                _print(infile, indent=INDENT)
 
-def print_trim_report(summary, outfile):
-    """Print the trimming report.
+        _print()
 
-    Args:
-        summary: Summary dict.
-        outfile: Open output stream.
-    """
-    paired = summary["options"]["paired"]
-    pairs_or_reads = "Pairs" if paired else "Reads"
-    total_bp = sum(summary["total_bp_counts"])
-    max_width = len(str(total_bp))
-    # account for commas
-    max_width += max_width // 3
-    _print_title = TitlePrinter(outfile)
-    _print = RowPrinter(outfile, (35, max_width))
-    total = summary["total_record_count"]
-    if total == 0:
-        _print(
-            "No reads processed! Either your input file is empty or you "
-            "used the wrong -f/--format parameter."
+        timing = summary["timing"]
+        total = summary["total_record_count"]
+        wctime = ["Wallclock time: {:.2F} s".format(timing["wallclock"])]
+
+        if total > 0:
+            wctime.append(
+                "({0:.0F} us/read; {1:.2F} M reads/minute)".format(
+                    1e6 * timing["wallclock"] / total,
+                    total / timing["wallclock"] * 60 / 1e6,
+                )
+            )
+
+        _print("Start time: {}".format(timing["start"]))
+        _print(*wctime)
+        _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
+        _print()
+
+    @classmethod
+    def _print_trim_report(cls, summary: dict, stream: IO):
+        """
+        Prints the trimming report.
+
+        Args:
+            summary: Summary dict.
+            stream: Open output stream.
+        """
+        total_bp = sum(summary["total_bp_counts"])
+        max_width = len(str(total_bp))
+        # account for commas
+        max_width += max_width // 3
+        _print = RowPrinter(stream, (35, max_width))
+        total = summary["total_record_count"]
+
+        if total == 0:
+            _print(
+                "No reads processed! Either your input file is empty or you "
+                "used the wrong -f/--format parameter."
+            )
+            return
+
+        modifiers, filters, formatters = (
+            summary["trim"][key] for key in ("modifiers", "filters", "formatters")
         )
-        return
 
-    modifiers, filters, formatters = (
-        summary["trim"][key] for key in ("modifiers", "filters", "formatters")
-    )
-    adapter_cutter = None
-    error_corrector = None
-    for modifier_dict in modifiers.values():
-        if adapter_cutter is None and "adapters" in modifier_dict:
-            adapter_cutter = modifier_dict
-            break
+        adapter_cutter = None
+        error_corrector = None
 
-        if error_corrector is None and "bp_corrected" in modifier_dict:
-            error_corrector = modifier_dict
-    correction_enabled = summary["options"]["correct_mismatches"]
-    corrected = None
-    trimmers = []
-    for name, mod in modifiers.items():
-        if "bp_trimmed" in mod:
-            trimmers.append((name, mod))
-        if correction_enabled and "records_corrected" in mod:
-            corrected = mod
-    _print_title("Trimming", level=1)
-    _print(pairs_or_reads, "records", "fraction", header=True)
-    _print("Total {} processed:".format("read pairs" if paired else "reads"), total)
-    if adapter_cutter:
-        if paired:
-            for read in range(2):
+        for modifier_dict in modifiers.values():
+            if adapter_cutter is None and "adapters" in modifier_dict:
+                adapter_cutter = modifier_dict
+                break
+
+            if error_corrector is None and "bp_corrected" in modifier_dict:
+                error_corrector = modifier_dict
+
+        correction_enabled = summary["options"]["correct_mismatches"]
+        corrected = None
+        trimmers = []
+
+        for name, mod in modifiers.items():
+            if "bp_trimmed" in mod:
+                trimmers.append((name, mod))
+
+            if correction_enabled and "records_corrected" in mod:
+                corrected = mod
+
+        _print_title = TitlePrinter(stream)
+        paired = summary["options"]["paired"]
+        pairs_or_reads = "Pairs" if paired else "Reads"
+
+        _print_title("Trimming", level=1)
+        _print(pairs_or_reads, "records", "fraction", header=True)
+        _print("Total {} processed:".format("read pairs" if paired else "reads"), total)
+
+        if adapter_cutter:
+            if paired:
+                for read in range(2):
+                    _print(
+                        "Read {} with adapter:".format(read + 1),
+                        adapter_cutter["records_with_adapters"][read],
+                        adapter_cutter["fraction_records_with_adapters"][read],
+                        indent=(INDENT, ""),
+                        pct=True,
+                    )
+            else:
                 _print(
-                    "Read {} with adapter:".format(read + 1),
-                    adapter_cutter["records_with_adapters"][read],
-                    adapter_cutter["fraction_records_with_adapters"][read],
-                    indent=(INDENT, ""),
+                    "Reads with adapters:",
+                    adapter_cutter["records_with_adapters"][0],
+                    adapter_cutter["fraction_records_with_adapters"][0],
                     pct=True,
                 )
-        else:
-            _print(
-                "Reads with adapters:",
-                adapter_cutter["records_with_adapters"][0],
-                adapter_cutter["fraction_records_with_adapters"][0],
-                pct=True,
-            )
 
-    def _print_filter(name, sep):
-        if name in filters:
-            _print(
-                "{} {} {}:".format(pairs_or_reads, sep, name.replace("_", " ")),
-                filters[name]["records_filtered"],
-                filters[name]["fraction_records_filtered"],
-                pct=True,
-            )
+        def _print_filter(_name, sep):
+            if _name in filters:
+                _print(
+                    "{} {} {}:".format(pairs_or_reads, sep, _name.replace("_", " ")),
+                    filters[_name]["records_filtered"],
+                    filters[_name]["fraction_records_filtered"],
+                    pct=True,
+                )
 
-    _print_filter("too_short", "that were")
-    _print_filter("too_long", "that were")
-    _print_filter("too_many_n", "with")
-    _print(
-        "{} written (passing filters):".format(pairs_or_reads),
-        formatters["records_written"],
-        formatters["fraction_records_written"],
-        pct=True,
-    )
-    if corrected:
+        _print_filter("too_short", "that were")
+        _print_filter("too_long", "that were")
+        _print_filter("too_many_n", "with")
         _print(
-            "Pairs corrected:",
-            corrected["records_corrected"],
-            corrected["fraction_records_corrected"],
+            "{} written (passing filters):".format(pairs_or_reads),
+            formatters["records_written"],
+            formatters["fraction_records_written"],
             pct=True,
         )
-    _print()
-    _print("Base pairs", "bp", "fraction", header=True)
-    _print("Total bp processed:", total_bp)
-    if paired:
-        for read in range(2):
-            _print(
-                "Read {}:".format(read + 1),
-                summary["total_bp_counts"][read],
-                indent=(INDENT, ""),
-            )
 
-    def _print_bp(title, data, key, default=0):
-        if paired:
+        if corrected:
             _print(
-                title,
-                data["total_{}".format(key)],
-                data["fraction_total_{}".format(key)],
+                "Pairs corrected:",
+                corrected["records_corrected"],
+                corrected["fraction_records_corrected"],
                 pct=True,
             )
+
+        _print()
+        _print("Base pairs", "bp", "fraction", header=True)
+        _print("Total bp processed:", total_bp)
+
+        if paired:
             for read in range(2):
                 _print(
                     "Read {}:".format(read + 1),
-                    data[key][read],
-                    data["fraction_{}".format(key)][read],
+                    summary["total_bp_counts"][read],
                     indent=(INDENT, ""),
+                )
+
+        def _print_bp(title, data, key, default=0):
+            if paired:
+                _print(
+                    title,
+                    data["total_{}".format(key)],
+                    data["fraction_total_{}".format(key)],
+                    pct=True,
+                )
+
+                for _read in range(2):
+                    _print(
+                        "Read {}:".format(_read + 1),
+                        data[key][_read],
+                        data["fraction_{}".format(key)][_read],
+                        indent=(INDENT, ""),
+                        pct=True,
+                        default=default,
+                    )
+            else:
+                _print(
+                    title,
+                    data[key][0],
+                    data["fraction_{}".format(key)][0],
                     pct=True,
                     default=default,
                 )
-        else:
-            _print(
-                title,
-                data[key][0],
-                data["fraction_{}".format(key)][0],
-                pct=True,
-                default=default,
-            )
 
-    for name, mod in trimmers:
-        _print_bp(mod["desc"], mod, "bp_trimmed")
-    _print_bp("Total bp written (filtered):", formatters, "bp_written")
-    if error_corrector:
-        _print_bp("Total bp corrected:", error_corrector, "bp_corrected")
-    if adapter_cutter:
-        _print()
-        adapters = adapter_cutter["adapters"]
-        print_adapter_report(adapters, outfile, paired, total, max_width)
+        for name, mod in trimmers:
+            _print_bp(mod["desc"], mod, "bp_trimmed")
 
+        _print_bp("Total bp written (filtered):", formatters, "bp_written")
 
-def print_adapter_report(adapters, outfile, paired, total_records, max_width):
-    """Print details for a adapters.
+        if error_corrector:
+            _print_bp("Total bp corrected:", error_corrector, "bp_corrected")
 
-    Args:
-        adapters: Sequence of adapter info dicts.
-        outfile: The output file
-        paired: Whether the data is paired-end.
+        if adapter_cutter:
+            _print()
+            adapters = adapter_cutter["adapters"]
+            cls._print_adapter_report(adapters, stream, paired, total, max_width)
 
-        max_width: Max column width.
-    """
-    adapter_lenghts = []
-    for pair in adapters:
-        if pair:
-            for adapter in pair.values():
-                if adapter["where"]["name"] == "linked":
-                    adapter_lenghts.append(
-                        3 + len(adapter["front_sequence"] + adapter["back_sequence"])
-                    )
-                else:
-                    adapter_lenghts.append(len(adapter["sequence"]))
-    max_seq_len = max(adapter_lenghts)
-    _print = Printer(outfile)
-    _print_title = TitlePrinter(outfile)
-    _print_adj = RowPrinter(outfile, (12, 5), pct=True, indent=(INDENT, ""))
-    seq_printer = RowPrinter(outfile, (max_seq_len, 14, 3, max_width), ("<", "<", ">"))
-    hist_printer = RowPrinter(outfile, justification=(">", ">", ">", ">", "<"))
-
-    def print_error_ranges(adapter_length, error_rate):
-        """Print max number of errors for ranges of adapter match lengths.
-        """
-        _print("No. of allowed errors:")
-        prev = 0
-        for errors in range(1, int(error_rate * adapter_length) + 1):
-            range_start = int(errors / error_rate)
-            _print(
-                "{0}-{1} bp: {2};".format(prev, range_start - 1, errors - 1), end=" "
-            )
-            prev = range_start
-        if prev == adapter_length:
-            _print(
-                "{0} bp: {1}".format(adapter_length, int(error_rate * adapter_length))
-            )
-        else:
-            _print(
-                "{0}-{1} bp: {2}".format(
-                    prev, adapter_length, int(error_rate * adapter_length)
-                )
-            )
-        _print()
-
-    def print_histogram(
-        data, adapter_length, num_reads, error_rate, errors, match_probabilities
+    @classmethod
+    def _print_adapter_report(
+        cls,
+        adapters: Sequence[dict],
+        stream: IO,
+        paired: bool,
+        total_records: int,
+        max_width: int
     ):
-        """Print a histogram. Also, print the no. of reads expected to be
-        trimmed by chance (assuming a uniform distribution of nucleotides in
-        the reads).
+        """
+        Prints details for a adapters.
 
         Args:
-            data: A dictionary mapping lengths of trimmed sequences to their
-                respective frequency
-            adapter_length: adapter length
-            num_reads: total no. of reads.
-            error_rate: Max error rate.
-            errors: Histogram of actual numbers of errors.
-            match_probabilities: List of random match proabilities for each
-                position in the adapter seqeunce.
+            adapters: Sequence of adapter info dicts.
+            stream: The output file
+            paired: Whether the data is paired-end.
+
+            max_width: Max column width.
         """
-        hist = []
-        hist_errors = []
-        for length, count in data.items():
-            # when length surpasses adapter_length, the probability does not
-            # increase anymore
-            estimated = num_reads * match_probabilities[min(length, adapter_length)]
-            hist.append(
-                [
-                    length,
-                    count,
-                    estimated,
-                    int(error_rate * min(length, adapter_length)),
-                ]
-            )
-            hist_errors.append(errors["rows"][length])
-        col_sizes = [len(str(max(col))) for col in zip(*hist_errors)]
+        adapter_lenghts = []
 
-        def _format_hist_errors(errs):
-            trailing = True
-            hist_str = []
-            for i, e in reversed(list(enumerate(errs))):
-                if trailing and e == 0:
-                    pass
-                else:
-                    trailing = False
-                    hist_str.append(("{:<" + str(col_sizes[i]) + "d}").format(e))
-            return " ".join(reversed(hist_str))
+        for pair in adapters:
+            if pair:
+                for adapter in pair.values():
+                    if adapter["where"]["name"] == "linked":
+                        adapter_lenghts.append(
+                            3 +
+                            len(adapter["front_sequence"] + adapter["back_sequence"])
+                        )
+                    else:
+                        adapter_lenghts.append(len(adapter["sequence"]))
 
-        for i, errs in enumerate(hist_errors):
-            hist[i].append(_format_hist_errors(errs))
-        error_header = " ".join(
-            ("{:<" + str(e) + "d}").format(i) for i, e in enumerate(col_sizes)
+        max_seq_len = max(adapter_lenghts)
+        _print = Printer(stream)
+        _print_title = TitlePrinter(stream)
+        _print_adj = RowPrinter(stream, (12, 5), pct=True, indent=(INDENT, ""))
+        seq_printer = RowPrinter(
+            stream, (max_seq_len, 14, 3, max_width), ("<", "<", ">")
         )
-        hist_printer.print_rows(
-            *hist,
-            header=(
-                ("length", ""),
-                ("count", ""),
-                ("expect", ""),
-                ("max.err", ""),
-                ("error counts", error_header),
+        hist_printer = RowPrinter(stream, justification=(">", ">", ">", ">", "<"))
+
+        def print_error_ranges(adapter_length: int, error_rate: float):
+            """
+            Prints max number of errors for ranges of adapter match lengths.
+            """
+            _print("No. of allowed errors:")
+
+            prev = 0
+
+            for errors in range(1, int(error_rate * adapter_length) + 1):
+                range_start = int(errors / error_rate)
+                _print(f"{prev}-{range_start - 1} bp: {errors - 1};", end=" ")
+                prev = range_start
+
+            if prev == adapter_length:
+                _print(f"{adapter_length} bp: {int(error_rate * adapter_length)}")
+            else:
+                _print(
+                    "{prev}-{adapter_length} bp: {int(error_rate * adapter_length)}"
+                )
+
+            _print()
+
+        def print_histogram(
+            data: dict,
+            adapter_length: int,
+            num_reads: int,
+            error_rate: float,
+            errors: dict,
+            match_probabilities: Sequence[float]
+        ):
+            """
+            Prints a histogram. Also, print the no. of reads expected to be
+            trimmed by chance (assuming a uniform distribution of nucleotides in
+            the reads).
+
+            Args:
+                data: A dictionary mapping lengths of trimmed sequences to their
+                    respective frequency
+                adapter_length: adapter length
+                num_reads: total no. of reads.
+                error_rate: Max error rate.
+                errors: Histogram of actual numbers of errors.
+                match_probabilities: List of random match proabilities for each
+                    position in the adapter seqeunce.
+            """
+            hist = []
+            hist_errors = []
+
+            for length, count in data.items():
+                # when length surpasses adapter_length, the probability does not
+                # increase anymore
+                estimated = num_reads * match_probabilities[min(length, adapter_length)]
+                hist.append(
+                    [
+                        length,
+                        count,
+                        estimated,
+                        int(error_rate * min(length, adapter_length)),
+                    ]
+                )
+                hist_errors.append(errors["rows"][length])
+
+            col_sizes = [len(str(max(col))) for col in zip(*hist_errors)]
+
+            def _format_hist_errors(_errs):
+                trailing = True
+                hist_str = []
+
+                for e_ctr, e in reversed(list(enumerate(_errs))):
+                    if trailing and e == 0:
+                        pass
+                    else:
+                        trailing = False
+                        hist_str.append(
+                            ("{:<" + str(col_sizes[e_ctr]) + "d}").format(e)
+                        )
+
+                return " ".join(reversed(hist_str))
+
+            for i, errs in enumerate(hist_errors):
+                hist[i].append(_format_hist_errors(errs))
+
+            error_header = " ".join(
+                ("{:<" + str(e) + "d}").format(i) for i, e in enumerate(col_sizes)
             )
-        )
-        hist_printer.newline()
 
-    def print_adjacent_bases(bases):
-        """Print a summary of the bases preceding removed adapter sequences.
-        Print a warning if one of the bases is overrepresented and there are
-        at least 20 preceding bases available.
+            hist_printer.print_rows(
+                *hist,
+                header=(
+                    ("length", ""),
+                    ("count", ""),
+                    ("expect", ""),
+                    ("max.err", ""),
+                    ("error counts", error_header),
+                )
+            )
+            hist_printer.newline()
 
-        Return:
-            True if a warning was printed.
-        """
-        total = sum(bases.values())
-        if total == 0:
+        def print_adjacent_bases(bases: Dict[str, int]):
+            """
+            Prints a summary of the bases preceding removed adapter sequences.
+            Print a warning if one of the bases is overrepresented and there are
+            at least 20 preceding bases available.
+
+            Return:
+                True if a warning was printed.
+            """
+            total = sum(bases.values())
+            if total == 0:
+                return False
+
+            _print("Bases preceding removed adapters:")
+
+            warnbase = None
+
+            for base in ["A", "C", "G", "T", ""]:
+                base_label = base if base != "" else "none/other"
+                fraction = bases[base] / total
+                _print_adj(base_label, fraction)
+                if fraction > 0.8 and base != "":
+                    warnbase = base_label
+
+            if total >= 20 and warnbase is not None:
+                _print("WARNING:")
+                _print(
+                    "\n".join(
+                        INDENTED.wrap(
+                            'The adapter is preceded by "{0}" extremely often. The '
+                            "provided adapter sequence may be incomplete. To fix the "
+                            'problem, add "{0}" to the beginning of the adapter '
+                            "sequence.".format(warnbase)
+                        )
+                    )
+                )
+                _print()
+                return True
+
+            _print()
             return False
 
-        _print("Bases preceding removed adapters:")
-        warnbase = None
-        for base in ["A", "C", "G", "T", ""]:
-            base_label = base if base != "" else "none/other"
-            fraction = 1.0 * bases[base] / total
-            _print_adj(base_label, fraction)
-            if fraction > 0.8 and base != "":
-                warnbase = base_label
-        if total >= 20 and warnbase is not None:
+        warning = False
+
+        for pair in range(2 if paired else 1):
+            if adapters[pair] is None:
+                continue
+
+            header = "Adapter {}"
+
+            if paired:
+                header = ("First read: " if pair == 0 else "Second read: ") + header
+
+            for name, adapter in adapters[pair].items():
+                _print_title(header.format(name), level=1)
+
+                where_name = adapter["where"]["name"]
+                front_len = 0
+                back_len = 0
+                seq_len = 0
+
+                if where_name == "linked":
+                    front_len, back_len = [
+                        len(adapter[s]) for s in ("front_sequence", "back_sequence")
+                    ]
+                    seq_printer.print_rows(
+                        (
+                            "{}...{}".format(
+                                adapter["front_sequence"], adapter["back_sequence"]
+                            ),
+                            "linked",
+                            "{}+{}".format(front_len, back_len),
+                            adapter["total_front"],
+                            adapter["total_back"],
+                        ),
+                        header=(
+                            "Sequence",
+                            "Type",
+                            "Length",
+                            "Trimmed (x)",
+                            "Half matches (x)",
+                        ),
+                    )
+                else:
+                    seq_len = len(adapter["sequence"])
+                    seq_printer.print_rows(
+                        (
+                            adapter["sequence"],
+                            adapter["where"]["desc"],
+                            seq_len,
+                            adapter["total"],
+                        ),
+                        header=("Sequence", "Type", "Length", "Trimmed (x)"),
+                    )
+
+                _print()
+
+                if adapter["total"] == 0:
+                    continue
+
+                if where_name == "anywhere":
+                    _print(
+                        adapter["total_front"],
+                        "times, it overlapped the 5' end of a read"
+                    )
+                    _print(
+                        adapter["total_back"],
+                        "times, it overlapped the 3' end or was within the read",
+                    )
+                    _print()
+                    print_error_ranges(seq_len, adapter["max_error_rate"])
+                    _print("Overview of removed sequences (5'):")
+                    print_histogram(
+                        adapter["lengths_front"],
+                        seq_len,
+                        total_records,
+                        adapter["max_error_rate"],
+                        adapter["errors_front"],
+                        adapter["match_probabilities"],
+                    )
+                    _print()
+                    _print("Overview of removed sequences (3' or within):")
+                    print_histogram(
+                        adapter["lengths_back"],
+                        seq_len,
+                        total_records,
+                        adapter["max_error_rate"],
+                        adapter["errors_back"],
+                        adapter["match_probabilities"],
+                    )
+                elif where_name == "linked":
+                    print_error_ranges(front_len, adapter["front_max_error_rate"])
+                    print_error_ranges(back_len, adapter["back_max_error_rate"])
+                    _print("Overview of removed sequences at 5' end:")
+                    print_histogram(
+                        adapter["front_lengths_front"],
+                        front_len,
+                        total_records,
+                        adapter["front_max_error_rate"],
+                        adapter["front_errors_front"],
+                        adapter["front_match_probabilities"],
+                    )
+                    _print()
+                    _print("Overview of removed sequences at 3' end:")
+                    print_histogram(
+                        adapter["back_lengths_back"],
+                        back_len,
+                        total_records,
+                        adapter["back_max_error_rate"],
+                        adapter["back_errors_back"],
+                        adapter["back_match_probabilities"],
+                    )
+                elif where_name in ("front", "prefix"):
+                    print_error_ranges(seq_len, adapter["max_error_rate"])
+                    _print("Overview of removed sequences:")
+                    print_histogram(
+                        adapter["lengths_front"],
+                        seq_len,
+                        total_records,
+                        adapter["max_error_rate"],
+                        adapter["errors_front"],
+                        adapter["match_probabilities"],
+                    )
+                elif where_name in ("back", "suffix"):
+                    print_error_ranges(seq_len, adapter["max_error_rate"])
+                    warning = warning or print_adjacent_bases(adapter["adjacent_bases"])
+                    _print("Overview of removed sequences:")
+                    print_histogram(
+                        adapter["lengths_back"],
+                        seq_len,
+                        total_records,
+                        adapter["max_error_rate"],
+                        adapter["errors_back"],
+                        adapter["match_probabilities"],
+                    )
+
+        if warning:
             _print("WARNING:")
             _print(
                 "\n".join(
                     INDENTED.wrap(
-                        'The adapter is preceded by "{0}" extremely often. The '
-                        "provided adapter sequence may be incomplete. To fix the "
-                        'problem, add "{0}" to the beginning of the adapter '
-                        "sequence.".format(warnbase)
+                        "One or more of your adapter sequences may be incomplete. "
+                        "Please see the detailed output above."
                     )
                 )
             )
-            _print()
-            return True
 
-        _print()
-        return False
+    @classmethod
+    def _print_pre_trim_report(cls, summary: dict, stream: IO):
+        """
+        Prints pre-trimming stats.
 
-    warning = False
-    for pair in range(2 if paired else 1):
-        if adapters[pair] is None:
-            continue
+        Args:
+            summary: The summary dict.
+            stream: The output file.
+        """
+        pre = summary["pre"]
+        _print_title = TitlePrinter(stream)
+        _print = Printer(stream)
+        _print_title("Pre-trimming stats", level=1)
 
-        header = "Adapter {}"
-        if paired:
-            header = ("First read: " if pair == 0 else "Second read: ") + header
-        for name, adapter in adapters[pair].items():
-            _print_title(header.format(name), level=1)
-            where_name = adapter["where"]["name"]
-            if where_name == "linked":
-                front_len, back_len = [
-                    len(adapter[s]) for s in ("front_sequence", "back_sequence")
-                ]
-                seq_printer.print_rows(
-                    (
-                        "{}...{}".format(
-                            adapter["front_sequence"], adapter["back_sequence"]
-                        ),
-                        "linked",
-                        "{}+{}".format(front_len, back_len),
-                        adapter["total_front"],
-                        adapter["total_back"],
-                    ),
-                    header=(
-                        "Sequence",
-                        "Type",
-                        "Length",
-                        "Trimmed (x)",
-                        "Half matches (x)",
-                    ),
-                )
-            else:
-                seq_len = len(adapter["sequence"])
-                seq_printer.print_rows(
-                    (
-                        adapter["sequence"],
-                        adapter["where"]["desc"],
-                        seq_len,
-                        adapter["total"],
-                    ),
-                    header=("Sequence", "Type", "Length", "Trimmed (x)"),
-                )
-            _print()
-            if adapter["total"] == 0:
-                continue
-
-            if where_name == "anywhere":
-                _print(
-                    adapter["total_front"], "times, it overlapped the 5' end of a read"
-                )
-                _print(
-                    adapter["total_back"],
-                    "times, it overlapped the 3' end or was within the read",
-                )
-                _print()
-                print_error_ranges(seq_len, adapter["max_error_rate"])
-                _print("Overview of removed sequences (5'):")
-                print_histogram(
-                    adapter["lengths_front"],
-                    seq_len,
-                    total_records,
-                    adapter["max_error_rate"],
-                    adapter["errors_front"],
-                    adapter["match_probabilities"],
-                )
-                _print()
-                _print("Overview of removed sequences (3' or within):")
-                print_histogram(
-                    adapter["lengths_back"],
-                    seq_len,
-                    total_records,
-                    adapter["max_error_rate"],
-                    adapter["errors_back"],
-                    adapter["match_probabilities"],
-                )
-            elif where_name == "linked":
-                print_error_ranges(front_len, adapter["front_max_error_rate"])
-                print_error_ranges(back_len, adapter["back_max_error_rate"])
-                _print("Overview of removed sequences at 5' end:")
-                print_histogram(
-                    adapter["front_lengths_front"],
-                    front_len,
-                    total_records,
-                    adapter["front_max_error_rate"],
-                    adapter["front_errors_front"],
-                    adapter["front_match_probabilities"],
-                )
-                _print()
-                _print("Overview of removed sequences at 3' end:")
-                print_histogram(
-                    adapter["back_lengths_back"],
-                    back_len,
-                    total_records,
-                    adapter["back_max_error_rate"],
-                    adapter["back_errors_back"],
-                    adapter["back_match_probabilities"],
-                )
-            elif where_name in ("front", "prefix"):
-                print_error_ranges(seq_len, adapter["max_error_rate"])
-                _print("Overview of removed sequences:")
-                print_histogram(
-                    adapter["lengths_front"],
-                    seq_len,
-                    total_records,
-                    adapter["max_error_rate"],
-                    adapter["errors_front"],
-                    adapter["match_probabilities"],
-                )
-            elif where_name in ("back", "suffix"):
-                print_error_ranges(seq_len, adapter["max_error_rate"])
-                warning = warning or print_adjacent_bases(adapter["adjacent_bases"])
-                _print("Overview of removed sequences:")
-                print_histogram(
-                    adapter["lengths_back"],
-                    seq_len,
-                    total_records,
-                    adapter["max_error_rate"],
-                    adapter["errors_back"],
-                    adapter["match_probabilities"],
-                )
-    if warning:
-        _print("WARNING:")
-        _print(
-            "\n".join(
-                INDENTED.wrap(
-                    "One or more of your adapter sequences may be incomplete. "
-                    "Please see the detailed output above."
-                )
-            )
-        )
-
-
-def print_pre_trim_report(summary, outfile):
-    """Print pre-trimming stats.
-
-    Args:
-        summary: The summary dict.
-        outfile: The output file.
-    """
-    pre = summary["pre"]
-    _print_title = TitlePrinter(outfile)
-    _print = Printer(outfile)
-    _print_title("Pre-trimming stats", level=1)
-    for source, data in pre.items():
-        _print_title("Source", level=3, newline=False)
-        # TODO: When multi-file input is supported, this code will need to
-        # get summary['input']['input_names'][source]
-        for read, src in enumerate(summary["input"]["input_names"], 1):
-            if src is None:
-                continue
-
-            _print("Read {}: {}".format(read, src))
-        _print()
-        print_stats_report(data, outfile)
-
-
-def print_post_trim_report(summary, outfile):
-    """Print post-trimming stats.
-
-    Args:
-        summary: The summary dict.
-        outfile: The output file.
-    """
-    post = summary["post"]
-    _print_title = TitlePrinter(outfile)
-    _print = Printer(outfile)
-    _print_title("Post-trimming stats", level=1)
-    for dest, stats in post.items():
-        _print_title("Destination: {}".format(dest), level=2)
-        for source, data in stats.items():
+        for source, data in pre.items():
             _print_title("Source", level=3, newline=False)
+
             # TODO: When multi-file input is supported, this code will need to
-            # get summary['input']['input_names'][source]
+            #  get summary['input']['input_names'][source]
             for read, src in enumerate(summary["input"]["input_names"], 1):
                 if src is None:
                     continue
 
                 _print("Read {}: {}".format(read, src))
+
             _print()
-            print_stats_report(data, outfile)
 
+            cls._print_metrics_report(data, stream)
 
-def print_stats_report(data, outfile):
-    """Print stats.
-
-    Args:
-        data: The stats dict.
-        outfile: The output file.
-    """
-    paired = "read2" in data
-    max_count = data["read1"]["counts"]
-    if paired:
-        max_count = max(max_count, data["read2"]["counts"])
-    max_width = len(str(max_count))
-    # add space for commas and column separation
-    max_width += (max_width // 3) + 1
-    _print_title = TitlePrinter(outfile)
-    _print = RowPrinter(outfile, (35, max_width))
-
-    def _print_histogram(title, hist1, hist2=None):
-        _print_title(title, level=2)
-        if hist1 is None:
-            _print("No Data")
-            return
-
-        if hist2:
-            hist = (
-                (key, hist1.get(key, 0), hist2.get(key, 0))
-                for key in sorted(set(hist1.keys()) | set(hist2.keys()))
-            )
-        else:
-            hist = sorted(hist1.items(), key=lambda x: x[0])
-        for histbin in hist:
-            _print(*histbin)
-
-    def _print_base_histogram(title, hist, extra_width=4, index_name="Pos"):
-        _print_title(title, level=2)
-        if hist is None:
-            _print("No Data")
-            return
-
-        _print(index_name, *hist["columns"], header=True, extra_width=extra_width)
-        for pos, row in hist["rows"].items():
-            total_count = sum(row)
-            base_pcts = (round(count * 100 / total_count, 1) for count in row)
-            _print(pos, *base_pcts, extra_width=extra_width)
-
-    def _print_tile_histogram(title, hist):
-        if hist is None:
-            _print_title(title, level=2)
-            _print("No Data")
-            return
-
-        ncol = len(hist["columns"])
-        max_tile_width = max(4, len(str(math.ceil(data["read1"]["counts"] / ncol)))) + 1
-        _print_base_histogram(
-            title, hist, extra_width=max_tile_width, index_name="Tile"
-        )
-
-    def _print_tile_base_histogram(title, hist):
-        """Print a histogram of position x tile, with values as the median
-        base quality.
+    @classmethod
+    def _print_post_trim_report(cls, summary: dict, outfile: IO):
         """
-        _print_title(title, level=2)
-        if hist is None:
-            _print("No Data")
-            return
+        Prints post-trimming stats.
 
-        quals = hist["columns"]
-        tiles = hist["columns2"]
-        ncol = len(tiles)
-        max_tile_width = max(4, len(str(math.ceil(data["read1"]["counts"] / ncol)))) + 1
-        _print("Pos", *tiles, header=True, extra_width=max_tile_width)
-        for pos, tiles in hist["rows"].items():
-            # compute the weighted median for each tile at each position
-            _print(
-                pos,
-                *(
-                    weighted_median(quals, tile_counts)
-                    for tile_counts in tiles.values()
-                ),
-                extra_width=max_tile_width
+        Args:
+            summary: The summary dict.
+            outfile: The output file.
+        """
+        post = summary["post"]
+        _print_title = TitlePrinter(outfile)
+        _print = Printer(outfile)
+        _print_title("Post-trimming stats", level=1)
+
+        for dest, stats in post.items():
+            _print_title("Destination: {}".format(dest), level=2)
+
+            for source, data in stats.items():
+                _print_title("Source", level=3, newline=False)
+
+                # TODO: When multi-file input is supported, this code will need to
+                #  get summary['input']['input_names'][source]
+
+                for read, src in enumerate(summary["input"]["input_names"], 1):
+                    if src is None:
+                        continue
+
+                    _print("Read {}: {}".format(read, src))
+
+                _print()
+
+                cls._print_metrics_report(data, outfile)
+
+    @classmethod
+    def _print_metrics_report(cls, data, outfile):
+        """
+        Prints metrics.
+
+        Args:
+            data: The stats dict.
+            outfile: The output file.
+        """
+        paired = "read2" in data
+        max_count = data["read1"]["counts"]
+
+        if paired:
+            max_count = max(max_count, data["read2"]["counts"])
+
+        max_width = len(str(max_count))
+        # add space for commas and column separation
+        max_width += (max_width // 3) + 1
+        _print_title = TitlePrinter(outfile)
+        _print = RowPrinter(outfile, (35, max_width))
+
+        def _print_histogram(title, hist1, hist2=None):
+            _print_title(title, level=2)
+
+            if hist1 is None:
+                _print("No Data")
+                return
+
+            if hist2:
+                hist = (
+                    (key, hist1.get(key, 0), hist2.get(key, 0))
+                    for key in sorted(set(hist1.keys()) | set(hist2.keys()))
+                )
+            else:
+                hist = sorted(hist1.items(), key=lambda x: x[0])
+
+            for histbin in hist:
+                _print(*histbin)
+
+        def _print_base_histogram(title, hist, extra_width=4, index_name="Pos"):
+            _print_title(title, level=2)
+
+            if hist is None:
+                _print("No Data")
+                return
+
+            _print(index_name, *hist["columns"], header=True, extra_width=extra_width)
+
+            for pos, row in hist["rows"].items():
+                total_count = sum(row)
+                base_pcts = (round(count * 100 / total_count, 1) for count in row)
+                _print(pos, *base_pcts, extra_width=extra_width)
+
+        def _print_tile_histogram(title, hist):
+            if hist is None:
+                _print_title(title, level=2)
+                _print("No Data")
+                return
+
+            ncol = len(hist["columns"])
+            max_tile_width = max(
+                4, len(str(math.ceil(data["read1"]["counts"] / ncol)))
+            ) + 1
+            _print_base_histogram(
+                title, hist, extra_width=max_tile_width, index_name="Tile"
             )
 
-    _print("", "Read1", "Read2", header=True)
-    # Sequence-level stats
-    _print(
-        "Read pairs:" if paired else "Reads:",
-        data["read1"]["counts"],
-        data["read2"]["counts"],
-    )
-    _print()
-    _print_histogram(
-        "Sequence lengths:",
-        data["read1"]["lengths"]["hist"],
-        data["read2"]["lengths"]["hist"],
-    )
-    _print()
-    if "qualities" in data["read1"]:
+        def _print_tile_base_histogram(title: str, hist: dict):
+            """Print a histogram of position x tile, with values as the median
+            base quality.
+            """
+            _print_title(title, level=2)
+            if hist is None:
+                _print("No Data")
+                return
+
+            quals = hist["columns"]
+            tiles = hist["columns2"]
+            ncol = len(tiles)
+            max_tile_width = max(
+                4, len(str(math.ceil(data["read1"]["counts"] / ncol)))
+            ) + 1
+            _print("Pos", *tiles, header=True, extra_width=max_tile_width)
+
+            for pos, tiles in hist["rows"].items():
+                # compute the weighted median for each tile at each position
+                _print(
+                    pos,
+                    *(
+                        weighted_median(quals, tile_counts)
+                        for tile_counts in tiles.values()
+                    ),
+                    extra_width=max_tile_width
+                )
+
+        _print("", "Read1", "Read2", header=True)
+
+        # Sequence-level stats
+        _print(
+            "Read pairs:" if paired else "Reads:",
+            data["read1"]["counts"],
+            data["read2"]["counts"],
+        )
+        _print()
         _print_histogram(
-            "Sequence qualities:",
-            data["read1"]["qualities"]["hist"],
-            data["read2"]["qualities"]["hist"],
+            "Sequence lengths:",
+            data["read1"]["lengths"]["hist"],
+            data["read2"]["lengths"]["hist"],
         )
         _print()
-    _print_histogram(
-        "Sequence GC content (%)",
-        data["read1"]["gc"]["hist"],
-        data["read2"]["gc"]["hist"],
-    )
-    _print()
-    if "tile_sequence_qualities" in data["read1"]:
-        _print_tile_histogram(
-            "Read 1 per-tile sequence qualities (%)",
-            data["read1"]["tile_sequence_qualities"],
+        if "qualities" in data["read1"]:
+            _print_histogram(
+                "Sequence qualities:",
+                data["read1"]["qualities"]["hist"],
+                data["read2"]["qualities"]["hist"],
+            )
+            _print()
+        _print_histogram(
+            "Sequence GC content (%)",
+            data["read1"]["gc"]["hist"],
+            data["read2"]["gc"]["hist"],
         )
         _print()
-        _print_tile_histogram(
-            "Read 2 per-tile sequence qualities (%)",
-            data["read2"]["tile_sequence_qualities"],
-        )
+        if "tile_sequence_qualities" in data["read1"]:
+            _print_tile_histogram(
+                "Read 1 per-tile sequence qualities (%)",
+                data["read1"]["tile_sequence_qualities"],
+            )
+            _print()
+            _print_tile_histogram(
+                "Read 2 per-tile sequence qualities (%)",
+                data["read2"]["tile_sequence_qualities"],
+            )
+            _print()
+
+        # Base-level stats
+        if "base_qualities" in data["read1"]:
+            _print_base_histogram(
+                "Read 1 base qualities (%)", data["read1"]["base_qualities"]
+            )
+            _print()
+            _print_base_histogram(
+                "Read 2 base qualities (%)", data["read2"]["base_qualities"]
+            )
+            _print()
+        _print_base_histogram("Read 1 base composition (%)", data["read1"]["bases"])
         _print()
-    # Base-level stats
-    if "base_qualities" in data["read1"]:
-        _print_base_histogram(
-            "Read 1 base qualities (%)", data["read1"]["base_qualities"]
-        )
-        _print()
-        _print_base_histogram(
-            "Read 2 base qualities (%)", data["read2"]["base_qualities"]
-        )
-        _print()
-    _print_base_histogram("Read 1 base composition (%)", data["read1"]["bases"])
-    _print()
-    _print_base_histogram("Read 2 base composition (%)", data["read2"]["bases"])
-    _print()
-    if "tile_base_qualities" in data["read1"]:
-        _print_tile_base_histogram(
-            "Read 1 per-tile base qualities (%)", data["read1"]["tile_base_qualities"]
-        )
-        _print()
-        _print_tile_base_histogram(
-            "Read 2 per-tile base qualities (%)", data["read2"]["tile_base_qualities"]
-        )
+        _print_base_histogram("Read 2 base composition (%)", data["read2"]["bases"])
         _print()
 
+        if "tile_base_qualities" in data["read1"]:
+            _print_tile_base_histogram(
+                "Read 1 per-tile base qualities (%)",
+                data["read1"]["tile_base_qualities"]
+            )
+            _print()
+            _print_tile_base_histogram(
+                "Read 2 per-tile base qualities (%)",
+                data["read2"]["tile_base_qualities"]
+            )
+            _print()
 
-def sizeof(*x, seps=True, prec=1):
-    """Returns the largest string size of all objects in x, where x is a
-    sequence of string or numeric values.
+
+def sizeof(*x: Union[str, int, float], seps: bool = True, prec: int = 1):
+    """
+    Returns the largest string size of all objects in x, where x is a sequence of
+    string or numeric values.
 
     Args:
         *x: The objects to test.
@@ -974,7 +1061,6 @@ def sizeof(*x, seps=True, prec=1):
     """
     if isinstance(x[0], str):
         return max(len(s) for s in x)
-
     else:
         if isinstance(x[0], int):
             numlen = len(str(max(x)))
@@ -988,3 +1074,12 @@ def sizeof(*x, seps=True, prec=1):
             raise ValueError("Unexpected data type: {}".format(x[0].__class__))
 
         return numlen
+
+
+class LegacyReportGenerator(BaseReportGenerator):
+    @classmethod
+    def _create_report_writer(cls, fmt: str, options: Namespace) -> ReportWriter:
+        if fmt == "txt":
+            return LegacyTextReportWriter(options)
+        else:
+            return super()._create_report_writer(fmt, options)

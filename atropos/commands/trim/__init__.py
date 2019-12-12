@@ -1,31 +1,33 @@
-"""Implementation of the 'trim' command.
-"""
 from abc import ABCMeta, abstractmethod
-from argparse import Namespace
 from collections import Sequence as SequenceCollection
-import logging
 from multiprocessing import Process
 import sys
-import textwrap
 from typing import (
-    Dict, Iterable, Optional, Sequence as SequenceType, Tuple, Type, Union
+    Dict,
+    Iterable,
+    Optional,
+    Sequence as SequenceType,
+    Tuple,
+    Type,
+    Union,
 )
 
+from loguru import logger
 import xphyle
 
 from atropos.adapters import AdapterParser, AdapterType
-from atropos.commands.base import (
-    BaseCommandRunner,
+from atropos.commands import (
+    BaseCommand,
     Summary,
     Pipeline,
     SingleEndPipelineMixin,
     PairedEndPipelineMixin,
 )
 from atropos.commands.multicore import WorkerProcess
-from atropos.commands.stats import (
-    StatsMode,
-    SingleEndReadStatistics,
-    PairedEndReadStatistics,
+from atropos.commands.metrics import (
+    MetricsMode,
+    SingleEndReadMetrics,
+    PairedEndReadMetrics,
 )
 from atropos.commands.trim.modifiers import (
     AdapterCutter,
@@ -73,11 +75,15 @@ from atropos.commands.trim.writers import (
     Writers,
 )
 from atropos.io.seqio import Sequence
-from atropos.util import RandomMatchProbability, run_interruptible
+from atropos.utils import classproperty, run_interruptible
+from atropos.utils import ReturnCode
+from atropos.utils.collections import Summarizable
+from atropos.utils.statistics import RandomMatchProbability
 
 
-class RecordHandler:
-    """Base class for record handlers.
+class RecordHandler(Summarizable):
+    """
+    Base class for record handlers.
     """
 
     def __init__(self, modifiers: Modifiers, filters: Filters, formatters: Formatters):
@@ -88,7 +94,8 @@ class RecordHandler:
     def handle_record(
         self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
     ) -> Tuple[Type[Filter], Tuple[Sequence, Optional[Sequence]]]:
-        """Handle a pair of reads.
+        """
+        Handles a pair of reads.
         """
         reads = self.modifiers.modify(read1, read2)
         dest = self.filters.filter(*reads)
@@ -96,7 +103,8 @@ class RecordHandler:
         return dest, reads
 
     def summarize(self) -> dict:
-        """Returns a summary dict.
+        """
+        Returns a summary dict.
         """
         return dict(
             trim=dict(
@@ -107,44 +115,52 @@ class RecordHandler:
         )
 
 
-class StatsRecordHandlerWrapper:
-    """Wrapper around a record handler that collects read statistics
-    before and/or after trimming.
-
-    Args:
-        record_handler:
-        paired: Whether reads are paired-end.
-        stats_arg: Sequence; when to collect stats ('pre', 'post')
-        kwargs:
-            mode: Collection mode; pre=only collect pre-trim stats; post=only
-            collect post-trim stats; both=collect both pre- and post-trim stats.
+class MetricsRecordHandlerWrapper(Summarizable):
+    """
+    Wrapper around a record handler that collects read metrics before and/or after
+    trimming.
     """
 
     def __init__(
         self,
         record_handler: RecordHandler,
         paired: bool,
-        stats_args: Dict[StatsMode, dict],
-        **kwargs
+        stats_args: Dict[MetricsMode, dict],
+        **kwargs,
     ):
+        """
+        Args:
+            record_handler:
+            paired: Whether reads are paired-end.
+            stats_arg: Sequence; when to collect stats ('pre', 'post')
+            kwargs:
+                mode: Collection mode; pre=only collect pre-trim stats; post=only
+                collect post-trim stats; both=collect both pre- and post-trim stats.
+        """
         self.record_handler = record_handler
-        self.read_statistics_class = (
-            PairedEndReadStatistics if paired else SingleEndReadStatistics
+        self.read_metrics_class = (
+            PairedEndReadMetrics if paired else SingleEndReadMetrics
         )
-        self.pre = self.post = None
-        if StatsMode.PRE in stats_args:
+
+        if MetricsMode.PRE in stats_args:
             self.pre = {}
             self.pre_kwargs = kwargs.copy()
-            self.pre_kwargs.update(stats_args[StatsMode.PRE])
-        if StatsMode.POST in stats_args:
+            self.pre_kwargs.update(stats_args[MetricsMode.PRE])
+        else:
+            self.pre = None
+
+        if MetricsMode.POST in stats_args:
             self.post = {}
             self.post_kwargs = kwargs.copy()
-            self.post_kwargs.update(stats_args[StatsMode.POST])
+            self.post_kwargs.update(stats_args[MetricsMode.POST])
+        else:
+            self.post = None
 
     def handle_record(
         self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
     ) -> Tuple[Type[Filter], Tuple[Sequence, Optional[Sequence]]]:
-        """Handle a pair of reads.
+        """
+        Handles a pair of reads.
 
         Args:
             context:
@@ -166,10 +182,10 @@ class StatsRecordHandlerWrapper:
         source: Union[str, Tuple[str, str]],
         read1: Sequence,
         read2: Optional[Sequence] = None,
-        **kwargs
+        **kwargs,
     ):
         """
-        Collect stats on a pair of reads.
+        Collects metrics on a pair of reads.
 
         Args:
             stats: The :class:`ReadStatistics` object.
@@ -179,56 +195,63 @@ class StatsRecordHandlerWrapper:
             kwargs:
         """
         if source not in stats:
-            stats[source] = self.read_statistics_class(**kwargs)
+            stats[source] = self.read_metrics_class(**kwargs)
+
         stats[source].collect(read1, read2)
 
     def summarize(self) -> dict:
-        """Returns a summary dict.
+        """
+        Returns a summary dict.
         """
         summary = self.record_handler.summarize()
+
         if self.pre is not None:
             summary["pre"] = dict(
                 (source, stats.summarize()) for source, stats in self.pre.items()
             )
+
         if self.post is not None:
             summary["post"] = {}
             for dest, stats_dict in self.post.items():
                 summary["post"][dest.name] = dict(
                     (source, stats.summarize()) for source, stats in stats_dict.items()
                 )
+
         return summary
 
 
 class ResultHandler(metaclass=ABCMeta):
-    """Base class for result handlers.
+    """
+    Base class for result handlers.
     """
 
     def start(self, worker: Optional[Process] = None):
-        """Start the result handler.
         """
-        pass
+        Starts the result handler.
+        """
 
     def finish(self, total_batches: Optional[int] = None):
-        """Finish the result handler.
+        """
+        Finishes the result handler.
 
         Args:
             total_batches: Total number of batches processed.
         """
-        pass
 
     @abstractmethod
     def write_result(self, batch_num: int, result: dict):
-        """Write a batch of results to output.
+        """
+        Writes a batch of results to output.
 
         Args:
             batch_num: The batch number.
             result: The result to write.
         """
-        pass
 
 
 class ResultHandlerWrapper(ResultHandler):
-    """Wraps a ResultHandler.
+    """
+    Wraps a ResultHandler.
     """
 
     def __init__(self, handler: ResultHandler):
@@ -245,12 +268,14 @@ class ResultHandlerWrapper(ResultHandler):
 
 
 class WorkerResultHandler(ResultHandlerWrapper):
-    """Wraps a ResultHandler and compresses results prior to writing.
+    """
+    Wraps a ResultHandler and compresses results prior to writing.
     """
 
     def write_result(self, batch_num: int, result: dict):
-        """Given a dict mapping files to lists of strings, join the strings and
-        compress them (if necessary) and then return the property formatted
+        """
+        Given a dict mapping files to lists of strings, joins the strings and
+        compresses them (if necessary) and then returns the properly formatted
         result dict.
         """
         self.handler.write_result(
@@ -258,7 +283,8 @@ class WorkerResultHandler(ResultHandlerWrapper):
         )
 
     def prepare_file(self, path: str, strings: Iterable[str]):
-        """Prepare data for writing.
+        """
+        Prepares data for writing.
 
         Returns:
             Tuple (path, data).
@@ -269,22 +295,23 @@ class WorkerResultHandler(ResultHandlerWrapper):
 class WriterResultHandler(ResultHandler):
     """
     ResultHandler that writes results to disk.
-
-    Args:
-        writers: :class:`Writers` object.
-        compressed: Whether the data is compressed.
-        use_suffix: Whether to add the worker index as a file suffix. Used for
-            parallel-write mode.
     """
 
     def __init__(
-         self, writers: Writers, compressed: bool = False, use_suffix: bool = False
+        self, writers: Writers, compressed: bool = False, use_suffix: bool = False
     ):
+        """
+        Args:
+            writers: :class:`Writers` object.
+            compressed: Whether the data is compressed.
+            use_suffix: Whether to add the worker index as a file suffix. Used for
+                parallel-write mode.
+        """
         self.writers = writers
         self.compressed = compressed
         self.use_suffix = use_suffix
 
-    def start(self, worker: Optional[Process] = None):
+    def start(self, worker: Optional[WorkerProcess] = None):
         if self.use_suffix:
             if worker is None:
                 raise ValueError("worker must not be None")
@@ -333,7 +360,8 @@ class TrimPipeline(Pipeline, metaclass=ABCMeta):
 
 
 class TrimSummary(Summary):
-    """Summary that adds aggregate values for record and bp stats.
+    """
+    Summary that adds aggregate values for record and bp stats.
     """
 
     def _post_process_other(self, dict_val: dict, key, value) -> None:
@@ -347,7 +375,8 @@ class TrimSummary(Summary):
             return
 
         def frac(val: int, _total: int):
-            """Compute fraction of total.
+            """
+            Computes fraction of total.
             """
             return (val / _total) if val and _total != 0 else 0
 
@@ -355,6 +384,7 @@ class TrimSummary(Summary):
             if key.startswith("records_"):
                 frac_key = "fraction_{}".format(key)
                 total_records = self["total_record_count"]
+
                 if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [frac(val, total_records) for val in value]
                     total = sum(val for val in value if val)
@@ -364,6 +394,7 @@ class TrimSummary(Summary):
             elif key.startswith("bp_"):
                 frac_key = "fraction_{}".format(key)
                 sum_total_bp = self["sum_total_bp_count"]
+
                 if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [
                         frac(val, bps)
@@ -378,22 +409,28 @@ class TrimSummary(Summary):
                     dict_val[frac_key] = frac(value, sum_total_bp)
 
 
-class CommandRunner(BaseCommandRunner):
-    name = "trim"
+class TrimCommand(BaseCommand):
+    @classproperty
+    def name(cls) -> str:
+        return "trim"
 
-    def __init__(self, options: Namespace):
-        super().__init__(options, TrimSummary)
+    @classmethod
+    def _create_summary(cls) -> dict:
+        return TrimSummary()
 
-    def __call__(self):
+    def __call__(self) -> ReturnCode:
         options = self.options
         match_probability = RandomMatchProbability()
 
         # Create Adapters
+        adapters1 = []
+        adapters2 = []
         has_adapters1 = options.adapters or options.anywhere or options.front
         has_adapters2 = options.adapters2 or options.anywhere2 or options.front2
-        adapters1 = adapters2 = []
+
         if has_adapters1 or has_adapters2:
-            adapter_cache = super().load_known_adapters()
+            adapter_cache = self._load_known_adapters()
+
             parser_args = dict(
                 colorspace=options.colorspace,
                 max_error_rate=options.error_rate,
@@ -409,15 +446,19 @@ class CommandRunner(BaseCommandRunner):
             )
             if options.adapter_max_rmp:
                 parser_args["max_rmp"] = options.adapter_max_rmp
+
             adapter_parser = AdapterParser(**parser_args)
+
             if has_adapters1:
                 adapters1 = adapter_parser.parse_multi(
                     options.adapters, options.anywhere, options.front
                 )
+
             if has_adapters2:
                 adapters2 = adapter_parser.parse_multi(
                     options.adapters2, options.anywhere2, options.front2
                 )
+
             if options.cache_adapters:
                 adapter_cache.save()
 
@@ -435,14 +476,15 @@ class CommandRunner(BaseCommandRunner):
             and (options.minimum_length is None or options.minimum_length <= 0)
             and options.maximum_length == sys.maxsize
             and not options.trim_n
-            and not self.has_qualfile
+            and not self.get_option("has_qualfile")
             and options.max_n is None
             and (not options.paired or options.overwrite_low_quality is None)
         ):
             raise ValueError("You need to provide at least one adapter sequence.")
 
         if options.aligner == "insert" and any(
-            not a or len(a) != 1 or a[0].where != BACK for a in (adapters1, adapters2)
+            not a or len(a) != 1 or a[0].where != AdapterType.BACK
+            for a in (adapters1, adapters2)
         ):
             raise ValueError(
                 "Insert aligner requires a single 3' adapter for each read"
@@ -484,7 +526,7 @@ class CommandRunner(BaseCommandRunner):
                     # Use different base probabilities if we're trimming
                     # bisulfite data.
                     # TODO: this doesn't seem to help things, so commenting it
-                    # out for now
+                    #  out for now
                     # if options.bisulfite:
                     #   base_probs = dict(match_prob=0.33, mismatch_prob=0.67)
                     # else:
@@ -585,7 +627,9 @@ class CommandRunner(BaseCommandRunner):
         if options.double_encode:
             modifiers.add_modifier(DoubleEncoder)
 
-        if options.zero_cap and self.delivers_qualities:
+        delivers_qualities = self.get_option("delivers_qualities")
+
+        if options.zero_cap and delivers_qualities:
             modifiers.add_modifier(ZeroCapper, quality_base=options.quality_base)
 
         if options.trim_primer:
@@ -610,7 +654,7 @@ class CommandRunner(BaseCommandRunner):
             output2 = options.paired_output
 
         if options.output_format is None:
-            if self.delivers_qualities:
+            if delivers_qualities:
                 options.output_format = "fastq"
             else:
                 options.output_format = "fasta"
@@ -619,7 +663,7 @@ class CommandRunner(BaseCommandRunner):
             output1,
             dict(
                 file_format=options.output_format,
-                qualities=self.delivers_qualities,
+                qualities=delivers_qualities,
                 colorspace=options.colorspace,
                 interleaved=interleaved,
             ),
@@ -687,13 +731,13 @@ class CommandRunner(BaseCommandRunner):
                 )
 
         if options.rest_file:
-            formatters.add_info_formatter(RestFormatter(options.rest_file))
+            formatters.add_detail_formatter(RestFormatter(options.rest_file))
 
         if options.info_file:
-            formatters.add_info_formatter(InfoFormatter(options.info_file))
+            formatters.add_detail_formatter(InfoFormatter(options.info_file))
 
         if options.wildcard_file:
-            formatters.add_info_formatter(WildcardFormatter(options.wildcard_file))
+            formatters.add_detail_formatter(WildcardFormatter(options.wildcard_file))
 
         if options.paired:
             mixin_class = PairedEndPipelineMixin
@@ -706,39 +750,35 @@ class CommandRunner(BaseCommandRunner):
         # Create record handler
         record_handler = RecordHandler(modifiers, filters, formatters)
         if options.stats:
-            record_handler = StatsRecordHandlerWrapper(
+            record_handler = MetricsRecordHandlerWrapper(
                 record_handler,
                 options.paired,
                 options.stats,
-                qualities=self.delivers_qualities,
-                quality_base=self.quality_base,
+                qualities=delivers_qualities,
+                quality_base=options.quality_base,
             )
 
-        logger = logging.getLogger()
         num_adapters = sum(len(a) for a in modifiers.get_adapters())
+
+        trim_mode = {
+            False: "single-end",
+            "first": "paired-end legacy",
+            "both": "paired-end",
+        }[options.paired]
         logger.info(
-            "Trimming %s adapter%s with at most %.1f%% errors in %s mode ...",
-            num_adapters,
-            "s" if num_adapters > 1 else "",
-            options.error_rate * 100,
-            {False: "single-end", "first": "paired-end legacy", "both": "paired-end"}[
-                options.paired
-            ],
+            f"Trimming {num_adapters} adapter{'s' if num_adapters > 1 else ''} "
+            f"with at most {options.error_rate * 100:.1f} errors in {trim_mode} mode..."
         )
+
         if options.paired == "first" and (
             len(record_handler.modifiers.get_modifiers(read=2)) > 0
             or options.quality_cutoff
         ):
             logger.warning(
-                "\n".join(
-                    textwrap.wrap(
-                        "Requested read modifications are applied only to the "
-                        "first read since backwards compatibility mode is enabled. "
-                        "To modify both reads, also use any of the -A/-B/-G/-U "
-                        "options. Use a dummy adapter sequence when necessary: "
-                        "-A XXX"
-                    )
-                )
+                """Requested read modifications are applied only to the first read 
+                since backwards compatibility mode is enabled. To modify both reads, 
+                also use any of the -A/-B/-G/-U options. Use a dummy adapter sequence 
+                when necessary: -A XXX"""
             )
 
         if options.threads is None:
@@ -754,8 +794,10 @@ class CommandRunner(BaseCommandRunner):
             return self.run_parallel(record_handler, writers, mixin_class)
 
     def run_parallel(
-        self, record_handler: RecordHandler, writers: Writers,
-        mixin_class: Type[Union[SingleEndPipelineMixin, PairedEndPipelineMixin]]
+        self,
+        record_handler: RecordHandler,
+        writers: Writers,
+        mixin_class: Type[Union[SingleEndPipelineMixin, PairedEndPipelineMixin]],
     ):
         """
         Parallel implementation of run_atropos. Works as follows:
@@ -819,7 +861,7 @@ class CommandRunner(BaseCommandRunner):
         # We do all the multicore imports and class definitions within the
         # run_parallel method to avoid extra work if only running in serial mode.
         from multiprocessing import Queue
-        from atropos.commands.multicore import ParallelPipelineMixin, RETRY_INTERVAL
+        from atropos.commands.multicore import ParallelPipelineMixin
         from atropos.commands.trim.multicore import (
             Done,
             Killed,
@@ -830,37 +872,41 @@ class CommandRunner(BaseCommandRunner):
             ResultProcess,
             WriterManager,
         )
+        from atropos.utils.multicore import DEFAULT_RETRY_INTERVAL
 
         # Main process
-        timeout = max(self.process_timeout, RETRY_INTERVAL)
-        threads = self.threads
-        logging.getLogger().debug(
-            "Starting atropos in parallel mode with threads=%d, timeout=%d",
-            threads,
-            timeout,
+        timeout = max(self.get_option("process_timeout"), DEFAULT_RETRY_INTERVAL)
+        threads = self.get_option("threads")
+        logger.debug(
+            f"Starting atropos in parallel mode with threads={threads}, "
+            f"timeout={timeout}"
         )
+
         if threads < 2:
             raise ValueError("'threads' must be >= 2")
 
-        # Reserve a thread for the writer process if it will be doing the
-        # compression and if one is available.
-        compression_mode = self.compression_mode
+        # Reserve a thread for the writer process if it will be doing the compression
+        # and if one is available.
+        compression_mode = self.get_option("compression_mode")
+
         if compression_mode is None:
             compression_mode = "worker"
             # TODO: this is a bit of a hack - we don't know what types of files we'll
             #  be compressing yet, so we make our guess based on the most commonly used
             #  compression format.
             gzip = xphyle.get_compressor("gzip")
-            if self.writer_process and gzip.can_use_system_compression:
+            if self.get_option("writer_process") and gzip.can_use_system_compression:
                 compression_mode = "writer"
+
         if compression_mode == "writer" and threads > 2:
             threads -= 1
 
-        # Queue by which results are sent from the worker processes to the
-        # writer process
-        result_queue = Queue(self.result_queue_size)
+        # Queue by which results are sent from the worker processes to the writer
+        # process
+        result_queue = Queue(self.get_option("result_queue_size"))
         writer_manager = None
-        if self.writer_process:
+
+        if self.get_option("writer_process"):
             if compression_mode == "writer":
                 worker_result_handler = WorkerResultHandler(
                     QueueResultHandler(result_queue)
@@ -869,8 +915,13 @@ class CommandRunner(BaseCommandRunner):
                 worker_result_handler = CompressingWorkerResultHandler(
                     QueueResultHandler(result_queue)
                 )
+
             writer_manager = WriterManager(
-                writers, compression_mode, self.preserve_order, result_queue, timeout
+                writers,
+                compression_mode,
+                self.get_option("preserve_order"),
+                result_queue,
+                timeout,
             )
         else:
             worker_result_handler = WorkerResultHandler(
@@ -881,5 +932,7 @@ class CommandRunner(BaseCommandRunner):
             "TrimPipelineImpl", (ParallelPipelineMixin, mixin_class, TrimPipeline), {}
         )
         pipeline = pipeline_class(record_handler, worker_result_handler)
+
         runner = ParallelTrimPipelineRunner(self, pipeline, threads, writer_manager)
+
         return runner.run()
