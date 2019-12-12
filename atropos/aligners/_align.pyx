@@ -4,10 +4,9 @@
 # in most implementations of NW alignment (http://biorxiv.org/content/biorxiv/early/2015/11/12/031500.full.pdf).
 # They provide a correct implementation (qalign: http://www.exelixis-lab.org/web/software/alignment/).
 
-from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
-from cpython.array cimport array, clone
+from cpython.mem cimport PyMem_Free, PyMem_Realloc
+from cpython.array cimport array
 cdef array ld_array = array('d', [])
-from libc.math cimport ceil
 
 DEF START_WITHIN_SEQ1 = 1
 DEF START_WITHIN_SEQ2 = 2

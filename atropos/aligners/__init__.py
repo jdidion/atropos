@@ -3,23 +3,13 @@
 Alignment module.
 """
 from collections import namedtuple
-from typing import Dict, Optional, Tuple, Union
+from enum import IntFlag
+from typing import Dict, Optional, Tuple, TypeVar, Union
 
-from atropos.align._align import Aligner, MultiAligner, compare_prefixes, locate
-from atropos.util import RandomMatchProbability, reverse_complement
+from atropos.aligners._align import Aligner, MultiAligner, compare_prefixes, locate
+from atropos.utils.ngs import reverse_complement
+from atropos.utils.stats import RandomMatchProbability
 
-
-START_WITHIN_SEQ1 = 1
-"""Gaps at begining of seq2 have no penalty."""
-START_WITHIN_SEQ2 = 2
-"""Gaps at begining of seq1 have no penalty."""
-STOP_WITHIN_SEQ1 = 4
-"""Gaps at end of seq2 have no penalty."""
-STOP_WITHIN_SEQ2 = 8
-"""Gaps at end of seq1 have no penalty"""
-
-SEMIGLOBAL = START_WITHIN_SEQ1 | START_WITHIN_SEQ2 | STOP_WITHIN_SEQ1 | STOP_WITHIN_SEQ2
-"""Typical semiglobal alignment (all gaps in the beginning or end are free)"""
 
 DEFAULT_INSERT_MAX_RMP = 1e-6
 """Default value for InsertAligner max insert random match probability"""
@@ -36,37 +26,28 @@ DEFAULT_MAX_ADAPTER_MISMATCH_FRAC = 0.2
 DEFAULT_ADAPTER_CHECK_CUTOFF = 9
 """Default value for InsertAligner adapter check cutoff"""
 
+
+class GapRule(IntFlag):
+    START_WITHIN_SEQ1 = 1
+    """Gaps at begining of seq2 have no penalty."""
+    START_WITHIN_SEQ2 = 2
+    """Gaps at begining of seq1 have no penalty."""
+    STOP_WITHIN_SEQ1 = 4
+    """Gaps at end of seq2 have no penalty."""
+    STOP_WITHIN_SEQ2 = 8
+    """Gaps at end of seq1 have no penalty"""
+
+
+SEMIGLOBAL = (
+    GapRule.START_WITHIN_SEQ1
+    | GapRule.START_WITHIN_SEQ2
+    | GapRule.STOP_WITHIN_SEQ1
+    | GapRule.STOP_WITHIN_SEQ2
+)
+"""Typical semiglobal alignment (all gaps in the beginning or end are free)"""
+
+
 MatchTuple = Tuple[int, int, int, int, int, int]
-
-
-def compare_suffixes(
-    suffix_ref: str,
-    suffix_query: str,
-    wildcard_ref: bool = False,
-    wildcard_query: bool = False,
-) -> MatchTuple:
-    """
-    Find out whether one string is the suffix of the other one, allowing mismatches.
-    Used to find an anchored 3' adapter when no indels are allowed.
-
-    Args:
-        suffix_ref, suffix_query: The suffices to compare.
-        wildcard_ref, wildcard_query: Whether wildcards are valid in either of
-            the suffices.
-    """
-    suffix_ref = suffix_ref[::-1]
-    suffix_query = suffix_query[::-1]
-    _, length, _, _, matches, errors = compare_prefixes(
-        suffix_ref, suffix_query, wildcard_ref, wildcard_query
-    )
-    return (
-        len(suffix_ref) - length,
-        len(suffix_ref),
-        len(suffix_query) - length,
-        len(suffix_query),
-        matches,
-        errors,
-    )
 
 
 MatchInfo = namedtuple(
@@ -91,23 +72,14 @@ MatchInfo = namedtuple(
 )
 
 
+M = TypeVar("M", bound="Match")
+
+
 class Match:
     """
     Common match-result object returned by aligners.
 
-    Args:
-        astart: Starting position of the match within the adapter.
-        astop: Ending position of the match within the adapter.
-        rstart: Starting position of the match within the read.
-        rstop: Ending position of the match within the read.
-        matches: Number of matching bases.
-        errors: Number of mismatching bases.
-        front: Whether the match is to the front of the read.
-        adapter: The :class:`Adapter`.
-        read: The :class:`Sequence`.
-
-    Todo:
-        Creating instances of this class is relatively slow.
+    Todo: Creating instances of this class is relatively slow.
     """
 
     __slots__ = [
@@ -131,10 +103,18 @@ class Match:
         rstop: int,
         matches: int,
         errors: int,
-        front: bool = None,
-        adapter: "Adapter" = None,  # TODO: circular reference
-        read: "Sequence" = None,  # TODO: circular reference
+        front: Optional[bool] = None,
     ):
+        """
+        Args:
+            astart: Starting position of the match within the adapter.
+            astop: Ending position of the match within the adapter.
+            rstart: Starting position of the match within the read.
+            rstop: Ending position of the match within the read.
+            matches: Number of matching bases.
+            errors: Number of mismatching bases.
+            front: Whether the match is to the front of the read.
+        """
         self.astart = astart
         self.astop = astop
         self.rstart = rstart
@@ -142,8 +122,6 @@ class Match:
         self.matches = matches
         self.errors = errors
         self.front = self._guess_is_front() if front is None else front
-        self.adapter = adapter
-        self.read = read
         # Number of aligned characters in the adapter. If there are indels,
         # this may be different from the number of characters in the read.
         self.length = self.astop - self.astart
@@ -163,8 +141,9 @@ class Match:
             f"errors={self.errors})"
         )
 
-    def copy(self) -> "Match":
-        """Create a copy of this Match.
+    def copy(self: M) -> M:
+        """
+        Create a copy of this Match.
         """
         return Match(
             self.astart,
@@ -174,21 +153,20 @@ class Match:
             self.matches,
             self.errors,
             self.front,
-            self.adapter,
-            self.read,
         )
 
     def _guess_is_front(self) -> bool:
         """
-        Guess whether this is match is for a front adapter.
+        Guesses whether this is match is for a front adapter.
 
         The match is assumed to be a front adapter when the first base of
         the read is involved in the alignment to the adapter.
         """
         return self.rstart == 0
 
-    def wildcards(self, wildcard_char="N") -> str:
-        """Return a string that contains, for each wildcard character,
+    def wildcards(self, wildcard_char: str = "N") -> str:
+        """
+        Returns a string that contains, for each wildcard character,
         the character that it matches. For example, if the adapter
         ATNGNA matches ATCGTA, then the string 'CT' is returned.
 
@@ -224,11 +202,13 @@ class Match:
         qualities = self.read.qualities
         if qualities is None:
             qualities = ""
+
         rsize = rsize_total = self.rstop - self.rstart
         if self.front and self.rstart > 0:
             rsize_total = self.rstop
         elif not self.front and self.rstop < len(seq):
             rsize_total = len(seq) - self.rstart
+
         return MatchInfo(
             self.read.name,
             self.errors,
@@ -285,7 +265,7 @@ class InsertAligner:
         self,
         adapter1: str,
         adapter2: str,
-        match_probability: RandomMatchProbability = RandomMatchProbability(),
+        match_probability: Optional[RandomMatchProbability] = None,
         insert_max_rmp: float = DEFAULT_INSERT_MAX_RMP,
         adapter_max_rmp: float = DEFAULT_ADAPTER_MAX_RMP,
         min_insert_overlap: int = DEFAULT_MIN_INSERT_OVERLAP,
@@ -301,7 +281,7 @@ class InsertAligner:
         self.adapter1_len = len(adapter1)
         self.adapter2 = adapter2
         self.adapter2_len = len(adapter2)
-        self.match_probability = match_probability
+        self.match_probability = match_probability or RandomMatchProbability()
         self.insert_max_rmp = insert_max_rmp
         self.adapter_max_rmp = adapter_max_rmp
         self.min_insert_overlap = min_insert_overlap
@@ -314,13 +294,13 @@ class InsertAligner:
         self.read_wildcards = read_wildcards
         self.aligner = MultiAligner(
             max_insert_mismatch_frac,
-            START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
+            GapRule.START_WITHIN_SEQ1 | GapRule.STOP_WITHIN_SEQ2,
             min_insert_overlap,
         )
 
     def match_insert(self, seq1: str, seq2: str) -> Optional[InsertMatchResult]:
         """
-        Use cutadapt aligner for insert and adapter matching.
+        Uses cutadapt aligner for insert and adapter matching.
 
         Args:
             seq1, seq2: Sequences to match.
@@ -432,3 +412,33 @@ class InsertAligner:
                             return match
 
             return None
+
+
+def compare_suffixes(
+    suffix_ref: str,
+    suffix_query: str,
+    wildcard_ref: bool = False,
+    wildcard_query: bool = False,
+) -> MatchTuple:
+    """
+    Find out whether one string is the suffix of the other one, allowing mismatches.
+    Used to find an anchored 3' adapter when no indels are allowed.
+
+    Args:
+        suffix_ref, suffix_query: The suffices to compare.
+        wildcard_ref, wildcard_query: Whether wildcards are valid in either of
+            the suffices.
+    """
+    suffix_ref = suffix_ref[::-1]
+    suffix_query = suffix_query[::-1]
+    _, length, _, _, matches, errors = compare_prefixes(
+        suffix_ref, suffix_query, wildcard_ref, wildcard_query
+    )
+    return (
+        len(suffix_ref) - length,
+        len(suffix_ref),
+        len(suffix_query) - length,
+        len(suffix_query),
+        matches,
+        errors,
+    )

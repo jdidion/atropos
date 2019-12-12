@@ -16,6 +16,10 @@
 * Added --output-format option to manually specify output format instead of determining the format from the output file name.
 * Enabled output to stdout by default with single-end and interleaved reads.
 
+## v1.1.24 (2019.11.17)
+
+* Fix #87 - Python 3.8 incompatibility - change time.clock() to time.process_time()
+
 ## v1.1.23 (2019.11.22)
 
 Set minimum Python version to 3.4.5

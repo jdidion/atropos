@@ -1,69 +1,68 @@
-"""Interface to report generation.
-"""
 from abc import ABCMeta, abstractmethod
 from importlib import import_module
 from pathlib import Path
-from typing import Dict, IO, Optional, Sequence, Type
+from typing import IO, Optional, Sequence
 
 from xphyle import STDOUT, STDERR, open_
 
 from atropos.io.seqio import InputRead
+from atropos.utils import classproperty
+from atropos.utils.argparse import Namespace
 
 
 class ReportWriter(metaclass=ABCMeta):
-    def __init__(self, output_file: Path, options=None, **kwargs):
-        self.output_file = output_file
+    def __init__(self, name: str, options: Namespace):
+        self.name = name
+        self.options = options
 
-    def __call__(self, summary: dict):
-        with open_(self.output_file, "wt") as stream:
+    @property
+    def extensions(self) -> Sequence[str]:
+        return self.name,
+
+    @abstractmethod
+    def write_report(self, summary: dict, output_file: Path) -> None:
+        pass
+
+    def _get_output_file(
+        self, output_file: Path, extensions: Optional[Sequence[str]] = None
+    ):
+        if not extensions:
+            extensions = self.extensions
+        if output_file.suffix and output_file.suffix[1:] in extensions:
+            return output_file
+        else:
+            return Path(str(output_file) + f".{extensions[0]}")
+
+
+class BaseReportWriter(ReportWriter, metaclass=ABCMeta):
+    def write_report(self, summary: dict, output_file: Path):
+        with open_(self._get_output_file(output_file), "wt") as stream:
             self.serialize(summary, stream)
 
     @abstractmethod
-    def serialize(self, summary: dict, stream: IO):
+    def serialize(self, summary: dict, stream: IO) -> None:
         pass
 
 
-class ReportWriterFactory:
+class TemplateReportWriter(BaseReportWriter):
     def __init__(
         self,
         name: str,
-        cls: Type[ReportWriter],
-        ext: Optional[str] = None,
-        default: bool = False,
-        **kwargs
-    ):
-        self.name = name
-        self.cls = cls
-        self.ext = ext if ext is not None else name
-        self.default = default
-        self.kwargs = kwargs
-
-    def __call__(self, output_file: Path, options):
-        return self.cls(output_file, name=self.name, options=options, **self.kwargs)
-
-
-class TemplateReportWriter(ReportWriter):
-    """
-    Args:
-        output_file: Where to write the report.
-        name: Report format. Must match the file extension on a discoverable
-            template.
-        template_name: A template name to use, rather than auto-discover.
-        template_paths: Sequence of paths to search for templates.
-        template_globals: Dict of additional globals to add to the template
-            environment.
-    """
-    def __init__(
-        self,
-        output_file: Path,
-        name: str = "txt",
+        options: Namespace,
         template_name: Optional[str] = None,
         template_paths: Sequence[Path] = None,
-        template_globals: Optional[dict] = None,
-        **_
+        template_globals: Optional[dict] = None
     ):
-        super().__init__(output_file)
-        self.name = name
+        """
+        Args:
+            name: Report format. Must match the file extension on a discoverable
+                template.
+            template_name: A template name to use, rather than auto-discover.
+            template_paths: Sequence of paths to search for templates.
+            template_globals: Dict of additional globals to add to the template
+                environment.
+        """
+        super().__init__(name, options)
         self.template_name = template_name
         self.template_paths = template_paths
         self.template_globals = template_globals
@@ -90,72 +89,52 @@ class TemplateReportWriter(ReportWriter):
         stream.write(template.render(summary=summary))
 
 
-class DumpReportWriter(ReportWriter):
-    def __init__(self, output_file: Path, name: str, options, **kwargs):
-        super().__init__(output_file)
-        self.mod_name = name
-        self.kwargs = kwargs
+class DumpReportWriter(BaseReportWriter):
+    def __init__(self, name: str, options: Namespace):
+        super().__init__(name, options)
 
     def serialize(self, summary: dict, stream: IO):
-        mod = import_module(self.mod_name)
-        mod.dump(summary, stream, **self.kwargs)
+        mod = import_module(self.name)
+        mod.dump(summary, stream)
 
 
-class BaseReportGenerator:
+class BaseReportGenerator(metaclass=ABCMeta):
     """
     Base class for command report generators.
-
-    Args:
-        options: Command-line options.
     """
 
-    def __init__(self, options, available_formats: Dict[str, ReportWriterFactory]):
-        report_file = options.report_file
-        report_formats = options.report_formats
-        default_formats = [
-            fmt for fmt, factory in available_formats.items() if factory.default
-        ]
+    @classproperty
+    def default_report_formats(cls) -> Sequence[str]:
+        return ()
 
-        if report_file in (STDOUT, STDERR):
-            if not report_formats:
-                report_formats = default_formats
-            self.report_formats = [
-                available_formats[fmt](report_file, options)
-                for fmt in report_formats
-            ]
-        else:
-            if not report_formats:
-                ext = report_file.suffix
-                if ext:
-                    report_formats = (ext[1:],)
-                else:
-                    report_formats = default_formats
-
-            if len(report_formats) == 1:
-                self.report_formats = [
-                    available_formats[report_formats[0]](report_file, options)
-                ]
-            else:
-                self.report_formats = [
-                    factory(Path(f"{report_file}.{factory.ext}"), options)
-                    for factory in (available_formats[fmt] for fmt in report_formats)
-                ]
-
-    def generate_reports(self, summary: dict):
+    @classmethod
+    def generate_reports(cls, summary: dict, options: Namespace):
         """
-        Generate report(s) from a summary.
+        Generates report(s) from a summary.
 
         Args:
             summary: The summary dict.
+            options:
         """
-        self.add_derived_data(summary)
-        for fmt in self.report_formats:
-            fmt(summary)
+        cls._add_derived_data(summary)
 
-    @staticmethod
-    def add_derived_data(summary: dict) -> None:
+        report_file = options.report_file
+        report_formats = options.report_formats
+
+        if not report_formats:
+            if report_file not in (STDOUT, STDERR) and report_file.suffix:
+                report_formats = (report_file.suffix[1:],)
+            else:
+                report_formats = cls.default_report_formats
+
+        for fmt in report_formats:
+            writer = cls._create_report_writer(fmt, options)
+            writer.write_report(summary, report_file)
+
+    @classmethod
+    def _add_derived_data(cls, summary: dict) -> None:
         """
-        Get some additional fields that are useful in the report.
+        Adds to the summary some additional fields that are useful in the report.
         """
         derived = {
             "mean_sequence_lengths": tuple(
@@ -180,9 +159,20 @@ class BaseReportGenerator:
         derived["input_format"] = fmt
         summary["derived"] = derived
 
+    @classmethod
+    def _create_report_writer(cls, fmt: str, options: Namespace) -> ReportWriter:
+        if fmt in ("json", "yaml", "pickle"):
+            return DumpReportWriter(fmt, options)
+        else:
+            try:
+                return TemplateReportWriter(fmt, options)
+            except IOError:
+                raise ValueError(f"Unsupported format {fmt}")
+
 
 def prettyprint_summary(summary: dict, outfile: Path = Path("summary.dump.txt")):
-    """Pretty-print the summary to a file. Mostly used for debugging.
+    """
+    Pretty-prints the summary to a file. Mostly used for debugging.
     """
     from pprint import pprint
 

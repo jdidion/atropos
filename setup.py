@@ -17,13 +17,18 @@ from distutils.command.build_ext import build_ext as _build_ext
 import versioneer
 
 
-MIN_CYTHON_VERSION = "0.25.2"
-
-
 version_info = sys.version_info
 if sys.version_info < (3, 6):
     sys.stdout.write("At least Python 3.6 is required.\n")
     sys.exit(1)
+
+
+MIN_CYTHON_VERSIONS = {
+    (3, 6): "0.25.2",
+    (3, 7): "0.29",
+    (3, 8): "0.29.14"
+}
+min_cython_version = MIN_CYTHON_VERSIONS[version_info[0:2]]
 
 
 cmdclass = versioneer.get_cmdclass()
@@ -96,13 +101,13 @@ def check_cython_version():
     except ImportError:
         sys.stdout.write(
             f"ERROR: Cython is not installed. Install at least Cython version "
-            f"{MIN_CYTHON_VERSION} to continue.\n"
+            f"{min_cython_version} to continue.\n"
         )
         sys.exit(1)
-    if LooseVersion(cyversion) < LooseVersion(MIN_CYTHON_VERSION):
+    if LooseVersion(cyversion) < LooseVersion(min_cython_version):
         sys.stdout.write(
             f"ERROR: Your Cython is at version '{cyversion}', but at least "
-            f"version {MIN_CYTHON_VERSION} is required.\n"
+            f"version {min_cython_version} is required.\n"
         )
         sys.exit(1)
 
@@ -134,7 +139,7 @@ with open(
 
 # Define extensions to be Cythonized
 extensions = [
-    Extension("atropos.align._align", sources=["atropos/align/_align.pyx"]),
+    Extension("atropos.aligners._align", sources=["atropos/aligners/_align.pyx"]),
     Extension(
         "atropos.commands.trim._qualtrim",
         sources=["atropos/commands/trim/_qualtrim.pyx"],
@@ -142,11 +147,11 @@ extensions = [
     Extension("atropos.io._seqio", sources=["atropos/io/_seqio.pyx"]),
 ]
 
-# TODO: load these from requirements*.txt file
 install_requirements = [
-    f"Cython>={MIN_CYTHON_VERSION}",
+    f"Cython>={min_cython_version}",
+    "loguru>=0.4.0",
+    "pokrok>=0.2.0",
     "xphyle>=4.2.0",
-    "pokrok>=0.2.0"
 ]
 test_requirements = [
     "pytest",  # 'jinja2', 'pysam',
@@ -162,7 +167,7 @@ extra_requirements = {
 
 setup(
     name="atropos",
-    version=versioneer.get_version(),
+    use_scm_version=True,
     cmdclass=cmdclass,
     author="John Didion",
     author_email="github@didion.net",
@@ -173,11 +178,24 @@ setup(
     license="MIT",
     ext_modules=extensions,
     packages=find_packages(),
-    package_data={"atropos": ["adapters/*.fa", "commands/**/templates/*"]},
+    package_data={
+        "atropos": ["adapters/*.fa", "commands/**/templates/*"]
+    },
+    setup_requires=["setuptools_scm"],
     install_requires=install_requirements,
     tests_require=test_requirements,
     extras_require=extra_requirements,
-    entry_points={"console_scripts": ["atropos=atropos.__main__:main"]},
+    entry_points={
+        "console_scripts": [
+            "atropos=atropos.__main__:main"
+        ],
+        "atropos.commands": [
+            "detect = atropos.commands.detect.console.DetectCommandConsole",
+            "error = atropos.commands.error.console.ErrorCommandConsole",
+            "qc = atropos.commands.qc.console.QcCommandConsole",
+            "trim = atropos.commands.trim.console.TrimCommandConsole",
+        ]
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Environment :: Console",

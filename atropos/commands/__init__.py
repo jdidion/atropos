@@ -1,251 +1,514 @@
-"""
-Atropos version {}
+from abc import ABCMeta, abstractmethod
+from collections.abc import Sequence as SequenceCollection
+import copy
+from functools import lru_cache
+import platform
+import sys
+from typing import Any, Dict, Iterator, Optional, Sequence as SequenceType, Tuple, cast
 
-usage: atropos [--config <config file>] <command> [options]
-
-commands
---------
-{}
-
-optional arguments:
-  -h, --help                show this help message and exit
-  --config <config file>    provide options in a config file
-
-Use "atropos <command> --help" to see all options for a specific command.
-See http://atropos.readthedocs.org/ for full documentation.
-
-Atropos is a fork of Cutadapt 1.10 (
-https://github.com/marcelm/cutadapt/tree/2f3cc0717aa9ff1e0326ea6bcb36b712950d4999)
-by John Didion, et al., "Atropos: sensitive, specific, and speedy trimming of
-NGS reads, submitted.
-
-Cutadapt (https://github.com/marcelm/cutadapt) was developed by Marcel Martin,
-"Cutadapt Removes Adapter Sequences From High-Throughput Sequencing Reads,"
-EMBnet Journal, 2011, 17(1):10-12.
-"""
-from importlib import import_module
-import logging
-import os
-from pkgutil import walk_packages
-import re
-import textwrap
-from typing import Sequence, Tuple, Callable, Iterator
 from atropos import __version__
-from atropos.commands.base import BaseCommandRunner, Summary
-from atropos.commands.cli import BaseCommandParser
-from atropos.commands.reports import BaseReportGenerator
+from atropos.adapters import AdapterCache
+from atropos.errors import AtroposError
+from atropos.io.seqio import Sequence, open_reader, sra_reader
+from atropos.utils import ReturnCode, classproperty, create_progress_reader
+from atropos.utils.argparse import Namespace
+from atropos.utils.collections import Const, MergingDict, Summarizable, Timing
 
 
-class Command:
-    """Contains information about a command package.
+EXCEPTION_KEY = "exception"
 
-    A command package consists of at least 3 modules:
-    1. The top level module (__init__.py), which contains the logic to run the
-    command. It must have a top-level CommandRunner class that extends
-    atropos.commands.base.BaseCommandRunner.
-    2. The cli module (cli.py), which configures the ArgumentParser and
-    validates command line options. It must have a top-level CommandParser
-    class that extends atropos.commands.base.BaseCommandParser.
-    3. The reports module (reports.py), which generates reports from the
-    command summary. It must have a top-level ReportGenerator class that
-    extends atropos.commands.reports.BaseReportGenerator.
+Batch = Tuple[dict, SequenceType[Sequence]]
 
-    Args:
-        name: The command name. Must match the name of a submodule of
-            atropos.commands, or all of the other arguments must be
-            specified.
-        module:
-        cli_module:
-        report_module: The absolute names of the three  modules described above. If
-            None, they are determined automatically from the command name.
+
+class Summary(MergingDict):
     """
-    def __init__(
-            self, name: str, module: str = None, cli_module: str = None,
-            report_module: str = None):
-        self.name = name
-        self.package = module or 'atropos.commands.{}'.format(name)
-        self.cli_module = cli_module or '{}.cli'.format(self.package)
-        self.report_module = report_module or '{}.reports'.format(self.package)
+    Container for summary information.
+    """
 
-    def execute(self, args: Sequence[str] = ()) -> Tuple[int, Summary]:
-        """Parse command line arguments, execute the command, and generate
-        summary reports.
+    @property
+    def has_exception(self) -> bool:
+        return EXCEPTION_KEY in self
+
+    def finish(self) -> None:
+        self._post_process_dict(self)
+
+    def _post_process_dict(self, dict_val: Optional[Dict[str, Any]]) -> None:
+        """
+        Replaces `Summarizable` members with their summaries, and computes some
+        aggregate values.
+
+        Args:
+            dict_val:
+        """
+        if dict_val is None:
+            return
+
+        for key, value in tuple(dict_val.items()):
+            if value is None:
+                continue
+
+            if isinstance(value, Summarizable):
+                dict_val[key] = value = value.summarize()
+
+            if isinstance(value, dict):
+                self._post_process_dict(value)
+            elif (
+                isinstance(value, SequenceCollection)
+                and len(value) > 0
+                and all(val is None or isinstance(val, dict) for val in value)
+            ):
+                for val in value:
+                    self._post_process_dict(val)
+            else:
+                if isinstance(value, Const):
+                    dict_val[key] = value = value.value
+                self._post_process_other(dict_val, key, value)
+
+    def _post_process_other(self, parent: dict, key: str, value: Any) -> None:
+        """
+        Override this method to perform additional post-processing on non-dict values.
+
+        Args:
+            parent: The parent dict
+            key: The key
+            value: The current value
+        """
+
+
+class Command(Iterator[Batch], metaclass=ABCMeta):
+    """
+    An Atropos command.
+    """
+
+    @abstractmethod
+    def get_option(self, name: str, default: Optional[Any] = None) -> Any:
+        """
+        Gets the value of the specified option.
+
+        Args:
+            name: The option name.
+            default: The default value to return if option `name` is not set.
+
+        Returns:
+            The option value.
+        """
+
+    @abstractmethod
+    def iterator(self) -> Iterator[Batch]:
+        """
+        Returns an iterator over input batches.
+        """
+
+    @abstractmethod
+    def merge_summary(self, summary: dict) -> None:
+        """
+        Merge a summary dict into the command's current summary.
+
+        Args:
+            summary: The summary to merge
+        """
+
+
+class BaseCommand(Command, metaclass=ABCMeta):
+    """
+    Base class for Atropos commands.
+    """
+
+    @classproperty
+    @abstractmethod
+    def name(cls) -> str:
+        """
+        The command name.
+        """
+
+    @classmethod
+    def _create_summary(cls) -> dict:
+        return Summary()
+
+    def __init__(self, options: Namespace):
+        """
+        Args:
+            options: Command-line options.
+        """
+        self.options = options
+        self.summary: dict = self._create_summary()
+        self.timing = Timing()
+        self.return_code: Optional[ReturnCode] = None
+        self.size = options.batch_size or 1000
+        self.batches = 0
+        self.done = False
+        self._empty_batch = [None] * self.size
+        self._progress_options = None
+
+        if options.sra_reader:
+            self.reader = reader = sra_reader(
+                reader=options.sra_reader,
+                quality_base=options.quality_base,
+                colorspace=options.colorspace,
+                input_read=options.input_read,
+                alphabet=options.alphabet,
+            )
+            options.sra_reader = None
+        else:
+            interleaved = bool(options.interleaved_input)
+            input1 = options.interleaved_input if interleaved else options.input1
+            input2 = qualfile = None
+            if options.paired and not interleaved:
+                input2 = options.input2
+            else:
+                qualfile = options.input2
+            self.reader = reader = open_reader(
+                file1=input1,
+                file2=input2,
+                file_format=options.input_format,
+                qualfile=qualfile,
+                quality_base=options.quality_base,
+                colorspace=options.colorspace,
+                interleaved=interleaved,
+                input_read=options.input_read,
+                alphabet=options.alphabet,
+            )
+
+        # Wrap reader in subsampler
+        if options.subsample:
+            import random
+
+            if options.subsample_seed:
+                random.seed(options.subsample_seed)
+
+            def subsample(_reader, frac):
+                """Generator that yields a random subsample of records.
+
+                Args:
+                    _reader: The reader from which to sample.
+                    frac: The fraction of records to yield.
+                """
+                for reads in _reader:
+                    if random.random() < frac:
+                        yield reads
+
+            reader = subsample(reader, options.subsample)
+
+        self.iterable = enumerate(reader, 1)
+
+        if options.progress:
+            self._progress_options = (
+                options.progress,
+                self.size,
+                self.get_option("max_reads"),
+                options.counter_magnitude,
+            )
+
+        self._init_summary()
+
+    @lru_cache
+    def get_option(self, name: str, default: Optional[Any] = None) -> Any:
+        if hasattr(self.reader, name):
+            return getattr(self.reader, name)
+        elif hasattr(self.options, name):
+            return getattr(self.options, name)
+        else:
+            return default
+
+    def iterator(self) -> Iterator[Batch]:
+        """
+        Returns an iterator (an object with the __iter__ method) over input batches.
+        BaseCommand is itself an iterable, and will be wrapped with a progress bar if
+        `_progress_options` is True.
+        """
+        if not self._progress_options:
+            return self
+
+        # Wrap iterator in progress bar
+        return create_progress_reader(self, *self._progress_options)
+
+    def merge_summary(self, summary: dict) -> None:
+        if isinstance(self.summary, MergingDict):
+            cast(MergingDict, self.summary).merge(summary)
+        else:
+            self.summary.update(summary)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> Batch:
+        if self.done:
+            raise StopIteration()
+
+        try:
+            read_index, record = next(self.iterable)
+        except StopIteration:
+            self.finish()
+            raise
+
+        batch = copy.copy(self._empty_batch)
+        batch[0] = record
+        batch_index = 1
+        max_reads = self.get_option("max_reads")
+        if max_reads:
+            max_size = min(self.size, max_reads - read_index + 1)
+        else:
+            max_size = self.size
+
+        while batch_index < max_size:
+            try:
+                read_index, record = next(self.iterable)
+                batch[batch_index] = record
+                batch_index += 1
+            except StopIteration:
+                self.finish()
+                break
+            except:
+                self.finish()
+                raise
+
+        if max_reads and read_index >= max_reads:
+            self.finish()
+
+        self.batches += 1
+
+        batch_meta = dict(
+            index=self.batches,
+            # TODO: When multi-file input is supported, 'source' will need to
+            # be the index of the current file/pair from which records are
+            # being read.
+            source=0,
+            size=batch_index,
+        )
+
+        if batch_index == self.size:
+            return batch_meta, batch
+        else:
+            return batch_meta, batch[0:batch_index]
+
+    def _init_summary(self) -> None:
+        """
+        Initializes the summary dict with general information.
+        """
+        self.summary["program"] = "Atropos"
+        self.summary["version"] = __version__
+        self.summary["python"] = platform.python_version()
+        self.summary["command"] = self.name
+        self.summary["options"] = self.options.__dict__.copy()
+        self.summary["timing"] = self.timing
+        self.summary["sample_id"] = self.options.sample_id
+        self.summary["input"] = self.reader.summarize()
+        self.summary["input"].update(
+            batch_size=self.size,
+            max_reads=self.get_option("max_reads"),
+            batches=self.batches
+        )
+
+    def run(self) -> Tuple[ReturnCode, dict]:
+        """
+        Runs the command, wrapping it in a Timing, catching any exceptions,
+        and finally closing the reader.
+
+        Returns:
+            The tuple (retcode, summary).
+        """
+        with self.timing:
+            try:
+                self.return_code = self()
+            except Exception as err:  # pylint: disable=broad-except
+                self.summary["exception"] = dict(
+                    message=str(err), details=sys.exc_info()
+                )
+                self.return_code = 1
+            finally:
+                self.finish()
+        return self.return_code, self.summary
+
+    @abstractmethod
+    def __call__(self) -> ReturnCode:
+        """
+        Executes the command.
 
         Returns:
             The return code.
         """
-        options = self.parse_args(args)
-        retcode, summary = self.run_command(options)
-        if retcode == 0 and options.report_file:
-            logging.getLogger().debug("Writing report to %s", options.report_file)
-            self.generate_reports(summary, options)
-        else:
-            logging.getLogger().debug("Not generating report file")
-        return retcode, summary
 
-    def get_command_parser_class(self) -> BaseCommandParser:
-        """Returns the CommandParser class within the cli module.
+    def finish(self) -> None:
         """
-        mod = import_module(self.cli_module)
-        return mod.CommandParser
+        Finishes the command.
+        """
+        # Close the underlying reader.
+        if not self.done:
+            self.done = True
+            self.reader.close()
+        if isinstance(self.summary, Summary):
+            cast(Summary, self.summary).finish()
 
-    @property
-    def usage(self) -> str:
-        """Returns the command's usage string.
+    def _load_known_adapters(self) -> AdapterCache:
         """
-        return self.get_command_parser_class().usage
+        Load known adapters based on setting in command-line options.
+        """
+        cache_file = None
+        if self.options.cache_adapters:
+            cache_file = self.options.adapter_cache_file
+        adapter_cache = AdapterCache(cache_file)
+        if adapter_cache.empty and self.options.default_adapters:
+            adapter_cache.load_default()
+        if self.options.known_adapter:
+            for known in self.options.known_adapter:
+                name, seq = known.split("=")
+                adapter_cache.add(name, seq)
+        if self.options.known_adapters_file:
+            for known_file in self.options.known_adapters_file:
+                adapter_cache.load_from_url(known_file)
+        if self.options.cache_adapters:
+            adapter_cache.save()
+        return adapter_cache
 
-    @property
-    def description(self) -> str:
-        """Returns the command's description string.
-        """
-        return self.get_command_parser_class().description
 
-    def get_help(
-            self, fmt: str = "* {name}: {description}", wrap: int = 80,
-            indent: int = 2) -> str:
-        """Returns a string to include in the command help.
+class Pipeline(metaclass=ABCMeta):
+    """
+    Base class for analysis pipelines.
+    """
+
+    def __init__(self):
+        self.record_counts = {}
+        self.bp_counts = {}
+
+    def __call__(
+        self, command_runner: BaseCommand, raise_on_error: bool = False, **kwargs
+    ) -> None:
         """
-        helpstr = fmt.format(name=self.name, description=self.description.strip())
-        if wrap:
-            helpstr = "\n".join(
-                textwrap.wrap(
-                    re.sub(r'\s+', ' ', helpstr), wrap, subsequent_indent=' ' * indent
+        Executes the pipeline.
+
+        Args:
+            command_runner:
+            raise_on_error:
+            **kwargs:
+
+        Raises:
+
+        """
+        self.start(**kwargs)
+        try:
+            for batch in command_runner.iterator():
+                self.process_batch(batch)
+        except Exception as err:
+            if raise_on_error:
+                raise
+            else:
+                command_runner.summary["exception"] = dict(
+                    message=str(err), details=sys.exc_info()
                 )
-            )
-        return helpstr
+        finally:
+            self.finish(command_runner.summary, **kwargs)
 
-    def parse_args(self, args):
-        """Parse the command line options.
-
-        Returns:
-            A Namespace-like object.
+    def start(self, **kwargs) -> None:
         """
-        parser_class: Callable[..., BaseCommandParser] = self.get_command_parser_class()
-        parser = parser_class()
-        return parser.parse(args)
-
-    def get_command_runner_class(self) -> Callable[..., BaseCommandRunner]:
-        """Returns the CommandRunner class within the top-level module.
+        Starts the pipeline.
         """
-        mod = import_module(self.package)
-        return mod.CommandRunner
 
-    def run_command(self, options):
-        """Run the command.
+    def process_batch(self, batch: Batch) -> None:
+        """
+        Runs the pipeline on a batch of records.
 
         Args:
-            options: A Namespace-like object.
-
-        Returns:
-            Tuple (retcode, summary).
+            batch: A batch of reads. A batch has the format
+            ({batch_metadata}, [records]).
         """
-        runner_class = self.get_command_runner_class()
-        runner = runner_class(options)
-        return runner.run()
+        batch_meta, records = batch
+        context = batch_meta.copy()
+        if context["source"] not in self.record_counts:
+            self.record_counts[context["source"]] = 0
+        self.record_counts[context["source"]] += context["size"]
+        if not context["source"] in self.bp_counts:
+            self.bp_counts[context["source"]] = [0, 0]
+        context["bp"] = self.bp_counts[context["source"]]
+        self.add_to_context(context)
+        self.handle_records(context, records)
 
-    def get_report_generator_class(self) -> Callable[..., BaseReportGenerator]:
-        """Returns the ReportGenerator class within the reports module.
+    def add_to_context(self, context: dict) -> None:
         """
-        mod = import_module(self.report_module)
-        return mod.ReportGenerator
+        Adds items to the batch context.
+        """
 
-    def generate_reports(self, summary: Summary, options) -> None:
-        """Generate reports.
+    def handle_records(self, context: dict, records: SequenceType[Sequence]) -> None:
+        """
+        Handles a sequence of records.
 
         Args:
-            summary: The summary dict.
-            options: Command-line options.
+            context: The pipeline context (dict).
+            records: The sequence of records.
+
+        Raises:
+            AtroposError
         """
-        generator_class = self.get_report_generator_class()
-        generator = generator_class(options)
-        generator.generate_reports(summary)
+        for idx, record in enumerate(records):
+            try:
+                self.handle_record(context, record)
+            except Exception as err:
+                raise AtroposError(
+                    "An error occurred at record {} of batch {}".format(
+                        idx, context["index"]
+                    )
+                ) from err
 
+    @abstractmethod
+    def handle_record(self, context: dict, record: Sequence) -> None:
+        """
+        Handles a single record.
 
-COMMANDS = dict(
-    (name, Command(name))
-    for _, name, ispkg in walk_packages([os.path.dirname(__file__)])
-    if ispkg
-)
+        Args:
+            context: The pipeline context (dict).
+            record: The record.
 
+        Returns:
 
-def get_command(name: str) -> Command:
-    """Returns the Command object for the specified command name.
-    """
-    if name not in COMMANDS:
-        raise ValueError("Invalid command: {}".format(name))
+        """
 
-    return COMMANDS[name]
+    @abstractmethod
+    def handle_reads(
+        self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
+    ) -> None:
+        """
+        Handles a read or read-pair.
 
+        Args:
+            context: The pipeline context (dict).
+            read1: The first read in the pair.
+            read2: The second read in the pair; will be `None` for single-end data.
+        """
 
-def iter_commands() -> Iterator[Command]:
-    """Iterate over commands, ordered by command name.
-    """
-    for name in sorted(COMMANDS.keys()):
-        yield COMMANDS[name]
+    def finish(self, summary: dict, **kwargs) -> None:
+        """
+        Finishes the pipeline, including adding information to the summary.
 
-
-def execute_cli(args: Sequence[str] = ()) -> int:
-    """Executes the Atropos command-line interface.
-
-    The first argument is expected to be the command name. If not (i.e. args is
-    empty or the first argument starts with a '-'), the 'trim' command is
-    assumed. If the first argument is '-h' or '--help', the command-level help
-    is printed.
-
-    Args:
-        args: Command-line arguments.
-
-    Returns:
-        The return code.
-    """
-    if len(args) == 0 or args[0] in ('-h', '--help'):
-        print_subcommands()
-        return 2
-
-    config_args = None
-    if args[0] == '--config':
-        with open(args[1], 'rt') as config_file:
-            config_args = list(
-                token for line in config_file for token in line.rstrip().split()
-            )
-        args = args[2:]
-
-    def parse_command(_args):
-        if not _args or _args[0][0] == '-':
-            return 'trim', _args
-        else:
-            return _args[0], _args[1:]
-
-    if len(args) == 0:
-        command_name, args = parse_command(config_args)
-    else:
-        command_name, args = parse_command(args)
-        if config_args:
-            args = config_args + args
-    try:
-        command = get_command(command_name)
-        retcode, summary = command.execute(args)
-        if 'exception' in summary:
-            logging.getLogger().error(
-                "Error executing command %s",
-                command_name,
-                exc_info=summary['exception']['details'],
-            )
-        return retcode
-
-    except Exception as err:
-        logging.getLogger().error(
-            "Error executing command: %s", command_name, exc_info=err
+        Args:
+            summary: Summary dict to update.
+        """
+        total_bp_counts = tuple(sum(b) for b in zip(*self.bp_counts.values()))
+        summary.update(
+            record_counts=self.record_counts,
+            total_record_count=sum(self.record_counts.values()),
+            bp_counts=self.bp_counts,
+            total_bp_counts=total_bp_counts,
+            sum_total_bp_count=sum(total_bp_counts),
         )
-        return 2
 
 
-def print_subcommands() -> None:
-    """Prints usage message listing the available subcommands.
+class SingleEndPipelineMixin:
     """
-    print(
-        __doc__.format(
-            __version__, "\n".join(command.get_help() for command in iter_commands())
-        )
-    )
+    Mixin for pipelines that implements `handle_record` for single-end data.
+    """
+
+    def handle_record(self, context: dict, record: Sequence) -> None:
+        context["bp"][0] += len(record)
+        cast(Pipeline, self).handle_reads(context, record)
+
+
+class PairedEndPipelineMixin:
+    """
+    Mixin for pipelines that implements `handle_record` for paired-end data.
+    """
+
+    def handle_record(self, context: dict, record: Sequence) -> None:
+        read1, read2 = record
+        bps = context["bp"]
+        bps[0] += len(read1.sequence)
+        bps[1] += len(read2.sequence)
+        cast(Pipeline, self).handle_reads(context, read1, read2)
