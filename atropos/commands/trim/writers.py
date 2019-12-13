@@ -9,7 +9,8 @@ from xphyle import STDOUT, xopen, open_
 from xphyle.types import ModeArg
 
 from atropos.commands.trim.filters import Filter, NoFilter
-from atropos.io.seqio import Formatter, Sequence, create_seq_formatter
+from atropos.io.sequence import Sequence
+from atropos.io.formatters import Formatter, create_seq_formatter
 from atropos.utils import splitext_compressed
 from atropos.utils.collections import Summarizable
 

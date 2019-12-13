@@ -5,7 +5,7 @@ from typing import IO, Optional, Sequence
 
 from xphyle import STDOUT, STDERR, open_
 
-from atropos.io.seqio import InputRead
+from atropos.io import InputRead
 from atropos.utils import classproperty
 from atropos.utils.argparse import Namespace
 

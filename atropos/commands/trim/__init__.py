@@ -74,9 +74,9 @@ from atropos.commands.trim.writers import (
     WildcardFormatter,
     Writers,
 )
-from atropos.io.seqio import Sequence
-from atropos.utils import classproperty, run_interruptible
-from atropos.utils import ReturnCode
+from atropos.io.sequence import Sequence
+from atropos.utils import ReturnCode, classproperty, run_interruptible
+from atropos.utils.argparse import Namespace
 from atropos.utils.collections import Summarizable
 from atropos.utils.statistics import RandomMatchProbability
 
@@ -890,13 +890,7 @@ class TrimCommand(BaseCommand):
         compression_mode = self.get_option("compression_mode")
 
         if compression_mode is None:
-            compression_mode = "worker"
-            # TODO: this is a bit of a hack - we don't know what types of files we'll
-            #  be compressing yet, so we make our guess based on the most commonly used
-            #  compression format.
-            gzip = xphyle.get_compressor("gzip")
-            if self.get_option("writer_process") and gzip.can_use_system_compression:
-                compression_mode = "writer"
+            compression_mode = choose_compression_mode(self.options)
 
         if compression_mode == "writer" and threads > 2:
             threads -= 1
@@ -936,3 +930,19 @@ class TrimCommand(BaseCommand):
         runner = ParallelTrimPipelineRunner(self, pipeline, threads, writer_manager)
 
         return runner.run()
+
+
+def choose_compression_mode(options: Namespace) -> str:
+    # TODO: this is a bit of a hack - we don't know what types of files we'll
+    #  be compressing yet, so we make our guess based on the most commonly used
+    #  compression format.
+    if (
+        options.writer_process and
+        2 < options.threads < 8 and
+        xphyle.get_compressor("gzip").can_use_system_compression
+    ):
+        # Our tests show that with 8 or more threads, worker compression
+        # is more efficient.
+        return "writer"
+    else:
+        return "worker"

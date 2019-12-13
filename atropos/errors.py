@@ -4,6 +4,18 @@ class AtroposError(Exception):
     """
 
 
+class FormatError(AtroposError):
+    """
+    Raised when an input file (FASTA or FASTQ) is malformatted.
+    """
+
+
+class UnknownFileTypeError(AtroposError):
+    """
+    Raised when file type could not be detected.
+    """
+
+
 class MulticoreError(AtroposError):
     """
     Base error for parallel processes.

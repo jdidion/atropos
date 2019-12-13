@@ -14,7 +14,8 @@ from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from typing import Callable, Optional, Type
 
-from atropos.io.seqio import Sequence
+from atropos.io.sequence import Sequence
+from atropos.utils import classproperty
 from atropos.utils.collections import Summarizable
 
 
@@ -29,7 +30,7 @@ class Filter(metaclass=ABCMeta):
     Marker type for Filters.
     """
 
-    @classmethod
+    @classproperty
     def name(cls) -> str:
         return cls.__name__
 
@@ -52,7 +53,7 @@ class TooShortReadFilter(Filter):
     Returns True if the read sequence is shorter than `minimum_length`.
     """
 
-    @classmethod
+    @classproperty
     def name(cls) -> str:
         return "too_short"
 
@@ -68,7 +69,7 @@ class TooLongReadFilter(Filter):
     Returns True if the read sequence is longer than `maximum_length`.
     """
 
-    @classmethod
+    @classproperty
     def name(cls) -> str:
         return "too_long"
 
@@ -86,7 +87,7 @@ class NContentFilter(Filter):
     greater than comparison, so a cutoff of '1' will keep reads with a single N in it.
     """
 
-    @classmethod
+    @classproperty
     def name(cls) -> str:
         return "too_many_n"
 
@@ -139,7 +140,9 @@ class NoFilter(Filter):
     Always returns False.
     """
 
-    name = "NoFilter"
+    @classproperty
+    def name(cls) -> str:
+        return "NoFilter"
 
     def __call__(self, read: Sequence) -> bool:
         return KEEP
@@ -151,8 +154,8 @@ class FilterWrapper(Summarizable, metaclass=ABCMeta):
     """
 
     def __init__(self, f: Filter):
-        self.filtered = 0
-        self.filter = f
+        self._filtered = 0
+        self._wrapped = f
 
     def __call__(self, read1, read2=None):
         """
@@ -162,7 +165,7 @@ class FilterWrapper(Summarizable, metaclass=ABCMeta):
             DISCARD if the filter function returns True, else KEEP
         """
         if self._filter(read1, read2):
-            self.filtered += 1
+            self._filtered += 1
             return DISCARD
 
         return KEEP
@@ -178,13 +181,13 @@ class FilterWrapper(Summarizable, metaclass=ABCMeta):
         """
         The filter name.
         """
-        return self.filter.name
+        return self._wrapped.name
 
     def summarize(self) -> dict:
         """
         Returns a summary dict.
         """
-        return dict(records_filtered=self.filtered)
+        return dict(records_filtered=self._filtered)
 
 
 class SingleWrapper(FilterWrapper):
@@ -195,7 +198,7 @@ class SingleWrapper(FilterWrapper):
     """
 
     def _filter(self, read1: Sequence, read2: Optional[Sequence] = None) -> bool:
-        return self.filter(read1)
+        return self._wrapped(read1)
 
 
 class PairedWrapper(FilterWrapper):
@@ -221,11 +224,11 @@ class PairedWrapper(FilterWrapper):
     def _filter(self, read1: Sequence, read2: Optional[Sequence] = None) -> bool:
         failures = 0
 
-        if self.filter(read1):
+        if self._wrapped(read1):
             failures += 1
 
         if (self.min_affected - failures == 1) and (
-            read2 is None or self.filter(read2)
+            read2 is None or self._wrapped(read2)
         ):
             failures += 1
 

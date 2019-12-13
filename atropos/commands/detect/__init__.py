@@ -16,7 +16,7 @@ from atropos.commands import (
     SingleEndPipelineMixin,
     Summary,
 )
-from atropos.io.seqio import Sequence
+from atropos.io.sequence import Sequence
 from atropos.utils import ReturnCode, classproperty, run_interruptible
 from atropos.utils.collections import Summarizable
 from atropos.utils.ngs import reverse_complement, sequence_complexity

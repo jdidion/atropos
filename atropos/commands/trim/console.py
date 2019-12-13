@@ -14,8 +14,8 @@ from atropos.commands.console import (
 )
 from atropos.commands.legacy_reports import LegacyReportGenerator
 from atropos.commands.metrics import MetricsMode
-from atropos.commands.trim import TrimCommand
-from atropos.io.seqio import guess_format_from_name
+from atropos.commands.trim import TrimCommand, choose_compression_mode
+from atropos.io import guess_format_from_name
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
     AtroposArgumentParser,
@@ -1206,17 +1206,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             threads = configure_threads(options, parser)
 
             if options.compression_mode is None:
-                if options.writer_process and 2 < threads < 8:
-                    # Our tests show that with 8 or more threads, worker compression
-                    # is more efficient.
-                    from atropos.io import compression
-
-                    if compression.can_use_system_compression():
-                        options.compression_mode = "writer"
-                    else:
-                        options.compression_mode = "worker"
-                else:
-                    options.compression_mode = "worker"
+                options.compression_mode = choose_compression_mode(options)
             elif options.compression_mode == "writer":
                 if not options.writer_process:
                     parser.error(

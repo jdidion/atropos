@@ -15,12 +15,12 @@ from atropos.aligners import (
     Aligner,
     GapRule,
     Match,
-    MatchInfo,
+    MatchTuple,
     InsertAligner,
     SEMIGLOBAL,
 )
 from atropos.commands.trim.qualtrim import quality_trim_index, nextseq_trim_index
-from atropos.io.seqio import Sequence
+from atropos.io.sequence import Sequence
 from atropos.utils import classproperty
 from atropos.utils.collections import Summarizable
 from atropos.utils.ngs import BASE_COMPLEMENTS, reverse_complement, quals2ints
@@ -288,7 +288,7 @@ class ErrorCorrectorMixin:
         self,
         read1: Sequence,
         read2: Sequence,
-        insert_match: MatchInfo,
+        insert_match: MatchTuple,
         truncate_seqs: bool = False,
     ):
         """

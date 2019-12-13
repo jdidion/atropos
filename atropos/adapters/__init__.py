@@ -23,7 +23,8 @@ from loguru import logger
 
 from atropos import aligners
 from atropos.aligners import GapRule
-from atropos.io.seqio import ColorspaceSequence, FastaReader, Sequence
+from atropos.io.sequence import ColorspaceSequence, Sequence
+from atropos.io.readers import FastaReader
 from atropos.utils import colorspace
 from atropos.utils.collections import Const, CountingDict, MergingDict, NestedDict
 from atropos.utils.statistics import RandomMatchProbability

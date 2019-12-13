@@ -1,8 +1,10 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 import copy
-from atropos.io.seqio import FormatError, SequenceReader
-from atropos.util import reverse_complement, truncate_string
+
+from atropos.errors import FormatError
+from atropos.utils import truncate_string
+from atropos.utils.ngs import reverse_complement
 
 
 cdef class Sequence(object):
@@ -13,6 +15,10 @@ cdef class Sequence(object):
 
     If an adapter has been matched to the sequence, the 'match' attribute is
     set to the corresponding Match instance.
+
+    Todo:
+        `name` should be `description` (reserve .name for the part before the first
+        space)
     """
     cdef:
         public str name
@@ -28,11 +34,11 @@ cdef class Sequence(object):
         public int corrected
         public str umi
 
-    def __init__(self, str name, str sequence, str qualities=None, str name2='',
-                 original_length=None, match=None, match_info=None, clipped=None,
-                 insert_overlap=False, merged=False, corrected=0, alphabet=None,
-                 str umi=None):
-
+    def __init__(
+        self, str name, str sequence, str qualities=None, str name2='',
+        original_length=None, match=None, match_info=None, clipped=None,
+        insert_overlap=False, merged=False, corrected=0, str umi=None, alphabet=None,
+    ):
         # Validate sequence and qualities lengths are equal
         if qualities is not None:
             slen = len(sequence)
@@ -74,7 +80,7 @@ cdef class Sequence(object):
             new_read.clipped[offset] += begin
         if end_bases:
             new_read.clipped[offset+1] += end_bases
-        return (begin, end_bases, new_read)
+        return begin, end_bases, new_read
 
     def clip(self, front=0, back=0):
         if back < 0:
@@ -87,10 +93,11 @@ cdef class Sequence(object):
             new_read.clipped[offset] += front
         if back:
             new_read.clipped[offset+1] += back
-        return (front, back, new_read)
+        return front, back, new_read
 
     def reverse_complement(self):
-        """Returns a copy of this read with the sequence reverse-complemented
+        """
+        Returns a copy of this read with the sequence reverse-complemented
         and the qualities reversed.
 
         TODO: add option to also reverse the alignment positions
@@ -113,7 +120,8 @@ cdef class Sequence(object):
             list(self.clipped),
             self.insert_overlap,
             self.merged,
-            self.corrected
+            self.corrected,
+            self.umi
         )
 
         if self.match:
@@ -122,6 +130,14 @@ cdef class Sequence(object):
             new_read.match = match
 
         return new_read
+
+    def size_in_bytes(self) -> int:
+        size = len(self.name) + len(self.sequence)
+        if self.name2:
+            size += len(self.name2)
+        if self.qualities:
+            size += len(self.qualities)
+        return size
 
     def __getitem__(self, key):
         """slicing"""
@@ -136,15 +152,17 @@ cdef class Sequence(object):
             list(self.clipped),
             self.insert_overlap,
             self.merged,
-            self.corrected
+            self.corrected,
+            self.umi
         )
 
     def __repr__(self):
-        qstr = ''
+        qstr = ""
         if self.qualities is not None:
-            qstr = ', qualities={0!r}'.format(truncate_string(self.qualities))
-        return '<Sequence(name={0!r}, sequence={1!r}{2})>'.format(
-            truncate_string(self.name), truncate_string(self.sequence), qstr)
+            qstr = ", qualities={0!r}".format(truncate_string(self.qualities))
+        return "<Sequence(name={0!r}, sequence={1!r}{2})>".format(
+            truncate_string(self.name), truncate_string(self.sequence), qstr
+        )
 
     def __len__(self):
         return len(self.sequence)
@@ -162,85 +180,4 @@ cdef class Sequence(object):
             raise NotImplementedError()
 
     def __reduce__(self):
-        return (Sequence, (self.name, self.sequence, self.qualities, self.name2))
-
-class FastqReader(SequenceReader):
-    """Reader for FASTQ files. Does not support multi-line FASTQ files.
-    """
-    file_format = "FASTQ"
-    delivers_qualities = True
-
-    def __init__(
-            self, filename, quality_base=33, sequence_class=Sequence,
-            alphabet=None):
-        """
-        file is a filename or a file-like object.
-        If file is a filename, then .gz files are supported.
-        """
-        super().__init__(
-            filename, quality_base=quality_base, alphabet=alphabet)
-        self.sequence_class = sequence_class
-
-    def __iter__(self):
-        """
-        Yield Sequence objects
-        """
-        cdef int i = 0
-        cdef int strip
-        cdef str line, name, qualities, sequence, name2
-        sequence_class = self.sequence_class
-
-        it = iter(self._file)
-        line = next(it)
-        if not (line and line[0] == '@'):
-            raise FormatError("Line {0} in FASTQ file is expected to start "
-                              "with '@', but found {1!r}".format(i+1, line[:10]))
-        strip = -2 if line.endswith('\r\n') else -1
-        name = line[1:strip]
-
-        i = 1
-        for line in it:
-            if i == 0:
-                if not (line and line[0] == '@'):
-                    raise FormatError("Line {0} in FASTQ file is expected to "
-                                      "start with '@', but found {1!r}".format(
-                                      i+1, line[:10]))
-                name = line[1:strip]
-            elif i == 1:
-                sequence = line[:strip]
-            elif i == 2:
-                if line == '+\n':  # check most common case first
-                    name2 = ''
-                else:
-                    line = line[:strip]
-                    if not (line and line[0] == '+'):
-                        raise FormatError(
-                            "Line {0} in FASTQ file is expected to start with "
-                            "'+', but found {1!r}".format(i+1, line[:10]))
-                    if len(line) > 1:
-                        if not line[1:] == name:
-                            raise FormatError(
-                                "At line {0}: Sequence descriptions in the FASTQ file don't match "
-                                "({1!r} != {2!r}).\n"
-                                "The second sequence description must be either empty "
-                                "or equal to the first description.".format(i+1,
-                                    name, line[1:]))
-                        name2 = name
-                    else:
-                        name2 = ''
-            elif i == 3:
-                if len(line) == len(sequence) - strip:
-                    qualities = line[:strip]
-                else:
-                    qualities = line.rstrip('\r\n')
-                try:
-                    yield sequence_class(
-                        name, sequence, qualities, name2=name2,
-                        alphabet=self.alphabet)
-                except Exception as err:
-                    raise FormatError(
-                        "Error creating sequence record at line "
-                        "{}".format(i+1)) from err
-            i = (i + 1) % 4
-        if i != 0:
-            raise FormatError("FASTQ file ended prematurely")
+        return Sequence, (self.name, self.sequence, self.qualities, self.name2)

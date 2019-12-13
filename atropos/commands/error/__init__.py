@@ -12,7 +12,7 @@ from atropos.commands import (
     SingleEndPipelineMixin,
     PairedEndPipelineMixin,
 )
-from atropos.io.seqio import Sequence
+from atropos.io.sequence import Sequence
 from atropos.utils import ReturnCode, classproperty, run_interruptible
 from atropos.utils.ngs import qual2prob
 

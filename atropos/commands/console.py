@@ -12,7 +12,7 @@ from xphyle.paths import STDOUT, STDERR
 
 from atropos import __version__
 from atropos.commands import BaseCommand
-from atropos.io.seqio import InputRead, Sequence
+from atropos.io import InputRead, Sequence
 from atropos.utils import (
     LOGGING_CONFIG, ReturnCode, classproperty
 )
@@ -446,18 +446,22 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
     # Find out which 'mode' we need to use.
     # TODO: unit tests for SRA streaming
     if options.sra_accession:
-        if options.input_format not in ("fastq", "sam", "bam", None):
+        if options.input_format in ("fastq", "sam", "bam", None):
+            options.input_format = "sra-fastq"
+        elif options.input_format != "sra-fastq":
             raise ValueError(
                 f"Invalid file format for SRA accession: {options.input_format}"
             )
 
-        options.input_format = "fastq"
         logger.debug(f"Opening reader for SRA Accession {options.sra_accession}")
-        try:
-            from srastream import SraReader
 
-            options.sra_reader = SraReader(
-                options.sra_accession, batch_size=options.batch_size or 1000
+        try:
+            import ngstream
+
+            options.sra_reader = ngstream.open(
+                options.sra_accession,
+                "sra",
+                batch_size=options.batch_size or 1000
             )
             options.sra_reader.start()
             options.paired = options.sra_reader.paired
@@ -469,6 +473,7 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
     elif options.single_input:
         if options.input1 or options.input2 or options.interleaved_input:
             parser.error("Cannot use -se together with -pe1, -pe2, or -l")
+
         options.paired = False
         options.input1 = options.single_input
         options.input2 = options.single_quals
@@ -482,9 +487,12 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
                 "trimming. If this is an interleaved file, use '-l' "
                 "instead."
             )
+
         options.paired = True
+
     if options.input_read is None:
         options.input_read = InputRead.PAIRED if options.paired else InputRead.SINGLE
+
     # Set sample ID from the input file name(s)
     if options.sample_id is None:
         if options.sra_reader:
@@ -492,6 +500,7 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
         else:
             fname = os.path.basename(options.input1 or options.interleaved_input)
             name = splitext_compressed(fname)[0]
+
             if options.input2:
                 name2 = splitext_compressed(os.path.basename(options.input2))[0]
                 if name != name2:
@@ -502,11 +511,14 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
 
             if name.endswith("."):
                 name = name[:-1]
+
             options.sample_id = name
+
     if options.quiet:
         options.progress = None
     elif options.progress and options.output == STDERR:
         logger.warning("Progress bar may corrupt output written to STDERR")
+
     if options.report_file in (STDOUT, STDERR) and options.quiet:
         logger.warning("Quiet mode - report will not be written to stdout")
         options.report_file = None

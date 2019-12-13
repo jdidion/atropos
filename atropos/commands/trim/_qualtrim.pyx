@@ -46,7 +46,7 @@ def quality_trim_index(str qualities, int cutoff_front, int cutoff_back, int bas
             stop = i
     if start >= stop:
         start, stop = 0, 0
-    return (start, stop)
+    return start, stop
 
 
 def nextseq_trim_index(sequence, int cutoff, int base=33):
@@ -70,7 +70,7 @@ def nextseq_trim_index(sequence, int cutoff, int base=33):
     s = 0
     max_qual = 0
     max_i = len(qualities)
-    for i in reversed(xrange(max_i)):
+    for i in reversed(range(max_i)):
         if bases[i] == 'G':
             s += 1
         else:

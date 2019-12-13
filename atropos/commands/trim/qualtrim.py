@@ -1,15 +1,24 @@
 # Import cythonized functions, defaulting to pure python implementations.
 try:
-    from ._qualtrim import quality_trim_index, nextseq_trim_index
+    from atropos.commands.trim._qualtrim import quality_trim_index, nextseq_trim_index
 except:
     from loguru import logger
+    from typing import Tuple
+
+    from atropos.io.sequence import Sequence
     from atropos.utils.ngs import qual2int
 
     logger.debug("Import failed for cythonized qualtrim functions")
 
-    def quality_trim_index(qualities, cutoff_front, cutoff_back, base=33):
-        """Find the position at which to trim a low-quality end from a
-        nucleotide sequence.
+    def quality_trim_index(
+        qualities: str,
+        cutoff_front: int,
+        cutoff_back: int,
+        base: int = 33
+    ) -> Tuple[int, int]:
+        """
+        Finds the position at which to trim a low-quality end from a nucleotide
+        sequence.
 
         Qualities are assumed to be ASCII-encoded as chr(qual + base).
 
@@ -57,7 +66,7 @@ except:
 
         return start, stop
 
-    def nextseq_trim_index(sequence, cutoff, base=33):
+    def nextseq_trim_index(sequence: Sequence, cutoff: int, base: int = 33) -> int:
         """
         Variant of the above quality trimming routine that works on NextSeq data.
         With Illumina NextSeq, bases are encoded with two colors. 'No color' (a dark
@@ -76,9 +85,12 @@ except:
 
         for idx in reversed(range(max_i)):
             qual = qual2int(qualities[idx], base)
+
             if bases[idx] == "G":
                 qual = cutoff - 1
+
             score += cutoff - qual
+
             if score < 0:
                 break
 

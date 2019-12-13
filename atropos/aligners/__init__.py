@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple, TypeVar, Union
 
 from atropos.aligners._align import Aligner, MultiAligner, compare_prefixes, locate
 from atropos.utils.ngs import reverse_complement
-from atropos.utils.stats import RandomMatchProbability
+from atropos.utils.statistics import RandomMatchProbability
 
 
 DEFAULT_INSERT_MAX_RMP = 1e-6
@@ -271,7 +271,8 @@ class InsertAligner:
         min_insert_overlap: int = DEFAULT_MIN_INSERT_OVERLAP,
         max_insert_mismatch_frac: Union[str, float] = DEFAULT_MAX_INSERT_MISMATCH_FRAC,
         min_adapter_overlap: int = DEFAULT_MIN_ADAPTER_OVERLAP,
-        max_adapter_mismatch_frac: Union[str, float] = DEFAULT_MAX_ADAPTER_MISMATCH_FRAC,
+        max_adapter_mismatch_frac: Union[str, float] =
+        DEFAULT_MAX_ADAPTER_MISMATCH_FRAC,
         adapter_check_cutoff: int = DEFAULT_ADAPTER_CHECK_CUTOFF,
         base_probs: Optional[Dict[str, float]] = None,
         adapter_wildcards: bool = True,

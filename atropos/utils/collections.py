@@ -13,7 +13,7 @@ from typing import (
 )
 
 from atropos.errors import AtroposError
-from atropos.utils.stats import (
+from atropos.utils.statistics import (
     weighted_mean,
     weighted_median,
     weighted_modes,

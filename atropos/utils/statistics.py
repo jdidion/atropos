@@ -29,7 +29,8 @@ class RandomMatchProbability:
         mismatch_prob: float = 0.75,
     ) -> float:
         """
-        Computes the random-match probability for a given sequence size and number of matches.
+        Computes the random-match probability for a given sequence size and number of
+        matches.
 
         Args:
             matches: Number of matches (numerator)

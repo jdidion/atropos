@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterator, Optional, Sequence as SequenceType, Tupl
 from atropos import __version__
 from atropos.adapters import AdapterCache
 from atropos.errors import AtroposError
-from atropos.io.seqio import Sequence, open_reader, sra_reader
+from atropos.io.readers import Sequence, open_reader
 from atropos.utils import ReturnCode, classproperty, create_progress_reader
 from atropos.utils.argparse import Namespace
 from atropos.utils.collections import Const, MergingDict, Summarizable, Timing
@@ -140,34 +140,35 @@ class BaseCommand(Command, metaclass=ABCMeta):
         self._empty_batch = [None] * self.size
         self._progress_options = None
 
+        open_args = dict(
+            file_format=options.input_format,
+            quality_base=options.quality_base,
+            colorspace=options.colorspace,
+            input_read=options.input_read,
+            alphabet=options.alphabet,
+        )
+
         if options.sra_reader:
-            self.reader = reader = sra_reader(
-                reader=options.sra_reader,
-                quality_base=options.quality_base,
-                colorspace=options.colorspace,
-                input_read=options.input_read,
-                alphabet=options.alphabet,
-            )
+            open_args["file1"] = options.sra_reader
             options.sra_reader = None
         else:
             interleaved = bool(options.interleaved_input)
             input1 = options.interleaved_input if interleaved else options.input1
             input2 = qualfile = None
+
             if options.paired and not interleaved:
                 input2 = options.input2
             else:
                 qualfile = options.input2
-            self.reader = reader = open_reader(
+
+            open_args.update(
                 file1=input1,
                 file2=input2,
-                file_format=options.input_format,
                 qualfile=qualfile,
-                quality_base=options.quality_base,
-                colorspace=options.colorspace,
                 interleaved=interleaved,
-                input_read=options.input_read,
-                alphabet=options.alphabet,
             )
+
+        self.reader = reader = open_reader(**open_args)
 
         # Wrap reader in subsampler
         if options.subsample:

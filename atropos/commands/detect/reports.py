@@ -7,7 +7,7 @@ from xphyle import open_
 
 from atropos.commands.legacy_reports import Printer, TitlePrinter
 from atropos.commands.reports import BaseReportGenerator, ReportWriter, BaseReportWriter
-from atropos.io.seqio import FastaFormat
+from atropos.io.formatters import FastaFormat
 
 
 class DetectTextReportWriter(BaseReportWriter):

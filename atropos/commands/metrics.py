@@ -4,7 +4,7 @@ from functools import lru_cache
 import re
 from typing import List, Optional, Pattern, Union
 
-from atropos.io.seqio import Sequence
+from atropos.io.sequence import Sequence
 from atropos.utils import classproperty
 from atropos.utils.collections import (
     BaseMergeableDict,
