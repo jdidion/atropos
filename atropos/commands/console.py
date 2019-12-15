@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import copy
 from multiprocessing import cpu_count
-import os
+from pathlib import Path
 import platform
 import re
 import textwrap
@@ -500,11 +500,11 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
         if options.sra_reader:
             options.sample_id = options.sra_reader.name
         else:
-            fname = os.path.basename(options.input1 or options.interleaved_input)
+            fname = Path(options.input1 or options.interleaved_input).name
             name = splitext_compressed(fname)[0]
 
             if options.input2:
-                name2 = splitext_compressed(os.path.basename(options.input2))[0]
+                name2 = splitext_compressed(Path(options.input2).name)[0]
                 if name != name2:
                     for i in range(min(len(name), len(name2))):
                         if name[i] != name2[i]:

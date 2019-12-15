@@ -165,7 +165,6 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
         # This is a temporary solution that requires R and the
         # ShadowRegression package. Eventually, this will be
         # replaced with a pure-python implementation.
-        import os
         import subprocess
         import tempfile
 
@@ -222,7 +221,7 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
 
         finally:
             for path in tempfiles:
-                os.remove(path)
+                path.unlink()
 
     def _write_read_counts(self, fileobj):
         writer = csv.writer(fileobj, delimiter=" ")
