@@ -164,7 +164,7 @@ class DetectFastaReportWriter(ReportWriter):
                     out.write("".join(records))
 
         if self.union:
-            with open(self._get_output_file(output_file), "wt") as stream:
+            with open_(self._get_output_file(output_file), "wt") as stream:
                 stream.write("".join(union_records))
 
 

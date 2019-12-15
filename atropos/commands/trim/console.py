@@ -1,9 +1,8 @@
-import logging
 import sys
 from typing import cast
 
 from loguru import logger
-from xphyle import STDOUT, STDERR
+from xphyle import STDOUT, STDERR, FORMATS
 
 from atropos.commands.console import (
     BaseCommandConsole,
@@ -84,6 +83,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             batch_size=None,
             known_adapter=None,
             use_interleaved_output=False,
+            can_use_system_compression=False,
         )
         group = parser.add_group(
             "Adapters",
@@ -506,9 +506,19 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             type=writeable_file,
             metavar="FILE",
             help="Write trimmed reads to FILE. FASTQ or FASTA format is chosen "
-            "depending on input. The summary report is sent to standard "
-            "output. Use '{name}' in FILE to demultiplex reads into "
-            "multiple files. (write to standard output)",
+            "depending on input. Use '{name}' in FILE to demultiplex reads into "
+            "multiple files. Use '-' to denote stdout. Unless writing to stdout, "
+            "the summary report goes to stdout by default. (write to standard output)",
+        )
+        group.add_argument(
+            "-C",
+            "--compression-format",
+            metavar="FORMAT", default=None,
+            choices=sorted(FORMATS.list_compression_formats()),
+            help="Force output to be compressed using the specified format, otherwise "
+            "the format is guessed from the  file extension. This is option is "
+            "required in order to have compressed output written to stdout/stderr. "
+            "(None)"
         )
         group.add_argument(
             "--output-format",
@@ -577,7 +587,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "--report-file",
             type=writeable_file,
-            default="-",
+            default=None,
             metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)",
         )
@@ -965,8 +975,13 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             )
 
         # Send report to stderr if main output will be going to stdout
-        if options.output is None and options.report_file == STDOUT:
-            options.report_file = STDERR
+        if options.output == options.report_file:
+            if options.output is None:
+                options.report_file = STDERR
+            else:
+                parser.error("'output' and 'report_file' must be different.")
+        elif options.report_file is None:
+            options.report_file = (STDERR if options.output is STDOUT else STDOUT)
 
         # If the user specifies a max rmp, that is used for determining the
         # minimum overlap and -O is set to 1, otherwise -O is set to the old
@@ -1008,7 +1023,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         if options.merge_overlapping:
             if options.merged_output is None:
-                logging.getLogger().warning(
+                logger.warning(
                     "--merge-output is not set; merged reads will be discarded"
                 )
 
@@ -1111,12 +1126,26 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 "and --untrimmed-output options can be used at the same time."
             )
 
-        if options.output is not None and "{name}" in options.output:
-            if options.discard_trimmed:
-                parser.error("Do not use --discard-trimmed when demultiplexing.")
+        compression_format = options.compression_format
 
-            if paired:
-                parser.error("Demultiplexing not supported for paired-end files, yet.")
+        if options.output is not None:
+            # Guess compression format from filename
+            if compression_format is None:
+                compression_format = FORMATS.guess_compression_format(options.output)
+
+            # Multiplexed output
+            if "{name}" in options.output:
+                if options.discard_trimmed:
+                    parser.error("Do not use --discard-trimmed when demultiplexing.")
+
+                if paired:
+                    parser.error(
+                        "Demultiplexing not yet supported for paired-end files."
+                    )
+
+        if compression_format is not None:
+            fmt = FORMATS.get_compression_format(compression_format)
+            options.can_use_system_compression = fmt.can_use_system_compression()
 
         if options.maq:
             options.colorspace = True

@@ -1,4 +1,3 @@
-# coding: utf-8
 import io
 
 from pytest import raises
@@ -15,18 +14,12 @@ log_capture_string = None
 
 def setup():
     # Create the logger
-    logger = logging.getLogger("basic_logger")
-    logger.setLevel(logging.DEBUG)
+    logger.configure(levels="DEBUG")
+
     # Setup the console handler with a StringIO object
     global log_capture_string
     log_capture_string = io.StringIO()
-    ch = logging.StreamHandler(log_capture_string)
-    ch.setLevel(logging.DEBUG)
-    # Optionally add a formatter
-    formatter = logging.Formatter("%(levelname)s: %(message)s")
-    ch.setFormatter(formatter)
-    # Add the console handler to the logger
-    logger.addHandler(ch)
+    logger.add(sink=log_capture_string)
 
 
 def assert_log(expected):

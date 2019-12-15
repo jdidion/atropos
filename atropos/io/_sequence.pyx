@@ -131,6 +131,7 @@ cdef class Sequence(object):
 
         return new_read
 
+    @property
     def size_in_bytes(self) -> int:
         size = len(self.name) + len(self.sequence)
         if self.name2:

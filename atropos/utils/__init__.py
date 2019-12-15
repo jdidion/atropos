@@ -1,14 +1,12 @@
 from enum import Enum, IntEnum
 import errno
-import os
 from pathlib import Path
 import sys
-from typing import Callable, Iterable, Iterator, Optional, Tuple, TypeVar, Union
+from typing import Callable, Iterable, Iterator, Optional, Tuple, TypeVar
 
 from loguru import logger
-import pokrok as pk
+import pokrok
 from xphyle import STDOUT, STDERR
-from xphyle.formats import FORMATS
 
 from atropos.errors import AtroposError
 
@@ -122,32 +120,6 @@ def truncate_string(string: Optional[str], max_len: int = 100) -> Optional[str]:
     return string
 
 
-def splitext_compressed(name: Union[str, Path]) -> Tuple[str, str, str]:
-    """
-    Splits the filename and extensions of a file that potentially has two extensions -
-    one for the file type (e.g. 'fq') and one for the compression type (e.g. 'gz').
-
-    Args:
-        name: The filename.
-
-    Returns:
-        A tuple (name, ext1, ext2), where ext1 is the filetype extension and
-        ext2 is the compression type extension, or None.
-    """
-    name_str = str(name)
-    ext2 = None
-
-    for ext in FORMATS.list_compression_formats(with_sep=True):
-        if name_str.endswith(ext):
-            ext2 = ext
-            name_str = name_str[:-len(ext)]
-            break
-
-    name_str, ext1 = os.path.splitext(name_str)
-
-    return name_str, ext1, ext2
-
-
 def run_interruptible(func: Callable, *args, **kwargs) -> ReturnCode:
     """
     Runs a function, gracefully handling keyboard interrupts.
@@ -205,25 +177,25 @@ def create_progress_reader(
         reader is returned.
     """
     if progress_type == "msg":
-        pk.set_plugins(["logging"])
+        pokrok.set_plugins(["logging"])
 
     if max_items:
         widgets = [
-            pk.Widget.COUNTER,
-            pk.Widget.PERCENT,
-            pk.Widget.ELAPSED,
-            pk.Widget.BAR,
-            pk.Widget.ETA,
+            pokrok.Widget.COUNTER,
+            pokrok.Widget.PERCENT,
+            pokrok.Widget.ELAPSED,
+            pokrok.Widget.BAR,
+            pokrok.Widget.ETA,
         ]
     else:
-        widgets = [pk.Widget.COUNTER, pk.Widget.ELAPSED, pk.Widget.SPINNER]
+        widgets = [pokrok.Widget.COUNTER, pokrok.Widget.ELAPSED, pokrok.Widget.SPINNER]
 
-    return pk.progress_iter(
+    return pokrok.progress_iter(
         reader,
         desc="Processed",
         size=max_items,
         unit="records",
         multiplier=batch_size,
-        style=pk.Style(widgets),
+        style=pokrok.Style(widgets),
         **kwargs,
     )

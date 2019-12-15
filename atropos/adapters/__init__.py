@@ -1,6 +1,7 @@
+from collections import namedtuple
 from enum import Enum
 import itertools
-import os
+from pathlib import Path
 import pickle
 import re
 from typing import (
@@ -20,6 +21,8 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from loguru import logger
+from xphyle import open_
+from xphyle.types import PathLike
 
 from atropos import aligners
 from atropos.aligners import GapRule
@@ -27,17 +30,16 @@ from atropos.io.sequence import ColorspaceSequence, Sequence
 from atropos.io.readers import FastaReader
 from atropos.utils import colorspace
 from atropos.utils.collections import Const, CountingDict, MergingDict, NestedDict
-from atropos.utils.statistics import RandomMatchProbability
 from atropos.utils.ngs import (
     ALPHABETS, GC_BASES, IUPAC_BASES, Alphabet, reverse_complement
 )
+from atropos.utils.paths import as_readable_path
+from atropos.utils.statistics import RandomMatchProbability
 
 
 # TODO: specify this externally rather than hard-coding
 DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/master/atropos/adapters/sequencing_adapters.fa"
-DEFAULT_ADAPTERS_PATH = os.path.join(
-    os.path.dirname(__file__), "sequencing_adapters.fa"
-)
+DEFAULT_ADAPTERS_PATH = Path(__file__).parent / "sequencing_adapters.fa"
 
 
 class AdapterType(int, Enum):
@@ -92,17 +94,22 @@ class AdapterCache:
     Cache for known adapters.
     """
 
-    def __init__(self, path: str = ".adapters", auto_reverse_complement: bool = False):
+    def __init__(
+        self,
+        path: Optional[Union[str, PathLike]] = Path(".adapters"),
+        auto_reverse_complement: bool = False
+    ):
         """
         Args:
             path: Path to file where cache is written.
             auto_reverse_complement: Whether adapter reverse-complements should
                 automatically be added to the cache.
         """
-        self.path = path
+        self.path = as_readable_path(path, False)
         self.auto_reverse_complement = auto_reverse_complement
-        if path and os.path.exists(path):
-            with open(path, "rb") as cache:
+
+        if self.path and path.exists():
+            with open_(self.path, "rb") as cache:
                 self.seq_to_name, self.name_to_seq = pickle.load(cache)
         else:
             self.seq_to_name = {}
@@ -119,8 +126,8 @@ class AdapterCache:
         """
         Save the cache to disk.
         """
-        if self.path is not None:
-            with open(self.path, "wb") as cache:
+        if self.path:
+            with open_(self.path, "wb") as cache:
                 pickle.dump((self.seq_to_name, self.name_to_seq), cache)
 
     def add(self, name: str, seq: str):
@@ -141,14 +148,15 @@ class AdapterCache:
         self.seq_to_name[seq].add(name)
         self.name_to_seq[name] = seq
 
-    def load_from_file(self, path: str = DEFAULT_ADAPTERS_PATH) -> int:
+    def load_from_file(self, path: Union[str, Path] = DEFAULT_ADAPTERS_PATH) -> int:
         """
         Loads cached data from a file.
 
         Args:
             path: Path from which to load.
         """
-        with open(path, "rt") as inp:
+        p = as_readable_path(path, True)
+        with open_(p, "rt") as inp:
             return self.load_from_fasta(inp)
 
     def load_from_url(self, url: str = DEFAULT_ADAPTERS_URL) -> int:
@@ -279,11 +287,35 @@ class AdapterCache:
         )
 
 
+MatchInfo = namedtuple(
+    "MatchInfo",
+    (
+        "read_name",
+        "errors",
+        "rstart",
+        "rstop",
+        "seq_before",
+        "seq_adapter",
+        "seq_after",
+        "adapter_name",
+        "qual_before",
+        "qual_adapter",
+        "qual_after",
+        "is_front",
+        "asize",
+        "rsize_adapter",
+        "rsize_total",
+    )
+)
+
+
 M = TypeVar("M", bound="AdapterMatch")
 S = TypeVar("S", bound=Sequence)
 
 
 class AdapterMatch(aligners.Match, Generic[S]):
+    __slots__ = ["adapter", "read"]
+
     def __init__(
         self,
         adapter: "Adapter",
@@ -316,6 +348,69 @@ class AdapterMatch(aligners.Match, Generic[S]):
             self.matches,
             self.errors,
             self.front,
+        )
+
+    def wildcards(self, wildcard_char: str = "N") -> str:
+        """
+        Returns a string that contains, for each wildcard character,
+        the character that it matches. For example, if the adapter
+        ATNGNA matches ATCGTA, then the string 'CT' is returned.
+
+        If there are indels, this is not reliable as the full alignment
+        is not available.
+        """
+        return "".join((
+            self.read.sequence[self.rstart + i]
+            for i in range(self.length)
+            if (
+                self.adapter.sequence[self.astart + i] == wildcard_char
+                and self.rstart + i < len(self.read.sequence)
+            )
+        ))
+
+    def rest(self) -> str:
+        """
+        Returns the part of the read before this match if this is a 'front' (5')
+        adapter, or the part after the match if this is not a 'front' adapter (3').
+        This can be an empty string.
+        """
+        if self.front:
+            return self.read.sequence[: self.rstart]
+        else:
+            return self.read.sequence[self.rstop:]
+
+    def get_info_record(self) -> MatchInfo:  # TODO: write test
+        """
+        Returns a :class:`MatchInfo`, which contains information about the match to
+        write into the info file.
+        """
+        seq = self.read.sequence
+        qualities = self.read.qualities
+        if qualities is None:
+            qualities = ""
+
+        rsize = rsize_total = self.rstop - self.rstart
+        if self.front and self.rstart > 0:
+            rsize_total = self.rstop
+        elif not self.front and self.rstop < len(seq):
+            rsize_total = len(seq) - self.rstart
+
+        return MatchInfo(
+            self.read.name,
+            self.errors,
+            self.rstart,
+            self.rstop,
+            seq[0:self.rstart],
+            seq[self.rstart:self.rstop],
+            seq[self.rstop:],
+            self.adapter.name,
+            qualities[0:self.rstart],
+            qualities[self.rstart:self.rstop],
+            qualities[self.rstop:],
+            self.front,
+            self.astop - self.astart,
+            rsize,
+            rsize_total,
         )
 
 
@@ -820,7 +915,7 @@ class LinkedMatch:
         self.back_match = back_match
         self.adapter = adapter
 
-    def get_info_record(self) -> aligners.MatchInfo:
+    def get_info_record(self) -> MatchInfo:
         """
         Returns the info record for the either the back or forward match.
         """

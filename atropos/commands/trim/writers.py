@@ -11,7 +11,7 @@ from xphyle.types import ModeArg
 from atropos.commands.trim.filters import Filter, NoFilter
 from atropos.io.sequence import Sequence
 from atropos.io.formatters import Formatter, create_seq_formatter
-from atropos.utils import splitext_compressed
+from atropos.utils.paths import splitext_compressed
 from atropos.utils.collections import Summarizable
 
 
@@ -23,7 +23,11 @@ class Writers:
     Manages writing to one or more outputs.
     """
 
-    def __init__(self, force_create: SequenceType[Path] = ()):
+    def __init__(
+        self,
+        force_create: SequenceType[Path] = (),
+        compression_format: Optional[str] = None
+    ):
         """
         Args:
             force_create: Whether empty output files should be created.
@@ -31,6 +35,7 @@ class Writers:
         self.writers = {}
         self.force_create = force_create
         self.suffix = None
+        self.compression_format = compression_format
 
     def get_writer(self, file_desc: FileDesc, compressed: bool = False) -> IO:
         """
@@ -46,9 +51,11 @@ class Writers:
         """
         if compressed:
             path, mode = file_desc
+            compression = False
         else:
             path = file_desc
-            mode = None
+            mode = "w"
+            compression = self.compression_format
 
         if path not in self.writers:
             if self.suffix:
@@ -57,10 +64,7 @@ class Writers:
                 real_path = path
 
             # TODO: test whether O_NONBLOCK allows non-blocking write to NFS
-            if compressed:
-                self.writers[path] = open_(real_path, mode)
-            else:
-                self.writers[path] = xopen(real_path, "w")
+            self.writers[path] = xopen(real_path, mode, compression=compression)
 
         return self.writers[path]
 

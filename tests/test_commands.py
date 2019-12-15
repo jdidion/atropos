@@ -1,4 +1,3 @@
-# Tests for internal components of the atropos commands
 import os
 import tempfile
 

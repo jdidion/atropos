@@ -1,8 +1,12 @@
-# coding: utf-8
 from atropos.adapters import (
-    Adapter, AdapterType, ColorspaceAdapter, LinkedAdapter, Match, parse_braces
+    Adapter,
+    AdapterMatch,
+    AdapterType,
+    ColorspaceAdapter,
+    LinkedAdapter,
+    parse_braces,
 )
-from atropos.io.seqio import Sequence
+from atropos.io.sequence import Sequence
 
 from pytest import raises
 
@@ -17,7 +21,7 @@ def test_issue_52():
         adapter_wildcards=True,
     )
     read = Sequence(name="abc", sequence="CCCCAGAACTACAGTCCCGGC")
-    am = Match(
+    am = AdapterMatch(
         astart=0,
         astop=17,
         rstart=5,

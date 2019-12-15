@@ -1,8 +1,7 @@
-# coding: utf-8
 from .utils import run, datapath
 
-from atropos.util.colorspace import encode, decode
-from atropos.commands import execute_cli
+from atropos.utils.colorspace import encode, decode
+from atropos.console import execute_cli
 
 # If there are any unknown characters in the test sequence,
 # round tripping will only work if all characters after the

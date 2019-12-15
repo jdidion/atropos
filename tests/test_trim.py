@@ -1,7 +1,6 @@
-# coding: utf-8
 from atropos.adapters import Adapter, AdapterType, ColorspaceAdapter
 from atropos.commands.trim.modifiers import AdapterCutter
-from atropos.io.seqio import ColorspaceSequence, Sequence
+from atropos.io.sequence import ColorspaceSequence, Sequence
 
 
 def test_cs_5p():

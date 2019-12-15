@@ -1,4 +1,3 @@
-# coding: utf-8
 from contextlib import contextmanager
 from importlib import import_module
 from io import BufferedWriter, BytesIO, TextIOWrapper
@@ -8,7 +7,7 @@ import traceback
 from unittest.mock import patch
 import urllib.request
 
-from atropos.commands import get_command
+from atropos.commands.trim.console import TrimCommandConsole
 
 
 @contextmanager
@@ -71,13 +70,12 @@ def run(
         params += ["-se", datapath(inpath)]
         if qualfile:
             params += ["-sq", datapath(qualfile)]
-    command = get_command("trim")
     if stdout:
         # Output is going to stdout, so we need to redirect it to the
         # temp file
         with intercept_stdout() as stdout:
             # print(params)
-            retcode, summary = command.execute(params)
+            retcode, summary = TrimCommandConsole.execute(params)
             with open(tmp_fastaq, "wt") as out:
                 out.write(stdout.getvalue())
     else:
@@ -86,7 +84,7 @@ def run(
         else:
             params += ["-o", tmp_fastaq]  # TODO not parallelizable
         # print(params)
-        retcode, summary = command.execute(params)
+        retcode, summary = TrimCommandConsole.execute(params)
     assert summary is not None
     assert isinstance(summary, dict)
     if "exception" in summary and summary["exception"] is not None:

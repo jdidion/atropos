@@ -1,12 +1,12 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 from atropos.errors import FormatError
-from atropos.io.readers import SequenceReader
+from atropos.io.readers import PrefetchSequenceReader, estimate_num_records
 from atropos.io._sequence import Sequence
 from atropos.utils import classproperty
 
 
-class FastqReader(SequenceReader):
+class FastqReader(PrefetchSequenceReader):
     """
     Reader for FASTQ files. Does not support multi-line FASTQ files.
     """
@@ -17,6 +17,18 @@ class FastqReader(SequenceReader):
     @classproperty
     def delivers_qualities(cls) -> bool:
         return True
+
+    @classproperty
+    def has_qualfile(cls) -> bool:
+        return False
+
+    @classproperty
+    def colorspace(cls) -> bool:
+        return False
+
+    @classproperty
+    def interleaved(cls) -> bool:
+        return False
 
     def __init__(
         self,
@@ -34,7 +46,10 @@ class FastqReader(SequenceReader):
         )
         self.sequence_class = sequence_class
 
-    def __iter__(self):
+    def estimate_num_records(self):
+        return estimate_num_records(self.name, self._first_seq.size_in_bytes, 4, 2)
+
+    def _iter(self):
         """
         Yield Sequence objects
         """

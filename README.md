@@ -16,7 +16,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 7. Improved summary reports, including support for serialization formats (JSON, YAML, pickle), support for user-defined templates (via the optional Jinja2 dependency), and integration with [MultiQC](http://multiqc.info).
 8. The ability to merge overlapping reads (this is experimental and the functionality is limited).
 9. The ability to write the summary report and log messages to separate files.
-10. The ability to read SAM/BAM files and read/write interleaved FASTQ files.
+10. The ability to read/write SAM, BAM, and interleaved FASTQ files.
 11. Direct trimming of reads from an SRA accession.
 12. A progress bar, and other minor usability enhancements.
 
@@ -28,20 +28,20 @@ First install dependencies:
 
 * Required
     * Python 3.6+ (python 2.x is NOT supported)
-        - note: we have identified a possible bug in python 3.4.2 that causes random segmentation faults. We think this mainly affects unit testing (and thus specifically test on 3.4.3). If you encounter this bug, we recommend upgrading to a newer python version.
-    * Cython 0.25.2+ (`pip install Cython`)
-    * xphyle 4+
-* Maybe python libraries
+    * Cython 0.25.2+/0.29+/0.29.14+, depending on whether you're using python 3.6/3.7.3.8 (`pip install Cython`)
+    * [loguru]()
+    * [pokrok]() 0.2.0+
+    * [xphyle]() 4.2.1+
+* Optional
     * pytest (for running unit tests)
-    * pokrok + your favorite progress bar library (e.g. progressbar2, tqdm) (progressbar support)
     * pysam (SAM/BAM support)
     * khmer 2.0+ (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
-    * srastream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
+    * ngstream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
 
 Pip can be used to install atropos and optional dependencies, e.g.:
 
-pip install atropos[tqdm,pysam,srastream]
+`pip install atropos[tqdm,pysam,srastream]`
 
 ## Conda
 

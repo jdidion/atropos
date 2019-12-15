@@ -28,10 +28,12 @@ from typing import Dict, Optional, Sequence, TypeVar, cast
 
 from loguru import logger
 import pkg_resources
+from xphyle import open_
 
 from atropos import __version__
 from atropos.commands.console import CommandConsole
 from atropos.utils import ReturnCode
+from atropos.utils.paths import as_readable_path
 
 
 HELP_TEXT = __doc__
@@ -113,13 +115,16 @@ def execute_cli(args: Sequence[str] = ()) -> ReturnCode:
         )
         return ReturnCode.ERROR
 
-    config_args = None
     if args[0] == "--config":
-        with open(args[1], "rt") as config_file:
+        config_path = as_readable_path(args[1])
+        args = args[2:]
+
+        with open_(config_path, "rt") as config_file:
             config_args = list(
                 token for line in config_file for token in line.rstrip().split()
             )
-        args = args[2:]
+    else:
+        config_args = None
 
     def parse_command(_args):
         if not _args or _args[0][0] == "-":

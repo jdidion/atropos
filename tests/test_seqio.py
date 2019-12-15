@@ -1,4 +1,3 @@
-# coding: utf-8
 from collections import defaultdict
 from io import StringIO
 import os
@@ -8,14 +7,9 @@ from textwrap import dedent
 import pytest
 from xphyle import open_, xopen
 
-from atropos.io.seqio import (
-    Sequence,
-    ColorspaceSequence,
-    FormatError,
-    FastaReader,
-    FastqReader,
-    FastaQualReader,
-    InterleavedSequenceReader,
+from atropos.errors import FormatError
+from atropos.io.sequence import Sequence, ColorspaceSequence
+from atropos.io.formatters import (
     FastaFormat,
     FastqFormat,
     InterleavedFormatter,
@@ -23,10 +17,16 @@ from atropos.io.seqio import (
     SingleEndSAMFormatter,
     PairedEndSAMFormatter,
     create_seq_formatter,
-    open_reader as openseq,
-    sequence_names_match,
 )
-from atropos.util import ALPHABETS
+from atropos.io.readers import (
+    FastaReader,
+    FastqReader,
+    FastaQualReader,
+    InterleavedSequenceReader,
+    open_reader as openseq,
+    _sequence_names_match
+)
+from atropos.utils.ngs import ALPHABETS
 from .utils import cutpath, datapath
 
 
@@ -214,7 +214,7 @@ class TestSeqioOpen:
         path = tmp_path_factory.mktemp("tmp.fasta")
         fmt = create_seq_formatter(path)
         assert isinstance(fmt, SingleEndFormatter)
-        assert isinstance(fmt.seq_format, FastaFormat)
+        assert isinstance(fmt._seq_format, FastaFormat)
         write_seq_output(simple_fasta, fmt)
         assert list(openseq(path)) == simple_fasta
 
@@ -222,7 +222,7 @@ class TestSeqioOpen:
         path = tmp_path_factory.mktemp("tmp.fasta")
         fmt = create_seq_formatter(path, qualities=True)
         assert isinstance(fmt, SingleEndFormatter)
-        assert isinstance(fmt.seq_format, FastaFormat)
+        assert isinstance(fmt._seq_format, FastaFormat)
         write_seq_output(simple_fasta, fmt)
         assert list(openseq(path)) == simple_fasta
 
@@ -230,7 +230,7 @@ class TestSeqioOpen:
         path = tmp_path_factory.mktemp("tmp.fastq")
         fmt = create_seq_formatter(path)
         assert isinstance(fmt, SingleEndFormatter)
-        assert isinstance(fmt.seq_format, FastqFormat)
+        assert isinstance(fmt._seq_format, FastqFormat)
         write_seq_output(simple_fastq, fmt)
         assert list(openseq(path)) == simple_fastq
 
@@ -282,33 +282,33 @@ class TestInterleavedReader:
 
 class TestFastaWriter:
     def test(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp()
+        path = tmp_path_factory.mktemp("tmp")
         fmt = FastaFormat()
         with open_(path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA"))
             fw.write(fmt.format_entry("name2", "HELLO"))
-        with open(path) as t:
+        with open_(path) as t:
             assert t.read() == ">name\nCCATA\n>name2\nHELLO\n"
 
     def test_linelength(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp()
+        path = tmp_path_factory.mktemp("tmp")
         fmt = FastaFormat(line_length=3)
         with open_(path, "w") as fw:
             fw.write(fmt.format_entry("r1", "ACG"))
             fw.write(fmt.format_entry("r2", "CCAT"))
             fw.write(fmt.format_entry("r3", "TACCAG"))
-        with open(path) as t:
+        with open_(path) as t:
             x = t.read()
             print(x)
             assert x == ">r1\nACG\n>r2\nCCA\nT\n>r3\nTAC\nCAG\n"
 
     def test_write_sequence_object(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp()
+        path = tmp_path_factory.mktemp("tmp")
         fmt = FastaFormat()
         with open_(path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA")))
             fw.write(fmt.format(Sequence("name2", "HELLO")))
-        with open(path) as t:
+        with open_(path) as t:
             assert t.read() == ">name\nCCATA\n>name2\nHELLO\n"
 
     def test_write_zero_length_sequence(self):
@@ -324,7 +324,7 @@ class TestFastqWriter:
         with open_(path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA", "!#!#!"))
             fw.write(fmt.format_entry("name2", "HELLO", "&&&!&&"))
-        with open(path) as t:
+        with open_(path) as t:
             assert t.read() == "@name\nCCATA\n+\n!#!#!\n@name2\nHELLO\n+\n&&&!&&\n"
 
     def test_twoheaders(self, tmp_path_factory):
@@ -333,7 +333,7 @@ class TestFastqWriter:
         with open_(path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA", "!#!#!", name2="name")))
             fw.write(fmt.format(Sequence("name2", "HELLO", "&&&!&", name2="name2")))
-        with open(path) as t:
+        with open_(path) as t:
             assert (
                 t.read() == "@name\nCCATA\n+name\n!#!#!\n@name2\nHELLO\n+name2\n&&&!&\n"
             )
@@ -375,7 +375,7 @@ class TestSAMWriter:
         assert "foo" in result
         result_str = "".join(result["foo"])
         expected = (
-            "@HD\tVN:1.5\tSO:unsorted\nA/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0"
+            "@HD\tVN:1.6\tSO:unsorted\nA/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0"
             "\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
         )
         print(result_str)
@@ -397,7 +397,7 @@ class TestSAMWriter:
         assert "foo" in result
         result_str = "".join(result["foo"])
         expected = (
-            "@HD\tVN:1.5\tSO:unsorted\nA/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129"
+            "@HD\tVN:1.6\tSO:unsorted\nA/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129"
             "\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2"
             "\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n"
         )
@@ -409,7 +409,7 @@ class TestPairedSequenceReader:
         def match(name1, name2):
             seq1 = Sequence(name1, "ACGT")
             seq2 = Sequence(name2, "AACC")
-            return sequence_names_match(seq1, seq2)
+            return _sequence_names_match(seq1, seq2)
 
         assert match("abc", "abc")
         assert match("abc/1", "abc/2")
@@ -419,7 +419,7 @@ class TestPairedSequenceReader:
 
 
 try:
-    import srastream
+    import ngstream
 
     ngs_available = True
 except ModuleNotFoundError:

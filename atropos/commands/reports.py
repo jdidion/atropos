@@ -25,7 +25,7 @@ class ReportWriter(metaclass=ABCMeta):
 
     def _get_output_file(
         self, output_file: Path, extensions: Optional[Sequence[str]] = None
-    ):
+    ) -> Path:
         if not extensions:
             extensions = self.extensions
         if output_file.suffix and output_file.suffix[1:] in extensions:

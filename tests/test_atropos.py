@@ -1,14 +1,13 @@
-# coding: utf-8
 # TODO:
 #  test with the --output option
 #  test reading from standard input
-from io import StringIO
 import os
-import sys
 
 import pytest
+from xphyle import open_
 
-from atropos.commands import execute_cli, get_command
+from atropos.console import execute_cli
+from atropos.commands.trim.console import TrimCommandConsole
 
 from .utils import (
     run,
@@ -30,6 +29,10 @@ except ImportError:
 
 def test_example(tmp_path_factory):
     run("-N -b ADAPTER", "example.fa", "example.fa", tmp_path_factory=tmp_path_factory)
+
+
+def test_example_stdout():
+    run('-N -b ADAPTER', 'example.fa', 'example.fa', stdout=True)
 
 
 def test_small(tmp_path_factory):
@@ -302,7 +305,7 @@ def test_adapter_wildcard(tmp_path_factory):
             "wildcard_adapter.fa",
             tmp_path_factory=tmp_path_factory
         )
-        with open(wildcardtmp) as wct:
+        with open_(wildcardtmp) as wct:
             lines = wct.readlines()
         lines = [line.strip() for line in lines]
         assert lines == ["AAA 1", "GGG 2", "CCC 3b", "TTT 4b"]
@@ -518,13 +521,6 @@ def test_no_args():
         assert execute_cli() != 0
 
 
-def test_two_fastqs():
-    with pytest.raises(SystemExit), redirect_stderr():
-        execute_cli(
-            ["-pe1", datapath("paired.1.fastq"), "-pe2", datapath("paired.2.fastq")]
-        )
-
-
 def test_anchored_no_indels(tmp_path_factory):
     """anchored 5' adapter, mismatches only (no indels)"""
     run(
@@ -648,8 +644,7 @@ def test_demultiplex():
         "-se",
         datapath("twoadapters.fasta"),
     ]
-    command = get_command("trim")
-    result = command.execute(params)
+    result = TrimCommandConsole.execute(params)
     assert isinstance(result, tuple)
     assert len(result) == 2
     assert result[0] == 0

@@ -1,5 +1,8 @@
 import pytest
-from atropos.util import *
+from atropos.utils import *
+from atropos.utils.collections import *
+from atropos.utils.ngs import *
+from atropos.utils.statistics import *
 
 
 def test_factorial():

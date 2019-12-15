@@ -1,7 +1,6 @@
 from argparse import ArgumentParser, ArgumentError, HelpFormatter, Namespace
 from numbers import Number
 import operator
-import os
 from pathlib import Path
 import re
 import textwrap
@@ -9,7 +8,7 @@ from typing import Callable, Sequence, List, Type, TypeVar, Generic, Union, Opti
 from urllib.parse import urlparse
 
 from xphyle.paths import STDOUT, STDERR, check_path, as_path, resolve_path
-from xphyle.types import PathType, Permission
+from xphyle.types import PathLike, PathType, Permission
 
 from atropos.utils import Magnitude
 
@@ -165,7 +164,7 @@ class AccessiblePath:
         self.path_type = path_type
         self.mode = mode
 
-    def __call__(self, path: Union[str, os.PathLike]) -> Path:
+    def __call__(self, path: Union[str, PathLike]) -> Path:
         path = as_path(path)
 
         if self.path_type == PathType.FILE and path in (STDOUT, STDERR):
@@ -182,7 +181,7 @@ class ReadwriteableFile(object):
         self.read_type = AccessiblePath(PathType.FILE, Permission.READ)
         self.write_type = AccessiblePath(PathType.FILE, Permission.WRITE)
 
-    def __call__(self, path: Union[str, os.PathLike]) -> Path:
+    def __call__(self, path: Union[str, PathLike]) -> Path:
         path = as_path(path)
         if path.exists():
             path = self.read_type(path)
@@ -190,7 +189,7 @@ class ReadwriteableFile(object):
         return path
 
 
-def existing_path(path: Union[str, os.PathLike]) -> Path:
+def existing_path(path: Union[str, PathLike]) -> Path:
     """Test that a path exists."""
     path = as_path(path)
     if path == STDOUT:

@@ -193,10 +193,17 @@ class BaseCommand(Command, metaclass=ABCMeta):
         self.iterable = enumerate(reader, 1)
 
         if options.progress:
+            max_reads = self.get_option("max_reads")
+
+            if not max_reads:
+                max_reads = self.reader.estimate_num_records()
+                if max_reads and options.subsample:
+                    max_reads = int(max_reads * options.subsample)
+
             self._progress_options = (
                 options.progress,
                 self.size,
-                self.get_option("max_reads"),
+                max_reads,
                 options.counter_magnitude,
             )
 
@@ -444,9 +451,7 @@ class Pipeline(metaclass=ABCMeta):
                 self.handle_record(context, record)
             except Exception as err:
                 raise AtroposError(
-                    "An error occurred at record {} of batch {}".format(
-                        idx, context["index"]
-                    )
+                    f"An error occurred at record {idx} of batch {context['index']}"
                 ) from err
 
     @abstractmethod

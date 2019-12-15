@@ -1,8 +1,3 @@
-# coding: utf-8
-"""
-Alignment module.
-"""
-from collections import namedtuple
 from enum import IntFlag
 from typing import Dict, Optional, Tuple, TypeVar, Union
 
@@ -50,36 +45,12 @@ SEMIGLOBAL = (
 MatchTuple = Tuple[int, int, int, int, int, int]
 
 
-MatchInfo = namedtuple(
-    "MatchInfo",
-    (
-        "read_name",
-        "errors",
-        "rstart",
-        "rstop",
-        "seq_before",
-        "seq_adapter",
-        "seq_after",
-        "adapter_name",
-        "qual_before",
-        "qual_adapter",
-        "qual_after",
-        "is_front",
-        "asize",
-        "rsize_adapter",
-        "rsize_total",
-    )
-)
-
-
 M = TypeVar("M", bound="Match")
 
 
 class Match:
     """
     Common match-result object returned by aligners.
-
-    Todo: Creating instances of this class is relatively slow.
     """
 
     __slots__ = [
@@ -90,8 +61,6 @@ class Match:
         "matches",
         "errors",
         "front",
-        "adapter",
-        "read",
         "length",
     ]
 
@@ -163,69 +132,6 @@ class Match:
         the read is involved in the alignment to the adapter.
         """
         return self.rstart == 0
-
-    def wildcards(self, wildcard_char: str = "N") -> str:
-        """
-        Returns a string that contains, for each wildcard character,
-        the character that it matches. For example, if the adapter
-        ATNGNA matches ATCGTA, then the string 'CT' is returned.
-
-        If there are indels, this is not reliable as the full alignment
-        is not available.
-        """
-        return "".join((
-            self.read.sequence[self.rstart + i]
-            for i in range(self.length)
-            if (
-                self.adapter.sequence[self.astart + i] == wildcard_char
-                and self.rstart + i < len(self.read.sequence)
-            )
-        ))
-
-    def rest(self) -> str:
-        """
-        Returns the part of the read before this match if this is a 'front' (5')
-        adapter, or the part after the match if this is not a 'front' adapter (3').
-        This can be an empty string.
-        """
-        if self.front:
-            return self.read.sequence[: self.rstart]
-        else:
-            return self.read.sequence[self.rstop:]
-
-    def get_info_record(self) -> MatchInfo:  # TODO: write test
-        """
-        Returns a :class:`MatchInfo`, which contains information about the match to
-        write into the info file.
-        """
-        seq = self.read.sequence
-        qualities = self.read.qualities
-        if qualities is None:
-            qualities = ""
-
-        rsize = rsize_total = self.rstop - self.rstart
-        if self.front and self.rstart > 0:
-            rsize_total = self.rstop
-        elif not self.front and self.rstop < len(seq):
-            rsize_total = len(seq) - self.rstart
-
-        return MatchInfo(
-            self.read.name,
-            self.errors,
-            self.rstart,
-            self.rstop,
-            seq[0:self.rstart],
-            seq[self.rstart:self.rstop],
-            seq[self.rstop:],
-            self.adapter.name,
-            qualities[0:self.rstart],
-            qualities[self.rstart:self.rstop],
-            qualities[self.rstop:],
-            self.front,
-            self.astop - self.astart,
-            rsize,
-            rsize_total,
-        )
 
 
 InsertMatchResult = Tuple[MatchTuple, Optional[Match], Optional[Match]]

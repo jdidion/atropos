@@ -1,14 +1,13 @@
-# coding: utf-8
 from atropos.adapters import *
 from atropos.commands.trim.modifiers import *
-from atropos.io.seqio import Sequence
-from atropos.util import reverse_complement as rc
+from atropos.io.sequence import Sequence
+from atropos.utils.ngs import reverse_complement as rc
 
 DUMMY_ADAPTER = Adapter("ACGT", AdapterType.FRONT)
 
 
 def front_match(read):
-    match = Match(0, 2, 0, 2, 1, 0, True, DUMMY_ADAPTER, read)
+    match = AdapterMatch(DUMMY_ADAPTER, read, 0, 2, 0, 2, 1, 0, True)
     match_info = MatchInfo(
         "read",
         0,
@@ -30,7 +29,7 @@ def front_match(read):
 
 
 def back_match(read):
-    match = Match(6, 8, 6, 8, 1, 0, False, DUMMY_ADAPTER, read)
+    match = AdapterMatch(DUMMY_ADAPTER, read, 6, 8, 6, 8, 1, 0, False)
     match_info = MatchInfo(
         "read",
         0,

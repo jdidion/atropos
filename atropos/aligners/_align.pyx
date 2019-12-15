@@ -1,8 +1,10 @@
 # cython: profile=False, emit_code_comments=False
 
 # TODO: Flouri et al. report errors in Gotoh's original paper that persist
-# in most implementations of NW alignment (http://biorxiv.org/content/biorxiv/early/2015/11/12/031500.full.pdf).
-# They provide a correct implementation (qalign: http://www.exelixis-lab.org/web/software/alignment/).
+#  in most implementations of NW alignment
+#  (http://biorxiv.org/content/biorxiv/early/2015/11/12/031500.full.pdf).
+#  They provide a correct implementation
+#  (qalign: http://www.exelixis-lab.org/web/software/alignment/).
 
 from cpython.mem cimport PyMem_Free, PyMem_Realloc
 from cpython.array cimport array
@@ -17,8 +19,11 @@ DEF SEMIGLOBAL = 15
 # structure for a DP matrix entry
 ctypedef struct _Entry:
     int cost
-    int matches  # no. of matches in this alignment
-    int origin   # where the alignment originated: negative for positions within seq1, positive for pos. within seq2
+    # no. of matches in this alignment
+    int matches
+    # where the alignment originated: negative for positions within seq1, positive for
+    # pos. within seq2
+    int origin
 
 ctypedef struct _Match:
     int origin
@@ -111,11 +116,13 @@ class DPMatrix:
         """
         Return a representation of the matrix as a string.
         """
-        rows = ['     ' + ' '.join(c.rjust(2) for c in self.query)]
-        for c, row in zip(' ' + self.reference, self._rows):
-            r = c + ' ' + ' '.join('  ' if v is None else '{0:2d}'.format(v) for v in row)
+        rows = ["     " + " ".join(c.rjust(2) for c in self.query)]
+        for c, row in zip(" " + self.reference, self._rows):
+            r = c + " " + " ".join(
+                "  " if v is None else "{0:2d}".format(v) for v in row
+            )
             rows.append(r)
-        return '\n'.join(rows)
+        return "\n".join(rows)
 
 cdef class Aligner:
     """
@@ -124,8 +131,8 @@ cdef class Aligner:
     Locate one string within another by computing an optimal semiglobal
     alignment between string1 and string2.
 
-    The alignment uses unit costs, which means that mismatches, insertions and deletions are
-    counted as one error.
+    The alignment uses unit costs, which means that mismatches, insertions and deletions
+    are counted as one error.
 
     flags is a bitwise 'or' of the allowed flags.
     To allow skipping of a prefix of string1 at no cost, set the
@@ -142,7 +149,8 @@ cdef class Aligner:
     The skipped parts are described with two intervals (start1, stop1),
     (start2, stop2).
 
-    For example, an optimal semiglobal alignment of SISSI and MISSISSIPPI looks like this:
+    For example, an optimal semiglobal alignment of SISSI and MISSISSIPPI looks like
+    this:
 
     ---SISSI---
     MISSISSIPPI
@@ -166,9 +174,9 @@ cdef class Aligner:
       leftmost position within the read.
 
     The alignment itself is not returned, only the tuple
-    (start1, stop1, start2, stop2, matches, errors), where the first four fields have the
-    meaning as described, matches is the number of matches and errors is the number of
-    errors in the alignment.
+    (start1, stop1, start2, stop2, matches, errors), where the first four fields have
+    the meaning as described, matches is the number of matches and errors is the
+    number of errors in the alignment.
 
     It is always the case that at least one of start1 and start2 is zero.
 
@@ -239,7 +247,9 @@ cdef class Aligner:
             return self._reference
 
         def __set__(self, str reference):
-            mem = <_Entry*> PyMem_Realloc(self.column, (len(reference) + 1) * sizeof(_Entry))
+            mem = <_Entry*> PyMem_Realloc(
+                self.column, (len(reference) + 1) * sizeof(_Entry)
+            )
             if not mem:
                 raise MemoryError()
             self.column = mem
@@ -468,7 +478,14 @@ cdef class Aligner:
                 length = i + min(column[i].origin, 0)
                 cost = column[i].cost
                 matches = column[i].matches
-                if length >= self._min_overlap and cost <= length * max_error_rate and (matches > best.matches or (matches == best.matches and cost < best.cost)):
+                if (
+                    length >= self._min_overlap and
+                    cost <= length * max_error_rate and (
+                        matches > best.matches or (
+                            matches == best.matches and cost < best.cost
+                        )
+                    )
+                ):
                     # update best
                     best.matches = matches
                     best.cost = cost
@@ -491,17 +508,27 @@ cdef class Aligner:
             start2 = 0
 
         assert best.ref_stop - start1 > 0  # Do not return empty alignments.
-        return (start1, best.ref_stop, start2, best.query_stop, best.matches, best.cost)
+        return start1, best.ref_stop, start2, best.query_stop, best.matches, best.cost
 
     def __dealloc__(self):
         PyMem_Free(self.column)
 
-def locate(str reference, str query, double max_error_rate, int flags=SEMIGLOBAL, bint wildcard_ref=False, bint wildcard_query=False, int min_overlap=1):
+def locate(
+    str reference,
+    str query,
+    double max_error_rate,
+    int flags=SEMIGLOBAL,
+    bint wildcard_ref=False,
+    bint wildcard_query=False,
+    int min_overlap=1
+):
     aligner = Aligner(reference, max_error_rate, flags, wildcard_ref, wildcard_query)
     aligner.min_overlap = min_overlap
     return aligner.locate(query)
 
-def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_query=False):
+def compare_prefixes(
+    str ref, str query, bint wildcard_ref=False, bint wildcard_query=False
+):
     """
     Find out whether one string is the prefix of the other one, allowing
     IUPAC wildcards in ref and/or query if the appropriate flag is set.
@@ -544,7 +571,7 @@ def compare_prefixes(str ref, str query, bint wildcard_ref=False, bint wildcard_
                 matches += 1
 
     # length - matches = no. of errors
-    return (0, length, 0, length, matches, length - matches)
+    return 0, length, 0, length, matches, length - matches
 
 DEF OVERHANG_MULTIPLIER = 100000
 
@@ -748,7 +775,10 @@ cdef class MultiAligner:
                             continue
 
                         length = i + min(column[i].origin, 0)
-                        if length >= self._min_overlap and cost <= length * max_error_rate:
+                        if (
+                            length >= self._min_overlap and
+                            cost <= length * max_error_rate
+                        ):
                             # update best
                             match_array[num_matches].ref_stop = i
                             match_array[num_matches].query_stop = n
@@ -775,7 +805,14 @@ cdef class MultiAligner:
             start1 = -_match.origin
             start2 = 0
         assert _match.ref_stop - start1 > 0  # Do not return empty alignments.
-        return (start1, _match.ref_stop, start2, _match.query_stop, _match.matches, _match.cost)
+        return (
+            start1,
+            _match.ref_stop,
+            start2,
+            _match.query_stop,
+            _match.matches,
+            _match.cost
+        )
 
     def __dealloc__(self):
         PyMem_Free(self.column)

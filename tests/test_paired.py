@@ -1,11 +1,12 @@
-# coding: utf-8
 import os
 import shutil
 from typing import Callable, Iterable, Union
 
 from pytest import raises
+from xphyle import open_
 
-from atropos.commands import execute_cli, get_command
+from atropos.console import execute_cli
+from atropos.commands.trim.console import TrimCommandConsole
 
 from .utils import (
     run,
@@ -44,8 +45,7 @@ def run_paired(
             infiles = [datapath(i.format(aligner=aligner)) for i in (in1, in2)]
             for infile_args in zip(("-pe1", "-pe2"), infiles):
                 p.extend(infile_args)
-            command = get_command("trim")
-            result = command.execute(p)
+            result = TrimCommandConsole.execute(p)
             assert isinstance(result, tuple)
             assert len(result) == 2
             if error_on_rc:
@@ -82,7 +82,6 @@ def run_interleaved(
         params = params.split()
     for aligner in aligners:
         tmp = tmp_path_factory.mktemp(expected.format(aligner=aligner))
-        command = get_command("trim")
         p = params.copy()
         p += ["--aligner", aligner, "-l", datapath(inpath.format(aligner=aligner))]
         if stdout:
@@ -90,12 +89,12 @@ def run_interleaved(
             # temp file
             with intercept_stdout() as stdout:
                 # print(params)
-                result = command.execute(p)
+                result = TrimCommandConsole.execute(p)
                 with open(tmp, "wt") as out:
                     out.write(stdout.getvalue())
         else:
             p.extend(["-L", tmp])
-            result = command.execute(p)
+            result = TrimCommandConsole.execute(p)
         assert isinstance(result, tuple)
         assert len(result) == 2
         if error_on_rc:
@@ -125,6 +124,8 @@ def run_interleaved(
 #                 assert execute_cli(p) == 0
 #                 assert files_equal(cutpath(expected.format(aligner=aligner)), p1)
 #                 assert files_equal(cutpath(expected.format(aligner=aligner)), p2)
+
+
 def test_paired_separate(tmp_path_factory):
     """test separate trimming of paired-end reads"""
     run(
@@ -191,8 +192,8 @@ def test_explicit_format_with_paired(tmp_path_factory):
         shutil.copyfile(datapath("paired.2.fastq"), txt2)
         run_paired(
             "--input-format=fastq -a TTAGACATAT -m 14",
-            in1=txt1,
-            in2=txt2,
+            in1=str(txt1),
+            in2=str(txt2),
             expected1="paired.m14.1.fastq",
             expected2="paired.m14.2.fastq",
             tmp_path_factory=tmp_path_factory,
@@ -247,10 +248,10 @@ def test_missing_file():
 def test_first_too_short(tmp_path_factory):
     trunc1 = tmp_path_factory.mktemp("truncated.1.fastq")
     # Create a truncated file in which the last read is missing
-    with open(datapath("paired.1.fastq")) as f:
+    with open_(datapath("paired.1.fastq")) as f:
         lines = f.readlines()
         lines = lines[:-4]
-    with open(trunc1, "w") as f:
+    with open_(trunc1, "w") as f:
         f.writelines(lines)
     with raises(SystemExit), redirect_stderr():
         execute_cli(
@@ -262,10 +263,10 @@ def test_first_too_short(tmp_path_factory):
 def test_second_too_short(tmp_path_factory):
     trunc2 = tmp_path_factory.mktemp("truncated.2.fastq")
     # Create a truncated file in which the last read is missing
-    with open(datapath("paired.2.fastq")) as f:
+    with open_(datapath("paired.2.fastq")) as f:
         lines = f.readlines()
         lines = lines[:-4]
-    with open(trunc2, "w") as f:
+    with open_(trunc2, "w") as f:
         f.writelines(lines)
     with raises(SystemExit), redirect_stderr():
         execute_cli(
@@ -278,14 +279,13 @@ def test_unmatched_read_names(tmp_path_factory):
     swapped = tmp_path_factory.mktemp("swapped.1.fastq")
     try:
         # Create a file in which reads 2 and are swapped
-        with open(datapath("paired.1.fastq")) as f:
+        with open_(datapath("paired.1.fastq")) as f:
             lines = f.readlines()
             lines = lines[0:4] + lines[8:12] + lines[4:8] + lines[12:]
-        with open(swapped, "w") as f:
+        with open_(swapped, "w") as f:
             f.writelines(lines)
         with redirect_stderr():
-            command = get_command("trim")
-            result = command.execute(
+            result = TrimCommandConsole.execute(
                 "-a XX -o out1.fastq -p out2.fastq".split()
                 + ["-pe1", swapped, "-pe2", datapath("paired.2.fastq")]
             )
@@ -426,6 +426,17 @@ def test_interleaved(tmp_path_factory):
         expected="interleaved.fastq",
         aligners=BACK_ALIGNERS,
         tmp_path_factory=tmp_path_factory,
+    )
+
+
+def test_interleaved_stdout():
+    """single-pass interleaved paired-end with -q and -m"""
+    run_interleaved(
+        "-q 20 -a TTAGACATAT -A CAGTGGAGTA -m 14 -M 90",
+        inpath="interleaved.fastq",
+        expected="interleaved.fastq",
+        aligners=BACK_ALIGNERS,
+        stdout=True,
     )
 
 

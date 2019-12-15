@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
+from xphyle import open_
+
 from atropos.errors import AtroposError
 from atropos.commands import (
     BaseCommand,
@@ -167,12 +169,12 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
         import subprocess
         import tempfile
 
-        tempfiles = (tempfile.mkstemp()[1] for _ in range(4))
+        tempfiles = (Path(tempfile.mkstemp()[1]) for _ in range(4))
         read_counts, per_read, per_cycle, script_file = tempfiles
 
         try:
             # write counts to a file
-            with open(read_counts, "wt") as out:
+            with open_(read_counts, "wt") as out:
                 self._write_read_counts(out)
 
             # execute R script
@@ -183,7 +185,7 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
                 per_cycle=per_cycle,
             )
 
-            with open(script_file, "wt") as out:
+            with open_(script_file, "wt") as out:
                 out.write(script)
 
             proc = subprocess.Popen(
@@ -202,13 +204,13 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
                     )
 
             # read the results
-            with open(per_read, "rt") as i:
+            with open_(per_read, "rt") as i:
                 reader = csv.reader(i, delimiter="\t")
                 per_read_error = dict(reader)
                 if len(per_read_error) != 4:
                     raise AtroposError("Invalid output from R script")
 
-            with open(per_cycle, "rt") as i:
+            with open_(per_cycle, "rt") as i:
                 reader = csv.reader(i, delimiter="\t")
                 per_cycle_error = list(row[0:3] for row in reader)
                 if not per_cycle_error:

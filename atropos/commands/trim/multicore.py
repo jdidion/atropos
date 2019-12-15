@@ -8,7 +8,11 @@ from xphyle.formats import CompressionFormat
 
 from atropos.commands.multicore import ParallelPipelineRunner, WorkerProcess
 from atropos.commands.trim import (
-    ResultHandler, WorkerResultHandler, WriterResultHandler, TrimCommand, TrimPipeline
+    ResultHandler,
+    WorkerResultHandler,
+    WriterResultHandler,
+    TrimCommand,
+    TrimPipeline,
 )
 from atropos.commands.trim.writers import Writers
 from atropos.utils import ReturnCode
@@ -28,6 +32,7 @@ class Done(MulticoreError):
     """
     Raised when process exits normally.
     """
+
     pass
 
 
@@ -35,6 +40,7 @@ class Killed(MulticoreError):
     """
     Raised when process exits is killed.
     """
+
     pass
 
 
@@ -46,19 +52,19 @@ class WriterManager:
     def __init__(
         self,
         writers: Writers,
-        compression: str,
+        compression_mode: str,
         preserve_order: bool,
         result_queue: Queue,
-        timeout: int
+        timeout: int,
     ):
         # result handler
         if preserve_order:
             writer_result_handler = OrderPreservingWriterResultHandler(
-                writers, compressed=compression == "worker"
+                writers, compressed=compression_mode == "worker"
             )
         else:
             writer_result_handler = WriterResultHandler(
-                writers, compressed=compression == "worker"
+                writers, compressed=compression_mode == "worker"
             )
 
         self.timeout = timeout
@@ -76,9 +82,8 @@ class WriterManager:
         Returns True if the writer process is alive and the control value is
         ControlSignal.ACTIVE.
         """
-        return (
-            self.writer_process.is_alive() and
-            self.writer_control.check_value(ControlSignal.ACTIVE)
+        return self.writer_process.is_alive() and self.writer_control.check_value(
+            ControlSignal.ACTIVE
         )
 
     def set_num_batches(self, num_batches: int):
@@ -110,7 +115,7 @@ class ParallelTrimPipelineRunner(ParallelPipelineRunner):
         command: TrimCommand,
         pipeline: TrimPipeline,
         threads: int,
-        writer_manager: Optional[WriterManager] = None
+        writer_manager: Optional[WriterManager] = None,
     ):
         super().__init__(command, pipeline, threads)
         self.writer_manager = writer_manager
@@ -167,8 +172,9 @@ class CompressingWorkerResultHandler(WorkerResultHandler):
     Wraps a ResultHandler and compresses results prior to writing.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, compression_format: Optional[str] = None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.compression_format = compression_format
         self.file_compressors: Optional[Dict[str, CompressionFormat]] = None
 
     def start(self, worker: Optional[WorkerProcess] = None):
@@ -180,18 +186,20 @@ class CompressingWorkerResultHandler(WorkerResultHandler):
 
         if compressor:
             return (
-                (path, 'wb'),
-                compressor.compress(b''.join(s.encode() for s in strings))
+                (path, "wb"),
+                compressor.compress(b"".join(s.encode() for s in strings)),
             )
         else:
-            return (path, 'wt'), "".join(strings)
+            return (path, "wt"), "".join(strings)
 
     def get_compressor(self, filename: str) -> CompressionFormat:
         """
         Returns the file compressor based on the file extension.
         """
         if filename not in self.file_compressors:
-            self.file_compressors[filename] = xphyle.get_compressor(filename)
+            self.file_compressors[filename] = xphyle.get_compressor(
+                self.compression_format or filename
+            )
 
         return self.file_compressors[filename]
 
@@ -238,8 +246,8 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
         """
         Consumes any remaining items in the queue.
         """
-        while (
-            (not self.pending.empty) and (self.cur_batch == self.pending.min_priority)
+        while (not self.pending.empty) and (
+            self.cur_batch == self.pending.min_priority
         ):
             self.writers.write_result(self.pending.pop(), self.compressed)
             self.cur_batch += 1
@@ -258,7 +266,7 @@ class ResultProcess(Process):
         result_handler: ResultHandler,
         queue: Queue,
         control: Control,
-        timeout: int = 60
+        timeout: int = 60,
     ):
         """
         Args:
@@ -286,8 +294,8 @@ class ResultProcess(Process):
                 self.num_batches = self.control.get_value()
 
             if (
-                self.num_batches is not None and
-                len(self.seen_batches) >= self.num_batches
+                self.num_batches is not None
+                and len(self.seen_batches) >= self.num_batches
             ):
                 raise Done()
 
@@ -296,7 +304,7 @@ class ResultProcess(Process):
             Logs an error with the missing batches.
             """
             if self.num_batches is not None:
-                missing = (set(range(1, self.num_batches + 1)) - self.seen_batches)
+                missing = set(range(1, self.num_batches + 1)) - self.seen_batches
                 logger.error(
                     f"Result thread still missing batches"
                     f"{','.join(str(i) for i in missing)} of {self.num_batches}"

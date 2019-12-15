@@ -183,9 +183,6 @@ class SequenceReader(SequenceReaderBase, metaclass=ABCMeta):
         self.close()
 
 
-from ._readers import FastqReader
-
-
 class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
     """
     SequenceReader that prefetches the first line and stores it so it can be
@@ -210,6 +207,9 @@ class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
     @abstractmethod
     def _iter(self) -> Iterator[Tuple[Sequence, ...]]:
         pass
+
+
+from ._readers import FastqReader
 
 
 class FastaReader(PrefetchSequenceReader):
@@ -293,7 +293,7 @@ class FastaReader(PrefetchSequenceReader):
         # TODO: this will underestimate the record size (and thus overestimate the
         #  total number of records) for FASTA files with wrapped sequence lines.
         record_size = sum(seq.size_in_bytes() for seq in self._first_seq)
-        return _estimate_num_records([self.name], record_size, 2, 1)
+        return estimate_num_records([self.name], record_size, 2, 1)
 
 
 class SraSequenceReader(SequenceReader):
@@ -934,7 +934,7 @@ class SAMParser:
 
     def estimate_num_records(self):
         record_len = len("\t".join(self._next_line))
-        return _estimate_num_records(
+        return estimate_num_records(
             self._sam_file, record_len, 1, header_size=self._header_size
         )
 
@@ -1274,7 +1274,7 @@ def open_reader(
     )
 
 
-def _estimate_num_records(
+def estimate_num_records(
     input_file, record_size, lineseps, format_chars=0, header_size=0
 ) -> Optional[int]:
     """

@@ -13,7 +13,7 @@ from typing import (
 )
 
 from loguru import logger
-import xphyle
+from xphyle import STDOUT, STDERR
 
 from atropos.adapters import AdapterParser, AdapterType
 from atropos.commands import (
@@ -538,7 +538,8 @@ class TrimCommand(BaseCommand):
                         action=options.action,
                         mismatch_action=options.correct_mismatches,
                         max_insert_mismatch_frac=options.insert_match_error_rate,
-                        max_adapter_mismatch_frac=options.insert_match_adapter_error_rate,
+                        max_adapter_mismatch_frac=
+                        options.insert_match_adapter_error_rate,
                         match_probability=match_probability,
                         insert_max_rmp=options.insert_max_rmp,
                         read_wildcards=options.match_read_wildcards,
@@ -646,6 +647,7 @@ class TrimCommand(BaseCommand):
         # Create Formatters
         output2 = None
         interleaved = False
+
         if options.interleaved_output:
             output1 = options.interleaved_output
             interleaved = True
@@ -706,13 +708,13 @@ class TrimCommand(BaseCommand):
         if not formatters.multiplexed:
             if output1 is not None:
                 formatters.add_seq_formatter(NoFilter, output1, output2)
-                if output1 != xphyle.STDOUT and options.writer_process:
+                if output1 != STDOUT and options.writer_process:
                     force_create.append(output1)
                     if output2 is not None:
                         force_create.append(output2)
             elif not (options.discard_trimmed and options.untrimmed_output):
                 formatters.add_seq_formatter(NoFilter, options.default_outfile)
-                if options.default_outfile != xphyle.STDOUT and options.writer_process:
+                if options.default_outfile != STDOUT and options.writer_process:
                     force_create.append(options.default_outfile)
 
         if options.discard_untrimmed or options.untrimmed_output:
@@ -745,7 +747,7 @@ class TrimCommand(BaseCommand):
             mixin_class = SingleEndPipelineMixin
 
         # Create writers
-        writers = Writers(force_create)
+        writers = Writers(force_create, options.compression_format)
 
         # Create record handler
         record_handler = RecordHandler(modifiers, filters, formatters)
@@ -907,7 +909,8 @@ class TrimCommand(BaseCommand):
                 )
             else:
                 worker_result_handler = CompressingWorkerResultHandler(
-                    QueueResultHandler(result_queue)
+                    QueueResultHandler(result_queue),
+                    compression_format=self.get_option("compression_format")
                 )
 
             writer_manager = WriterManager(
@@ -936,10 +939,13 @@ def choose_compression_mode(options: Namespace) -> str:
     # TODO: this is a bit of a hack - we don't know what types of files we'll
     #  be compressing yet, so we make our guess based on the most commonly used
     #  compression format.
-    if (
+    if options.output is None or options.output in (STDOUT, STDERR):
+        # We must use a writer process to write to stdout/stderr
+        options.compression_mode = "writer"
+    elif (
         options.writer_process and
         2 < options.threads < 8 and
-        xphyle.get_compressor("gzip").can_use_system_compression
+        options.can_use_system_compression
     ):
         # Our tests show that with 8 or more threads, worker compression
         # is more efficient.

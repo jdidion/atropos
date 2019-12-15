@@ -19,7 +19,7 @@ from atropos.utils import (
 from atropos.utils.argparse import (
     ParagraphHelpFormatter
 )
-from atropos.utils import splitext_compressed
+from atropos.utils.paths import splitext_compressed
 from atropos.utils.argparse import (
     AtroposArgumentParser,
     Namespace,
@@ -280,10 +280,12 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     )
     parser.add_argument(
         "--progress",
+        nargs="?",
         choices=("bar", "msg"),
-        default=None,
-        help="Show progress. bar = show progress bar; msg = show a status "
-        "message. (no)",
+        default=False,
+        help="Show progress. An optional argument determines what type of progress "
+        "meter to use: bar = progress bar; msg = status message. Ohterwise the default "
+        "progress meter is shown. (now)"
     )
     parser.add_argument(
         "--quiet",
@@ -515,9 +517,13 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
             options.sample_id = name
 
     if options.quiet:
-        options.progress = None
-    elif options.progress and options.output == STDERR:
-        logger.warning("Progress bar may corrupt output written to STDERR")
+        options.progress = False
+    else:
+        if options.progress is None:
+            options.progress = True
+
+        if options.progress and options.output == STDERR:
+            logger.warning("Progress bar may corrupt output written to STDERR")
 
     if options.report_file in (STDOUT, STDERR) and options.quiet:
         logger.warning("Quiet mode - report will not be written to stdout")

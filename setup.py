@@ -11,11 +11,8 @@ import sys
 
 from setuptools import setup, Extension, find_packages
 from distutils.version import LooseVersion
-from distutils.command.sdist import sdist as _sdist
-from distutils.command.build_ext import build_ext as _build_ext
-
-import versioneer
-
+from distutils.command.sdist import sdist
+from distutils.command.build_ext import build_ext
 
 version_info = sys.version_info
 if sys.version_info < (3, 6):
@@ -31,12 +28,7 @@ MIN_CYTHON_VERSIONS = {
 min_cython_version = MIN_CYTHON_VERSIONS[version_info[0:2]]
 
 
-cmdclass = versioneer.get_cmdclass()
-VersioneerBuildExt = cmdclass.get("build_ext", _build_ext)
-VersioneerSdist = cmdclass.get("sdist", _sdist)
-
-
-class BuildExtCython(VersioneerBuildExt):
+class BuildExtCython(build_ext):
     def run(self):
         # If we encounter a PKG-INFO file, then this is likely a .tar.gz/.zip
         # file retrieved from PyPI that already includes the pre-cythonized
@@ -50,22 +42,16 @@ class BuildExtCython(VersioneerBuildExt):
             from Cython.Build import cythonize
             self.extensions = cythonize(self.extensions)
 
-        _build_ext.run(self)
+        super().run()
 
 
-cmdclass["build_ext"] = BuildExtCython
-
-
-class SdistCython(VersioneerSdist):
+class SdistCython(sdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
         check_cython_version()
         cythonize(extensions)
-        _sdist.run(self)
-
-
-cmdclass["sdist"] = SdistCython
+        super().run()
 
 
 def out_of_date(_extensions):
@@ -151,7 +137,7 @@ install_requirements = [
     f"Cython>={min_cython_version}",
     "loguru>=0.4.0",
     "pokrok>=0.2.0",
-    "xphyle>=4.2.0",
+    "xphyle>=4.2.1",
 ]
 test_requirements = [
     "pytest",  # 'jinja2', 'pysam',
@@ -162,13 +148,16 @@ extra_requirements = {
     "khmer": ["khmer"],
     "pysam": ["pysam"],
     "jinja": ["jinja2"],
-    "sra": ["sratream"],
+    "sra": ["ngstream"],
 }
 
 setup(
     name="atropos",
     use_scm_version=True,
-    cmdclass=cmdclass,
+    cmdclass={
+        "build_ext": BuildExtCython,
+        "sdist": SdistCython
+    },
     author="John Didion",
     author_email="github@didion.net",
     url="https://atropos.readthedocs.org/",
