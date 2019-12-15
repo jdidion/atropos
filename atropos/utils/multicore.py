@@ -114,7 +114,7 @@ class PendingQueue:
             raise Full()
 
         if priority in self.queue:
-            raise ValueError("Duplicate priority value: {}".format(priority))
+            raise ValueError(f"Duplicate priority value: {priority}")
 
         self.queue[priority] = value
         if self.min_priority is None or priority < self.min_priority:
@@ -243,7 +243,7 @@ def wait_on(
             wait_start = now
         else:
             waiting = now - wait_start
-            msg = wait_message.format("for {} seconds".format(round(waiting, 1)))
+            msg = wait_message.format(f"for {round(waiting, 1)} seconds")
 
             if timeout is not None and waiting >= timeout:
                 logger.error(msg)
@@ -278,7 +278,7 @@ def wait_on_process(
     timeout_callback = process.terminate if terminate else None
     return wait_on(
         lambda: not process.is_alive(),
-        wait_message="Waiting on {} to terminate {{}}".format(process.name),
+        wait_message=f"Waiting on {process.name} to terminate {{}}",
         timeout=wait_timeout,
         wait=lambda: process.join(retry_interval),
         timeout_callback=timeout_callback,

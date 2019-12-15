@@ -155,7 +155,7 @@ class QueueResultHandler(ResultHandler):
         if worker is None:
             raise RuntimeError("worker must not be None")
 
-        self.message = "{} waiting to queue result {{}}".format(worker.name)
+        self.message = f"{worker.name} waiting to queue result {{}}"
         self.timeout = worker.timeout
 
     def write_result(self, batch_num: int, result: dict):
@@ -234,10 +234,9 @@ class OrderPreservingWriterResultHandler(WriterResultHandler):
 
             if self.cur_batch != total_batches + 1:
                 raise MulticoreError(
-                    "OrderPreservingWriterResultHandler finishing "
-                    "without having seen {} of {} batches".format(
-                        total_batches + 1 - self.cur_batch, total_batches
-                    )
+                    f"OrderPreservingWriterResultHandler finishing "
+                    f"without having seen {total_batches + 1 - self.cur_batch} of "
+                    f"{total_batches} batches"
                 )
 
         super().finish(total_batches=total_batches)

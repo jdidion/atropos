@@ -315,7 +315,7 @@ class WriterResultHandler(ResultHandler):
         if self.use_suffix:
             if worker is None:
                 raise ValueError("worker must not be None")
-            self.writers.suffix = ".{}".format(worker.index)
+            self.writers.suffix = f".{worker.index}"
 
     def write_result(self, batch_num: int, result: dict):
         self.writers.write_result(result, self.compressed)
@@ -382,17 +382,17 @@ class TrimSummary(Summary):
 
         if isinstance(key, str):
             if key.startswith("records_"):
-                frac_key = "fraction_{}".format(key)
+                frac_key = f"fraction_{key}"
                 total_records = self["total_record_count"]
 
                 if isinstance(value, SequenceCollection):
                     dict_val[frac_key] = [frac(val, total_records) for val in value]
                     total = sum(val for val in value if val)
-                    dict_val["total_{}".format(key)] = total
+                    dict_val[f"total_{key}"] = total
                 else:
                     dict_val[frac_key] = frac(value, total_records)
             elif key.startswith("bp_"):
-                frac_key = "fraction_{}".format(key)
+                frac_key = f"fraction_{key}"
                 sum_total_bp = self["sum_total_bp_count"]
 
                 if isinstance(value, SequenceCollection):
@@ -401,8 +401,8 @@ class TrimSummary(Summary):
                         for val, bps in zip(value, self["total_bp_counts"])
                     ]
                     total = sum(val for val in value if val)
-                    dict_val["total_{}".format(key)] = total
-                    dict_val["fraction_total_{}".format(key)] = frac(
+                    dict_val[f"total_{key}"] = total
+                    dict_val[f"fraction_total_{key}"] = frac(
                         total, sum_total_bp
                     )
                 else:

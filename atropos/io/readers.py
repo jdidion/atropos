@@ -442,8 +442,8 @@ class FastaQualReader(SequenceReaderBase):
                 )
             except KeyError as err:
                 raise FormatError(
-                    "Within read named {0!r}: Found invalid quality "
-                    "value {1}".format(fastaread.name, err)
+                    f"Within read named {fastaread.name!r}: Found invalid quality "
+                    f"value {err}"
                 )
 
             assert fastaread.name == qualread.name

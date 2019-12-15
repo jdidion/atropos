@@ -145,7 +145,7 @@ class BaseReportGenerator(metaclass=ABCMeta):
         if inp["input_read"] == InputRead.PAIRED:
             fmt += ", Paired"
         else:
-            fmt += ", Read {}".format(inp["input_read"])
+            fmt += f", Read {inp['input_read']}"
         if inp["colorspace"]:
             fmt += ", Colorspace"
         if inp["interleaved"]:

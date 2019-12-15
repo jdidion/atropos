@@ -48,8 +48,9 @@ cdef class Sequence(object):
             if slen != qlen:
                 rname = truncate_string(name)
                 raise FormatError(
-                    "In read named {0!r}: length of quality sequence ({1}) and "
-                    "length  of read ({2}) do not match".format(rname, qlen, slen))
+                    f"In read named {rname!r}: length of quality sequence ({qlen}) and "
+                    f"length  of read ({slen}) do not match"
+                )
 
         # If an alphabet is specified, replace any bases not in the alphabet
         # with the default character.
@@ -160,10 +161,9 @@ cdef class Sequence(object):
     def __repr__(self):
         qstr = ""
         if self.qualities is not None:
-            qstr = ", qualities={0!r}".format(truncate_string(self.qualities))
-        return "<Sequence(name={0!r}, sequence={1!r}{2})>".format(
-            truncate_string(self.name), truncate_string(self.sequence), qstr
-        )
+            qstr = f", qualities={truncate_string(self.qualities)!r}"
+        return f"<Sequence(name={truncate_string(self.name)!r}, " \
+               f"sequence={truncate_string(self.sequence)!r}{qstr})>"
 
     def __len__(self):
         return len(self.sequence)

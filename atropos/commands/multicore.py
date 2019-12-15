@@ -81,7 +81,7 @@ class WorkerProcess(Process):
             while True:
                 yield dequeue(
                     self.input_queue,
-                    wait_message="{} waiting on batch {{}}".format(self.name),
+                    wait_message=f"{self.name} waiting on batch {{}}",
                     block_timeout=self.timeout,
                 )
 
@@ -252,24 +252,21 @@ class ParallelPipelineRunner:
             """
             missing_summaries = set(range(1, self.threads)) - self.seen_summaries
             raise AtroposError(
-                "Missing summaries from processes {}".format(
-                    ",".join(str(summ) for summ in missing_summaries)
-                )
+                f"Missing summaries from processes "
+                f"{','.join(str(summ) for summ in missing_summaries)}"
             )
 
         for _ in range(1, self.threads + 1):
             batch = dequeue(self.summary_queue, fail_callback=summary_fail_callback)
             worker_index, worker_batches, worker_summary = batch
             if worker_summary is None:
-                raise MulticoreError(
-                    "Worker process {} died unexpectedly".format(worker_index)
-                )
+                raise MulticoreError(f"Worker process {worker_index} died unexpectedly")
             elif (
                 "exception" in worker_summary
                 and worker_summary["exception"] is not None
             ):
                 raise AtroposError(
-                    "Worker process {} died unexpectedly".format(worker_index),
+                    f"Worker process {worker_index} died unexpectedly",
                     worker_summary["exception"],
                 )
             else:
@@ -284,9 +281,8 @@ class ParallelPipelineRunner:
             missing_batches = set(range(1, self.num_batches + 1)) - self.seen_batches
             if len(missing_batches) > 0:
                 raise AtroposError(
-                    "Workers did not process batches {}".format(
-                        ",".join(str(batch) for batch in missing_batches)
-                    )
+                    f"Workers did not process batches "
+                    f"{','.join(str(batch) for batch in missing_batches)}"
                 )
 
         self.finish()

@@ -70,7 +70,7 @@ class Const(Generic[ConstType], Mergeable):
             ValueError
         """
         if self != other:
-            raise ValueError("{} != {}".format(self, other))
+            raise ValueError(f"{self} != {other}")
 
         return self
 
@@ -274,7 +274,7 @@ class NestedDict(BaseMergeableDict):
 
     def merge(self, other: "NestedDict") -> "NestedDict":
         if not isinstance(other, NestedDict):
-            raise ValueError("Cannot merge object of type {}".format(type(other)))
+            raise ValueError(f"Cannot merge object of type {type(other)}")
         for key, value in other.items():
             if key in self:
                 self[key].merge(value)

@@ -1055,7 +1055,7 @@ def add_umi_to_read_name(read, umi: str, delim: str = ":"):
         @{read_name}{delim}{UMI} {DESCRIPTION}.
     """
     fields = read.name.split(" ")
-    new_name = "{}{}{}".format(fields[0], delim, umi)
+    new_name = f"{fields[0]}{delim}{umi}"
 
     if len(fields) > 1:
         fields[0] = new_name
@@ -1314,8 +1314,8 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
                         )
                 else:
                     raise AtroposError(
-                        "Invalid alignment while trying to merge read "
-                        "{}: {}".format(read1.name, ",".join(str(i) for i in alignment))
+                        f"Invalid alignment while trying to merge read "
+                        f"{read1.name}: {','.join(str(i) for i in alignment)}"
                     )
 
                 read1.merged = True
@@ -1514,7 +1514,7 @@ class PairedEndModifiers(Modifiers):
         if issubclass(mod_class, ReadPairModifier):
             if self.paired != "both" and read == 1 | 2:
                 raise ValueError(
-                    "Must have paired-end reads to use modifer {}".format(mod_class)
+                    f"Must have paired-end reads to use modifer {mod_class}"
                 )
 
             mods = mod_class(**kwargs)

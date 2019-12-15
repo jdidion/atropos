@@ -69,9 +69,12 @@ class TitlePrinter(Printer):
         self,
         outfile: IO,
         levels: Sequence[Tuple[str, Optional[str]]] = (
-            ("=", "="), ("-", "-"), ("-", None), ("~", None)
+            ("=", "="),
+            ("-", "-"),
+            ("-", None),
+            ("~", None),
         ),
-        **kwargs
+        **kwargs,
     ):
         super().__init__(outfile, **kwargs)
         self.levels = levels
@@ -85,7 +88,7 @@ class TitlePrinter(Printer):
 
         if level is not None:
             if level >= len(self.levels):
-                raise ValueError("Invalid level: {}".format(level))
+                raise ValueError(f"Invalid level: {level}")
 
             underline, overline = self.levels[level]
             if overline is True:
@@ -118,7 +121,7 @@ class RowPrinter(Printer):
         indent: Union[str, Tuple[str, ...]] = "",
         pct: bool = False,
         default: int = 0,
-        **kwargs
+        **kwargs,
     ):
         """
         Args:
@@ -146,7 +149,7 @@ class RowPrinter(Printer):
         self,
         *rows,
         header: Optional[Sequence[Union[str, Tuple[str, str]]]] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Prints multiple rows. Automatically figures out column widths.
@@ -175,7 +178,7 @@ class RowPrinter(Printer):
                     *header_row,
                     colwidths=colwidths,
                     header=(i == len(header_rows)),
-                    **kwargs
+                    **kwargs,
                 )
 
         for row in rows:
@@ -194,7 +197,7 @@ class RowPrinter(Printer):
         underline: str = "-",
         pct: Optional[bool] = None,
         default: Optional[Any] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Prints a row.
@@ -309,16 +312,15 @@ class LegacyTextReportWriter(BaseReportWriter):
         _print_title = TitlePrinter(stream)
         _print = Printer(stream)
         _print_title("Atropos", level=0)
-        _print("Atropos version: {}".format(summary["version"]))
-        _print("Python version: {}".format(summary["python"]))
+        _print(f"Atropos version: {summary['version']}")
+        _print(f"Python version: {summary['python']}")
         _print(
-            "Command line parameters: {} {}".format(
-                summary["command"], " ".join(summary["options"]["orig_args"])
-            )
+            f"Command line parameters: {summary['command']} "
+            f"{' '.join(summary['options']['orig_args'])}"
         )
         _print()
-        _print("Sample ID: {}".format(summary["sample_id"]))
-        _print("Input format: {}".format(summary["derived"]["input_format"]))
+        _print(f"Sample ID: {summary['sample_id']}")
+        _print(f"Input format: {summary['derived']['input_format']}")
         _print("Input files:")
 
         for infile in summary["input"]["input_names"]:
@@ -329,19 +331,17 @@ class LegacyTextReportWriter(BaseReportWriter):
 
         timing = summary["timing"]
         total = summary["total_record_count"]
-        wctime = ["Wallclock time: {:.2F} s".format(timing["wallclock"])]
+        wctime = [f"Wallclock time: {timing['wallclock']:.2F} s"]
 
         if total > 0:
             wctime.append(
-                "({0:.0F} us/read; {1:.2F} M reads/minute)".format(
-                    1e6 * timing["wallclock"] / total,
-                    total / timing["wallclock"] * 60 / 1e6,
-                )
+                f"({1e6 * timing['wallclock'] / total:.0F} us/read; "
+                f"{total / timing['wallclock'] * 60 / 1e6:.2F} M reads/minute)"
             )
 
-        _print("Start time: {}".format(timing["start"]))
+        _print(f"Start time: {timing['start']}")
         _print(*wctime)
-        _print("CPU time (main process): {0:.2F} s".format(timing["cpu"]))
+        _print(f"CPU time (main process): {timing['cpu']:.2F} s")
         _print()
 
     @classmethod
@@ -399,13 +399,13 @@ class LegacyTextReportWriter(BaseReportWriter):
 
         _print_title("Trimming", level=1)
         _print(pairs_or_reads, "records", "fraction", header=True)
-        _print("Total {} processed:".format("read pairs" if paired else "reads"), total)
+        _print(f"Total {'read pairs' if paired else 'reads'} processed:", total)
 
         if adapter_cutter:
             if paired:
                 for read in range(2):
                     _print(
-                        "Read {} with adapter:".format(read + 1),
+                        f"Read {read + 1} with adapter:",
                         adapter_cutter["records_with_adapters"][read],
                         adapter_cutter["fraction_records_with_adapters"][read],
                         indent=(INDENT, ""),
@@ -422,7 +422,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         def _print_filter(_name, sep):
             if _name in filters:
                 _print(
-                    "{} {} {}:".format(pairs_or_reads, sep, _name.replace("_", " ")),
+                    f"{pairs_or_reads} {sep} {_name.replace('_', ' ')}:",
                     filters[_name]["records_filtered"],
                     filters[_name]["fraction_records_filtered"],
                     pct=True,
@@ -432,7 +432,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         _print_filter("too_long", "that were")
         _print_filter("too_many_n", "with")
         _print(
-            "{} written (passing filters):".format(pairs_or_reads),
+            f"{pairs_or_reads} written (passing filters):",
             formatters["records_written"],
             formatters["fraction_records_written"],
             pct=True,
@@ -453,7 +453,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         if paired:
             for read in range(2):
                 _print(
-                    "Read {}:".format(read + 1),
+                    f"Read {read + 1}:",
                     summary["total_bp_counts"][read],
                     indent=(INDENT, ""),
                 )
@@ -462,16 +462,16 @@ class LegacyTextReportWriter(BaseReportWriter):
             if paired:
                 _print(
                     title,
-                    data["total_{}".format(key)],
-                    data["fraction_total_{}".format(key)],
+                    data[f"total_{key}"],
+                    data[f"fraction_total_{key}"],
                     pct=True,
                 )
 
                 for _read in range(2):
                     _print(
-                        "Read {}:".format(_read + 1),
+                        f"Read {_read + 1}:",
                         data[key][_read],
-                        data["fraction_{}".format(key)][_read],
+                        data[f"fraction_{key}"][_read],
                         indent=(INDENT, ""),
                         pct=True,
                         default=default,
@@ -480,7 +480,7 @@ class LegacyTextReportWriter(BaseReportWriter):
                 _print(
                     title,
                     data[key][0],
-                    data["fraction_{}".format(key)][0],
+                    data[f"fraction_{key}"][0],
                     pct=True,
                     default=default,
                 )
@@ -505,7 +505,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         stream: IO,
         paired: bool,
         total_records: int,
-        max_width: int
+        max_width: int,
     ):
         """
         Prints details for a adapters.
@@ -524,8 +524,8 @@ class LegacyTextReportWriter(BaseReportWriter):
                 for adapter in pair.values():
                     if adapter["where"]["name"] == "linked":
                         adapter_lenghts.append(
-                            3 +
-                            len(adapter["front_sequence"] + adapter["back_sequence"])
+                            3
+                            + len(adapter["front_sequence"] + adapter["back_sequence"])
                         )
                     else:
                         adapter_lenghts.append(len(adapter["sequence"]))
@@ -555,9 +555,7 @@ class LegacyTextReportWriter(BaseReportWriter):
             if prev == adapter_length:
                 _print(f"{adapter_length} bp: {int(error_rate * adapter_length)}")
             else:
-                _print(
-                    "{prev}-{adapter_length} bp: {int(error_rate * adapter_length)}"
-                )
+                _print("{prev}-{adapter_length} bp: {int(error_rate * adapter_length)}")
 
             _print()
 
@@ -567,7 +565,7 @@ class LegacyTextReportWriter(BaseReportWriter):
             num_reads: int,
             error_rate: float,
             errors: dict,
-            match_probabilities: Sequence[float]
+            match_probabilities: Sequence[float],
         ):
             """
             Prints a histogram. Also, print the no. of reads expected to be
@@ -633,7 +631,7 @@ class LegacyTextReportWriter(BaseReportWriter):
                     ("expect", ""),
                     ("max.err", ""),
                     ("error counts", error_header),
-                )
+                ),
             )
             hist_printer.newline()
 
@@ -666,10 +664,10 @@ class LegacyTextReportWriter(BaseReportWriter):
                 _print(
                     "\n".join(
                         INDENTED.wrap(
-                            'The adapter is preceded by "{0}" extremely often. The '
-                            "provided adapter sequence may be incomplete. To fix the "
-                            'problem, add "{0}" to the beginning of the adapter '
-                            "sequence.".format(warnbase)
+                            f"The adapter is preceded by '{warnbase}'extremely often. "
+                            f"The provided adapter sequence may be incomplete. To fix "
+                            f"the problem, add '{warnbase}' to the beginning of the "
+                            f"adapter sequence."
                         )
                     )
                 )
@@ -704,11 +702,9 @@ class LegacyTextReportWriter(BaseReportWriter):
                     ]
                     seq_printer.print_rows(
                         (
-                            "{}...{}".format(
-                                adapter["front_sequence"], adapter["back_sequence"]
-                            ),
+                            f"{adapter['front_sequence']}...{adapter['back_sequence']}",
                             "linked",
-                            "{}+{}".format(front_len, back_len),
+                            f"{front_len}+{back_len}",
                             adapter["total_front"],
                             adapter["total_back"],
                         ),
@@ -740,7 +736,7 @@ class LegacyTextReportWriter(BaseReportWriter):
                 if where_name == "anywhere":
                     _print(
                         adapter["total_front"],
-                        "times, it overlapped the 5' end of a read"
+                        "times, it overlapped the 5' end of a read",
                     )
                     _print(
                         adapter["total_back"],
@@ -847,7 +843,7 @@ class LegacyTextReportWriter(BaseReportWriter):
                 if src is None:
                     continue
 
-                _print("Read {}: {}".format(read, src))
+                _print(f"Read {read}: {src}")
 
             _print()
 
@@ -868,7 +864,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         _print_title("Post-trimming stats", level=1)
 
         for dest, stats in post.items():
-            _print_title("Destination: {}".format(dest), level=2)
+            _print_title(f"Destination: {dest}", level=2)
 
             for source, data in stats.items():
                 _print_title("Source", level=3, newline=False)
@@ -880,7 +876,7 @@ class LegacyTextReportWriter(BaseReportWriter):
                     if src is None:
                         continue
 
-                    _print("Read {}: {}".format(read, src))
+                    _print(f"Read {read}: {src}")
 
                 _print()
 
@@ -946,9 +942,9 @@ class LegacyTextReportWriter(BaseReportWriter):
                 return
 
             ncol = len(hist["columns"])
-            max_tile_width = max(
-                4, len(str(math.ceil(data["read1"]["counts"] / ncol)))
-            ) + 1
+            max_tile_width = (
+                max(4, len(str(math.ceil(data["read1"]["counts"] / ncol)))) + 1
+            )
             _print_base_histogram(
                 title, hist, extra_width=max_tile_width, index_name="Tile"
             )
@@ -965,9 +961,9 @@ class LegacyTextReportWriter(BaseReportWriter):
             quals = hist["columns"]
             tiles = hist["columns2"]
             ncol = len(tiles)
-            max_tile_width = max(
-                4, len(str(math.ceil(data["read1"]["counts"] / ncol)))
-            ) + 1
+            max_tile_width = (
+                max(4, len(str(math.ceil(data["read1"]["counts"] / ncol)))) + 1
+            )
             _print("Pos", *tiles, header=True, extra_width=max_tile_width)
 
             for pos, tiles in hist["rows"].items():
@@ -978,7 +974,7 @@ class LegacyTextReportWriter(BaseReportWriter):
                         weighted_median(quals, tile_counts)
                         for tile_counts in tiles.values()
                     ),
-                    extra_width=max_tile_width
+                    extra_width=max_tile_width,
                 )
 
         _print("", "Read1", "Read2", header=True)
@@ -1039,12 +1035,12 @@ class LegacyTextReportWriter(BaseReportWriter):
         if "tile_base_qualities" in data["read1"]:
             _print_tile_base_histogram(
                 "Read 1 per-tile base qualities (%)",
-                data["read1"]["tile_base_qualities"]
+                data["read1"]["tile_base_qualities"],
             )
             _print()
             _print_tile_base_histogram(
                 "Read 2 per-tile base qualities (%)",
-                data["read2"]["tile_base_qualities"]
+                data["read2"]["tile_base_qualities"],
             )
             _print()
 
@@ -1071,7 +1067,7 @@ def sizeof(*x: Union[str, int, float], seps: bool = True, prec: int = 1):
             if seps:
                 numlen += (numlen - prec - 1) // 3
         else:
-            raise ValueError("Unexpected data type: {}".format(x[0].__class__))
+            raise ValueError(f"Unexpected data type: {x[0].__class__}")
 
         return numlen
 

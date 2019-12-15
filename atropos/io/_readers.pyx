@@ -61,8 +61,10 @@ class FastqReader(PrefetchSequenceReader):
         it = iter(self._file)
         line = next(it)
         if not (line and line[0] == '@'):
-            raise FormatError("Line {0} in FASTQ file is expected to start "
-                              "with '@', but found {1!r}".format(i+1, line[:10]))
+            raise FormatError(
+                f"Line {i+1} in FASTQ file is expected to start with '@', but found "
+                f"{line[:10]!r}"
+            )
         strip = -2 if line.endswith('\r\n') else -1
         name = line[1:strip]
 
@@ -70,9 +72,10 @@ class FastqReader(PrefetchSequenceReader):
         for line in it:
             if i == 0:
                 if not (line and line[0] == '@'):
-                    raise FormatError("Line {0} in FASTQ file is expected to "
-                                      "start with '@', but found {1!r}".format(
-                                      i+1, line[:10]))
+                    raise FormatError(
+                        "Line {i+1} in FASTQ file is expected to start with '@', but "
+                        "found {line[:10]!r}"
+                    )
                 name = line[1:strip]
             elif i == 1:
                 sequence = line[:strip]
@@ -83,16 +86,17 @@ class FastqReader(PrefetchSequenceReader):
                     line = line[:strip]
                     if not (line and line[0] == '+'):
                         raise FormatError(
-                            "Line {0} in FASTQ file is expected to start with "
-                            "'+', but found {1!r}".format(i+1, line[:10]))
+                            f"Line {i+1} in FASTQ file is expected to start with '+', "
+                            f"but found {line[:10]!r}"
+                        )
                     if len(line) > 1:
                         if not line[1:] == name:
                             raise FormatError(
-                                "At line {0}: Sequence descriptions in the FASTQ file don't match "
-                                "({1!r} != {2!r}).\n"
-                                "The second sequence description must be either empty "
-                                "or equal to the first description.".format(i+1,
-                                    name, line[1:]))
+                                f"At line {i+1}: Sequence descriptions in the FASTQ "
+                                f"file don't match ({name!r} != {line[1:]!r}).\n"
+                                f"The second sequence description must be either empty "
+                                f"or equal to the first description."
+                            )
                         name2 = name
                     else:
                         name2 = ''
@@ -107,8 +111,8 @@ class FastqReader(PrefetchSequenceReader):
                         alphabet=self.alphabet)
                 except Exception as err:
                     raise FormatError(
-                        "Error creating sequence record at line "
-                        "{}".format(i+1)) from err
+                        f"Error creating sequence record at line {i+1}"
+                    ) from err
             i = (i + 1) % 4
         if i != 0:
             raise FormatError("FASTQ file ended prematurely")

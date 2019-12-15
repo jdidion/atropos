@@ -33,7 +33,7 @@ class ErrorTextReportWriter(BaseReportWriter):
                 sum(err * total_len for err, total_len in zip(estimates, total_lens)) /
                 sum(total_lens)
             )
-            print("Error rate: {:.2%}".format(overall_err), file=stream)
+            print(f"Error rate: {overall_err:.2%}", file=stream)
 
     @staticmethod
     def _generate_estimator_report(
@@ -47,18 +47,18 @@ class ErrorTextReportWriter(BaseReportWriter):
     ):
         _print_indent = Printer(stream, indent='  ')
         _print.newline()
-        _print_title("Input {}".format(input_idx), level=0)
+        _print_title(f"Input {input_idx}", level=0)
 
         if input_name:
-            _print("File: {}".format(input_name))
+            _print(f"File: {input_name}")
 
-        _print("Error rate: {:.2%}".format(estimate))
+        _print(f"Error rate: {estimate:.2%}")
 
         if details:
             _print("Details:\n")
             per_read = details['per_read']
             per_cycle = details['per_cycle']
-            _print_indent("StdErr: {:.2%}".format(per_read['standard error']))
+            _print_indent(f"StdErr: {per_read['standard error']:.2%}")
             _print_indent("Per-cycle rates:")
 
             for cycle in per_cycle:

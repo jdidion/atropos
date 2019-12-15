@@ -458,34 +458,30 @@ class Detector(SingleEndPipelineMixin, Pipeline, metaclass=ABCMeta):
         def _filter(_match: Match):
             if _match.count < self.min_report_freq:
                 logger.debug(
-                    "Filtering {} because frequency {} < {}".format(
-                        _match.seq, _match.count, self.min_report_freq
-                    )
+                    f"Filtering {_match.seq} because frequency {_match.count} < "
+                    f"{self.min_report_freq}"
                 )
                 return False
 
             if min_len and len(_match) < min_len:
                 logger.debug(
-                    "Filtering {} because it's too short (< {} bp)".format(
-                        _match.seq, min_len
-                    )
+                    f"Filtering {_match.seq} because it's too short (< {min_len} bp)"
                 )
                 return False
 
             if min_complexity and _match.seq_complexity < min_complexity:
                 logger.debug(
-                    "Filtering {} because its complexity {} < {}".format(
-                        _match.seq, _match.seq_complexity, min_complexity
-                    )
+                    f"Filtering {_match.seq} because its complexity "
+                    f"{_match.seq_complexity} < {min_complexity}"
                 )
                 return False
 
             if self.include == "known" and not _match.is_known:
-                logger.debug("Filtering {} because it's not known".format(_match.seq))
+                logger.debug(f"Filtering {_match.seq} because it's not known")
                 return False
 
             elif self.include == "unknown" and _match.is_known:
-                logger.debug("Filtering {} because it's known".format(_match.seq))
+                logger.debug(f"Filtering {_match.seq} because it's known")
                 return False
 
             if (
@@ -494,9 +490,8 @@ class Detector(SingleEndPipelineMixin, Pipeline, metaclass=ABCMeta):
                 and _match.match_frac < min_match_frac
             ):
                 logger.debug(
-                    "Filtering {} because its match_frac {} < {}".format(
-                        _match.seq, _match.match_frac, min_match_frac
-                    )
+                    f"Filtering {_match.seq} because its match_frac "
+                    f"{_match.match_frac} < {min_match_frac}"
                 )
                 return False
 
@@ -896,9 +891,8 @@ class KhmerDetector(Detector):
                 seqlen = len(seq)
                 if seqlen < self.kmer_size:
                     print(
-                        "Cannot check {}; sequence is shorter than {}".format(
-                            list(names)[0], self.kmer_size
-                        )
+                        f"Cannot check {list(names)[0]}; sequence is shorter than "
+                        f"{self.kmer_size}"
                     )
                     continue
 

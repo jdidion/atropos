@@ -198,9 +198,8 @@ class ShadowRegressionErrorEstimator(ErrorEstimator):
                 stdout, stderr = proc.communicate()
                 if proc.returncode != 0:
                     raise AtroposError(
-                        "R script failed: rc={}; stdout={}; stderr={}".format(
-                            proc.returncode, stdout, stderr
-                        )
+                        f"R script failed: rc={proc.returncode}; stdout={stdout}; "
+                        f"stderr={stderr}"
                     )
 
             # read the results

@@ -31,7 +31,7 @@ class AtroposArgumentParser(ArgumentParser):
         later be retrieved via `get_group`.
         """
         if name in self._groups:
-            raise ValueError("Group already exists: {}".format(name))
+            raise ValueError(f"Group already exists: {name}")
 
         if mutex:
             group = self.add_mutually_exclusive_group(required=required)
@@ -246,7 +246,7 @@ def int_or_str(arg):
             return int(num)
 
     else:
-        raise ValueError("Unsupported type {}".format(arg))
+        raise ValueError(f"Unsupported type {arg}")
 
 
 def positive(type_=int, inclusive=False):

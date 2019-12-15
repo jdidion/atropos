@@ -73,7 +73,7 @@ class ColorspaceSequence(Sequence):
         if self.qualities is None:
             qstr = ""
         else:
-            qstr = ", qualities={0!r}".format(truncate_string(self.qualities))
+            qstr = f", qualities={truncate_string(self.qualities)!r}"
 
         return fmt_str.format(
             truncate_string(self.name),
