@@ -1024,7 +1024,7 @@ class UmiTrimmer(Trimmer):
     def __call__(self, read: Sequence) -> Sequence:
         """
         Trim off {number_of_bases} on the read sequence and set UMI for the read
-        object (see Sequence class from io/_seqio.pyx)
+        object (see Sequence class from io/_sequences.pyx)
 
         Args:
             read: read to modify

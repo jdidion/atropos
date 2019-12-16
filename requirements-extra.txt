@@ -1,0 +1,7 @@
+pysam-0.15.3
+tqdm-4.40.2
+khmer-2.1.1
+bz2file-0.98
+screed-1.0.1
+jinja2-2.10.3
+MarkupSafe-1.1.1
