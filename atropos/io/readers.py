@@ -6,7 +6,8 @@ import os
 from pathlib import Path
 import sys
 from typing import (
-    Callable, Iterator, IO, Optional, Sequence as SequenceType, Tuple, Type, Union, cast
+    Callable, Iterable, Iterator, IO, Optional, Sequence as SequenceType, Tuple, Type,
+    Union, cast
 )
 
 from xphyle import STDOUT, xopen
@@ -24,7 +25,9 @@ from atropos.utils.collections import Summarizable
 LINESEP_LEN = len(os.linesep)
 
 
-class SequenceReaderBase(Summarizable, metaclass=ABCMeta):
+class SequenceReaderBase(
+    Summarizable, Iterable[Tuple[Sequence, ...]], metaclass=ABCMeta
+):
     """
     Base class for sequence readers.
     """
@@ -639,7 +642,7 @@ class PairedSequenceReader(SequenceReaderBase):
                     "in file 2."
                 )
 
-            if not _sequence_names_match(read1, read2):
+            if not sequence_names_match(read1, read2):
                 raise FormatError(
                     f"Reads are improperly paired. Read name '{read1.name}' in file 1 "
                     f"does not match '{read2.name}' in file 2."
@@ -771,7 +774,7 @@ class InterleavedSequenceReader(SequenceReaderWrapper):
                     "Interleaved input file incomplete: Last record has no " "partner."
                 )
 
-            if not _sequence_names_match(read1, read2):
+            if not sequence_names_match(read1, read2):
                 raise FormatError(
                     f"Reads are improperly paired. Name {read1.name!r} (first) does "
                     f"not match {read2.name!r} (second)."
@@ -799,6 +802,10 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
     """
     Reader for SAM/BAM files. Paired-end files must be name-sorted. Does not support
     secondary/supplementary reads.
+
+    TODO: either drop support for BAM files (require user to pipe output from
+     `samtools view`) and implement pure-python SAM parsing, or replace pysam with a
+     different BAM-parsing library (pysam is not Python 3.8 compatible).
     """
 
     @classproperty
@@ -1298,7 +1305,7 @@ def estimate_num_records(
         return int(file_size / (record_size + (lineseps * LINESEP_LEN) + format_chars))
 
 
-def _sequence_names_match(read1: Sequence, read2: Sequence) -> bool:
+def sequence_names_match(read1: Sequence, read2: Sequence) -> bool:
     """
     Checks whether the sequences read1 and read2 have identical names, ignoring a
     suffix of '1' or '2'. Some old paired-end reads have names that end in '/1' and

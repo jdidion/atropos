@@ -196,7 +196,7 @@ class ReadMetricsCollector(Summarizable):
         self.sequence_gc = Histogram()
         # per-position base composition
         self.bases = BaseCountingDicts()
-        # whether to collect base quality stats
+        # whether to collect base quality metrics
         self.qualities = qualities
         self.quality_base = quality_base
         self.tile_key_regexp = None
@@ -245,7 +245,7 @@ class ReadMetricsCollector(Summarizable):
 
     def collect_record(self, record: Sequence):
         """
-        Collects stats on a single sequence record.
+        Collects metrics on a single sequence record.
         """
         if self.qualities is None and record.qualities:
             self.qualities = True

@@ -687,9 +687,9 @@ def test_quiet_is_quiet():
         assert captured_stderr.getvalue() == ""
 
 
-def test_nextseq(tmp_path_factory):
+def test_twocolor(tmp_path_factory):
     run(
-        "--nextseq-trim 22", "nextseq.fastq", "nextseq.fastq",
+        "--twocolor-trim 22", "nextseq.fastq", "nextseq.fastq",
         tmp_path_factory=tmp_path_factory
     )
 

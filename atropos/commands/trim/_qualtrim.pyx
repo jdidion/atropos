@@ -49,15 +49,16 @@ def quality_trim_index(str qualities, int cutoff_front, int cutoff_back, int bas
     return start, stop
 
 
-def nextseq_trim_index(sequence, int cutoff, int base=33):
-    """Variant of the above quality trimming routine that works on NextSeq data.
-    With Illumina NextSeq, bases are encoded with two colors. 'No color' (a
-    dark cycle) usually means that a 'G' was sequenced, but that also occurs
-    when sequencing falls off the end of the fragment. The read then contains
-    a run of high-quality G bases in the end.
+def twocolor_trim_index(sequence, int cutoff, int base=33):
+    """
+    Variant of the above quality trimming routine that works on two-color data, in which
+    bases are encoded with two colors rather than four. 'No color' (a dark cycle)
+    usually means that a 'G' was sequenced, but that also occurs when sequencing falls
+    off the end of the fragment. The read then contains a run of high-quality G bases in
+    the end.
 
-    This routine works as the one above, but counts qualities belonging to 'G'
-    bases as being equal to cutoff - 1.
+    This routine works as the one above, but counts qualities belonging to 'G' bases
+    as being equal to cutoff - 1.
     """
     bases = sequence.sequence
     qualities = sequence.qualities

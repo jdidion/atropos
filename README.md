@@ -12,7 +12,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 3. Options for trimming specific types of data (miRNA, bisulfite-seq).
 4. A new command ('detect') that will detect adapter sequences and other potential contaminants.
 5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
-6. A new command ('qc') that generates read statistics similar to FastQC. The trim command can also compute read statistics both before and after trimming (using the '--stats' option).
+6. A new command ('qc') that generates read statistics similar to FastQC. The trim command can also compute read metrics both before and after trimming (using the '--metrics' option).
 7. Improved summary reports, including support for serialization formats (JSON, YAML, pickle), support for user-defined templates (via the optional Jinja2 dependency), and integration with [MultiQC](http://multiqc.info).
 8. The ability to merge overlapping reads (this is experimental and the functionality is limited).
 9. The ability to write the summary report and log messages to separate files.

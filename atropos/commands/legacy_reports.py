@@ -823,7 +823,7 @@ class LegacyTextReportWriter(BaseReportWriter):
     @classmethod
     def _print_pre_trim_report(cls, summary: dict, stream: IO):
         """
-        Prints pre-trimming stats.
+        Prints pre-trimming metrics.
 
         Args:
             summary: The summary dict.
@@ -832,7 +832,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         pre = summary["pre"]
         _print_title = TitlePrinter(stream)
         _print = Printer(stream)
-        _print_title("Pre-trimming stats", level=1)
+        _print_title("Pre-trimming metrics", level=1)
 
         for source, data in pre.items():
             _print_title("Source", level=3, newline=False)
@@ -852,7 +852,7 @@ class LegacyTextReportWriter(BaseReportWriter):
     @classmethod
     def _print_post_trim_report(cls, summary: dict, outfile: IO):
         """
-        Prints post-trimming stats.
+        Prints post-trimming metrics.
 
         Args:
             summary: The summary dict.
@@ -861,12 +861,12 @@ class LegacyTextReportWriter(BaseReportWriter):
         post = summary["post"]
         _print_title = TitlePrinter(outfile)
         _print = Printer(outfile)
-        _print_title("Post-trimming stats", level=1)
+        _print_title("Post-trimming metrics", level=1)
 
-        for dest, stats in post.items():
+        for dest, metrics in post.items():
             _print_title(f"Destination: {dest}", level=2)
 
-            for source, data in stats.items():
+            for source, data in metrics.items():
                 _print_title("Source", level=3, newline=False)
 
                 # TODO: When multi-file input is supported, this code will need to
@@ -888,7 +888,7 @@ class LegacyTextReportWriter(BaseReportWriter):
         Prints metrics.
 
         Args:
-            data: The stats dict.
+            data: The metrics dict.
             outfile: The output file.
         """
         paired = "read2" in data
@@ -979,7 +979,7 @@ class LegacyTextReportWriter(BaseReportWriter):
 
         _print("", "Read1", "Read2", header=True)
 
-        # Sequence-level stats
+        # Sequence-level metrics
         _print(
             "Read pairs:" if paired else "Reads:",
             data["read1"]["counts"],
@@ -1017,7 +1017,7 @@ class LegacyTextReportWriter(BaseReportWriter):
             )
             _print()
 
-        # Base-level stats
+        # Base-level metrics
         if "base_qualities" in data["read1"]:
             _print_base_histogram(
                 "Read 1 base qualities (%)", data["read1"]["base_qualities"]

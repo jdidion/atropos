@@ -37,7 +37,7 @@ from atropos.commands.trim.modifiers import (
     MergeOverlapping,
     MinCutter,
     NEndTrimmer,
-    NextseqQualityTrimmer,
+    TwoColorQualityTrimmer,
     UmiTrimmer,
     SyncUmi,
     AddUmi,
@@ -125,34 +125,34 @@ class MetricsRecordHandlerWrapper(Summarizable):
         self,
         record_handler: RecordHandler,
         paired: bool,
-        stats_args: Dict[MetricsMode, dict],
+        metrics_args: Dict[MetricsMode, dict],
         **kwargs,
     ):
         """
         Args:
             record_handler:
             paired: Whether reads are paired-end.
-            stats_arg: Sequence; when to collect stats ('pre', 'post')
+            metrics_args: Sequence; when to collect metrics ('pre', 'post')
             kwargs:
-                mode: Collection mode; pre=only collect pre-trim stats; post=only
-                collect post-trim stats; both=collect both pre- and post-trim stats.
+                mode: Collection mode; pre=only collect pre-trim metrics; post=only
+                collect post-trim metrics; both=collect both pre- and post-trim metrics.
         """
         self.record_handler = record_handler
         self.read_metrics_class = (
             PairedEndReadMetrics if paired else SingleEndReadMetrics
         )
 
-        if MetricsMode.PRE in stats_args:
+        if MetricsMode.PRE in metrics_args:
             self.pre = {}
             self.pre_kwargs = kwargs.copy()
-            self.pre_kwargs.update(stats_args[MetricsMode.PRE])
+            self.pre_kwargs.update(metrics_args[MetricsMode.PRE])
         else:
             self.pre = None
 
-        if MetricsMode.POST in stats_args:
+        if MetricsMode.POST in metrics_args:
             self.post = {}
             self.post_kwargs = kwargs.copy()
-            self.post_kwargs.update(stats_args[MetricsMode.POST])
+            self.post_kwargs.update(metrics_args[MetricsMode.POST])
         else:
             self.post = None
 
@@ -178,7 +178,7 @@ class MetricsRecordHandlerWrapper(Summarizable):
 
     def collect(
         self,
-        stats: dict,
+        metrics: dict,
         source: Union[str, Tuple[str, str]],
         read1: Sequence,
         read2: Optional[Sequence] = None,
@@ -188,16 +188,16 @@ class MetricsRecordHandlerWrapper(Summarizable):
         Collects metrics on a pair of reads.
 
         Args:
-            stats: The :class:`ReadStatistics` object.
+            metrics: The :class:`ReadStatistics` object.
             source: The source file(s).
             read1
             read2: The reads.
             kwargs:
         """
-        if source not in stats:
-            stats[source] = self.read_metrics_class(**kwargs)
+        if source not in metrics:
+            metrics[source] = self.read_metrics_class(**kwargs)
 
-        stats[source].collect(read1, read2)
+        metrics[source].collect(read1, read2)
 
     def summarize(self) -> dict:
         """
@@ -207,14 +207,15 @@ class MetricsRecordHandlerWrapper(Summarizable):
 
         if self.pre is not None:
             summary["pre"] = dict(
-                (source, stats.summarize()) for source, stats in self.pre.items()
+                (source, metrics.summarize()) for source, metrics in self.pre.items()
             )
 
         if self.post is not None:
             summary["post"] = {}
-            for dest, stats_dict in self.post.items():
+            for dest, metrics_dict in self.post.items():
                 summary["post"][dest.name] = dict(
-                    (source, stats.summarize()) for source, stats in stats_dict.items()
+                    (source, metrics.summarize())
+                    for source, metrics in metrics_dict.items()
                 )
 
         return summary
@@ -361,12 +362,12 @@ class TrimPipeline(Pipeline, metaclass=ABCMeta):
 
 class TrimSummary(Summary):
     """
-    Summary that adds aggregate values for record and bp stats.
+    Summary that adds aggregate values for record and bp metrics.
     """
 
     def _post_process_other(self, dict_val: dict, key, value) -> None:
         """
-        For trim stats, any value with a name that starts with 'records_' will have
+        For trim metrics, any value with a name that starts with 'records_' will have
         'fraction_<var>' computed as value / total_records, and any value with a name
         that starts with 'bp_' will have 'fraction_<var>' and 'total_<var>' computed.
         We also replace any `Const`s with their values.
@@ -468,7 +469,7 @@ class TrimCommand(BaseCommand):
             not adapters1
             and not adapters2
             and not options.quality_cutoff
-            and options.nextseq_trim is None
+            and options.twocolor_trim is None
             and options.cut == []
             and options.cut2 == []
             and options.cut_min == []
@@ -571,10 +572,10 @@ class TrimCommand(BaseCommand):
                     dict(lengths=options.cut),
                     dict(lengths=options.cut2),
                 )
-            elif oper == "G" and (options.nextseq_trim is not None):
+            elif oper == "G" and (options.twocolor_trim is not None):
                 modifiers.add_modifier(
-                    NextseqQualityTrimmer,
-                    cutoff=options.nextseq_trim,
+                    TwoColorQualityTrimmer,
+                    cutoff=options.twocolor_trim,
                     base=options.quality_base,
                 )
             elif oper == "Q" and options.quality_cutoff:
@@ -645,15 +646,15 @@ class TrimCommand(BaseCommand):
             )
 
         # Create Formatters
-        output2 = None
-        interleaved = False
 
         if options.interleaved_output:
             output1 = options.interleaved_output
+            output2 = None
             interleaved = True
         else:
             output1 = options.output
             output2 = options.paired_output
+            interleaved = False
 
         if options.output_format is None:
             if delivers_qualities:
@@ -714,7 +715,10 @@ class TrimCommand(BaseCommand):
                         force_create.append(output2)
             elif not (options.discard_trimmed and options.untrimmed_output):
                 formatters.add_seq_formatter(NoFilter, options.default_outfile)
-                if options.default_outfile != STDOUT and options.writer_process:
+                if (
+                    options.default_outfile not in (STDOUT, STDERR) and
+                    options.writer_process
+                ):
                     force_create.append(options.default_outfile)
 
         if options.discard_untrimmed or options.untrimmed_output:
@@ -741,27 +745,22 @@ class TrimCommand(BaseCommand):
         if options.wildcard_file:
             formatters.add_detail_formatter(WildcardFormatter(options.wildcard_file))
 
-        if options.paired:
-            mixin_class = PairedEndPipelineMixin
-        else:
-            mixin_class = SingleEndPipelineMixin
-
         # Create writers
         writers = Writers(force_create, options.compression_format)
 
         # Create record handler
         record_handler = RecordHandler(modifiers, filters, formatters)
-        if options.stats:
+
+        if options.metrics:
             record_handler = MetricsRecordHandlerWrapper(
                 record_handler,
                 options.paired,
-                options.stats,
+                options.metrics,
                 qualities=delivers_qualities,
                 quality_base=options.quality_base,
             )
 
         num_adapters = sum(len(a) for a in modifiers.get_adapters())
-
         trim_mode = {
             False: "single-end",
             "first": "paired-end legacy",
@@ -782,6 +781,11 @@ class TrimCommand(BaseCommand):
                 also use any of the -A/-B/-G/-U options. Use a dummy adapter sequence 
                 when necessary: -A XXX"""
             )
+
+        if options.paired:
+            mixin_class = PairedEndPipelineMixin
+        else:
+            mixin_class = SingleEndPipelineMixin
 
         if options.threads is None:
             # Run single-threaded version
@@ -861,16 +865,16 @@ class TrimCommand(BaseCommand):
             The return code.
         """
         # We do all the multicore imports and class definitions within the
-        # run_parallel method to avoid extra work if only running in serial mode.
+        # run_parallel method to avoid extra overhead if only running in serial mode.
         from multiprocessing import Queue
         from atropos.commands.multicore import ParallelPipelineMixin
         from atropos.commands.trim.multicore import (
+            CompressingWorkerResultHandler,
             Done,
             Killed,
+            OrderPreservingWriterResultHandler,
             ParallelTrimPipelineRunner,
             QueueResultHandler,
-            CompressingWorkerResultHandler,
-            OrderPreservingWriterResultHandler,
             ResultProcess,
             WriterManager,
         )
@@ -887,13 +891,13 @@ class TrimCommand(BaseCommand):
         if threads < 2:
             raise ValueError("'threads' must be >= 2")
 
-        # Reserve a thread for the writer process if it will be doing the compression
-        # and if one is available.
         compression_mode = self.get_option("compression_mode")
 
         if compression_mode is None:
             compression_mode = choose_compression_mode(self.options)
 
+        # Reserve a thread for the writer process if it will be doing the compression
+        # and if one is available.
         if compression_mode == "writer" and threads > 2:
             threads -= 1
 
@@ -936,19 +940,16 @@ class TrimCommand(BaseCommand):
 
 
 def choose_compression_mode(options: Namespace) -> str:
-    # TODO: this is a bit of a hack - we don't know what types of files we'll
-    #  be compressing yet, so we make our guess based on the most commonly used
-    #  compression format.
-    if options.output is None or options.output in (STDOUT, STDERR):
-        # We must use a writer process to write to stdout/stderr
-        options.compression_mode = "writer"
-    elif (
-        options.writer_process and
-        2 < options.threads < 8 and
-        options.can_use_system_compression
+    if (
+        options.output is None or
+        options.output in (STDOUT, STDERR) or (
+            options.writer_process and
+            2 < options.threads < 8 and
+            options.can_use_system_compression
+        )
     ):
-        # Our tests show that with 8 or more threads, worker compression
-        # is more efficient.
+        # We must use a writer process to write to stdout/stderr. Otherwise, our
+        # tests show that with 8 or more threads, worker compression is more efficient.
         return "writer"
     else:
         return "worker"

@@ -23,8 +23,8 @@ from atropos.io.readers import (
     FastqReader,
     FastaQualReader,
     InterleavedSequenceReader,
-    open_reader as openseq,
-    _sequence_names_match
+    open_reader,
+    sequence_names_match
 )
 from atropos.utils.ngs import ALPHABETS
 from .utils import cutpath, datapath
@@ -118,7 +118,7 @@ class TestFastaReader:
         filename = datapath("simple.fasta")
         with open(filename) as f:
             assert not f.closed
-            _ = list(openseq(f))
+            _ = list(open_reader(f))
             assert not f.closed
         assert f.closed
         with FastaReader(filename) as sr:
@@ -158,7 +158,7 @@ class TestFastqReader:
         filename = datapath("simple.fastq")
         with open(filename) as f:
             assert not f.closed
-            _ = list(openseq(f))
+            _ = list(open_reader(f))
             assert not f.closed
         assert f.closed
         with FastqReader(filename) as sr:
@@ -193,21 +193,21 @@ class TestFastaQualReader:
 class TestSeqioOpen:
     def test_sequence_reader(self):
         # test the autodetection
-        with openseq(datapath("simple.fastq")) as f:
+        with open_reader(datapath("simple.fastq")) as f:
             reads = list(f)
         assert reads == simple_fastq
-        with openseq(datapath("simple.fasta")) as f:
+        with open_reader(datapath("simple.fasta")) as f:
             reads = list(f)
         assert reads == simple_fasta
         with open(datapath("simple.fastq")) as f:
-            reads = list(openseq(f))
+            reads = list(open_reader(f))
         assert reads == simple_fastq
         # make the name attribute unavailable
         f = StringIO(datapath("simple.fastq").read())
-        reads = list(openseq(f))
+        reads = list(open_reader(f))
         assert reads == simple_fastq
         f = StringIO(datapath("simple.fasta").read())
-        reads = list(openseq(f))
+        reads = list(open_reader(f))
         assert reads == simple_fasta
 
     def test_autodetect_fasta_format(self, tmp_path_factory):
@@ -216,7 +216,7 @@ class TestSeqioOpen:
         assert isinstance(fmt, SingleEndFormatter)
         assert isinstance(fmt._seq_format, FastaFormat)
         write_seq_output(simple_fasta, fmt)
-        assert list(openseq(path)) == simple_fasta
+        assert list(open_reader(path)) == simple_fasta
 
     def test_write_qualities_to_fasta(self, tmp_path_factory):
         path = tmp_path_factory.mktemp("tmp.fasta")
@@ -224,7 +224,7 @@ class TestSeqioOpen:
         assert isinstance(fmt, SingleEndFormatter)
         assert isinstance(fmt._seq_format, FastaFormat)
         write_seq_output(simple_fasta, fmt)
-        assert list(openseq(path)) == simple_fasta
+        assert list(open_reader(path)) == simple_fasta
 
     def test_autodetect_fastq_format(self, tmp_path_factory):
         path = tmp_path_factory.mktemp("tmp.fastq")
@@ -232,7 +232,7 @@ class TestSeqioOpen:
         assert isinstance(fmt, SingleEndFormatter)
         assert isinstance(fmt._seq_format, FastqFormat)
         write_seq_output(simple_fastq, fmt)
-        assert list(openseq(path)) == simple_fastq
+        assert list(open_reader(path)) == simple_fastq
 
     def test_fastq_qualities_missing(self, tmp_path_factory):
         with pytest.raises(ValueError):
@@ -265,7 +265,7 @@ class TestInterleavedReader:
         for (r1, r2), (e1, e2) in zip(reads, expected):
             print(r1, r2, e1, e2)
         assert reads == expected
-        with openseq(cutpath("interleaved.fastq"), interleaved=True) as f:
+        with open_reader(cutpath("interleaved.fastq"), interleaved=True) as f:
             reads = list(f)
         assert reads == expected
 
@@ -409,7 +409,7 @@ class TestPairedSequenceReader:
         def match(name1, name2):
             seq1 = Sequence(name1, "ACGT")
             seq2 = Sequence(name2, "AACC")
-            return _sequence_names_match(seq1, seq2)
+            return sequence_names_match(seq1, seq2)
 
         assert match("abc", "abc")
         assert match("abc/1", "abc/2")
@@ -426,12 +426,17 @@ except ModuleNotFoundError:
     ngs_available = False
 
 
-# @skipIf(not ngs_available, "ngstream library not available")
-# class TestSraReader(TestCase):
-#     def test_sra_reader(self):
-#         with srastream.SraReader(item_limit=10) as _:
-#             # atropos_reader = sra_reader(reader)
-#             pass
+SRA_ACCESSION = ""
+SRA_SEQ1 = None
+SRA_SEQ2 = None
+
+
+@pytest.mark.skipif(not ngs_available, "ngstream library not available")
+class TestSraReader:
+    def test_sra_reader(self):
+        with ngstream.open(SRA_ACCESSION, "sra") as stream:
+            reader = open_reader(stream, "sra-fastq")
+            assert next(iter(reader)) == (SRA_SEQ1, SRA_SEQ2)
 
 
 def create_truncated_file(path):

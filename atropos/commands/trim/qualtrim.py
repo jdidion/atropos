@@ -1,6 +1,6 @@
 # Import cythonized functions, defaulting to pure python implementations.
 try:
-    from atropos.commands.trim._qualtrim import quality_trim_index, nextseq_trim_index
+    from atropos.commands.trim._qualtrim import quality_trim_index, twocolor_trim_index
 except:
     from loguru import logger
     from typing import Tuple
@@ -66,13 +66,13 @@ except:
 
         return start, stop
 
-    def nextseq_trim_index(sequence: Sequence, cutoff: int, base: int = 33) -> int:
+    def twocolor_trim_index(sequence: Sequence, cutoff: int, base: int = 33) -> int:
         """
-        Variant of the above quality trimming routine that works on NextSeq data.
-        With Illumina NextSeq, bases are encoded with two colors. 'No color' (a dark
-        cycle) usually means that a 'G' was sequenced, but that also occurs when
-        sequencing falls off the end of the fragment. The read then contains a run of
-        high-quality G bases in the end.
+        Variant of the above quality trimming routine that works on two-color data,
+        in which bases are encoded with two colors. 'No color' (a dark cycle) usually
+        means that a 'G' was sequenced, but that also occurs when sequencing falls
+        off the end of the fragment. The read then contains a run of high-quality G
+        bases in the end.
 
         This routine works as the one above, but counts qualities belonging to
         'G' bases as being equal to cutoff - 1.

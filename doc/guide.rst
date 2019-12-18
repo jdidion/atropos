@@ -142,7 +142,7 @@ Read modifications are applied in a specific order (below), and steps not reques
 on the command-line are skipped.
 
 1. :ref:`Removing a fixed number of bases <cut-bases>` with ``-c`` (C).
-2. :ref:`NextSeq polyG trimming <nextseq>` with ``--nextseq-trim`` (G).
+2. :ref:`Two-color chemistry polyG trimming <quality>` with ``--twocolor-trim`` (G).
 3. :ref:`Quality trimming <quality-trimming>` with ``-q``/``-Q`` (Q).
 4. :ref:`Adapter removal <removing-adapters>` with ``-a``/``-A``, ``-b``/``-B``, and ``-g``/``-G`` (A).
 5. :ref:`Bisulfite sequencing-specific trimming <bisulfite>` with ``--bisulfite``.
@@ -753,16 +753,16 @@ After trimming, the read would perhaps look like this::
     >read1 length=10
     ACGTACGTAC
 
-.. _nextseq:
+.. _twocolor:
 
-NextSeq-specific trimming
--------------------------
+Two-color-chemistry-specific trimming
+-------------------------------------
 
-Some data from the new Illumina NextSeq platform generates base calls that have
-high quality scores but are incorrect due to the use of only two fluorescent tags
-(rather than the 4 used in the MiSeq and HiSeq sequencers). These base calls
-appear as a polyG string at the end of the read. The ``--nextseq-trim`` option will
-remove these bases.
+Some data from Illumina sequencers that use two-color chemistry (e.g. NextSeq and
+NovaSeq) have base calls with high quality scores but are incorrect due to the use of
+only two fluorescent tags (rather than the 4 used in the MiSeq and HiSeq sequencers).
+These base calls appear as a polyG string at the end of the read. The
+``--twocolor-trim`` option will remove these bases.
 
 .. _filtering:
 
@@ -1309,7 +1309,7 @@ following 5 operations can be customized:
 
 * A = adapter trimming
 * C = cutting (unconditional)
-* G = NextSeq trimming
+* G = Two-color-chemistry trimming
 * Q = quality trimming
 * W = overwrite poor quality reads
 
@@ -1662,13 +1662,13 @@ involve iterating over all reads in the dataset, we reasoned that implementing
 both operations in the same tool would reduce the overall processing time, and
 also eliminate the need to install two separate tools.
 
-You can enable QC using the ``--stats`` option of the ``trim`` subcommand. This
+You can enable QC using the ``--metrics`` option of the ``trim`` subcommand. This
 option takes one of three values controlling at what point(s) QC metrics are
-collected: pre, post, and both. The ``--stats`` option can take additional arguments
+collected: pre, post, and both. The ``--metrics`` option can take additional arguments
 to customize which metrics are collected. Currently, only the ``tiles`` parameter
 is supported, which enables collecting tile-level metrics (Illumina only)::
 
-    atropos --stats pre:tiles
+    atropos --metrics pre:tiles
 
 To collect tile-level metrics, Atropos must parse the read name to obtain the tile
 ID. By default it uses a regular expression that matches standard Illumina read names::
@@ -1678,7 +1678,7 @@ ID. By default it uses a regular expression that matches standard Illumina read 
 If you need to modify this regular expression, you can pass it as an argument to
 the tiles argument::
 
-    atropos --stats "pre:tiles=<myregexp>"
+    atropos --metrics "pre:tiles=<myregexp>"
 
 Additionally, there is a ``qc`` subcommand that only collects QC metrics (i.e. it
 does not perform trimming).

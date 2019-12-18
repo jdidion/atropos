@@ -40,6 +40,7 @@ from atropos.utils.statistics import RandomMatchProbability
 # TODO: specify this externally rather than hard-coding
 DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/master/atropos/adapters/sequencing_adapters.fa"
 DEFAULT_ADAPTERS_PATH = Path(__file__).parent / "sequencing_adapters.fa"
+DEFAULT_ADAPTER_CACHE_FILE = ".adapters"
 
 
 class AdapterType(int, Enum):
@@ -96,7 +97,7 @@ class AdapterCache:
 
     def __init__(
         self,
-        path: Optional[Union[str, PathLike]] = Path(".adapters"),
+        path: Optional[Union[str, PathLike]] = Path(DEFAULT_ADAPTER_CACHE_FILE),
         auto_reverse_complement: bool = False
     ):
         """
@@ -725,26 +726,26 @@ class Adapter(AdapterBase):
                 f"total_back={total_back}"
             )
 
-        stats = MergingDict(
+        metrics = MergingDict(
             adapter_class=self.__class__.__name__,
             total_front=total_front,
             total_back=total_back,
             total=total_front + total_back,
             match_probabilities=Const(self.random_match_probabilities()),
         )
-        stats["where"] = AdapterType(where).as_dict()
-        stats["sequence"] = Const(self.sequence)
-        stats["max_error_rate"] = Const(self.max_error_rate)
+        metrics["where"] = AdapterType(where).as_dict()
+        metrics["sequence"] = Const(self.sequence)
+        metrics["max_error_rate"] = Const(self.max_error_rate)
         if where in (AdapterType.ANYWHERE, AdapterType.FRONT, AdapterType.PREFIX):
-            stats["lengths_front"] = self.lengths_front
-            stats["errors_front"] = self.errors_front
+            metrics["lengths_front"] = self.lengths_front
+            metrics["errors_front"] = self.errors_front
         if where in (AdapterType.ANYWHERE, AdapterType.BACK, AdapterType.SUFFIX):
-            stats["lengths_back"] = self.lengths_back
-            stats["errors_back"] = self.errors_back
+            metrics["lengths_back"] = self.lengths_back
+            metrics["errors_back"] = self.errors_back
         if where in (AdapterType.BACK, AdapterType.SUFFIX):
-            stats["adjacent_bases"] = self.adjacent_bases
+            metrics["adjacent_bases"] = self.adjacent_bases
 
-        return stats
+        return metrics
 
 
 class ColorspaceAdapter(Adapter):
@@ -1030,33 +1031,33 @@ class LinkedAdapter(AdapterBase):
                 f"total_back={total_back}"
             )
 
-        stats = MergingDict(
+        metrics = MergingDict(
             total_front=total_front,
             total_back=total_back,
             total=total_front + total_back,
         )
-        stats["where"] = AdapterType(where).as_dict()
-        stats["front_sequence"] = Const(self.front_adapter.sequence)
-        stats["front_match_probabilities"] = Const(
+        metrics["where"] = AdapterType(where).as_dict()
+        metrics["front_sequence"] = Const(self.front_adapter.sequence)
+        metrics["front_match_probabilities"] = Const(
             self.front_adapter.random_match_probabilities()
         )
-        stats["back_sequence"] = Const(self.back_adapter.sequence)
-        stats["back_match_probabilities"] = Const(
+        metrics["back_sequence"] = Const(self.back_adapter.sequence)
+        metrics["back_match_probabilities"] = Const(
             self.back_adapter.random_match_probabilities()
         )
-        stats["front_max_error_rate"] = Const(self.front_adapter.max_error_rate)
-        stats["back_max_error_rate"] = Const(self.back_adapter.max_error_rate)
-        stats["front_lengths_front"] = self.front_adapter.lengths_front
-        stats["front_lengths_back"] = self.front_adapter.lengths_back
-        stats["back_lengths_front"] = self.back_adapter.lengths_front
-        stats["back_lengths_back"] = self.back_adapter.lengths_back
+        metrics["front_max_error_rate"] = Const(self.front_adapter.max_error_rate)
+        metrics["back_max_error_rate"] = Const(self.back_adapter.max_error_rate)
+        metrics["front_lengths_front"] = self.front_adapter.lengths_front
+        metrics["front_lengths_back"] = self.front_adapter.lengths_back
+        metrics["back_lengths_front"] = self.back_adapter.lengths_front
+        metrics["back_lengths_back"] = self.back_adapter.lengths_back
         # have to clone these nested dicts and set them up with a custom merge function
-        stats["front_errors_front"] = self.front_adapter.errors_front
-        stats["front_errors_back"] = self.front_adapter.errors_back
-        stats["back_errors_front"] = self.back_adapter.errors_front
-        stats["back_errors_back"] = self.back_adapter.errors_back
+        metrics["front_errors_front"] = self.front_adapter.errors_front
+        metrics["front_errors_back"] = self.front_adapter.errors_back
+        metrics["back_errors_front"] = self.back_adapter.errors_front
+        metrics["back_errors_back"] = self.back_adapter.errors_back
 
-        return stats
+        return metrics
 
 
 class AdapterParser:

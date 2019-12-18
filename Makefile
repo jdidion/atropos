@@ -1,27 +1,11 @@
 tests = tests
-module = atropos
+package = atropos
 #pytestops = --full-trace
 #pytestops = -v -s
-repo = jdidion/$(module)
+repo = jdidion/$(package)
 desc = Release $(version)
 
-all: clean install test
-
-build:
-	python setup.py build_ext -i
-	python setup.py sdist bdist_wheel
-
-install: clean build
-	python setup.py install $(installargs)
-
-test:
-	py.test $(pytestops) $(tests)
-
-docs:
-	make -C doc html
-
-lint:
-	pylint $(module)
+all: clean install install_extras install_test_requirements test test_release_setup
 
 clean:
 	rm -Rf __pycache__
@@ -34,6 +18,35 @@ clean:
 	rm -Rf .adapters
 	rm -Rf atropos.egg-info
 
+build:
+	python setup.py build_ext -i
+	python setup.py sdist bdist_wheel
+
+install: clean build
+	pip install --upgrade dist/*.whl $(installargs)
+
+install_test_requirements:
+	pip install -r requirements-test.txt
+
+install_extras:
+	pip install -r requirements-extra.txt
+
+test:
+	pytest $(pytestops) $(tests)
+
+test_release_setup:
+	twine check dist/*
+
+docs:
+	make -C doc html
+
+lint:
+	pylint $(package)
+
+reformat:
+	black $(package)
+	black $(tests)
+
 docker:
 	# build
 	docker build -f Dockerfile -t $(repo):$(version) .
@@ -42,26 +55,21 @@ docker:
 	# push to Docker Hub
 	docker login && docker push $(repo)
 
-release:
-	$(clean)
-	# tag
-	git tag $(version)
-	# build
-	$(BUILD)
-	$(TEST)
-	python setup.py sdist bdist_wheel
-	# release
-	python setup.py sdist upload -r pypi
-	git push origin --tags
-	$(github_release)
-	$(docker)
-
 tag:
 	git tag $(version)
 
-release: clean tag install test
-	python setup.py sdist upload -r pypi
+push_tag:
 	git push origin --tags
+
+del_tag:
+	git tag -d $(version)
+
+pypi_release:
+	twine upload dist/*
+
+release: clean tag
+	${MAKE} install install_extras test pypi_release push_tag || (${MAKE} del_tag && exit 1)
+
 	# github release
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \

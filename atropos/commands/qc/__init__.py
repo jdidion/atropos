@@ -20,21 +20,21 @@ class QcPipeline(Pipeline, metaclass=ABCMeta):
     def __init__(self, read_statistics_class, **kwargs):
         super().__init__()
         self.read_statistics_class = read_statistics_class
-        self.stats = {}
-        self.stats_kwargs = kwargs
+        self._metrics = {}
+        self._metrics_kwargs = kwargs
 
-    def _get_stats(self, source):
-        if source not in self.stats:
-            self.stats[source] = self.read_statistics_class(**self.stats_kwargs)
-        return self.stats[source]
+    def _get_metrics(self, source):
+        if source not in self._metrics:
+            self._metrics[source] = self.read_statistics_class(**self._metrics_kwargs)
+        return self._metrics[source]
 
     def handle_reads(self, context, read1, read2=None):
-        self._get_stats(context["source"]).collect(read1, read2)
+        self._get_metrics(context["source"]).collect(read1, read2)
 
     def finish(self, summary, **kwargs):
         super().finish(summary)
         summary["pre"] = dict(
-            (source, stats.summarize()) for source, stats in self.stats.items()
+            (source, metrics.summarize()) for source, metrics in self._metrics.items()
         )
 
 
@@ -71,8 +71,8 @@ class QcCommand(BaseCommand):
             qualities=self.get_option("delivers_qualities"),
             quality_base=self.get_option("quality_base"),
         )
-        if self.get_option("stats"):
-            pipeline_args.update(self.get_option("stats"))
+        if self.get_option("metrics"):
+            pipeline_args.update(self.get_option("metrics"))
 
         threads = self.get_option("threads", 1)
 

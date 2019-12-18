@@ -4,6 +4,7 @@ from typing import cast
 from loguru import logger
 from xphyle import STDOUT, STDERR, FORMATS
 
+from atropos.adapters import DEFAULT_ADAPTER_CACHE_FILE
 from atropos.commands.console import (
     BaseCommandConsole,
     add_common_options,
@@ -29,6 +30,36 @@ from atropos.utils.argparse import (
     readwriteable_file,
     writeable_file,
 )
+
+
+DEFAULT_ADAPTER_MAX_RMP = 1e-6
+DEFAULT_ADAPTER_INDEL_COST = 1
+DEFAULT_ADAPTER_MIN_OVERLAP = 3
+DEFAULT_ADAPTER_MIN_OVERLAP_WITH_RMP = 1
+
+DEFAULT_INSERT_MAX_RMP = 1e-6
+DEFAULT_INSERT_MATCH_ERROR_RATE = 0.2
+DEFAULT_INSERT_MIN_OVERLAP = 1
+DEFAULT_INSERT_INDEL_COST = 3
+
+DEFAULT_MERGE_MIN_OVERLAP = 0.9
+DEFAULT_MERGE_ERROR_RATE = 0.2
+
+DEFAULT_GC_CONTENT = 0.5
+DEFAULT_ERROR_RATE = 0.1
+
+DEFAULT_MIRNA_ADAPTERS = ["TGGAATTCTCGG"]  # illumina small RNA adapter
+DEFAULT_MINRA_QUALITY_CUTOFF = [20, 20]
+DEFAULT_MIRNA_MIN_LENGTH = 16
+DEFAULT_MIRNA_ERROR_RATE = 0.12
+
+DEFAULT_BATCH_SIZE = 1000
+MAX_QUEUE_SIZE = 10e6
+DEFAULT_PROCESS_TIMEOUT = 60
+WRITER_READ_QUEUE_SIZE_MULTIPLER = 100
+WORKER_READ_QUEUE_SIZE_MULTIPLIER = 500
+WORKER_RESULT_QUEUE_SIZE_MULTIPLIER = 100
+WRITER_RESULT_QUEUE_SIZE_MULTIPLIER = 500
 
 
 class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole):
@@ -85,6 +116,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             use_interleaved_output=False,
             can_use_system_compression=False,
         )
+
         group = parser.add_group(
             "Adapters",
             title="Finding adapters",
@@ -97,6 +129,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "option is used, adapters can be specified by name rather "
             "than sequence.",
         )
+
         group.add_argument(
             "-a",
             "--adapter",
@@ -154,7 +187,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "--adapter-cache-file",
             type=readwriteable_file,
-            default=".adapters",
+            default=DEFAULT_ADAPTER_CACHE_FILE,
             help="File where adapter sequences will be cached, unless "
             "--no-cache-adapters is set.",
         )
@@ -163,8 +196,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             action="store_false",
             dest="cache_adapters",
             default=True,
-            help="Don't cache adapters list as '.adapters' in the working "
-            "directory.",
+            help=f"Don't cache adapters list as '{DEFAULT_ADAPTER_CACHE_FILE}' in the "
+            f"working directory.",
         )
         group.add_argument(
             "--no-trim",
@@ -178,19 +211,21 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "--mask-adapter",
             action="store_const",
             dest="action",
-            const="mask",
-            help="Mask adapters with 'N' characters instead of trimming " "them. (no)",
+            const="mask",  # TODO: replace with enum
+            help="Mask adapters with 'N' characters instead of trimming them. (no)",
         )
         group.add_argument(
             "--gc-content",
             type=probability,
-            default=0.5,
-            help="Expected GC content of sequences.",
+            default=DEFAULT_GC_CONTENT,
+            help=f"Expected GC content of sequences. ({DEFAULT_GC_CONTENT})",
         )
+
         # Arguments specific to the choice of aligner
+
         group.add_argument(
             "--aligner",
-            choices=("adapter", "insert"),
+            choices=("adapter", "insert"),  # TODO: replace with enum
             default="adapter",
             help="Which alignment algorithm to use for identifying adapters. "
             "Currently, you can choose between the semi-global alignment "
@@ -200,25 +235,26 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "reads containing 3' adapters. New algorithms are being "
             "implemented and the default is likely to change. (adapter)",
         )
-        # TODO: all the different matching options are pretty confusing. Either
-        # explain their usage better in the docs or find a way to simplify the
-        # choices.
+
         # Arguments for adapter match
+        # TODO: all the different matching options are pretty confusing. Either
+        #  explain their usage better in the docs or find a way to simplify the choices.
         group.add_argument(
             "-e",
             "--error-rate",
             type=probability,
             default=None,
-            help="Maximum allowed error rate for adapter match (no. of errors "
-            "divided by the length of the matching region). (0.1)",
+            help=f"Maximum allowed error rate for adapter match (no. of errors "
+            f"divided by the length of the matching region). ({DEFAULT_ERROR_RATE})",
         )
         group.add_argument(
             "--indel-cost",
             type=positive(int, True),
             default=None,
             metavar="COST",
-            help="Integer cost of insertions and deletions during adapter "
-            "match. Substitutions always have a cost of 1. (1)",
+            help=f"Integer cost of insertions and deletions during adapter "
+            f"match. Substitutions always have a cost of 1. "
+            f"({DEFAULT_ADAPTER_INDEL_COST})",
         )
         group.add_argument(
             "--no-indels",
@@ -256,43 +292,47 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             type=positive(int, False),
             default=None,
             metavar="MINLENGTH",
-            help="If the overlap between the read and the adapter is shorter "
-            "than MINLENGTH, the read is not modified. Reduces the no. "
-            "of bases trimmed due to random adapter matches. (3)",
+            help=f"If the overlap between the read and the adapter is shorter "
+            f"than MINLENGTH, the read is not modified. Reduces the no. "
+            f"of bases trimmed due to random adapter matches. "
+            f"({DEFAULT_ADAPTER_MIN_OVERLAP})",
         )
         group.add_argument(
             "--adapter-max-rmp",
             type=probability,
             default=None,
             metavar="PROB",
-            help="If no minimum overlap (-O) is specified, then adapters are "
-            "only matched when the probabilty of observing k out of n "
-            "matching bases is <= PROB. (1E-6)",
+            help=f"If no minimum overlap (-O) is specified, then adapters are "
+            f"only matched when the probabilty of observing k out of n "
+            f"matching bases is <= PROB. ({DEFAULT_ADAPTER_MAX_RMP})",
         )
+
         # Arguments for insert match
         group.add_argument(
             "--insert-max-rmp",
             type=probability,
-            default=1e-6,
+            default=DEFAULT_INSERT_MAX_RMP,
             metavar="PROB",
-            help="Overlapping inserts only match when the probablity of "
-            "observing k of n matching bases is <= PROB. (1E-6)",
+            help=f"Overlapping inserts only match when the probablity of "
+            f"observing k of n matching bases is <= PROB. ({DEFAULT_INSERT_MAX_RMP})",
         )
         group.add_argument(
             "--insert-match-error-rate",
             type=probability,
             default=None,
-            help="Maximum allowed error rate for insert match (no. of errors "
-            "divided by the length of the matching region). (0.2)",
+            help=f"Maximum allowed error rate for insert match (no. of errors "
+            f"divided by the length of the matching region). "
+            f"({DEFAULT_INSERT_MATCH_ERROR_RATE})",
         )
         group.add_argument(
             "--insert-match-adapter-error-rate",
             type=probability,
             default=None,
-            help="Maximum allowed error rate for matching adapters after "
-            "successful insert match (no. of errors divided by the length "
-            "of the matching region). (0.2)",
+            help=f"Maximum allowed error rate for matching adapters after "
+            f"successful insert match (no. of errors divided by the length "
+            f"of the matching region). ({DEFAULT_INSERT_MATCH_ERROR_RATE})",
         )
+
         # Arguments for merging and error correction
         # TODO: add RMP parameter for MergeOverlap
         group.add_argument(
@@ -306,23 +346,22 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "--merge-min-overlap",
             type=positive(float, True),
-            default=0.9,
-            help="The minimum overlap between reads required for merging. If "
-            "this number is (0,1.0], it specifies the minimum length as "
-            "the fraction of the length of the *shorter* read in the "
-            "pair; otherwise it specifies the minimum number of "
-            "overlapping base pairs (with an absolute minimum of 2 bp). "
-            "(0.9)",
+            default=DEFAULT_MERGE_MIN_OVERLAP,
+            help=f"The minimum overlap between reads required for merging. If this "
+            f"number is (0,1.0], it specifies the minimum length as the fraction of "
+            f"the length of the *shorter* read in the pair; otherwise it specifies "
+            f"the minimum number of overlapping base pairs (with an absolute minimum "
+            f"of 2 bp). ({DEFAULT_MERGE_MIN_OVERLAP})",
         )
         group.add_argument(
             "--merge-error-rate",
             type=probability,
             default=None,
-            help="The maximum error rate for merging. (0.2)",
+            help=f"The maximum error rate for merging. ({DEFAULT_MERGE_ERROR_RATE})",
         )
         group.add_argument(
             "--correct-mismatches",
-            choices=("liberal", "conservative", "N"),
+            choices=("liberal", "conservative", "N"),  # TODO: convert to enum
             default=None,
             help="How to handle mismatches while aligning/merging. 'Liberal' "
             "and 'conservative' error correction both involve setting the "
@@ -333,7 +372,10 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "set the base to N. If exactly one base is ambiguous, the "
             "non-ambiguous base is always used. (no error correction)",
         )
+
         group = parser.add_group("Modifications", title="Additional read modifications")
+
+        # UMIs
         group.add_argument(
             "--read1_umi",
             type=int,
@@ -356,17 +398,18 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             metavar="CHAR",
             help="Delimiter for separating UMI from read ID. (default: ':')",
         )
+
+        # Core operations
         group.add_argument(
             "--op-order",
-            type=CharList(choices=("A", "C", "G", "Q", "W")),
+            type=CharList(choices=("A", "C", "G", "Q", "W")),  # TODO: convert to enum
             default="CGQAW",
             help="The order in which trimming operations are be applied. This "
-            "is a string of 1-5 of the following characters: A = adapter "
-            "trimming; C = cutting (unconditional); G = NextSeq trimming; "
-            "Q = quality trimming; W = overwrite poor quality reads. The "
-            "default is 'WCGQA' to maintain compatibility with "
-            "Cutadapt; however, this is likely to change to 'GAWCQ' in "
-            "the near future. Note that UMI clipping is always performed "
+            "is a string of the following characters: A = adapter trimming; C = "
+            "cutting (unconditional); G = two-color polyG trimming; Q = quality "
+            "trimming; W = overwrite poor quality reads. The default is 'WCGQA' to "
+            "maintain compatibility with Cutadapt; however, this is likely to change "
+            "to 'GAWCQ' in the near future. Note that UMI clipping is always performed "
             "before any other trimming operation.",
         )
         group.add_argument(
@@ -408,13 +451,13 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         # TODO: the name of this option should be changed to more generally refer to
         # trimming two-color chemistry artifacts. (--twocolor-trim)
         group.add_argument(
-            "--nextseq-trim",
+            "--twocolor-trim",
             type=positive(),
             default=None,
             metavar="3'CUTOFF",
-            help="NextSeq-specific quality trimming (each read). Trims also "
+            help="Two-color-chemistry-specific quality trimming (each read). Trims "
             "dark cycles appearing as high-quality G bases. Similar to "
-            "'--quality-cutoff' bug G bases are ignored. (no)",
+            "'--quality-cutoff' but G bases are ignored. (no)",
         )
         group.add_argument(
             "--trim-n",
@@ -451,10 +494,10 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "use --length-tag 'length=' to correct fields like "
             "'length=123'. (no)",
         )
+
         group = parser.add_group("Filtering", title="Filtering of processed reads")
         group.add_argument(
             "--discard-trimmed",
-            "--discard",
             action="store_true",
             default=False,
             help="Discard reads that contain an adapter. Also use -O to avoid "
@@ -462,7 +505,6 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--discard-untrimmed",
-            "--trimmed-only",
             action="store_true",
             default=False,
             help="Discard reads that do not contain the adapter. (no)",
@@ -499,42 +541,44 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "between 0 and 1, it is treated as the proportion of N's "
             "allowed in a read. (no)",
         )
+
         group = parser.add_group("Output")
         group.add_argument(
             "-o",
             "--output",
             type=writeable_file,
             metavar="FILE",
-            help="Write trimmed reads to FILE. FASTQ or FASTA format is chosen "
-            "depending on input. Use '{name}' in FILE to demultiplex reads into "
-            "multiple files. Use '-' to denote stdout. Unless writing to stdout, "
-            "the summary report goes to stdout by default. (write to standard output)",
+            help="Write trimmed reads to FILE. Use '{name}' in FILE to demultiplex "
+            "reads into multiple files. Use '-' to denote stdout. Unless writing to "
+            "stdout, the summary report goes to stdout by default. (write to standard "
+            "output)",
+        )
+        group.add_argument(
+            "--output-format",
+            choices=("fasta", "fastq", "sam"),  # TODO: convert to enum
+            metavar="FORMAT",
+            default=None,
+            help="The format of the output file. If not specified, the output "
+            "format is determined from the filename. Defaults to FASTQ when writing to "
+            "stdout. Note: BAM output is not (yet) supported, but you can output to "
+            "stdout and pipe to 'samtools view'. (autodetect)",
         )
         group.add_argument(
             "-C",
             "--compression-format",
-            metavar="FORMAT", default=None,
-            choices=sorted(FORMATS.list_compression_formats()),
-            help="Force output to be compressed using the specified format, otherwise "
-            "the format is guessed from the  file extension. This is option is "
-            "required in order to have compressed output written to stdout/stderr. "
-            "(None)"
-        )
-        group.add_argument(
-            "--output-format",
-            choices=("fasta", "fastq", "sam"),
             metavar="FORMAT",
             default=None,
-            help="The format of the output file. If not specified, the output "
-            "format is determined from the filename. Defaults to FASTQ "
-            "when writing to stdout. (autodetect)",
+            choices=sorted(FORMATS.list_compression_formats()),
+            help="Force output to be compressed using the specified format, otherwise "
+            "the format is guessed from the file extension. This is option is required "
+            "in order to have compressed output written to stdout/stderr. (None)"
         )
         group.add_argument(
             "--info-file",
             type=writeable_file,
             metavar="FILE",
-            help="Write information about each read and its adapter matches "
-            "into FILE. See the documentation for the file format. (no)",
+            help="Write information about each read and its adapter matches into FILE. "
+            "See the documentation for the file format. (no)",
         )
         group.add_argument(
             "-r",
@@ -550,16 +594,14 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             metavar="FILE",
             help="When the adapter has N bases (wildcards), write adapter "
             "bases matching wildcard positions to FILE. When there are "
-            "indels in the alignment, this will often not be accurate. "
-            "(no)",
+            "indels in the alignment, this will often not be accurate. (no)",
         )
         group.add_argument(
             "--too-short-output",
             type=writeable_file,
             metavar="FILE",
             help="Write reads that are too short (according to length "
-            "specified by -m) to FILE. (no - too short reads are "
-            "discarded)",
+            "specified by -m) to FILE. (no - too short reads are discarded)",
         )
         group.add_argument(
             "--too-long-output",
@@ -593,9 +635,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--report-formats",
-            type=EnumChoice(MetricsMode),
             nargs="*",
-            choices=("txt", "json", "yaml", "pickle"),
+            choices=("txt", "json", "yaml", "pickle"),  # TODO: convert to enum
             default=None,
             metavar="FORMAT",
             help="Report type(s) to generate. If multiple, '--report-file' "
@@ -607,19 +648,19 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "formats).",
         )
         group.add_argument(
-            "--stats",
+            "--metrics",
+            dest="metrics",
             nargs="*",
             default=None,
-            help="Which read-level statistics to compute. Can be 'none' "
-            "(default), 'pre': only compute pre-trimming stats; 'post': "
-            "only compute post-trimming stats; or 'both'. The keyword can "
-            "be followed by ':' and then additional configuration "
-            "parameters. E.g. 'pre:tiles' means to also collect "
-            "tile-level statistics (Illumina data only), and "
-            "'pre:tiles=<regexp>' means to use the specified regular "
-            "expression to extract key portions of read names to "
-            "collect the tile statistics.",
+            help="Which read-level statistics to compute. Can be 'pre': only compute "
+            "pre-trimming metrics; 'post': only compute post-trimming metrics; or "
+            "'both'. The keyword can be followed by ':' and then additional "
+            "configuration parameters. E.g. 'pre:tiles' means to also collect "
+            "tile-level statistics (Illumina data only), and 'pre:tiles=<regexp>' "
+            "means to use the specified regular expression to extract key portions "
+            "of read names to collect the tile statistics. (none)",
         )
+
         group = parser.add_group("Colorspace options")
         group.add_argument(
             "-d",
@@ -666,12 +707,12 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "by default when -c/--colorspace is also enabled. Use the "
             "above option to disable it. (no)",
         )
+
         group = parser.add_group(
             "Paired",
             title="Paired-end options",
             description="The -A/-G/-B/-U/-I options work like their -a/-b/-g/-u/-i "
-            "counterparts, but are applied to the second read in each "
-            "pair.",
+            "counterparts, but are applied to the second read in each pair.",
         )
         group.add_argument(
             "-A",
@@ -708,7 +749,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             dest="cut2",
             default=[],
             metavar="LENGTH",
-            help="Remove LENGTH bases from second read in a pair (see --cut). " "(no)",
+            help="Remove LENGTH bases from second read in a pair (see --cut). (no)",
         )
         group.add_argument(
             "-I",
@@ -745,11 +786,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             metavar="FILE",
             help="Write output to interleaved file.",
         )
-        # Setting the default for pair_filter to None allows us to find out
-        # whether the option was used at all.
         group.add_argument(
             "--pair-filter",
-            choices=("any", "both"),
+            choices=("any", "both"),  # TODO: Convert to enum
             default=None,
             metavar="(any|both)",
             help="Which of the reads in a paired-end read have to match the "
@@ -783,12 +822,13 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "long. Use together with --too-long-output. (no - too long "
             "reads are discarded)",
         )
+
         group = parser.add_group("Method-specific options")
         group = group.add_mutually_exclusive_group()
         group.add_argument(
             "--bisulfite",
             default=False,
-            metavar="METHOD",
+            metavar="METHOD",  # TODO: convert to enum
             help="Set default option values for bisulfite-treated data. The "
             "argument specifies the type of bisulfite library (rrbs, "
             "non-directional, non-directional-rrbs, truseq, epignome, or "
@@ -807,6 +847,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             default=False,
             help="Set default option values for miRNA data. (no)",
         )
+
         group = parser.add_group("Parallel", title="Parallel (multi-core) options")
         group.add_argument(
             "-T",
@@ -835,10 +876,10 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "--process-timeout",
             type=positive(int, True),
-            default=60,
+            default=DEFAULT_PROCESS_TIMEOUT,
             metavar="SECONDS",
-            help="Number of seconds process should wait before escalating "
-            "messages to ERROR level. (60)",
+            help=f"Number of seconds process should wait before escalating "
+            f"messages to ERROR level. ({DEFAULT_PROCESS_TIMEOUT})",
         )
         group.add_argument(
             "--read-queue-size",
@@ -858,7 +899,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--compression-mode",
-            choices=("worker", "writer"),
+            choices=("worker", "writer"),  # TODO: convert to enum
             default=None,
             help="Where data compression should be performed. Defaults to "
             "'writer' if system-level compression can be used and "
@@ -896,6 +937,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         if paired or paired_implicit:
             any_output = options.output or options.paired_output
+
             if options.interleaved_output:
                 if any_output:
                     parser.error("Cannot specify both interleaved and paired output.")
@@ -906,9 +948,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                     parser.error("SAM output must be specified using the -l option")
 
                 if options.no_writer_process:
-                    logging.getLogger().warning(
-                        "Note: output SAM files cannot be concatenated; "
-                        "use 'samtools merge' instead."
+                    logger.warning(
+                        "Note: output SAM files cannot be concatenated; use "
+                        "'samtools merge' instead."
                     )
 
                 options.use_interleaved_output = True
@@ -929,8 +971,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                         "(--paired-output)."
                     )
 
-                if bool(options.untrimmed_output) != bool(
-                    options.untrimmed_paired_output
+                if (
+                    bool(options.untrimmed_output) !=
+                    bool(options.untrimmed_paired_output)
                 ):
                     parser.error(
                         "When trimming paired-end reads, you must use "
@@ -938,8 +981,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                         "--untrimmed-paired-output options."
                     )
 
-                if bool(options.too_short_output) != bool(
-                    options.too_short_paired_output
+                if (
+                    bool(options.too_short_output) !=
+                    bool(options.too_short_paired_output)
                 ):
                     parser.error(
                         "When using --too-short-output with paired-end "
@@ -947,8 +991,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                         "--too-short-paired-output"
                     )
 
-                if bool(options.too_long_output) != bool(
-                    options.too_long_paired_output
+                if (
+                    bool(options.too_long_output) !=
+                    bool(options.too_long_paired_output)
                 ):
                     parser.error(
                         "When using --too-long-output with paired-end "
@@ -983,38 +1028,39 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         elif options.report_file is None:
             options.report_file = (STDERR if options.output is STDOUT else STDOUT)
 
-        # If the user specifies a max rmp, that is used for determining the
-        # minimum overlap and -O is set to 1, otherwise -O is set to the old
-        # default of 3.
         # TODO: This is pretty confusing logic - need to simplify
         if options.aligner == "adapter":
             if options.indels and options.indel_cost is None:
-                options.indel_cost = 1
+                options.indel_cost = DEFAULT_ADAPTER_INDEL_COST
 
             if options.overlap is None:
+                # If the user specifies a max rmp, that is used for determining the
+                # minimum overlap and -O is set to 1, otherwise -O is set to the old
+                # default of 3.
                 if options.adapter_max_rmp is None:
-                    options.overlap = 3
+                    options.overlap = DEFAULT_ADAPTER_MIN_OVERLAP
                 else:
-                    options.overlap = 1
+                    options.overlap = DEFAULT_ADAPTER_MIN_OVERLAP_WITH_RMP
         elif options.aligner == "insert":
             if paired != "both":
                 parser.error("Insert aligner only works with paired-end reads")
 
-            # TODO: should also be checking that there is exactly one 3'
-            #  adapter for each read
-            # TODO: have the aligner tell us whether it can be used based on
-            #  options?
+            # TODO: should also be checking that there is exactly one 3' adapter for
+            #  each read
+            # TODO: have the aligner tell us whether it can be used based on options?
 
             if options.indels and options.indel_cost is None:
-                options.indel_cost = 3
+                options.indel_cost = DEFAULT_INSERT_INDEL_COST
 
             if options.overlap is None:
-                options.overlap = 1
+                options.overlap = DEFAULT_INSERT_MIN_OVERLAP
                 if options.adapter_max_rmp is None:
-                    options.adapter_max_rmp = 1e-6
+                    options.adapter_max_rmp = DEFAULT_ADAPTER_MAX_RMP
 
             if options.insert_match_error_rate is None:
-                options.insert_match_error_rate = options.error_rate or 0.2
+                options.insert_match_error_rate = (
+                    options.error_rate or DEFAULT_INSERT_MATCH_ERROR_RATE
+                )
 
             if options.insert_match_adapter_error_rate is None:
                 options.insert_match_adapter_error_rate = (
@@ -1028,20 +1074,21 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 )
 
             if options.merge_error_rate is None:
-                options.merge_error_rate = options.error_rate or 0.2
+                options.merge_error_rate = (
+                    options.error_rate or DEFAULT_MERGE_ERROR_RATE
+                )
 
         if options.mirna:
             if not (options.adapters or options.front or options.anywhere):
-                options.adapters = ["TGGAATTCTCGG"]  # illumina small RNA adapter
+                options.adapters = DEFAULT_MIRNA_ADAPTERS
 
             if options.quality_cutoff is None:
-                options.quality_cutoff = [20, 20]
-
+                options.quality_cutoff = DEFAULT_MINRA_QUALITY_CUTOFF
             if options.minimum_length is None:
-                options.minimum_length = 16
+                options.minimum_length = DEFAULT_MIRNA_MIN_LENGTH
 
             if options.error_rate is None:
-                options.error_rate = 0.12
+                options.error_rate = DEFAULT_MIRNA_ERROR_RATE
         elif options.bisulfite:
             # TODO: set default adapter sequences
             # Jury is out on whether quality trimming helps. For aligners like
@@ -1179,7 +1226,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 parser.error("Double-encoding makes only sense in colorspace.")
 
         if options.error_rate is None:
-            options.error_rate = 0.1
+            options.error_rate = DEFAULT_ERROR_RATE
 
         if options.cut:
             if len(options.cut) > 2:
@@ -1215,21 +1262,21 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             ):
                 parser.error("You cannot remove bases from the same end twice.")
 
-        if not options.stats or options.stats == "none":
-            options.stats = None
+        if not options.metrics or options.metrics == "none":
+            options.metrics = None
         else:
             metrics = {}
 
-            for metric_spec in options.stats:
+            for metric_spec in options.metrics:
                 parts = metric_spec.split(":")
                 name = parts[0]
                 args = {} if len(parts) == 1 else parse_metrics_args(parts[1])
                 if name == "both":
-                    metrics["pre"] = metrics["post"] = args
+                    metrics[MetricsMode.PRE] = metrics[MetricsMode.PRE] = args
                 else:
-                    metrics[name] = args
+                    metrics[MetricsMode(name)] = args
 
-            options.stats = metrics
+            options.metrics = metrics
 
         if options.threads is not None:
             threads = configure_threads(options, parser)
@@ -1243,9 +1290,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                         "mutually exclusive"
                     )
                 elif threads == 2:
-                    logging.getLogger().warning(
-                        "Writer compression requires > 2 threads; using "
-                        "worker compression instead"
+                    logger.warning(
+                        "Writer compression requires > 2 threads; using worker "
+                        "compression instead"
                     )
                     options.compression_mode = "worker"
 
@@ -1253,28 +1300,36 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
             if options.read_queue_size is None:
-                options.read_queue_size = threads * (
-                    100 if options.compression_mode == "writer" else 500
-                )
+                if options.compression_mode == "writer":
+                    read_queue_multiplier = WRITER_READ_QUEUE_SIZE_MULTIPLER
+                else:
+                    read_queue_multiplier = WORKER_READ_QUEUE_SIZE_MULTIPLIER
+
+                options.read_queue_size = threads * read_queue_multiplier
             elif 0 < options.read_queue_size < threads:
                 parser.error("Read queue size must be >= 'threads'")
 
             if options.result_queue_size is None:
-                options.result_queue_size = threads * (
-                    100 if options.compression_mode == "worker" else 500
-                )
+                if options.compression_mode == "worker":
+                    result_queue_multiplier = WORKER_RESULT_QUEUE_SIZE_MULTIPLIER
+                else:
+                    result_queue_multiplier = WRITER_RESULT_QUEUE_SIZE_MULTIPLIER
+
+                options.result_queue_size = threads * result_queue_multiplier
             elif 0 < options.result_queue_size < threads:
                 parser.error("Result queue size must be >= 'threads'")
 
             max_queue_size = options.read_queue_size + options.result_queue_size
 
             if options.batch_size is None:
-                options.batch_size = max(1000, int(max_queue_size / 10e6))
-            elif options.batch_size * max_queue_size > 10e6:
+                options.batch_size = max(
+                    DEFAULT_BATCH_SIZE, int(max_queue_size / MAX_QUEUE_SIZE)
+                )
+            elif options.batch_size * max_queue_size > MAX_QUEUE_SIZE:
                 logger.warning(
                     "Combination of batch size {options.batch_size} and total queue "
                     "size {max_queue_size} may lead to excessive memory usage"
                 )
 
         if options.batch_size is None:
-            options.batch_size = 1000
+            options.batch_size = DEFAULT_BATCH_SIZE

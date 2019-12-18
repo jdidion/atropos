@@ -29,7 +29,7 @@ class QcCommandConsole(QcCommand, LegacyReportGenerator, BaseCommandConsole):
     def usage(cls) -> str:
         return """
         Compute read-level statistics. The output is identical to running the 'trim'
-        command with '--stats pre'. Use this command to get an idea of the quality of
+        command with '--metrics pre'. Use this command to get an idea of the quality of
         your raw data.
         """
 
@@ -55,7 +55,7 @@ class QcCommandConsole(QcCommand, LegacyReportGenerator, BaseCommandConsole):
             type=writeable_file,
             default="-",
             metavar="FILE",
-            help="Write stats to file rather than stdout.",
+            help="Write metrics to file rather than stdout.",
         )
         group = parser.add_group(
             "Report", title="Report content and formatting options"
@@ -72,7 +72,7 @@ class QcCommandConsole(QcCommand, LegacyReportGenerator, BaseCommandConsole):
             "output file extension.",
         )
         group.add_argument(
-            "--stats",
+            "--metrics",
             type=parse_metrics_args,
             default=None,
             help="Additional arguments for read statistic collection. E.g. "

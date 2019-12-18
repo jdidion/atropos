@@ -104,6 +104,9 @@ class ColorspaceFastqFormat(FastqFormat):
 class SAMFormat(SequenceFileFormat):
     """
     SAM SequenceFileFormat.
+
+    TODO: when the input is SAM/BAM and the output is SAM, propagate the header to
+     the output file.
     """
 
     def __init__(self, flag: int):
