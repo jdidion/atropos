@@ -22,7 +22,8 @@ def splitext_compressed(name: Union[str, Path]) -> Tuple[str, str, str]:
     name_str = str(name)
     ext2 = None
 
-    for ext in FORMATS.list_compression_formats(with_sep=True):
+    for ext in FORMATS.list_compression_formats():
+        ext = f".{ext}"
         if name_str.endswith(ext):
             ext2 = ext
             name_str = name_str[:-len(ext)]

@@ -190,7 +190,7 @@ class Formatters(Summarizable):
                 constructor.
         """
         self.output = output
-        self.multiplexed = output is not None and "{name}" in output
+        self.multiplexed = output is not None and "{name}" in output.name
         self.seq_formatter_args = seq_formatter_args
         self.seq_formatters: Dict[Type[Filter], Formatter] = {}
         self.mux_formatters: Dict[str, Formatter] = {}
@@ -227,7 +227,7 @@ class Formatters(Summarizable):
         assert self.multiplexed
 
         if name not in self.mux_formatters:
-            path = self.output.format(name=name)
+            path = Path(str(self.output).format(name=name))
             self.mux_formatters[name] = create_seq_formatter(
                 path, **self.seq_formatter_args
             )

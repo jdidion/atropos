@@ -8,18 +8,19 @@
   * The --format option has been renamed to --input-format, to avoid confusion with the new --output-format option
   * The --stats option has been renamed to --metrics.
   * The --nextseq-trim option has been renamed to --twocolor-trim.
-  * Dropped the --discard alias for --discard-trimmed
-  * Dropped the --trimmed-only alias for --discard-untrimmed
+  * The --sra-accession option has been renamed to --accession and now accepts a protocol prefix.
+  * Dropped the --discard alias for --discard-trimmed.
+  * Dropped the --trimmed-only alias for --discard-untrimmed.
 * Merged PR #63: Implementation of UMI support. Thanks @wckdouglas!
-* Eliminate the bin/ folder; switch to using entry points for the atropos
-  executable.
+* Eliminated the bin/ folder; switch to using entry points for the atropos executable.
 * Fix #32: SAM output.
 * Fix #36: Progress bars don't increment correctly when batch size > 1 used.
 * Moved all file management code to use [xphyle](https://github.com/jdidion/atropos/tree/xphyle)
 * Added --compression-format option to override filename-based detection of compression format, and to enable compressed output to stdout.
 * Added --output-format option to manually specify output format instead of determining the format from the output file name.
+* Added --query option to specify a URL for a supported streaming protocol (e.g. htsget).
 * Enabled output to stdout by default with single-end and interleaved reads.
-* Migrate to setuptools_scm for version management.
+* Migrated to setuptools_scm for version management.
 
 ## v1.1.24 (2019.11.17)
 

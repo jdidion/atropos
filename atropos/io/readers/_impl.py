@@ -9,7 +9,7 @@ from typing import (
     Union, cast
 )
 
-from xphyle import STDOUT, xopen
+from xphyle import STDIN, xopen
 
 from atropos.errors import FormatError, UnknownFileTypeError
 from atropos.io import InputRead, guess_format_from_name
@@ -62,12 +62,10 @@ class FastaReader(PrefetchSequenceReader):
         self,
         path: Union[str, Path, Iterator[str]],
         keep_linebreaks: bool = False,
-        sequence_factory: Callable[..., Sequence] = Sequence,
-        alphabet: Optional[Alphabet] = None
+        **kwargs
     ):
-        super().__init__(path, alphabet=alphabet)
-        self._sequence_factory = sequence_factory
         self._delimiter = "\n" if keep_linebreaks else ""
+        super().__init__(path, **kwargs)
 
     def _iter(self):
         """
@@ -111,7 +109,7 @@ class FastaReader(PrefetchSequenceReader):
         return estimate_num_records([self.name], record_size, 2, 1)
 
 
-class SraSequenceReader(SequenceReader):
+class NgstreamSequenceReader(SequenceReader):
     @classproperty
     def file_format(cls) -> str:
         return "FASTQ"
@@ -132,25 +130,13 @@ class SraSequenceReader(SequenceReader):
     def interleaved(cls) -> bool:
         return False
 
-    def __init__(
-        self,
-        reader,
-        quality_base: Optional[int] = None,
-        alphabet: Optional[Alphabet] = None,
-        sequence_factory: Callable[..., Sequence] = Sequence,
-    ):
+    def __init__(self, reader, **kwargs):
         import ngstream
 
-        super().__init__(
-            cast(ngstream.Protocol, reader),
-            quality_base=quality_base,
-            alphabet=alphabet
-        )
-        self._sequence_factory = sequence_factory
-        if self._file.paired:
-            self._input_read = InputRead.PAIRED
-        else:
-            self._input_read = InputRead.SINGLE
+        protocol = cast(ngstream.Protocol, reader)
+
+        self._input_read = InputRead.PAIRED if protocol.paired else InputRead.SINGLE
+        super().__init__(protocol, **kwargs)
 
     @property
     def input_read(self) -> InputRead:
@@ -208,8 +194,8 @@ class FastaQualReader(SequenceReaderBase):
         fastafile: Union[str, Path, Iterator[str]],
         qualfile: Union[str, Path, Iterator[str]],
         quality_base: int = 33,
+        alphabet: Optional[Alphabet] = None,
         sequence_factory: Callable[..., Sequence] = Sequence,
-        alphabet=None,
     ):
         """
         Args:
@@ -222,8 +208,8 @@ class FastaQualReader(SequenceReaderBase):
         self._fastareader = FastaReader(fastafile)
         self._qualreader = FastaReader(qualfile, keep_linebreaks=True)
         self._quality_base = quality_base
-        self._sequence_factory = sequence_factory
         self._alphabet = alphabet
+        self._sequence_factory = sequence_factory
 
     @property
     def input_names(self) -> Tuple[Tuple[str, str], None]:
@@ -307,7 +293,9 @@ class ColorspaceSequenceReaderMixin:
         )
 
 
-class SraColorspaceSequenceReader(ColorspaceSequenceReaderMixin, SraSequenceReader):
+class ColorspaceNgstreamSequenceReader(
+    ColorspaceSequenceReaderMixin, NgstreamSequenceReader
+):
     """
     Reads colorspace sequences from an SRA accession.
     """
@@ -325,7 +313,7 @@ class ColorspaceFastqReader(ColorspaceSequenceReaderMixin, FastqReader):
     """
 
 
-class SRAColorspaceFastqReader(ColorspaceSequenceReaderMixin, FastqReader):
+class SraColorspaceFastqReader(ColorspaceSequenceReaderMixin, FastqReader):
     """
     Reads SRA-formatted colorspace sequences from a FASTQ.
     """
@@ -945,6 +933,7 @@ class FileWithPrependedLine:
 def open_reader(
     file1=None,
     file2=None,
+    ngstream_reader=None,
     qualfile: Union[str, Path, Iterator[str]] = None,
     quality_base: Optional[int] = None,
     colorspace: bool = False,
@@ -960,6 +949,7 @@ def open_reader(
     Args:
         file1: Path to read1 regular or compressed file or file-like object.
         file2: Path to read2 regular or compressed file or file-like object.
+        ngstream_reader: An ngstream.Protocol object.
         qualfile: Path to qualfile regular or compressed file or file-like object. If
             specified, then file1 must be a FASTA file and sequences are single-end.
             One of file2 and qualfile must always be None (no paired-end data is
@@ -1010,82 +1000,95 @@ def open_reader(
             alphabet=alphabet
         )
 
-    if file_format is None and file1 != STDOUT:
-        file_format = guess_format_from_name(file1)
+    reader = None
 
-    if file_format is None:
-        if file1 == STDOUT:
-            file1 = sys.stdin
+    if file1:
+        if file_format is None:
+            if file1 not in (STDIN, sys.stdin):
+                file_format = guess_format_from_name(file1)
 
-        for line in file1:
-            if line.startswith("#"):
-                # Skip comment lines (needed for csfasta)
-                continue
+            if file_format is None:
+                if file1 == STDIN:
+                    file1 = sys.stdin
 
-            if line.startswith(">"):
-                file_format = "fasta"
-            elif line.startswith("@"):
-                file_format = "fastq"
+                for line in file1:
+                    if line.startswith("#"):
+                        # Skip comment lines (needed for csfasta)
+                        continue
 
-            # TODO: guess SAM/BAM from data
-            file1 = FileWithPrependedLine(file1, line)
+                    if line.startswith(">"):
+                        file_format = "fasta"
+                    elif line.startswith("@"):
+                        file_format = "fastq"
 
-            break
+                    # TODO: guess SAM/BAM from data
+                    file1 = FileWithPrependedLine(file1, line)
 
-    if file_format is not None:
-        file_format = file_format.lower()
+                    break
 
-        if file_format in ("sam", "bam"):
-            if colorspace:
-                raise ValueError(
-                    "SAM/BAM format is not currently supported for colorspace reads"
-                )
+        if file_format is not None:
+            file_format = file_format.lower()
+
+            if file_format in ("sam", "bam"):
+                if colorspace:
+                    raise ValueError(
+                        "SAM/BAM format is not currently supported for colorspace reads"
+                    )
+
+                if interleaved:
+                    return PairedEndSAMReader(
+                        file1, quality_base=quality_base, alphabet=alphabet
+                    )
+                elif input_read == InputRead.READ1:
+                    return Read1SingleEndSAMReader(
+                        file1, quality_base=quality_base, alphabet=alphabet
+                    )
+                elif input_read == InputRead.READ2:
+                    return Read2SingleEndSAMReader(
+                        file1, quality_base=quality_base, alphabet=alphabet
+                    )
+                else:
+                    return SingleEndSAMReader(
+                        file1, quality_base=quality_base, alphabet=alphabet
+                    )
 
             if interleaved:
-                return PairedEndSAMReader(
+                reader = InterleavedSequenceReader(
+                    file1,
+                    quality_base=quality_base,
+                    colorspace=colorspace,
+                    file_format=file_format,
+                    alphabet=alphabet
+                )
+            elif file_format == "fasta":
+                reader_class = ColorspaceFastaReader if colorspace else FastaReader
+                reader = reader_class(file1, alphabet=alphabet)
+            elif file_format == "fastq":
+                reader_class = ColorspaceFastqReader if colorspace else FastqReader
+                reader = reader_class(
                     file1, quality_base=quality_base, alphabet=alphabet
                 )
-            elif input_read == InputRead.READ1:
-                return Read1SingleEndSAMReader(
+            elif file_format == "sra-fastq" and colorspace:
+                reader = SraColorspaceFastqReader(
                     file1, quality_base=quality_base, alphabet=alphabet
                 )
-            elif input_read == InputRead.READ2:
-                return Read2SingleEndSAMReader(
-                    file1, quality_base=quality_base, alphabet=alphabet
-                )
-            else:
-                return SingleEndSAMReader(
-                    file1, quality_base=quality_base, alphabet=alphabet
-                )
+    elif ngstream_reader:
+        if colorspace:
+            reader_class = ColorspaceNgstreamSequenceReader
+        else:
+            reader_class = NgstreamSequenceReader
 
-        reader = None
+        reader = reader_class(
+            ngstream_reader,
+            quality_base=quality_base,
+            alphabet=alphabet
+        )
 
-        if interleaved:
-            reader = InterleavedSequenceReader(
-                file1,
-                quality_base=quality_base,
-                colorspace=colorspace,
-                file_format=file_format,
-                alphabet=alphabet
-            )
-        elif file_format == "fasta":
-            reader_class = ColorspaceFastaReader if colorspace else FastaReader
-            reader = reader_class(file1, alphabet=alphabet)
-        elif file_format == "fastq":
-            reader_class = ColorspaceFastqReader if colorspace else FastqReader
-            reader = reader_class(
-                file1, quality_base=quality_base, alphabet=alphabet
-            )
-        elif file_format == "sra-fastq":
-            reader_class = \
-                SraColorspaceSequenceReader if colorspace else SraSequenceReader
-            reader = reader_class(file1, quality_base=quality_base, alphabet=alphabet)
-
-        if reader:
-            if input_read == InputRead.PAIRED or not reader.paired:
-                return reader
-            else:
-                return PairedToSingleEndReader(reader, input_read)
+    if reader:
+        if input_read == InputRead.PAIRED or not reader.paired:
+            return reader
+        else:
+            return PairedToSingleEndReader(reader, input_read)
 
     raise UnknownFileTypeError(
         f"File format {file_format!r} is unknown (expected 'sra-fastq' (only for "

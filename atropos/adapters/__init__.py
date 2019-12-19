@@ -84,7 +84,7 @@ class AdapterType(int, Enum):
         """
         Returns AdapterType fields in a dict.
         """
-        return dict(name=self.name, desc=self.desc, flags=Const(self.flags))
+        return dict(name=self.name, desc=self.desc, flags=Const(self.value))
 
 
 ADAPTER_TYPE_NAMES = set(AdapterType.__members__.keys())
@@ -1119,7 +1119,7 @@ class AdapterParser:
             raise ValueError(f"cmdline_type cannot be {cmdline_type!r}")
 
         orig_spec = spec
-        where = AdapterType[type_name].flags
+        where = AdapterType[type_name].value
 
         if name is None:
             if self.cache and self.cache.has_name(spec):

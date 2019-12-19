@@ -54,13 +54,15 @@ def run(
     interleaved_output=False,
     sra_accn=None,
     stdout=False,
-    tmp_path_factory=None,
+    output_dir=None,
 ):
     if type(params) is str:
         params = params.split()
-    tmp_fastaq = tmp_path_factory.mktemp(expected)
+
+    tmp_fastaq = output_dir / expected
+
     if sra_accn:
-        params += ["-sra", sra_accn]
+        params += ["--accession", sra_accn]
     elif interleaved_input:
         params += ["-l", inpath]
     elif inpath2:
@@ -70,12 +72,15 @@ def run(
         params += ["-se", datapath(inpath)]
         if qualfile:
             params += ["-sq", datapath(qualfile)]
+
     if stdout:
         # Output is going to stdout, so we need to redirect it to the
         # temp file
         with intercept_stdout() as stdout:
             # print(params)
-            retcode, summary = TrimCommandConsole.execute(params)
+            retcode, summary = TrimCommandConsole.execute(
+                tuple(str(p) for p in params)
+            )
             with open(tmp_fastaq, "wt") as out:
                 out.write(stdout.getvalue())
     else:
@@ -84,17 +89,21 @@ def run(
         else:
             params += ["-o", tmp_fastaq]  # TODO not parallelizable
         # print(params)
-        retcode, summary = TrimCommandConsole.execute(params)
+        retcode, summary = TrimCommandConsole.execute(
+            tuple(str(p) for p in params)
+        )
+
     assert summary is not None
     assert isinstance(summary, dict)
+
     if "exception" in summary and summary["exception"] is not None:
         assert retcode != 0
         err = summary["exception"]
         traceback.print_exception(*err["details"])
         raise Exception("Unexpected error: {}".format(err["message"]))
-
     else:
         assert retcode == 0
+
     # TODO redirect standard output
     assert os.path.exists(tmp_fastaq)
     assert files_equal(cutpath(expected), tmp_fastaq)

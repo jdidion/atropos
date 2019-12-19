@@ -13,7 +13,7 @@ from atropos.utils.argparse import (
     Namespace,
     positive,
     int_or_str,
-    writeable_file,
+    writable_file,
 )
 
 
@@ -52,7 +52,7 @@ class QcCommandConsole(QcCommand, LegacyReportGenerator, BaseCommandConsole):
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file,
+            type=writable_file,
             default="-",
             metavar="FILE",
             help="Write metrics to file rather than stdout.",

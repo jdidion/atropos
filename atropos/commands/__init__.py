@@ -148,9 +148,9 @@ class BaseCommand(Command, metaclass=ABCMeta):
             alphabet=options.alphabet,
         )
 
-        if options.sra_reader:
-            open_args["file1"] = options.sra_reader
-            options.sra_reader = None
+        if options.ngstream_reader:
+            open_args["ngstream_reader"] = options.ngstream_reader
+            options.ngstream_reader = None
         else:
             interleaved = bool(options.interleaved_input)
             input1 = options.interleaved_input if interleaved else options.input1

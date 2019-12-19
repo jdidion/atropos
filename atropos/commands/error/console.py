@@ -9,7 +9,7 @@ from atropos.utils import classproperty
 from atropos.utils.argparse import (
     AtroposArgumentParser,
     Namespace,
-    writeable_file
+    writable_file
 )
 
 
@@ -69,7 +69,7 @@ class ErrorCommandConsole(ErrorCommand, ErrorReportGenerator, BaseCommandConsole
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file,
+            type=writable_file,
             default=STDOUT,
             help="File in which to write the summary of the estimated error "
             "rates. (stdout)",

@@ -435,7 +435,7 @@ SRA_SEQ2 = None
 class TestSraReader:
     def test_sra_reader(self):
         with ngstream.open(SRA_ACCESSION, "sra") as stream:
-            reader = open_reader(stream, "sra-fastq")
+            reader = open_reader(stream, "fastq")
             assert next(iter(reader)) == (SRA_SEQ1, SRA_SEQ2)
 
 

@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 import os
 from pathlib import Path
 from typing import (
-    Iterable, Iterator, Optional, Sequence as SequenceType, Tuple, Union
+    Callable, Iterable, Iterator, Optional, Sequence as SequenceType, Tuple, Union
 )
 
 from xphyle import xopen
@@ -111,8 +111,9 @@ class SequenceReader(SequenceReaderBase, metaclass=ABCMeta):
         self,
         path,
         mode: Optional[ModeArg] = "r",
-        quality_base: Optional[int] = None,
+        quality_base: Optional[int] = 33,
         alphabet: Optional[Alphabet] = None,
+        sequence_factory: Callable[..., Sequence] = Sequence,
         close_on_exit: Optional[bool] = None
     ):
         """
@@ -127,6 +128,7 @@ class SequenceReader(SequenceReaderBase, metaclass=ABCMeta):
         # TODO: if quality_base is None, detect it from the data
         self._quality_base = quality_base
         self._alphabet = alphabet
+        self._sequence_factory = sequence_factory
 
         is_path = isinstance(path, (str, Path))
 
@@ -186,14 +188,8 @@ class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
     inspected before iteration begins.
     """
 
-    def __init__(
-        self,
-        path,
-        mode: ModeArg = "r",
-        quality_base: Optional[int] = None,
-        alphabet: Optional[Alphabet] = None,
-    ):
-        super().__init__(path, mode, quality_base, alphabet)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._seq_iter = self._iter()
         self._first_seq = next(self._seq_iter)
 

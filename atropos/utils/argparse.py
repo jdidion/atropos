@@ -1,4 +1,4 @@
-from argparse import ArgumentParser, ArgumentError, HelpFormatter, Namespace
+from argparse import ArgumentParser, ArgumentTypeError, HelpFormatter, Namespace
 from numbers import Number
 import operator
 from pathlib import Path
@@ -7,7 +7,15 @@ import textwrap
 from typing import Callable, Sequence, List, Type, TypeVar, Generic, Union, Optional
 from urllib.parse import urlparse
 
-from xphyle.paths import STDOUT, STDERR, check_path, as_path, resolve_path
+from xphyle.paths import (
+    STDOUT,
+    STDERR,
+    check_path,
+    as_path,
+    resolve_path,
+    check_readable_file,
+    check_writable_file,
+)
 from xphyle.types import PathLike, PathType, Permission
 
 from atropos.utils import Magnitude
@@ -83,7 +91,8 @@ class CompositeType:
 
 
 class ComparisonValidator(Generic[T]):
-    """Validator that compares an argument against an expected value.
+    """
+    Validator that compares an argument against an expected value.
     """
 
     def __init__(self, rhs: T, oper: Callable[[T, T], bool], expected: bool = True):
@@ -91,15 +100,19 @@ class ComparisonValidator(Generic[T]):
         self.oper = oper
         self.expected = expected
 
-    def _do_call(self, lhs: T):
-        assert (
-            self.oper(lhs, self.rhs) == self.expected
-        ), f"{self.oper}({lhs}, {self.rhs}) != {self.expected}"
+    def __call__(self, lhs: T):
+        if self.oper(lhs, self.rhs) != self.expected:
+            raise ArgumentTypeError(
+                f"{self.oper}({lhs}, {self.rhs}) != {self.expected}"
+            )
+
+        return lhs
 
 
 class CharList:
-    """Parses a string into a list of characters and ensures they are all in
-    the choices tuple.
+    """
+    Parses a string into a list of characters and ensures they are all in the choices
+    tuple.
     """
 
     def __init__(self, choices):
@@ -107,12 +120,18 @@ class CharList:
 
     def __call__(self, string):
         chars = list(string)
-        assert all(char in self.choices for char in chars)
+
+        if not all(char in self.choices for char in chars):
+            raise ArgumentTypeError(
+                f"One or more characters in {chars} not in {self.choices}"
+            )
+
         return chars
 
 
 class Delimited(Generic[T]):
-    """Splits a string argument using a delimiter.
+    """
+    Splits a string argument using a delimiter.
     """
 
     def __init__(
@@ -140,10 +159,10 @@ class Delimited(Generic[T]):
             vals = [self.data_type(v) for v in vals]
 
         if self.min_len and len(vals) < self.min_len:
-            raise ArgumentError(self, "there must be at least {self.min_len} values")
+            raise ArgumentTypeError(f"There must be at least {self.min_len} values")
 
         if self.max_len and len(vals) > self.max_len:
-            raise ArgumentError(self, f"there can be at most {self.max_len} values")
+            raise ArgumentTypeError(f"There can be at most {self.max_len} values")
 
         return vals
 
@@ -157,7 +176,8 @@ class EnumChoice(Generic[T]):
 
 
 class AccessiblePath:
-    """Test that a path is accessible.
+    """
+    Tests that a path is accessible.
     """
 
     def __init__(self, path_type: PathType, mode: Permission):
@@ -170,47 +190,57 @@ class AccessiblePath:
         if self.path_type == PathType.FILE and path in (STDOUT, STDERR):
             return path
 
-        return Path(check_path(path, self.path_type, self.mode))
-
-
-class ReadwriteableFile(object):
-    """Validator for a file argument that must be both readable and writeable.
-    """
-
-    def __init__(self):
-        self.read_type = AccessiblePath(PathType.FILE, Permission.READ)
-        self.write_type = AccessiblePath(PathType.FILE, Permission.WRITE)
-
-    def __call__(self, path: Union[str, PathLike]) -> Path:
-        path = as_path(path)
-        if path.exists():
-            path = self.read_type(path)
-        path = self.write_type(path)
-        return path
+        try:
+            return Path(check_path(path, self.path_type, self.mode))
+        except IOError:
+            raise ArgumentTypeError(
+                f"Path {path} is not an accessible {self.path_type} with mode "
+                f"{self.mode}"
+            )
 
 
 def existing_path(path: Union[str, PathLike]) -> Path:
-    """Test that a path exists."""
+    """
+    Tests that a path exists.
+    """
     path = as_path(path)
     if path == STDOUT:
         return path
-    return Path(resolve_path(path))
+    try:
+        return Path(resolve_path(path))
+    except IOError:
+        raise ArgumentTypeError(f"Path {path} does not exist")
 
 
-readable_file = CompositeType(
-    existing_path, AccessiblePath(PathType.FILE, Permission.READ)
-)
-"""Test that a file exists and is readable."""
-writeable_file = AccessiblePath(PathType.FILE, Permission.WRITE)
-"""Test that a file 1) exists and is writelable, or 2) does not exist but
-is in a writeable directory.
-"""
-readwriteable_file = ReadwriteableFile()
-"""Test that a file is both readable and writeable."""
+def readable_file(path):
+    try:
+        return check_readable_file(path)
+    except IOError:
+        raise ArgumentTypeError(
+            f"Path {path} does not exist, is not a file, or is not readable"
+        )
+
+
+def writable_file(path):
+    try:
+        return check_writable_file(path)
+    except IOError:
+        raise ArgumentTypeError(f"Path {path} is not writable")
+
+
+def readwritable_file(path):
+    """Tests that a file is both readable and writeable."""
+    path = as_path(path)
+
+    if path.exists():
+        path = readable_file(path)
+
+    return writable_file(path)
 
 
 def readable_url(url):
-    """Validator for a URL that must be readable.
+    """
+    Validator for a URL that must be readable.
 
     Args:
         url: The URL to validate.
@@ -219,39 +249,37 @@ def readable_url(url):
     scheme = parsed.scheme or "file"
     if scheme == "file":
         filename = readable_file(parsed.path)
-        return "file:" + filename
-
+        return "file:" + str(filename)
     else:
         return url
 
 
 str_list = Delimited[str](data_type=str)
 """Comma-delimited list of strings."""
+
 INT_OR_STR_RE = re.compile(r"([\d.]+)([KkMmGg]?)")
 
 
 def int_or_str(arg):
-    """Similar to int(), but accepts K, M, and G abbreviations.
+    """
+    Similar to int(), but accepts K, M, and G abbreviations.
     """
     if arg is None or isinstance(arg, int):
         return arg
-
     elif isinstance(arg, str):
         match = INT_OR_STR_RE.match(arg.upper())
         num, mult = match.groups()
         if mult:
             return int(float(num) * Magnitude[mult].divisor)
-
         else:
             return int(num)
-
     else:
-        raise ValueError(f"Unsupported type {arg}")
+        raise ArgumentTypeError(f"Unsupported type {arg}")
 
 
 def positive(type_=int, inclusive=False):
-    """Test that a number is greater than (or equal to, if ``inclusive=True``)
-    zero.
+    """
+    Tests that a number is greater than (or equal to, if ``inclusive=True``) zero.
     """
     oper = operator.ge if inclusive else operator.gt
     return CompositeType(type_, ComparisonValidator(0, oper))
@@ -261,7 +289,8 @@ N = TypeVar("N", bound=Number)
 
 
 def between(min_val: N = None, max_val: N = None, type_: Type[N] = int):
-    """Returns a CompositeType that validates `min_val <= x <= max_val`.
+    """
+    Returns a CompositeType that validates `min_val <= x <= max_val`.
     """
     return CompositeType(
         type_,

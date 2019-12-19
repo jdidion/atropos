@@ -27,7 +27,7 @@ from atropos.utils.argparse import (
     positive,
     probability,
     readable_file,
-    writeable_file,
+    writable_file,
 )
 from atropos.utils.ngs import ALPHABETS
 
@@ -270,7 +270,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
         report_formats=None,
         batch_size=1000,
         counter_magnitude="M",
-        sra_reader=None,
+        ngstream_reader=None,
     )
     parser.add_argument(
         "--debug",
@@ -301,7 +301,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     )
     parser.add_argument(
         "--log-file",
-        type=writeable_file,
+        type=writable_file,
         default=None,
         metavar="FILE",
         help="File to write logging info. (stdout)",
@@ -364,12 +364,20 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
         help="A single-end qual file.",
     )
     group.add_argument(
-        "-sra",
-        "--sra-accession",
+        "--accession",
         default=None,
         metavar="ACCN",
-        help="Accession to stream from SRA (requires optional NGS "
-        "dependency to be installed).",
+        help="Accession to stream using a supported protocol. Should be of the form "
+        "<protocol>:<accession>, e.g. 'sra:SRR000066'. If no protocol is specified, "
+        "it assumed to be an SRA accession."
+    )
+    group.add_argument(
+        "--query",
+        default=None,
+        metavar="URL",
+        help="Query URL for a supported protocol. Should be of the form "
+        "'<protocol>+http://...'. If no protocol is specified, it is assumed to be "
+        "htsget."
     )
     group.add_argument(
         "-f",
@@ -447,26 +455,45 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
     """
     # Find out which 'mode' we need to use.
     # TODO: unit tests for SRA streaming
-    if options.sra_accession:
-        if options.input_format in ("fastq", "sam", "bam", None):
-            options.input_format = "sra-fastq"
-        elif options.input_format != "sra-fastq":
+    if options.accession or options.query:
+        if options.input_format is None:
+            options.input_format = "fastq"
+        elif options.input_format not in ("fastq", "sra-fastq", "sam", "bam"):
             raise ValueError(
-                f"Invalid file format for SRA accession: {options.input_format}"
+                f"Invalid file format for accession/query: {options.input_format}"
             )
 
-        logger.debug(f"Opening reader for SRA Accession {options.sra_accession}")
+        if options.accession:
+            accession = options.accession
+
+            if ":" in accession:
+                protocol, accession = accession.split(":", 1)
+            else:
+                protocol = "sra"
+
+            logger.debug(
+                f"Opening reader for {protocol} Accession {options.accession}"
+            )
+        else:
+            accession = options.query
+
+            if "+" in accession:
+                protocol, accession = accession.split("+", 1)
+            else:
+                protocol = "htsget"
+
+            logger.debug(
+                f"Opening reader for {protocol} query {options.accession}"
+            )
 
         try:
             import ngstream
 
-            options.sra_reader = ngstream.open(
-                options.sra_accession,
-                "sra",
-                batch_size=options.batch_size or 1000
+            options.ngstream_reader = ngstream.open(
+                accession, protocol, batch_size=options.batch_size or 1000
             )
-            options.sra_reader.start()
-            options.paired = options.sra_reader.paired
+            options.ngstream_reader.start()
+            options.paired = options.ngstream_reader.paired
         except Exception:
             logger.exception(
                 f"Error while fetching accession {options.sra_accession} from SRA"
@@ -497,8 +524,8 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
 
     # Set sample ID from the input file name(s)
     if options.sample_id is None:
-        if options.sra_reader:
-            options.sample_id = options.sra_reader.name
+        if options.ngstream_reader:
+            options.sample_id = options.ngstream_reader.name
         else:
             fname = Path(options.input1 or options.interleaved_input).name
             name = splitext_compressed(fname)[0]

@@ -1,7 +1,6 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 from atropos.errors import FormatError
-from atropos.io.sequence import Sequence
 from atropos.utils import classproperty
 
 from ._base import PrefetchSequenceReader, estimate_num_records
@@ -31,22 +30,6 @@ class FastqReader(PrefetchSequenceReader):
     def interleaved(cls) -> bool:
         return False
 
-    def __init__(
-        self,
-        filename,
-        quality_base=33,
-        sequence_class=Sequence,
-        alphabet=None
-    ):
-        """
-        file is a filename or a file-like object.
-        If file is a filename, then .gz files are supported.
-        """
-        super().__init__(
-            filename, quality_base=quality_base, alphabet=alphabet
-        )
-        self.sequence_class = sequence_class
-
     def estimate_num_records(self):
         return estimate_num_records(self.name, self._first_seq.size_in_bytes, 4, 2)
 
@@ -57,7 +40,7 @@ class FastqReader(PrefetchSequenceReader):
         cdef int i = 0
         cdef int strip
         cdef str line, name, qualities, sequence, name2
-        sequence_class = self.sequence_class
+        sequence_factory = self._sequence_factory
 
         it = iter(self._file)
         line = next(it)
@@ -107,9 +90,9 @@ class FastqReader(PrefetchSequenceReader):
                 else:
                     qualities = line.rstrip('\r\n')
                 try:
-                    yield sequence_class(
-                        name, sequence, qualities, name2=name2,
-                        alphabet=self.alphabet)
+                    yield sequence_factory(
+                        name, sequence, qualities, name2=name2, alphabet=self._alphabet
+                    )
                 except Exception as err:
                     raise FormatError(
                         f"Error creating sequence record at line {i+1}"

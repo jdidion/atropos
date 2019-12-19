@@ -26,7 +26,7 @@ def test_timing():
     with Timing() as t:
         time.sleep(1)
     summary = t.summarize()
-    assert summary["start"] == t.start_time.isoformat()
+    assert summary["start"] == t.start_time.isoformat
     assert summary["wallclock"] >= 1
 
 

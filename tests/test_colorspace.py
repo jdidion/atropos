@@ -57,11 +57,11 @@ def test_decode():
     assert decode("T.") == "TN"
 
 
-def test_qualtrim_csfastaqual(tmp_path_factory):
+def test_qualtrim_csfastaqual(tmp_path):
     """-q with csfasta/qual files"""
     run(
         "-c -q 10", "solidqual.fastq", "solid.csfasta", qualfile="solid.qual",
-        tmp_path_factory=tmp_path_factory
+        output_dir=tmp_path
     )
 
 
@@ -73,50 +73,52 @@ def test_e3m():
     )
 
 
-def test_bwa():
+def test_bwa(tmp_path):
     """MAQ-/BWA-compatible output"""
     run(
         "-c -e 0.12 -a 330201030313112312 -x 552: --maq",
         "solidmaq.fastq",
         "solid.csfasta",
         qualfile="solid.qual",
+        output_dir=tmp_path,
     )
 
 
-def test_bfast():
+def test_bfast(tmp_path):
     """BFAST-compatible output"""
     run(
         "-c -e 0.12 -a 330201030313112312 -x abc: --strip-f3",
         "solidbfast.fastq",
         "solid.csfasta",
         qualfile="solid.qual",
+        output_dir=tmp_path,
     )
 
 
-def test_trim_095(tmp_path_factory):
+def test_trim_095(tmp_path):
     """some reads properly trimmed since atropos 0.9.5"""
     run(
         "-c -e 0.122 -a 330201030313112312", "solid.fasta", "solid.fasta",
-        tmp_path_factory=tmp_path_factory
+        output_dir=tmp_path
     )
 
 
-def test_solid(tmp_path_factory):
+def test_solid(tmp_path):
     run(
         "-c -e 0.122 -a 330201030313112312", "solid.fastq", "solid.fastq",
-        tmp_path_factory=tmp_path_factory
+        output_dir=tmp_path
     )
 
 
-def test_solid_basespace_adapter(tmp_path_factory):
+def test_solid_basespace_adapter(tmp_path):
     """colorspace adapter given in basespace"""
     run(
         "-c -e 0.122 -a CGCCTTGGCCGTACAGCAG", "solid.fastq", "solid.fastq",
-        tmp_path_factory=tmp_path_factory
+        output_dir=tmp_path
     )
 
 
-def test_solid5p(tmp_path_factory):
+def test_solid5p(tmp_path):
     """test 5' colorspace adapter"""
     # this is not a real adapter, just a random string
     # in colorspace: C0302201212322332333
@@ -124,31 +126,31 @@ def test_solid5p(tmp_path_factory):
         "-c -e 0.1 --trim-primer -g CCGGAGGTCAGCTCGCTATA",
         "solid5p.fasta",
         "solid5p.fasta",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_solid5p_prefix_notrim(tmp_path_factory):
+def test_solid5p_prefix_notrim(tmp_path):
     """test anchored 5' colorspace adapter, no primer trimming"""
     run(
         "-c -e 0.1 -g ^CCGGAGGTCAGCTCGCTATA",
         "solid5p-anchored.notrim.fasta",
         "solid5p.fasta",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_solid5p_prefix(tmp_path_factory):
+def test_solid5p_prefix(tmp_path):
     """test anchored 5' colorspace adapter"""
     run(
         "-c -e 0.1 --trim-primer -g ^CCGGAGGTCAGCTCGCTATA",
         "solid5p-anchored.fasta",
         "solid5p.fasta",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_solid5p_fastq(tmp_path_factory):
+def test_solid5p_fastq(tmp_path):
     """test 5' colorspace adapter"""
     # this is not a real adapter, just a random string
     # in colorspace: C0302201212322332333
@@ -156,44 +158,44 @@ def test_solid5p_fastq(tmp_path_factory):
         "-c -e 0.1 --trim-primer -g CCGGAGGTCAGCTCGCTATA",
         "solid5p.fastq",
         "solid5p.fastq",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_solid5p_prefix_notrim_fastq(tmp_path_factory):
+def test_solid5p_prefix_notrim_fastq(tmp_path):
     """test anchored 5' colorspace adapter, no primer trimming"""
     run(
         "-c -e 0.1 -g ^CCGGAGGTCAGCTCGCTATA",
         "solid5p-anchored.notrim.fastq",
         "solid5p.fastq",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_solid5p_prefix_fastq(tmp_path_factory):
+def test_solid5p_prefix_fastq(tmp_path):
     """test anchored 5' colorspace adapter"""
     run(
         "-c -e 0.1 --trim-primer -g ^CCGGAGGTCAGCTCGCTATA",
         "solid5p-anchored.fastq",
         "solid5p.fastq",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_sra_fastq(tmp_path_factory):
+def test_sra_fastq(tmp_path):
     """test SRA-formatted colorspace FASTQ"""
     run(
         "-c -e 0.1 --input-format sra-fastq -a CGCCTTGGCCGTACAGCAG",
         "sra.fastq",
         "sra.fastq",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )
 
 
-def test_no_zero_cap(tmp_path_factory):
+def test_no_zero_cap(tmp_path):
     run(
         "--no-zero-cap -c -e 0.122 -a CGCCTTGGCCGTACAGCAG",
         "solid-no-zerocap.fastq",
         "solid.fastq",
-        tmp_path_factory=tmp_path_factory,
+        output_dir=tmp_path,
     )

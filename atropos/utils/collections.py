@@ -158,7 +158,7 @@ class Timing(Summarizable):
             raise AtroposError(
                 "Timing instance must be started before it can be summarized"
             )
-        summary = dict(start=self.start_time.isoformat())
+        summary = dict(start=self.start_time.isoformat)
         summary.update(self.cur_time - self.start_time)
         return summary
 

@@ -9,8 +9,8 @@ from atropos.utils.argparse import (
     Namespace,
     positive,
     readable_url,
-    writeable_file,
-    readwriteable_file,
+    writable_file,
+    readwritable_file,
     probability,
 )
 from xphyle import STDOUT, STDERR
@@ -110,7 +110,7 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         )
         group.add_argument(
             "--contaminant-cache-file",
-            type=readwriteable_file,
+            type=readwritable_file,
             dest="adapter_cache_file",
             default=".adapters",
             help="File where known contaminant sequences will be cached, "
@@ -150,7 +150,7 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file,
+            type=writable_file,
             default=STDOUT,
             metavar="FILE",
             help="File in which to write the summary of detected adapters. (stdout)",

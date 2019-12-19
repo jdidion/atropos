@@ -27,8 +27,8 @@ from atropos.utils.argparse import (
     positive,
     probability,
     readable_file,
-    readwriteable_file,
-    writeable_file,
+    readwritable_file,
+    writable_file,
 )
 
 
@@ -186,7 +186,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--adapter-cache-file",
-            type=readwriteable_file,
+            type=readwritable_file,
             default=DEFAULT_ADAPTER_CACHE_FILE,
             help="File where adapter sequences will be cached, unless "
             "--no-cache-adapters is set.",
@@ -546,7 +546,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "-o",
             "--output",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="Write trimmed reads to FILE. Use '{name}' in FILE to demultiplex "
             "reads into multiple files. Use '-' to denote stdout. Unless writing to "
@@ -575,7 +575,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--info-file",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="Write information about each read and its adapter matches into FILE. "
             "See the documentation for the file format. (no)",
@@ -583,14 +583,14 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "-r",
             "--rest-file",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="When the adapter matches in the middle of a read, write the "
             "rest (after the adapter) into FILE. (no)",
         )
         group.add_argument(
             "--wildcard-file",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="When the adapter has N bases (wildcards), write adapter "
             "bases matching wildcard positions to FILE. When there are "
@@ -598,21 +598,21 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--too-short-output",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="Write reads that are too short (according to length "
             "specified by -m) to FILE. (no - too short reads are discarded)",
         )
         group.add_argument(
             "--too-long-output",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="Write reads that are too long (according to length specified "
             "by -M) to FILE. (no - too long reads are discarded)",
         )
         group.add_argument(
             "--untrimmed-output",
-            type=writeable_file,
+            type=writable_file,
             default=None,
             metavar="FILE",
             help="Write reads that do not contain the adapter to FILE. (no - "
@@ -620,7 +620,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--merged-output",
-            type=writeable_file,
+            type=writable_file,
             default=None,
             metavar="FILE",
             help="Write reads that have been merged to this file. (merged "
@@ -628,7 +628,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--report-file",
-            type=writeable_file,
+            type=writable_file,
             default=None,
             metavar="FILE",
             help="Write report to file rather than stdout/stderr. (no)",
@@ -775,14 +775,14 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "-p",
             "--paired-output",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="Write second read in a pair to FILE. (no)",
         )
         group.add_argument(
             "-L",
             "--interleaved-output",
-            type=writeable_file,
+            type=writable_file,
             metavar="FILE",
             help="Write output to interleaved file.",
         )
@@ -796,7 +796,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--untrimmed-paired-output",
-            type=writeable_file,
+            type=writable_file,
             default=None,
             metavar="FILE",
             help="Write second read in a pair to this FILE when no adapter "
@@ -806,7 +806,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--too-short-paired-output",
-            type=writeable_file,
+            type=writable_file,
             default=None,
             metavar="FILE",
             help="Write second read in a pair to this file if pair is too "
@@ -815,7 +815,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--too-long-paired-output",
-            type=writeable_file,
+            type=writable_file,
             default=None,
             metavar="FILE",
             help="Write second read in a pair to this file if pair is too "
@@ -1181,7 +1181,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 compression_format = FORMATS.guess_compression_format(options.output)
 
             # Multiplexed output
-            if "{name}" in options.output:
+            if "{name}" in options.output.name:
                 if options.discard_trimmed:
                     parser.error("Do not use --discard-trimmed when demultiplexing.")
 
