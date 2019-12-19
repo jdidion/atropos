@@ -1,24 +1,20 @@
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict, Iterable
+from collections import OrderedDict
 from datetime import datetime
 from numbers import Number
 import time
 from typing import (
-    Tuple,
-    Union,
-    Generic,
-    TypeVar,
-    Type,
     Any,
+    Generic,
+    Iterable,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
 )
 
 from atropos.errors import AtroposError
-from atropos.utils.statistics import (
-    weighted_mean,
-    weighted_median,
-    weighted_modes,
-    weighted_stdev,
-)
 
 
 class Mergeable(metaclass=ABCMeta):
@@ -170,9 +166,7 @@ class Timing(Summarizable):
 SummaryType = TypeVar("SummaryType")
 
 
-class BaseMergeableDict(
-    dict, Mergeable, Summarizable, Generic[SummaryType], metaclass=ABCMeta
-):
+class BaseMergeableDict(dict, Mergeable, Summarizable, metaclass=ABCMeta):
     pass
 
 
@@ -183,7 +177,7 @@ class CountingDict(BaseMergeableDict):
 
     def __init__(
         self,
-        keys: Iterable = None,
+        keys: Optional[Iterable] = None,
         sort_by: int = 0,
         summary_type: Type[SummaryType] = dict,
     ):
@@ -229,29 +223,6 @@ class CountingDict(BaseMergeableDict):
         """
         summary_func = ordered_dict if self.summary_type == dict else tuple
         return summary_func(self.get_sorted_items())
-
-
-class Histogram(CountingDict[dict]):
-    """
-    CountingDict that returns a summary dict that contains summary stats.
-    """
-
-    def summarize(self) -> dict:
-        hist = super().summarize()
-        return dict(hist=hist, summary=self.get_summary_stats())
-
-    def get_summary_stats(self) -> dict:
-        """Returns dict with mean, median, and modes of histogram.
-        """
-        values = tuple(self.keys())
-        counts = tuple(self.values())
-        mu0 = weighted_mean(values, counts)
-        return dict(
-            mean=mu0,
-            stdev=weighted_stdev(values, counts, mu0),
-            median=weighted_median(values, counts),
-            modes=weighted_modes(values, counts),
-        )
 
 
 class NestedDict(BaseMergeableDict):

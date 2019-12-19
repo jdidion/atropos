@@ -9,12 +9,12 @@ from atropos.utils import classproperty
 from atropos.utils.collections import (
     BaseMergeableDict,
     CountingDict,
-    Histogram,
     Mergeable,
     NestedDict,
     Summarizable,
     ordered_dict,
 )
+from atropos.utils.statistics import Histogram
 from atropos.utils.ngs import qual2int
 
 
@@ -225,12 +225,12 @@ class ReadMetricsCollector(Summarizable):
             self.tile_sequence_qualities = NestedDict()
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def gc_pct(self) -> float:
         return sum(base["C"] + base["G"] for base in self.bases) / self.total_bases
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def total_bases(self) -> int:
         return sum(
             length * count for base in self.bases for length, count in base.items()

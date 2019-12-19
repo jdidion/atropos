@@ -5,7 +5,7 @@ package = atropos
 repo = jdidion/$(package)
 desc = Release $(version)
 
-all: clean install install_extras install_test_requirements test test_release_setup
+all: clean install install_extra_requirements install_test_requirements test test_release_setup
 
 clean:
 	rm -Rf __pycache__
@@ -28,10 +28,10 @@ install: clean build
 install_test_requirements:
 	pip install -r requirements-test.txt
 
-install_extras:
+install_extra_requirements:
 	pip install -r requirements-extra.txt
 
-test:
+test: install install_extra_requirements install_test_requirements
 	pytest $(pytestops) $(tests)
 
 test_release_setup:

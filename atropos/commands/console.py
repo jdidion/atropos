@@ -5,14 +5,14 @@ from pathlib import Path
 import platform
 import re
 import textwrap
-from typing import Dict, Tuple, Type, Union, cast
+from typing import Dict, Sequence as SequenceType, Tuple, Type, Union, cast
 
 from loguru import logger
 from xphyle.paths import STDOUT, STDERR
 
 from atropos import __version__
 from atropos.commands import BaseCommand
-from atropos.io import InputRead, Sequence
+from atropos.io import InputRead
 from atropos.utils import (
     LOGGING_CONFIG, ReturnCode, classproperty
 )
@@ -51,7 +51,7 @@ class CommandConsole(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def execute(cls, args: Sequence[str] = ()) -> Tuple[ReturnCode, dict]:
+    def execute(cls, args: SequenceType[str] = ()) -> Tuple[ReturnCode, dict]:
         """
         Parse command line arguments, execute the command, and generate summary reports.
 
@@ -131,7 +131,7 @@ class BaseCommandConsole(metaclass=ABCMeta):
             return helpstr
 
     @classmethod
-    def execute(cls, args: Sequence[str] = ()) -> Tuple[ReturnCode, dict]:
+    def execute(cls, args: SequenceType[str] = ()) -> Tuple[ReturnCode, dict]:
         """
         Parse command line arguments, execute the command, and generate summary reports.
 
@@ -149,7 +149,7 @@ class BaseCommandConsole(metaclass=ABCMeta):
         return retcode, summary
 
     @classmethod
-    def _parse_args(cls, args: Sequence[str]) -> Namespace:
+    def _parse_args(cls, args: SequenceType[str]) -> Namespace:
         """
         Parses command line arguments.
 

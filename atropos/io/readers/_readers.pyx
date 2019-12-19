@@ -1,9 +1,10 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 from atropos.errors import FormatError
-from atropos.io.readers import PrefetchSequenceReader, estimate_num_records
-from atropos.io._sequence import Sequence
+from atropos.io.sequence import Sequence
 from atropos.utils import classproperty
+
+from ._base import PrefetchSequenceReader, estimate_num_records
 
 
 class FastqReader(PrefetchSequenceReader):

@@ -1,7 +1,6 @@
-from collections import Iterable
 import functools
 import math
-from typing import Sequence, Tuple, Optional
+from typing import Iterable, Optional, Sequence, Tuple
 
 from atropos.utils.collections import CountingDict
 
@@ -91,6 +90,29 @@ class RandomMatchProbability:
             next_i += 1
 
         self.max_n = idx
+
+
+class Histogram(CountingDict):
+    """
+    CountingDict that returns a summary dict that contains summary stats.
+    """
+
+    def summarize(self) -> dict:
+        hist = super().summarize()
+        return dict(hist=hist, summary=self.get_summary_stats())
+
+    def get_summary_stats(self) -> dict:
+        """Returns dict with mean, median, and modes of histogram.
+        """
+        values = tuple(self.keys())
+        counts = tuple(self.values())
+        mu0 = weighted_mean(values, counts)
+        return dict(
+            mean=mu0,
+            stdev=weighted_stdev(values, counts, mu0),
+            median=weighted_median(values, counts),
+            modes=weighted_modes(values, counts),
+        )
 
 
 def mean(values: Sequence[float]) -> float:

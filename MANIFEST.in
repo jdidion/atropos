@@ -9,7 +9,8 @@ include doc/Makefile
 include atropos/**/*.pyx
 include atropos/align/_align.c
 include atropos/commands/trim/_qualtrim.c
-include atropos/io/_seqio.c
+include atropos/io/readers/_readers.c
+include atropos/io/sequence/_sequence.c
 include atropos/adapters/*.fa
 include atropos/report/templates/*
 include bin/_preamble.py

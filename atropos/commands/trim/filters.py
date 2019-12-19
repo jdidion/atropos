@@ -245,7 +245,7 @@ class FilterFactory:
         self.paired = paired
         self.min_affected = min_affected
 
-    def __call__(self, filter_type: Callable[[...], Filter], *args, **kwargs):
+    def __call__(self, filter_type: Callable[..., Filter], *args, **kwargs):
         """
         Creates a wrapped filter of the specified type.
         """

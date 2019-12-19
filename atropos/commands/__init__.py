@@ -209,7 +209,7 @@ class BaseCommand(Command, metaclass=ABCMeta):
 
         self._init_summary()
 
-    @lru_cache
+    @lru_cache(maxsize=None)
     def get_option(self, name: str, default: Optional[Any] = None) -> Any:
         if hasattr(self.reader, name):
             return getattr(self.reader, name)

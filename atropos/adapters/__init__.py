@@ -1220,7 +1220,7 @@ class AdapterParser:
         back: Optional[Iterable[str]] = None,
         anywhere: Optional[Iterable[str]] = None,
         front: Optional[Iterable[str]] = None,
-    ) -> Sequence[Adapter]:
+    ) -> SequenceType[Adapter]:
         """
         Parses all three types of commandline options that can be used to specify
         adapters. `back`, `anywhere` and `front` are lists of strings, corresponding

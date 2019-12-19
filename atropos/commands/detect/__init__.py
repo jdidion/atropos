@@ -8,7 +8,7 @@ from typing import Iterable, Optional, Sequence as SequenceType, Tuple, Union
 from loguru import logger
 
 from atropos.adapters import AdapterCache
-from atropos.aligners import Aligner, SEMIGLOBAL
+from atropos.aligners import Aligner, GapRule
 from atropos.commands import (
     BaseCommand,
     Pipeline,
@@ -191,7 +191,7 @@ class Match(Summarizable):
         self,
         seq_or_contam: Union[str, ContaminantMatcher],
         count: int = 0,
-        names: Optional[Sequence[str]] = None,
+        names: Optional[SequenceType[str]] = None,
         match_frac: Optional[float] = None,
         match_frac2: Optional[float] = None,
         abundance: Optional[float] = None,
@@ -262,7 +262,7 @@ class Match(Summarizable):
     def set_known(
         self,
         names: Iterable[str],
-        seqs: Sequence[str],
+        seqs: SequenceType[str],
         match_frac: float,
         match_frac2: Optional[float] = None,
     ):
@@ -944,7 +944,7 @@ def align(seq1: str, seq2: str, min_overlap_frac: float = 0.9) -> Optional[str]:
     Returns:
         The matching portion of the sequence.
     """
-    aligner = Aligner(seq1, 0.0, SEMIGLOBAL, False, False)
+    aligner = Aligner(seq1, 0.0, GapRule.SEMIGLOBAL, False, False)
     aligner.min_overlap = math.ceil(min(len(seq1), len(seq2)) * min_overlap_frac)
     aligner.indel_cost = 100000
     match = aligner.locate(seq2)

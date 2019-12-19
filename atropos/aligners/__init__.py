@@ -31,15 +31,13 @@ class GapRule(IntFlag):
     """Gaps at end of seq2 have no penalty."""
     STOP_WITHIN_SEQ2 = 8
     """Gaps at end of seq1 have no penalty"""
-
-
-SEMIGLOBAL = (
-    GapRule.START_WITHIN_SEQ1
-    | GapRule.START_WITHIN_SEQ2
-    | GapRule.STOP_WITHIN_SEQ1
-    | GapRule.STOP_WITHIN_SEQ2
-)
-"""Typical semiglobal alignment (all gaps in the beginning or end are free)"""
+    SEMIGLOBAL = (
+        START_WITHIN_SEQ1
+        | START_WITHIN_SEQ2
+        | STOP_WITHIN_SEQ1
+        | STOP_WITHIN_SEQ2
+    )
+    """Typical semiglobal alignment (all gaps in the beginning or end are free)"""
 
 
 MatchTuple = Tuple[int, int, int, int, int, int]

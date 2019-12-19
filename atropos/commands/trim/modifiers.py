@@ -8,18 +8,28 @@ from collections import OrderedDict
 import copy
 from enum import Enum
 import re
-from typing import Callable, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
-from atropos.errors import AtroposError
-from atropos.adapters import Adapter
+from typing import (
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Sequence as SequenceType,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
+
+from atropos.adapters import Adapter, AdapterMatch
 from atropos.aligners import (
     Aligner,
     GapRule,
-    Match,
     MatchTuple,
     InsertAligner,
-    SEMIGLOBAL,
 )
 from atropos.commands.trim.qualtrim import quality_trim_index, twocolor_trim_index
+from atropos.errors import AtroposError
 from atropos.io.sequence import Sequence
 from atropos.utils import classproperty
 from atropos.utils.collections import Summarizable
@@ -99,9 +109,7 @@ class Trimmer(ReadModifier, metaclass=ABCMeta):
         else:
             return read
 
-    def clip(
-        self, read: Sequence, front: int = 0, back: int = 0
-    ) -> Sequence:
+    def clip(self, read: Sequence, front: int = 0, back: int = 0) -> Sequence:
         """
         Returns a read with bases trimmed off the front/back.
 
@@ -155,7 +163,7 @@ class AdapterCutter(ReadModifier):
         self.action = action
         self.with_adapters = 0
 
-    def _best_match(self, read: Sequence) -> Optional[Match]:
+    def _best_match(self, read: Sequence) -> Optional[AdapterMatch]:
         """
         Finds the best matching adapter in the given read.
 
@@ -308,8 +316,8 @@ class ErrorCorrectorMixin:
             return
 
         # read2 reverse-complement is the reference, read1 is the query
-        r1_seq = list(read1.sequence)
-        r2_seq = list(read2.sequence)
+        r1_seq: List[str] = list(read1.sequence)
+        r2_seq: List[str] = list(read2.sequence)
         len1 = len(r1_seq)
         len2 = len(r2_seq)
         has_quals = read1.qualities and read2.qualities
@@ -408,11 +416,11 @@ class ErrorCorrectorMixin:
 
             def update_read(
                 read: Sequence,
-                seq: Sequence[str],
-                qual: Sequence[str],
+                seq: SequenceType[str],
+                qual: SequenceType[str],
                 seq_len: int,
                 read_num: int,
-                num_changed: int
+                num_changed: int,
             ):
                 self.corrected_bp[read_num] += num_changed
                 read.corrected = num_changed
@@ -464,7 +472,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         mismatch_action: MismatchAction = MismatchAction.NONE,
         symmetric: bool = True,
         min_insert_overlap: int = 1,
-        **aligner_args
+        **aligner_args,
     ):
         """
         Args:
@@ -487,7 +495,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
             adapter1.sequence,
             adapter2.sequence,
             min_insert_overlap=min_insert_overlap,
-            **aligner_args
+            **aligner_args,
         )
         self.min_insert_len = min_insert_overlap
         self.action = action
@@ -535,6 +543,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
             self.symmetric
             and sum(bool(m) for m in (adapter_match1, adapter_match2)) == 1
         ):
+
             def create_symmetric_match(_match, read_len):
                 if _match.rstart > read_len:
                     return None
@@ -581,7 +590,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         )
 
     def trim(
-        self, read: Sequence, adapter: Adapter, match: Match, read_idx: int
+        self, read: Sequence, adapter: Adapter, match: AdapterMatch, read_idx: int
     ) -> Sequence:
         """
         Trims an adapter from a read.
@@ -1234,6 +1243,7 @@ class SwiftBisulfiteTrimmer(ReadPairModifier):
 # TODO: InsertAdapterCutter should save the insert match, and
 #  MergeOverlapping should use that rather than doing another alignment
 
+
 class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
     """
     Merges overlaping reads. The merged reads are stored in read1.
@@ -1268,7 +1278,7 @@ class MergeOverlapping(ReadPairModifier, ErrorCorrectorMixin):
             # with a 3' overhang, we can constrain our alignment
             aflags = GapRule.START_WITHIN_SEQ1 | GapRule.STOP_WITHIN_SEQ2
         else:
-            aflags = SEMIGLOBAL
+            aflags = GapRule.SEMIGLOBAL
 
         # align read1 to read2 reverse-complement to be compatible with
         # InsertAligner
@@ -1383,7 +1393,7 @@ class Modifiers(Summarizable, metaclass=ABCMeta):
 
     def get_modifiers(
         self, mod_class: Type[Modifier] = None, read: Optional[int] = None
-    ) -> Sequence[Modifier]:
+    ) -> SequenceType[Modifier]:
         """
         Returns a list of modifiers that have been added.
 
@@ -1472,7 +1482,7 @@ class SingleEndModifiers(Modifiers):
         self,
         mod_class: Type[M],
         read1_args: Optional[dict] = None,
-        read2_args: Optional[dict] = None
+        read2_args: Optional[dict] = None,
     ) -> int:
         if read1_args is not None:
             return self.add_modifier(mod_class, **read1_args)

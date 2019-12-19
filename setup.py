@@ -130,8 +130,14 @@ extensions = [
         "atropos.commands.trim._qualtrim",
         sources=["atropos/commands/trim/_qualtrim.pyx"],
     ),
-    Extension("atropos.io._sequence", sources=["atropos/io/_sequence.pyx"]),
-    Extension("atropos.io._readers", sources=["atropos/io/_readers.pyx"]),
+    Extension(
+        "atropos.io.sequence._sequence",
+        sources=["atropos/io/sequence/_sequence.pyx"]
+    ),
+    Extension(
+        "atropos.io.readers._readers",
+        sources=["atropos/io/readers/_readers.pyx"]
+    ),
 ]
 
 install_requirements = [

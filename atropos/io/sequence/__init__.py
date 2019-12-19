@@ -1,9 +1,10 @@
 from typing import Optional
 
 from atropos.errors import FormatError
-from atropos.io._sequence import Sequence
 from atropos.utils import truncate_string
 from atropos.utils.ngs import Alphabet
+
+from ._sequence import Sequence
 
 
 class ColorspaceSequence(Sequence):

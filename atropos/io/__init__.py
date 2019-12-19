@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import IO, Union
 
 from atropos.errors import UnknownFileTypeError
-from atropos.io._sequence import Sequence
 from atropos.utils.paths import splitext_compressed
 
 
