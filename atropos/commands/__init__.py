@@ -462,9 +462,6 @@ class Pipeline(metaclass=ABCMeta):
         Args:
             context: The pipeline context (dict).
             record: The record.
-
-        Returns:
-
         """
 
     @abstractmethod

@@ -77,6 +77,7 @@ class FastaReader(PrefetchSequenceReader):
         for i, line in enumerate(self._file):
             # strip() also removes DOS line breaks
             line = line.strip()
+
             if not line:
                 continue
 
@@ -87,6 +88,7 @@ class FastaReader(PrefetchSequenceReader):
                         sequence=self._delimiter.join(seq),
                         alphabet=self._alphabet
                     )
+
                 name = line[1:]
                 seq = []
             elif line and line[0] == "#":
@@ -247,8 +249,6 @@ class FastaQualReader(SequenceReaderBase):
                     f"value {err}"
                 )
 
-            assert fastaread.name == qualread.name
-
             yield self._sequence_factory(
                 name=fastaread.name,
                 sequence=fastaread.sequence,
@@ -283,12 +283,13 @@ class ColorspaceSequenceReaderMixin:
         self,
         reader,
         quality_base: int = 33,
+        sequence_factory: Callable[..., Sequence] = ColorspaceSequence,
         **kwargs
     ):
         super().__init__(
             reader,
             quality_base=quality_base,
-            sequence_factory=ColorspaceSequence,
+            sequence_factory=sequence_factory,
             **kwargs
         )
 
@@ -310,12 +311,6 @@ class ColorspaceFastaReader(ColorspaceSequenceReaderMixin, FastaReader):
 class ColorspaceFastqReader(ColorspaceSequenceReaderMixin, FastqReader):
     """
     Reads colorspace sequences from a FASTQ.
-    """
-
-
-class SraColorspaceFastqReader(ColorspaceSequenceReaderMixin, FastqReader):
-    """
-    Reads SRA-formatted colorspace sequences from a FASTQ.
     """
 
 
@@ -886,10 +881,20 @@ class PairedEndSAMReader(SAMReader, PairedEndEstimatorMixin):
                     f"secondary/supplementary alignments."
                 )
 
-            if reads[0].is_read1:
-                assert reads[1].is_read2
-            else:
-                assert reads[1].is_read1
+            if not reads[0].is_read1 ^ reads[1].is_read1:
+                raise ValueError(
+                    f"There must be exactly one read with read1 flag set in pair "
+                    f"{reads}"
+                )
+
+            if not reads[0].is_read2 ^ reads[1].is_read2:
+                raise ValueError(
+                    f"There must be exactly one read with read2 flag set in pair "
+                    f"{reads}"
+                )
+
+            if reads[1].is_read1:
+                # Swap reads so the first read is always read1
                 reads = (reads[1], reads[0])
 
             yield tuple(self._as_sequence(r) for r in reads)
@@ -1069,8 +1074,26 @@ def open_reader(
                     file1, quality_base=quality_base, alphabet=alphabet
                 )
             elif file_format == "sra-fastq" and colorspace:
-                reader = SraColorspaceFastqReader(
-                    file1, quality_base=quality_base, alphabet=alphabet
+                def sra_colorspace_sequence_factory(
+                    name: str,
+                    sequence: str,
+                    qualities: str,
+                    *args,
+                    **kwargs
+                ):
+                    """
+                    Factory for an SRA colorspace sequence (which has one quality
+                    value too many).
+                    """
+                    return ColorspaceSequence(
+                        name, sequence, qualities[1:], *args, **kwargs
+                    )
+
+                reader = ColorspaceFastqReader(
+                    file1,
+                    quality_base=quality_base,
+                    alphabet=alphabet,
+                    sequence_factory=sra_colorspace_sequence_factory
                 )
     elif ngstream_reader:
         if colorspace:

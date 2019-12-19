@@ -391,6 +391,7 @@ class Detector(SingleEndPipelineMixin, Pipeline, metaclass=ABCMeta):
     def set_read_length(self, record: Sequence):
         if self._read_length is not None:
             raise RuntimeError("Cannot set read length once it has already been set")
+
         self._read_length = len(record.sequence)
 
     def handle_records(self, context: dict, records: SequenceType[Sequence]):

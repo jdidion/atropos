@@ -186,10 +186,10 @@ setup(
             "atropos=atropos.__main__:main"
         ],
         "atropos.commands": [
-            "detect = atropos.commands.detect.console.DetectCommandConsole",
-            "error = atropos.commands.error.console.ErrorCommandConsole",
-            "qc = atropos.commands.qc.console.QcCommandConsole",
-            "trim = atropos.commands.trim.console.TrimCommandConsole",
+            "detect = atropos.commands.detect.console:DetectCommandConsole",
+            "error = atropos.commands.error.console:ErrorCommandConsole",
+            "qc = atropos.commands.qc.console:QcCommandConsole",
+            "trim = atropos.commands.trim.console:TrimCommandConsole",
         ]
     },
     classifiers=[

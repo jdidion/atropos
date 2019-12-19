@@ -154,12 +154,15 @@ class Timing(Summarizable):
         """
         if not self.cur_time:
             self.update()
+
         if self.start_time is None:
             raise AtroposError(
                 "Timing instance must be started before it can be summarized"
             )
+
         summary = dict(start=self.start_time.isoformat)
         summary.update(self.cur_time - self.start_time)
+
         return summary
 
 

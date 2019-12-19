@@ -824,13 +824,10 @@ class ColorspaceAdapter(Adapter):
             else:
                 return None
 
-        if match.length == 0 or match.errors / match.length < self.max_error_rate:
-            raise ValueError(f"Invalid match: {match}")
-
-        if match.length < self.min_overlap:
-            raise ValueError(
-                f"Match length {match.length} < min overlap {self.min_overlap}"
-            )
+        # The following assertions should be guarnateed by the matching algorithm
+        assert match.length > 0
+        assert (match.errors / match.length) <= self.max_error_rate
+        assert match.length >= self.min_overlap
 
         return match
 
@@ -912,6 +909,7 @@ class LinkedMatch:
         """
         if front_match is None:
             raise ValueError("front_match cannot be None")
+        
         self.front_match = front_match
         self.back_match = back_match
         self.adapter = adapter
@@ -1115,6 +1113,7 @@ class AdapterParser:
             raise ValueError("Either name or spec must be given")
 
         type_name = cmdline_type.upper()
+
         if type_name not in ADAPTER_TYPE_NAMES:
             raise ValueError(f"cmdline_type cannot be {cmdline_type!r}")
 
@@ -1138,9 +1137,11 @@ class AdapterParser:
             self.cache.add(name, spec)
 
         front_anchored, back_anchored = False, False
+
         if spec.startswith("^"):
             spec = spec[1:]
             front_anchored = True
+
         if spec.endswith("$"):
             spec = spec[:-1]
             back_anchored = True

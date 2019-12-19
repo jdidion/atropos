@@ -1493,7 +1493,7 @@ class SingleEndModifiers(Modifiers):
         for mods in self.modifiers:
             read1 = mods[0](read1)
 
-        return tuple(read1)
+        return read1,
 
     def summarize(self) -> dict:
         summary = {}

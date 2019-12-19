@@ -16,7 +16,7 @@ class ColorspaceSequence(Sequence):
         self,
         name: str,
         sequence: str,
-        qualities: str,
+        qualities: Optional[str] = None,
         primer: Optional[str] = None,
         name2: str = "",
         original_length: Optional[int] = None,

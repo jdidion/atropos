@@ -224,7 +224,10 @@ class Formatters(Summarizable):
         Returns the formatter associated with the given name (barcode) when running
         in multiplexed mode.
         """
-        assert self.multiplexed
+        if not self.multiplexed:
+            raise ValueError(
+                "Cannot call 'get_mux_formatter' for non-multiplexed data"
+            )
 
         if name not in self.mux_formatters:
             path = Path(str(self.output).format(name=name))
