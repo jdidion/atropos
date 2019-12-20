@@ -1,5 +1,6 @@
 import io
 
+from loguru import logger
 from pytest import raises
 
 from atropos.commands.multicore import *
@@ -13,13 +14,10 @@ log_capture_string = None
 
 
 def setup():
-    # Create the logger
-    logger.configure(levels="DEBUG")
-
     # Setup the console handler with a StringIO object
     global log_capture_string
     log_capture_string = io.StringIO()
-    logger.add(sink=log_capture_string)
+    logger.add(sink=log_capture_string, level="DEBUG")
 
 
 def assert_log(expected):

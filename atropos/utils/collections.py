@@ -244,6 +244,7 @@ class NestedDict(BaseMergeableDict):
     def __getitem__(self, key) -> CountingDict:
         if key not in self:
             self[key] = CountingDict()
+
         return self.get(key)
 
     def merge(self, other: "NestedDict") -> "NestedDict":
@@ -261,8 +262,8 @@ class NestedDict(BaseMergeableDict):
         Returns a flattened version of the nested dict.
 
         Returns:
-            When `self.shape=='long'`, a list of (key1, key2, value) tuples.
-            When `self.shape=='wide'`, a dict of
+            When `self.summary_type==list`, a list of (key1, key2, value) tuples.
+            When `self.summary_type==dict`, a dict of
                 {columns:keys2, rows: {key1, values}}, where `keys2` is the set
                 of keys in the child dicts.
         """

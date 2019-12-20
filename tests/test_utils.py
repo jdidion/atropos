@@ -79,7 +79,7 @@ def test_nested_dict():
         columns=("x", "y", "z"), rows=dict(a=(2, 1, 1), b=(0, 1, 0))
     )
 
-    nd1.shape = "long"
+    nd1.summary_type = list
     assert set(nd1.summarize()) == {
         ("a", "x", 2),
         ("a", "y", 1),
