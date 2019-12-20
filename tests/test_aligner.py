@@ -1,9 +1,6 @@
-from .utils import approx_equal
-
 from atropos.adapters import AdapterType
-from atropos.aligners import (
+from atropos.aligner import (
     Aligner,
-    InsertAligner,
     locate,
     compare_prefixes,
     compare_suffixes,
@@ -138,58 +135,8 @@ def test_no_match():
     assert a is None, a
 
 
-def test_match_probability():
-    a = InsertAligner("TTAGACATAT", "CAGTGGAGTA")
-    k = 3
-    n = 5
-    i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
-    i4 = (120 / 24) * (0.25 ** 4) * 0.75
-    i5 = 0.25 ** 5
-    assert approx_equal(a.match_probability(k, n), i3 + i4 + i5, 0.0001)
-
-
-def test_insert_align():
-    a1_seq = "TTAGACATATGG"
-    a2_seq = "CAGTGGAGTATA"
-    aligner = InsertAligner(a1_seq, a2_seq)
-    r1 = "AGTCGAGCCCATTGCAGACT" + a1_seq[0:10]
-    r2 = "AGTCTGCAATGGGCTCGACT" + a2_seq[0:10]
-    insert_match, match1, match2 = aligner.match_insert(r1, r2)
-    assert match1.rstart == 20
-    assert match1.length == 10
-    assert match2.rstart == 20
-    assert match2.length == 10
-
-
-def test_short_adapter_overlap():
-    a1_seq = "TTAGACATAT"
-    a2_seq = "CAGTGGAGTA"
-    seq1 = "GACAGGCCGTTTGAATGTTGACGGGATGTT"
-    seq2 = "CATCCCGTCAACATTCAAACGGCCTGTCCA"
-    aligner = InsertAligner(a1_seq, a2_seq)
-    insert_match, match1, match2 = aligner.match_insert(seq1, seq2)
-    assert match1.rstart == 28
-    assert match1.length == 2
-    assert match2.rstart == 28
-    assert match2.length == 2
-
-
-# TODO: implement this test
-# def test_insert_align_different_lengths():
-#     # Test for #51. This is the alignment:
-#     # TTAGGCTATGGCTTCTCGGGTTGAGGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAA
-#     #                                                                                                                       AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT
-#     # ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT
-#     #
-#     # The inserts should align even though there is a gap at the 5' end of read1.
-#     a1_seq = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG"
-#     a2_seq = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT"
-#     seq1 = "TTTGCAGCTTTTGTAGACAAGTGCTGTGCAGCTGATGTCAAAGAGACCTGCTTTGCTCTGGAGGGTCCAAAACTTGTAGCCTCAACCCGAGAAGCCATAGCCTAA"
-#     seq2 = "ATAGGCTATGGCTTCTCGAGTTGAAGCTACAAGTTTTGGACCCTCCAGAGCAAAGCAGGTCTCTTTGACATCAGCTGCACAGCACTTGTCTACAAAAGCTGCAAAAGATCGGAAGAGCGTCTCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGACGTATCATTAAAAAAAAAAACACATCACATCAACAAGATAACACGACTTCTCCATCCACAGTACCGATGACCTCAACATTAGT"
-
-
 def test_multi_aligner_no_mismatches():
-    from atropos.aligners._align import MultiAligner
+    from atropos.aligner import MultiAligner
 
     a = MultiAligner(max_error_rate=0, min_overlap=3)
     matches = a.locate("AGAGATCAGATGACAGATC", "GATCA")
@@ -210,7 +157,7 @@ def test_multi_aligner_no_mismatches():
 
 
 def test_multi_aligner_with_mismatches():
-    from atropos.aligners._align import MultiAligner
+    from atropos.aligner import MultiAligner
 
     a = MultiAligner(max_error_rate=0.1, min_overlap=10)
     matches = a.locate("GATATCAGATGACAGATCAGAGATCAGAT", "GAGATCAGATGA")

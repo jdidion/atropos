@@ -125,7 +125,7 @@ with open(
 
 # Define extensions to be Cythonized
 extensions = [
-    Extension("atropos.aligners._align", sources=["atropos/aligners/_align.pyx"]),
+    Extension("atropos.aligner._aligner", sources=["atropos/aligner/_aligner.pyx"]),
     Extension(
         "atropos.commands.trim._qualtrim",
         sources=["atropos/commands/trim/_qualtrim.pyx"],

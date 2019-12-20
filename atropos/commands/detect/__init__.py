@@ -8,7 +8,7 @@ from typing import Iterable, Optional, Sequence as SequenceType, Tuple, Union
 from loguru import logger
 
 from atropos.adapters import AdapterCache
-from atropos.aligners import Aligner, GapRule
+from atropos.aligner import Aligner, GapRule
 from atropos.commands import (
     BaseCommand,
     Pipeline,

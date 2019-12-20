@@ -24,14 +24,19 @@ from loguru import logger
 from xphyle import open_
 from xphyle.types import PathLike
 
-from atropos import aligners
-from atropos.aligners import GapRule
+from atropos.aligner import (
+    Aligner, GapRule, MatchTuple, MultiAligner, compare_prefixes, compare_suffixes
+)
 from atropos.io.sequence import ColorspaceSequence, Sequence
 from atropos.io.readers import FastaReader
 from atropos.utils import colorspace
 from atropos.utils.collections import Const, CountingDict, MergingDict, NestedDict
 from atropos.utils.ngs import (
-    ALPHABETS, GC_BASES, IUPAC_BASES, Alphabet, reverse_complement
+    ALPHABETS,
+    GC_BASES,
+    IUPAC_BASES,
+    Alphabet,
+    reverse_complement,
 )
 from atropos.utils.paths import as_readable_path
 from atropos.utils.statistics import RandomMatchProbability
@@ -41,6 +46,24 @@ from atropos.utils.statistics import RandomMatchProbability
 DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/master/atropos/adapters/sequencing_adapters.fa"
 DEFAULT_ADAPTERS_PATH = Path(__file__).parent / "sequencing_adapters.fa"
 DEFAULT_ADAPTER_CACHE_FILE = ".adapters"
+
+DEFAULT_INSERT_MAX_RMP = 1e-6
+"""Default value for InsertAligner max insert random match probability"""
+DEFAULT_ADAPTER_MAX_RMP = 0.001
+"""Default value for InsertAligner max adapter random match probability"""
+DEFAULT_MIN_INSERT_OVERLAP = 1
+"""Default value for InsertAligner min insert overlap"""
+DEFAULT_MAX_INSERT_MISMATCH_FRAC = 0.2
+"""Default value for InsertAligner max insert mismatch fraction"""
+DEFAULT_MIN_ADAPTER_OVERLAP = 1
+"""Default value for InsertAligner min adapter overlap"""
+DEFAULT_MAX_ADAPTER_MISMATCH_FRAC = 0.2
+"""Default value for InsertAligner max adapter mismatch fraction"""
+DEFAULT_ADAPTER_CHECK_CUTOFF = 9
+"""Default value for InsertAligner adapter check cutoff"""
+
+M = TypeVar("M", bound="Match")
+S = TypeVar("S", bound=Sequence)
 
 
 class AdapterType(int, Enum):
@@ -90,6 +113,423 @@ class AdapterType(int, Enum):
 ADAPTER_TYPE_NAMES = set(AdapterType.__members__.keys())
 
 
+MatchInfo = namedtuple(
+    "MatchInfo",
+    (
+        "read_name",
+        "errors",
+        "rstart",
+        "rstop",
+        "seq_before",
+        "seq_adapter",
+        "seq_after",
+        "adapter_name",
+        "qual_before",
+        "qual_adapter",
+        "qual_after",
+        "is_front",
+        "asize",
+        "rsize_adapter",
+        "rsize_total",
+    ),
+)
+
+
+class Match:
+    """
+    Common match-result object returned by aligners.
+    """
+
+    __slots__ = [
+        "astart",
+        "astop",
+        "rstart",
+        "rstop",
+        "matches",
+        "errors",
+        "front",
+        "length",
+    ]
+
+    def __init__(
+        self,
+        astart: int,
+        astop: int,
+        rstart: int,
+        rstop: int,
+        matches: int,
+        errors: int,
+        front: Optional[bool] = None,
+    ):
+        """
+        Args:
+            astart: Starting position of the match within the adapter.
+            astop: Ending position of the match within the adapter.
+            rstart: Starting position of the match within the read.
+            rstop: Ending position of the match within the read.
+            matches: Number of matching bases.
+            errors: Number of mismatching bases.
+            front: Whether the match is to the front of the read.
+        """
+        self.astart = astart
+        self.astop = astop
+        self.rstart = rstart
+        self.rstop = rstop
+        self.matches = matches
+        self.errors = errors
+        self.front = self._guess_is_front() if front is None else front
+        # Number of aligned characters in the adapter. If there are indels,
+        # this may be different from the number of characters in the read.
+        self.length = self.astop - self.astart
+        if self.length <= 0:
+            raise ValueError("Match length must be >= 0")
+        if self.length - self.errors <= 0:
+            raise ValueError("A Match requires at least one matching position.")
+        # TODO: this assertion may not always hold now that we use both error
+        #  rates and probabilities
+        # if self.adapter:
+        #    assert self.errors / self.length <= self.adapter.max_error_rate
+
+    def __str__(self) -> str:
+        return (
+            f"Match(astart={self.astart}, astop={self.astop}, "
+            f"rstart={self.rstart}, rstop={self.rstop}, matches={self.matches}, "
+            f"errors={self.errors})"
+        )
+
+    def copy(self: M) -> M:
+        """
+        Create a copy of this Match.
+        """
+        return Match(
+            self.astart,
+            self.astop,
+            self.rstart,
+            self.rstop,
+            self.matches,
+            self.errors,
+            self.front,
+        )
+
+    def _guess_is_front(self) -> bool:
+        """
+        Guesses whether this is match is for a front adapter.
+
+        The match is assumed to be a front adapter when the first base of
+        the read is involved in the alignment to the adapter.
+        """
+        return self.rstart == 0
+
+
+class AdapterMatch(Match, Generic[S]):
+    __slots__ = ["_adapter", "_read"]
+
+    def __init__(
+        self,
+        *args,
+        adapter: Optional["Adapter"] = None,
+        read: Optional[S] = None,
+        **kwargs,
+    ):
+        """
+        Args:
+            adapter: The :class:`Adapter`.
+            read: The :class:`Sequence`.
+            *args: Positional arguments to pass to `Match` initializer.
+            **kwargs: Keyword arguments to pass to `Match` initializer.
+        """
+        super().__init__(*args, **kwargs)
+        self._adapter = adapter
+        self._read = read
+
+    def update(self, adapter: "Adapter", read: S, front: bool):
+        self._adapter = adapter
+        self._read = read
+        self.front = front
+
+    @property
+    def adapter(self):
+        return self._adapter
+
+    @property
+    def read(self):
+        return self._read
+
+    def copy(self: M) -> M:
+        """
+        Create a copy of this Match.
+        """
+        return AdapterMatch(
+            self.astart,
+            self.astop,
+            self.rstart,
+            self.rstop,
+            self.matches,
+            self.errors,
+            self.front,
+            adapter=self._adapter,
+            read=self._read,
+        )
+
+    def wildcards(self, wildcard_char: str = "N") -> str:
+        """
+        Returns a string that contains, for each wildcard character,
+        the character that it matches. For example, if the adapter
+        ATNGNA matches ATCGTA, then the string 'CT' is returned.
+
+        If there are indels, this is not reliable as the full alignment
+        is not available.
+        """
+        return "".join(
+            (
+                self.read.sequence[self.rstart + i]
+                for i in range(self.length)
+                if (
+                    self._adapter.sequence[self.astart + i] == wildcard_char
+                    and self.rstart + i < len(self._read.sequence)
+                )
+            )
+        )
+
+    def rest(self) -> str:
+        """
+        Returns the part of the read before this match if this is a 'front' (5')
+        adapter, or the part after the match if this is not a 'front' adapter (3').
+        This can be an empty string.
+        """
+        if self.front:
+            return self._read.sequence[: self.rstart]
+        else:
+            return self._read.sequence[self.rstop :]
+
+    def get_info_record(self) -> MatchInfo:  # TODO: write test
+        """
+        Returns a :class:`MatchInfo`, which contains information about the match to
+        write into the info file.
+        """
+        seq = self._read.sequence
+        qualities = self._read.qualities
+
+        if qualities is None:
+            qualities = ""
+
+        rsize = rsize_total = self.rstop - self.rstart
+
+        if self.front and self.rstart > 0:
+            rsize_total = self.rstop
+        elif not self.front and self.rstop < len(seq):
+            rsize_total = len(seq) - self.rstart
+
+        return MatchInfo(
+            self._read.name,
+            self.errors,
+            self.rstart,
+            self.rstop,
+            seq[0 : self.rstart],
+            seq[self.rstart : self.rstop],
+            seq[self.rstop :],
+            self._adapter.name,
+            qualities[0 : self.rstart],
+            qualities[self.rstart : self.rstop],
+            qualities[self.rstop :],
+            self.front,
+            self.astop - self.astart,
+            rsize,
+            rsize_total,
+        )
+
+
+InsertMatchResult = Tuple[MatchTuple, Optional[AdapterMatch], Optional[AdapterMatch]]
+
+
+class InsertAligner:
+    """
+    Implementation of an insert matching algorithm.
+
+    If the inserts align, the overhangs are searched for the adapter sequences.
+    Otherwise, each read is search for its adapter separately.
+
+    This only works with paired-end reads with 3' adapters.
+    """
+
+    def __init__(
+        self,
+        adapter1: str,
+        adapter2: str,
+        match_probability: Optional[RandomMatchProbability] = None,
+        insert_max_rmp: float = DEFAULT_INSERT_MAX_RMP,
+        adapter_max_rmp: float = DEFAULT_ADAPTER_MAX_RMP,
+        min_insert_overlap: int = DEFAULT_MIN_INSERT_OVERLAP,
+        max_insert_mismatch_frac: Union[str, float] = DEFAULT_MAX_INSERT_MISMATCH_FRAC,
+        min_adapter_overlap: int = DEFAULT_MIN_ADAPTER_OVERLAP,
+        max_adapter_mismatch_frac: Union[str, float] =
+        DEFAULT_MAX_ADAPTER_MISMATCH_FRAC,
+        adapter_check_cutoff: int = DEFAULT_ADAPTER_CHECK_CUTOFF,
+        base_probs: Optional[Dict[str, float]] = None,
+        adapter_wildcards: bool = True,
+        read_wildcards: bool = False,
+    ):
+        """
+        Args:
+            adapter1: read1 adapter.
+            adapter2: read2 adapter.
+            match_probability: Callable that calculates random match probability
+                given arguments (num_matches, match_len).
+            insert_max_rmp: Max random match probability for the insert match.
+            adapter_max_rmp: Max random match probability for the adapter match.
+            min_insert_overlap: Minimum number of bases the inserts must overlap
+                to be considered matching.
+            max_insert_mismatch_frac: Maximum fraction of mismatching bases between
+                the inserts to be considered matching.
+            min_adapter_overlap: Minimum number of bases the adapter must overlap
+                the read to be considered matching.
+            max_adapter_mismatch_frac: Maximum fraction of mismatching bases between
+                the adapter and the read to be considered matching.
+            adapter_check_cutoff: Threshold number of matching bases required before
+                adapter matches are checked against random match probability.
+            base_probs: Dict of (match_prob, mismatch_prob), which are the
+                probabilities passed to
+                :method:`atropos.util.RandomMatchProbability.__call__()`.
+        """
+
+        self.adapter1 = adapter1
+        self.adapter1_len = len(adapter1)
+        self.adapter2 = adapter2
+        self.adapter2_len = len(adapter2)
+        self.match_probability = match_probability or RandomMatchProbability()
+        self.insert_max_rmp = insert_max_rmp
+        self.adapter_max_rmp = adapter_max_rmp
+        self.min_insert_overlap = min_insert_overlap
+        self.max_insert_mismatch_frac = float(max_insert_mismatch_frac)
+        self.min_adapter_overlap = min_adapter_overlap
+        self.max_adapter_mismatch_frac = float(max_adapter_mismatch_frac)
+        self.adapter_check_cutoff = adapter_check_cutoff
+        self.base_probs = base_probs or dict(match_prob=0.25, mismatch_prob=0.75)
+        self.adapter_wildcards = adapter_wildcards
+        self.read_wildcards = read_wildcards
+        self.aligner = MultiAligner(
+            max_insert_mismatch_frac,
+            GapRule.START_WITHIN_SEQ1 | GapRule.STOP_WITHIN_SEQ2,
+            min_insert_overlap,
+        )
+
+    def match_insert(self, seq1: str, seq2: str) -> Optional[InsertMatchResult]:
+        """
+        Uses cutadapt aligner for insert and adapter matching.
+
+        Args:
+            seq1, seq2: Sequences to match.
+
+        Returns:
+            A :class:`Match` object, or None if there is no match.
+        """
+        seq_len1 = len(seq1)
+        seq_len2 = len(seq2)
+
+        if seq_len1 > seq_len2:
+            seq1 = seq1[:seq_len2]
+            seq_len = seq_len2
+        else:
+            seq_len = seq_len1
+            if seq_len2 > seq_len1:
+                seq2 = seq2[:seq_len1]
+
+        seq2_rc = reverse_complement(seq2)
+
+        def _match(
+            _insert_match: MatchTuple, _offset: int, _insert_match_size: int
+        ) -> Optional[InsertMatchResult]:
+            if offset < self.min_adapter_overlap:
+                # The reads are mostly overlapping, to the point where
+                # there's not enough overhang to do a confident adapter
+                # match. We return just the insert match to signal that
+                # error correction can be done even though no adapter
+                # trimming is required.
+                return _insert_match, None, None
+
+            # TODO: this is very sensitive to the exact correct choice of adapter.
+            #  For example, if you specifiy GATCGGAA... and the correct adapter is
+            #  AGATCGGAA..., the prefixes will not match exactly and the alignment
+            #  will fail. We need to use a comparison that is a bit more forgiving.
+            def _match_adapter(
+                insert_seq: str, adapter_seq: str, adapter_len: int
+            ) -> Tuple[MatchTuple, int, float]:
+                amatch = compare_prefixes(
+                    insert_seq[_insert_match_size:],
+                    adapter_seq,
+                    wildcard_ref=self.adapter_wildcards,
+                    wildcard_query=self.read_wildcards
+                )
+                alen = min(_offset, adapter_len)
+                return amatch, alen, round(alen * self.max_adapter_mismatch_frac)
+
+            a1_match, a1_length, a1_max_mismatches = _match_adapter(
+                seq1, self.adapter1, self.adapter1_len
+            )
+            a2_match, a2_length, a2_max_mismatches = _match_adapter(
+                seq2, self.adapter2, self.adapter2_len
+            )
+
+            if (
+                a1_match[5] > a1_max_mismatches and
+                a2_match[5] > a2_max_mismatches
+            ):
+                return None
+
+            if min(a1_length, a2_length) > self.adapter_check_cutoff:
+                a1_prob = self.match_probability(a1_match[4], a1_length)
+                a2_prob = self.match_probability(a2_match[4], a2_length)
+                if (a1_prob * a2_prob) > self.adapter_max_rmp:
+                    return None
+
+            mismatches = min(a1_match[5], a2_match[5])
+
+            def _create_adapter_match(alen: int, slen: int) -> AdapterMatch:
+                alen = min(alen, slen - _insert_match_size)
+                _mismatches = min(alen, mismatches)
+                _matches = alen - _mismatches
+                return AdapterMatch(
+                    0, alen, _insert_match_size, slen, _matches, _mismatches
+                )
+
+            return (
+                _insert_match,
+                _create_adapter_match(a1_length, seq_len1),
+                _create_adapter_match(a2_length, seq_len2)
+            )
+
+        insert_matches = self.aligner.locate(seq2_rc, seq1)
+
+        if insert_matches:
+            # Filter by random-match probability
+            filtered_matches = []
+
+            for insert_match in insert_matches:
+                offset = min(insert_match[0], seq_len - insert_match[3])
+                insert_match_size = seq_len - offset
+                prob = self.match_probability(
+                    insert_match[4], insert_match_size, **self.base_probs
+                )
+                if prob <= self.insert_max_rmp:
+                    filtered_matches.append(
+                        (insert_match, offset, insert_match_size, prob)
+                    )
+
+            if filtered_matches:
+                if len(filtered_matches) == 1:
+                    return _match(*filtered_matches[0][0:3])
+                else:
+                    # Test matches in order of random-match probability.
+                    # TODO: compare against sorting by length (which is how
+                    #  SeqPurge essentially does it).
+                    #  filtered_matches.sort(key=lambda x: x[2], reverse=True)
+                    filtered_matches.sort(key=lambda x: x[3])
+                    for match_args in filtered_matches:
+                        match = _match(*match_args[0:3])
+                        if match:
+                            return match
+
+
 class AdapterCache:
     """
     Cache for known adapters.
@@ -98,7 +538,7 @@ class AdapterCache:
     def __init__(
         self,
         path: Optional[Union[str, PathLike]] = Path(DEFAULT_ADAPTER_CACHE_FILE),
-        auto_reverse_complement: bool = False
+        auto_reverse_complement: bool = False,
     ):
         """
         Args:
@@ -193,7 +633,8 @@ class AdapterCache:
         return num_records
 
     def load_default(self) -> int:
-        """Tries to load from default URL first, then from default path.
+        """
+        Tries to load from default URL first, then from default path.
         """
         try:
             return self.load_from_url()
@@ -288,133 +729,6 @@ class AdapterCache:
         )
 
 
-MatchInfo = namedtuple(
-    "MatchInfo",
-    (
-        "read_name",
-        "errors",
-        "rstart",
-        "rstop",
-        "seq_before",
-        "seq_adapter",
-        "seq_after",
-        "adapter_name",
-        "qual_before",
-        "qual_adapter",
-        "qual_after",
-        "is_front",
-        "asize",
-        "rsize_adapter",
-        "rsize_total",
-    )
-)
-
-
-M = TypeVar("M", bound="AdapterMatch")
-S = TypeVar("S", bound=Sequence)
-
-
-class AdapterMatch(aligners.Match, Generic[S]):
-    __slots__ = ["adapter", "read"]
-
-    def __init__(
-        self,
-        adapter: "Adapter",
-        read: S,
-        *args,
-        **kwargs
-    ):
-        """
-        Args:
-            adapter: The :class:`Adapter`.
-            read: The :class:`Sequence`.
-            *args: Positional arguments to pass to `Match` initializer.
-            **kwargs: Keyword arguments to pass to `Match` initializer.
-        """
-        super().__init__(*args, **kwargs)
-        self.adapter = adapter
-        self.read = read
-
-    def copy(self: M) -> M:
-        """
-        Create a copy of this Match.
-        """
-        return AdapterMatch(
-            self.adapter,
-            self.read,
-            self.astart,
-            self.astop,
-            self.rstart,
-            self.rstop,
-            self.matches,
-            self.errors,
-            self.front,
-        )
-
-    def wildcards(self, wildcard_char: str = "N") -> str:
-        """
-        Returns a string that contains, for each wildcard character,
-        the character that it matches. For example, if the adapter
-        ATNGNA matches ATCGTA, then the string 'CT' is returned.
-
-        If there are indels, this is not reliable as the full alignment
-        is not available.
-        """
-        return "".join((
-            self.read.sequence[self.rstart + i]
-            for i in range(self.length)
-            if (
-                self.adapter.sequence[self.astart + i] == wildcard_char
-                and self.rstart + i < len(self.read.sequence)
-            )
-        ))
-
-    def rest(self) -> str:
-        """
-        Returns the part of the read before this match if this is a 'front' (5')
-        adapter, or the part after the match if this is not a 'front' adapter (3').
-        This can be an empty string.
-        """
-        if self.front:
-            return self.read.sequence[: self.rstart]
-        else:
-            return self.read.sequence[self.rstop:]
-
-    def get_info_record(self) -> MatchInfo:  # TODO: write test
-        """
-        Returns a :class:`MatchInfo`, which contains information about the match to
-        write into the info file.
-        """
-        seq = self.read.sequence
-        qualities = self.read.qualities
-        if qualities is None:
-            qualities = ""
-
-        rsize = rsize_total = self.rstop - self.rstart
-        if self.front and self.rstart > 0:
-            rsize_total = self.rstop
-        elif not self.front and self.rstop < len(seq):
-            rsize_total = len(seq) - self.rstart
-
-        return MatchInfo(
-            self.read.name,
-            self.errors,
-            self.rstart,
-            self.rstop,
-            seq[0:self.rstart],
-            seq[self.rstart:self.rstop],
-            seq[self.rstop:],
-            self.adapter.name,
-            qualities[0:self.rstart],
-            qualities[self.rstart:self.rstop],
-            qualities[self.rstop:],
-            self.front,
-            self.astop - self.astart,
-            rsize,
-            rsize_total,
-        )
-
-
 class AdapterBase:
     ADAPTER_ID_GENERATOR = itertools.count(1)
 
@@ -476,8 +790,10 @@ class Adapter(AdapterBase):
         # TODO: all of this validation code should be wrapped up in Alphabet
         sequence = parse_braces(sequence.upper().replace("U", "T"))
         seq_set = set(sequence)
+
         if seq_set <= set("ACGT"):
             adapter_wildcards = False
+
         if adapter_wildcards and not seq_set <= IUPAC_BASES:
             raise ValueError(
                 f"Invalid character(s) in adapter sequence: "
@@ -517,7 +833,7 @@ class Adapter(AdapterBase):
         else:
             self._front_flag = where not in (AdapterType.BACK, AdapterType.SUFFIX)
 
-        self.aligner = aligners.Aligner(
+        self.aligner = Aligner(
             reference=self.sequence,
             max_error_rate=self.max_error_rate,
             flags=int(self.where),
@@ -590,20 +906,28 @@ class Adapter(AdapterBase):
         if pos >= 0:
             seqlen = len(self.sequence)
             return AdapterMatch(
-                self, read, 0, seqlen, pos, pos + seqlen, seqlen, 0, self._front_flag
+                0,
+                seqlen,
+                pos,
+                pos + seqlen,
+                seqlen,
+                0,
+                self._front_flag,
+                adapter=self,
+                read=read,
             )
 
         # try approximate matching
         if not self.indels and self.where in (AdapterType.PREFIX, AdapterType.SUFFIX):
             if self.where == AdapterType.PREFIX:
-                alignment = aligners.compare_prefixes(
+                alignment = compare_prefixes(
                     self.sequence,
                     read_seq,
                     wildcard_ref=self.adapter_wildcards,
                     wildcard_query=self.read_wildcards,
                 )
             else:
-                alignment = aligners.compare_suffixes(
+                alignment = compare_suffixes(
                     self.sequence,
                     read_seq,
                     wildcard_ref=self.adapter_wildcards,
@@ -622,8 +946,6 @@ class Adapter(AdapterBase):
                 or self.match_probability(matches, size) <= self.max_rmp
             ):
                 return AdapterMatch(
-                    self,
-                    read,
                     astart,
                     astop,
                     rstart,
@@ -631,6 +953,8 @@ class Adapter(AdapterBase):
                     matches,
                     errors,
                     self._front_flag,
+                    adapter=self,
+                    read=read,
                 )
 
         return None
@@ -656,7 +980,7 @@ class Adapter(AdapterBase):
         """
         self.lengths_front[match.rstop] += 1
         self.errors_front[match.rstop][match.errors] += 1
-        return match.read[match.rstop:]
+        return match.read[match.rstop :]
 
     def _trimmed_back(self, match: AdapterMatch) -> Sequence:
         """
@@ -667,7 +991,7 @@ class Adapter(AdapterBase):
         """
         self.lengths_back[len(match.read) - match.rstart] += 1
         self.errors_back[len(match.read) - match.rstart][match.errors] += 1
-        adjacent_base = match.read.sequence[match.rstart - 1:match.rstart]
+        adjacent_base = match.read.sequence[match.rstart - 1 : match.rstart]
         if adjacent_base not in "ACGT":
             adjacent_base = ""
         self.adjacent_bases[adjacent_base] += 1
@@ -801,8 +1125,6 @@ class ColorspaceAdapter(Adapter):
 
         if read.sequence.startswith(asequence):
             match = AdapterMatch(
-                self,
-                read,
                 0,
                 len(asequence),
                 0,
@@ -810,6 +1132,8 @@ class ColorspaceAdapter(Adapter):
                 len(asequence),
                 0,
                 self._front_flag,
+                adapter=self,
+                read=read,
             )
         else:
             # try approximate matching
@@ -820,7 +1144,9 @@ class ColorspaceAdapter(Adapter):
                 logger.debug(self.aligner.dpmatrix)
 
             if alignment:
-                match = AdapterMatch(self, read, *alignment, self._front_flag)
+                match = AdapterMatch(
+                    *alignment, self._front_flag, adapter=self, read=read
+                )
             else:
                 return None
 
@@ -849,10 +1175,10 @@ class ColorspaceAdapter(Adapter):
 
         # to remove a front adapter, we need to re-encode the first color following
         # the adapter match
-        color_after_adapter = read.sequence[match.rstop:match.rstop + 1]
+        color_after_adapter = read.sequence[match.rstop : match.rstop + 1]
         if not color_after_adapter:
             # the read is empty
-            return read[match.rstop:]
+            return read[match.rstop :]
 
         base_after_adapter = colorspace.DECODE[
             self.nucleotide_sequence[-1:] + color_after_adapter
@@ -860,10 +1186,10 @@ class ColorspaceAdapter(Adapter):
         new_first_color = colorspace.ENCODE[read.primer + base_after_adapter]
 
         new_read = read[:]
-        new_read.sequence = new_first_color + read.sequence[(match.rstop + 1):]
+        new_read.sequence = new_first_color + read.sequence[(match.rstop + 1) :]
         new_read.qualities = None
         if read.qualities:
-            new_read.qualities = read.qualities[match.rstop:]
+            new_read.qualities = read.qualities[match.rstop :]
 
         return new_read
 
@@ -899,7 +1225,7 @@ class LinkedMatch:
         self,
         front_match: AdapterMatch,
         back_match: AdapterMatch,
-        adapter: "LinkedAdapter"
+        adapter: "LinkedAdapter",
     ):
         """
         Args:
@@ -909,7 +1235,7 @@ class LinkedMatch:
         """
         if front_match is None:
             raise ValueError("front_match cannot be None")
-        
+
         self.front_match = front_match
         self.back_match = back_match
         self.adapter = adapter
@@ -992,7 +1318,7 @@ class LinkedAdapter(AdapterBase):
 
         # TODO use match.trimmed() instead as soon as that does not update statistics
         #  anymore
-        read = read[front_match.rstop:]
+        read = read[front_match.rstop :]
         back_match = self.back_adapter.match_to(read)
         return LinkedMatch(front_match, back_match, self)
 
@@ -1235,15 +1561,17 @@ class AdapterParser:
         Return:
             A list of appropriate Adapter classes.
         """
-        return list(itertools.chain.from_iterable(
-            self.parse(spec, cmdline_type)
-            for specs, cmdline_type in (
-                (back, "back"),
-                (anywhere, "anywhere"),
-                (front, "front"),
+        return list(
+            itertools.chain.from_iterable(
+                self.parse(spec, cmdline_type)
+                for specs, cmdline_type in (
+                    (back, "back"),
+                    (anywhere, "anywhere"),
+                    (front, "front"),
+                )
+                for spec in specs or ()
             )
-            for spec in specs or ()
-        ))
+        )
 
 
 BRACES = re.compile(r"([{}])")
@@ -1281,8 +1609,7 @@ def parse_braces(sequence: str) -> str:
 
             if char == "}":
                 raise ValueError(
-                    f"Invalid expression: {sequence};"
-                    '"}" cannot be used here'
+                    f"Invalid expression: {sequence};" '"}" cannot be used here'
                 )
 
             prev = char
@@ -1296,19 +1623,13 @@ def parse_braces(sequence: str) -> str:
                 )
         elif isinstance(prev, int):
             if char != "}":
-                raise ValueError(
-                    f"Invalid expression: {sequence}; "
-                    '"}" expected'
-                )
+                raise ValueError(f"Invalid expression: {sequence}; " '"}" expected')
 
             result = result[:-1] + result[-1] * prev
             prev = None
         else:
             if char != "{":
-                raise ValueError(
-                    f"Invalid expression: {sequence}; "
-                    'Expected "{"'
-                )
+                raise ValueError(f"Invalid expression: {sequence}; " 'Expected "{"')
 
             prev = "{"
 

@@ -79,7 +79,7 @@ def check_importability() -> bool:  # pragma: no cover
         True if a cython-compiled module can be imported, otherwise False.
     """
     try:
-        import atropos.aligners._align  # pylint: disable=unused-variable
+        import atropos.aligner  # pylint: disable=unused-variable
         return True
     except ImportError as err:
         if "undefined symbol" in str(err):

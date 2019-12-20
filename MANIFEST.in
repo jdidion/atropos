@@ -7,7 +7,7 @@ include doc/*.rst
 include doc/conf.py
 include doc/Makefile
 include atropos/**/*.pyx
-include atropos/align/_align.c
+include atropos/aligner/_aligner.c
 include atropos/commands/trim/_qualtrim.c
 include atropos/io/readers/_readers.c
 include atropos/io/sequence/_sequence.c

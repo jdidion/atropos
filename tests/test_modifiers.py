@@ -7,7 +7,7 @@ DUMMY_ADAPTER = Adapter("ACGT", AdapterType.FRONT)
 
 
 def front_match(read):
-    match = AdapterMatch(DUMMY_ADAPTER, read, 0, 2, 0, 2, 1, 0, True)
+    match = AdapterMatch(0, 2, 0, 2, 1, 0, True, adapter=DUMMY_ADAPTER, read=read)
     match_info = MatchInfo(
         "read",
         0,
@@ -29,7 +29,7 @@ def front_match(read):
 
 
 def back_match(read):
-    match = AdapterMatch(DUMMY_ADAPTER, read, 6, 8, 6, 8, 1, 0, False)
+    match = AdapterMatch(6, 8, 6, 8, 1, 0, False, adapter=DUMMY_ADAPTER, read=read)
     match_info = MatchInfo(
         "read",
         0,

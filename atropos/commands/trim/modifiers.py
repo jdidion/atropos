@@ -21,20 +21,16 @@ from typing import (
     cast,
 )
 
-from atropos.adapters import Adapter, AdapterMatch
-from atropos.aligners import (
-    Aligner,
-    GapRule,
-    MatchTuple,
-    InsertAligner,
-)
-from atropos.commands.trim.qualtrim import quality_trim_index, twocolor_trim_index
+from atropos.adapters import Adapter, AdapterMatch, GapRule, InsertAligner
+from atropos.aligner import Aligner, MatchTuple
 from atropos.errors import AtroposError
 from atropos.io.sequence import Sequence
 from atropos.utils import classproperty
 from atropos.utils.collections import Summarizable
 from atropos.utils.ngs import BASE_COMPLEMENTS, reverse_complement, quals2ints
 from atropos.utils.statistics import mean
+
+from .qualtrim import quality_trim_index, twocolor_trim_index
 
 
 class Modifier(Summarizable):
@@ -606,9 +602,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
             read.match_info = None
             return read
 
-        match.adapter = adapter
-        match.read = read
-        match.front = False
+        match.update(adapter, read, False)
 
         if self.action is None or match.rstart >= len(read):
             trimmed_read = read
