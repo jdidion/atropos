@@ -8,6 +8,7 @@ import pytest
 from xphyle import open_, xopen
 
 from atropos.errors import FormatError
+from atropos.io import InputRead
 from atropos.io.sequence import Sequence, ColorspaceSequence
 from atropos.io.formatters import (
     FastaFormat,
@@ -203,40 +204,42 @@ class TestSeqioOpen:
             reads = list(open_reader(f))
         assert reads == simple_fastq
         # make the name attribute unavailable
-        f = StringIO(datapath("simple.fastq").read())
+        with open(datapath("simple.fastq")) as inp:
+            f = StringIO(inp.read())
         reads = list(open_reader(f))
         assert reads == simple_fastq
-        f = StringIO(datapath("simple.fasta").read())
+        with open(datapath("simple.fasta")) as inp:
+            f = StringIO(inp.read())
         reads = list(open_reader(f))
         assert reads == simple_fasta
 
-    def test_autodetect_fasta_format(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp.fasta")
+    def test_autodetect_fasta_format(self, tmp_path):
+        path = tmp_path / "tmp.fasta"
         fmt = create_seq_formatter(path)
         assert isinstance(fmt, SingleEndFormatter)
         assert isinstance(fmt._seq_format, FastaFormat)
         write_seq_output(simple_fasta, fmt)
         assert list(open_reader(path)) == simple_fasta
 
-    def test_write_qualities_to_fasta(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp.fasta")
+    def test_write_qualities_to_fasta(self, tmp_path):
+        path = tmp_path / "tmp.fasta"
         fmt = create_seq_formatter(path, qualities=True)
         assert isinstance(fmt, SingleEndFormatter)
         assert isinstance(fmt._seq_format, FastaFormat)
         write_seq_output(simple_fasta, fmt)
         assert list(open_reader(path)) == simple_fasta
 
-    def test_autodetect_fastq_format(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp.fastq")
+    def test_autodetect_fastq_format(self, tmp_path):
+        path = tmp_path / "tmp.fastq"
         fmt = create_seq_formatter(path)
         assert isinstance(fmt, SingleEndFormatter)
         assert isinstance(fmt._seq_format, FastqFormat)
         write_seq_output(simple_fastq, fmt)
         assert list(open_reader(path)) == simple_fastq
 
-    def test_fastq_qualities_missing(self, tmp_path_factory):
+    def test_fastq_qualities_missing(self, tmp_path):
         with pytest.raises(ValueError):
-            path = tmp_path_factory.mktemp("tmp.fastq")
+            path = tmp_path / "tmp.fastq"
             create_seq_formatter(path, qualities=False)
 
 
@@ -262,10 +265,13 @@ class TestInterleavedReader:
             ),
         ]
         reads = list(InterleavedSequenceReader(cutpath("interleaved.fastq")))
-        for (r1, r2), (e1, e2) in zip(reads, expected):
-            print(r1, r2, e1, e2)
         assert reads == expected
-        with open_reader(cutpath("interleaved.fastq"), interleaved=True) as f:
+
+        with open_reader(
+            cutpath("interleaved.fastq"),
+            interleaved=True,
+            input_read=InputRead.PAIRED
+        ) as f:
             reads = list(f)
         assert reads == expected
 
@@ -281,8 +287,8 @@ class TestInterleavedReader:
 
 
 class TestFastaWriter:
-    def test(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp")
+    def test(self, tmp_path):
+        path = tmp_path / "tmp"
         fmt = FastaFormat()
         with open_(path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA"))
@@ -290,8 +296,8 @@ class TestFastaWriter:
         with open_(path) as t:
             assert t.read() == ">name\nCCATA\n>name2\nHELLO\n"
 
-    def test_linelength(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp")
+    def test_linelength(self, tmp_path):
+        path = tmp_path / "tmp"
         fmt = FastaFormat(line_length=3)
         with open_(path, "w") as fw:
             fw.write(fmt.format_entry("r1", "ACG"))
@@ -302,8 +308,8 @@ class TestFastaWriter:
             print(x)
             assert x == ">r1\nACG\n>r2\nCCA\nT\n>r3\nTAC\nCAG\n"
 
-    def test_write_sequence_object(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp")
+    def test_write_sequence_object(self, tmp_path):
+        path = tmp_path / "tmp"
         fmt = FastaFormat()
         with open_(path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA")))
@@ -318,8 +324,8 @@ class TestFastaWriter:
 
 
 class TestFastqWriter:
-    def test(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp.fastq")
+    def test(self, tmp_path):
+        path = tmp_path / "tmp.fastq"
         fmt = FastqFormat()
         with open_(path, "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA", "!#!#!"))
@@ -327,8 +333,8 @@ class TestFastqWriter:
         with open_(path) as t:
             assert t.read() == "@name\nCCATA\n+\n!#!#!\n@name2\nHELLO\n+\n&&&!&&\n"
 
-    def test_twoheaders(self, tmp_path_factory):
-        path = tmp_path_factory.mktemp("tmp.fastq")
+    def test_twoheaders(self, tmp_path):
+        path = tmp_path / "tmp.fastq"
         fmt = FastqFormat()
         with open_(path, "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA", "!#!#!", name2="name")))
@@ -426,17 +432,20 @@ except ModuleNotFoundError:
     ngs_available = False
 
 
-SRA_ACCESSION = ""
-SRA_SEQ1 = None
-SRA_SEQ2 = None
+SRA_ACCESSION = "ERR2009169"
+SRA_SEQ1 = Sequence(
+    "D00442:178:C87AVANXX:2:2203:1465:2211",
+    "CAGCTTCTTCATCATGTCCTCTACTTTCTTGGCCCGCTCGGCAGGCCCCAAC",
+    "CCCCCFGGGGGGGGGGGGGGGFGGGGGGGGGCGGGGGGGG@BEDDGGGGGGG"
+)
 
 
-@pytest.mark.skipif(not ngs_available, "ngstream library not available")
+@pytest.mark.skipif(not ngs_available, reason="ngstream library not available")
 class TestSraReader:
     def test_sra_reader(self):
         with ngstream.open(SRA_ACCESSION, "sra") as stream:
-            reader = open_reader(stream, "fastq")
-            assert next(iter(reader)) == (SRA_SEQ1, SRA_SEQ2)
+            reader = open_reader(ngstream_reader=stream)
+            assert next(iter(reader)) == (SRA_SEQ1,)
 
 
 def create_truncated_file(path):
@@ -450,18 +459,18 @@ def create_truncated_file(path):
     f.close()
 
 
-def test_truncated_gz(tmp_path_factory):
+def test_truncated_gz(tmp_path):
     with pytest.raises(EOFError):
-        path = tmp_path_factory.mktemp("truncated.gz")
+        path = tmp_path / "truncated.gz"
         create_truncated_file(path)
         f = xopen(path, "r")
         f.read()
         f.close()
 
 
-def test_truncated_gz_iter(tmp_path_factory):
+def test_truncated_gz_iter(tmp_path):
     with pytest.raises(EOFError):
-        path = tmp_path_factory.mktemp("truncated.gz")
+        path = tmp_path / "truncated.gz"
         create_truncated_file(path)
         f = xopen(path, "r", use_system=False)  # work around bug in py3.4
         for _ in f:

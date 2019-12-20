@@ -6,7 +6,7 @@ from typing import (
 )
 
 from xphyle import xopen
-from xphyle.types import ModeArg
+from xphyle.types import ModeArg, PathOrFile
 from xphyle.utils import uncompressed_size
 
 from atropos.io import InputRead
@@ -125,6 +125,9 @@ class SequenceReader(SequenceReaderBase, metaclass=ABCMeta):
                 no validation is done.
             close_on_exit: Whether to close the source file on exit.
         """
+        if path is None:
+            raise ValueError("'path' cannot be None")
+
         # TODO: if quality_base is None, detect it from the data
         self._quality_base = quality_base
         self._alphabet = alphabet

@@ -502,7 +502,7 @@ def test_bzip2(tmp_path):
     )
 
 
-@pytest.mark.skipif(lzma is None)
+@pytest.mark.skipif(lzma is None, reason="no lzma library")
 def test_xz(tmp_path):
     """test xz support"""
     run(
@@ -744,7 +744,7 @@ def test_custom_bisulfite_4(tmp_path):
 
 @pytest.mark.skipif(
     no_internet("https://ncbi.nlm.nih.gov") or no_import("srastream"),
-    "No internet connection or srastream not importable",
+    reason="No internet connection or srastream not importable",
 )
 def test_sra(tmp_path):
     run(

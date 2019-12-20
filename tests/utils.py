@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from importlib import import_module
 from io import BufferedWriter, BytesIO, TextIOWrapper
 import os
+from pathlib import Path
 import sys
 import traceback
 from unittest.mock import patch
@@ -21,11 +22,11 @@ def redirect_stderr():
 
 
 def datapath(path):
-    return os.path.join(os.path.dirname(__file__), "data", path)
+    return Path(__file__).parent / "data" / path
 
 
 def cutpath(path):
-    return os.path.join(os.path.dirname(__file__), "cut", path)
+    return Path(__file__).parent / "cut" / path
 
 
 def files_equal(path1, path2):

@@ -148,15 +148,20 @@ class NgstreamSequenceReader(SequenceReader):
         return self._file.read_count
 
     def __iter__(self):
-        if self.input_read == InputRead.PAIRED:
+        if self._input_read == InputRead.PAIRED:
             for read in self._file:
-                yield tuple(self._as_sequence(frag) for frag in read[:2])
+                yield tuple(self._as_sequence(read[i]) for i in (0, 1))
         else:
             for read in self._file:
-                yield self._as_sequence(read[0])
+                yield self._as_sequence(read),
 
     def _as_sequence(self, frag):
-        return self._sequence_factory(*frag, alphabet=self._alphabet)
+        return self._sequence_factory(
+            frag.name,
+            frag.sequence,
+            frag.qualities,
+            alphabet=self._alphabet
+        )
 
     def close(self):
         self._file.finish()
@@ -557,7 +562,7 @@ class InterleavedSequenceReader(SequenceReaderWrapper):
     def estimate_num_records(self) -> int:
         return math.ceil(self._reader.estimate_num_records() / 2)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[Sequence, Sequence]]:
         # Avoid usage of zip() below since it will consume one item too many.
         itr = iter(self._reader)
 
