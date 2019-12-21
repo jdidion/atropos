@@ -8,11 +8,14 @@ from xphyle import open_
 
 from atropos.console import execute_cli
 from atropos.commands.trim.console import TrimCommandConsole
+from atropos.utils import ReturnCode
 
 from .utils import (
     run,
     files_equal,
     datapath,
+    datapathstr,
+    dataurl,
     cutpath,
     redirect_stderr,
     no_internet,
@@ -31,8 +34,8 @@ def test_example(tmp_path):
     run("-N -b ADAPTER", "example.fa", "example.fa", output_dir=tmp_path)
 
 
-def test_example_stdout():
-    run('-N -b ADAPTER', 'example.fa', 'example.fa', stdout=True)
+def test_example_stdout(tmp_path):
+    run('-N -b ADAPTER', 'example.fa', 'example.fa', output_dir=tmp_path, stdout=True)
 
 
 def test_small(tmp_path):
@@ -85,10 +88,10 @@ def test_restfront(tmp_path):
     assert files_equal(datapath("restfront.txt"), path)
 
 
-def test_discard(tmp_path):
+def test_discard_trimmed(tmp_path):
     """--discard"""
     run(
-        "-b TTAGACATATCTCCGTCG --discard", "discard.fastq", "small.fastq",
+        "-b TTAGACATATCTCCGTCG --discard-trimmed", "discard.fastq", "small.fastq",
         output_dir=tmp_path
     )
 
@@ -512,8 +515,8 @@ def test_xz(tmp_path):
 
 
 def test_qualfile_only():
-    with pytest.raises(SystemExit), redirect_stderr():
-        execute_cli(["-sq", datapath("E3M.qual")])
+    retcode = execute_cli(["-sq", datapath("E3M.qual")])
+    assert retcode == ReturnCode.ERROR
 
 
 def test_no_args():
@@ -589,14 +592,14 @@ def test_untrimmed_output(tmp_path):
 
 def test_adapter_file(tmp_path):
     run(
-        "-a file:" + datapath("adapter.fasta"), "illumina.fastq", "illumina.fastq.gz",
+        "-a " + dataurl("adapter.fasta"), "illumina.fastq", "illumina.fastq.gz",
         output_dir=tmp_path
     )
 
 
 def test_adapter_file_5p_anchored(tmp_path):
     run(
-        "-N -g file:" + datapath("prefix-adapter.fasta"),
+        "-N -g " + dataurl("prefix-adapter.fasta"),
         "anchored.fasta",
         "anchored.fasta",
         output_dir=tmp_path,
@@ -605,7 +608,7 @@ def test_adapter_file_5p_anchored(tmp_path):
 
 def test_adapter_file_3p_anchored(tmp_path):
     run(
-        "-N -a file:" + datapath("suffix-adapter.fasta"),
+        "-N -a " + dataurl("suffix-adapter.fasta"),
         "anchored-back.fasta",
         "anchored-back.fasta",
         output_dir=tmp_path,
@@ -614,7 +617,7 @@ def test_adapter_file_3p_anchored(tmp_path):
 
 def test_adapter_file_5p_anchored_no_indels(tmp_path):
     run(
-        "-N --no-indels -g file:" + datapath("prefix-adapter.fasta"),
+        "-N --no-indels -g " + dataurl("prefix-adapter.fasta"),
         "anchored.fasta",
         "anchored.fasta",
         output_dir=tmp_path,
@@ -623,17 +626,15 @@ def test_adapter_file_5p_anchored_no_indels(tmp_path):
 
 def test_adapter_file_3p_anchored_no_indels(tmp_path):
     run(
-        "-N --no-indels -a file:" + datapath("suffix-adapter.fasta"),
+        "-N --no-indels -a " + dataurl("suffix-adapter.fasta"),
         "anchored-back.fasta",
         "anchored-back.fasta",
         output_dir=tmp_path,
     )
 
 
-def test_demultiplex():
-    multiout = os.path.join(
-        os.path.dirname(__file__), "data", "tmp-demulti.{name}.fasta"
-    )
+def test_demultiplex(tmp_path):
+    multiout = str(tmp_path / "tmp-demulti.{name}.fasta")
     params = [
         "-a",
         "first=AATTTCAGGAATT",
@@ -642,7 +643,7 @@ def test_demultiplex():
         "-o",
         multiout,
         "-se",
-        datapath("twoadapters.fasta"),
+        datapathstr("twoadapters.fasta"),
     ]
     result = TrimCommandConsole.execute(params)
     assert isinstance(result, tuple)
@@ -657,9 +658,6 @@ def test_demultiplex():
     assert files_equal(
         cutpath("twoadapters.unknown.fasta"), multiout.format(name="unknown")
     )
-    os.remove(multiout.format(name="first"))
-    os.remove(multiout.format(name="second"))
-    os.remove(multiout.format(name="unknown"))
 
 
 def test_max_n(tmp_path):

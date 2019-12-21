@@ -25,6 +25,14 @@ def datapath(path):
     return Path(__file__).parent / "data" / path
 
 
+def datapathstr(path):
+    return str(datapath(path))
+
+
+def dataurl(path):
+    return f"file:{datapath(path)}"
+
+
 def cutpath(path):
     return Path(__file__).parent / "cut" / path
 

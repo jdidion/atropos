@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import Sequence as SequenceCollection
 from multiprocessing import Process
+from pathlib import Path
 import sys
 from typing import (
     Dict,
@@ -726,7 +727,10 @@ class TrimCommand(BaseCommand):
 
         if not options.discard_untrimmed:
             if formatters.multiplexed:
-                untrimmed = options.untrimmed_output or output1.format(name="unknown")
+                untrimmed = (
+                    options.untrimmed_output or
+                    Path(str(output1).format(name="unknown"))
+                )
                 formatters.add_seq_formatter(UntrimmedFilter, untrimmed)
                 formatters.add_seq_formatter(NoFilter, untrimmed)
             elif options.untrimmed_output:

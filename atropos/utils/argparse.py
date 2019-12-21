@@ -204,8 +204,10 @@ def existing_path(path: Union[str, PathLike]) -> Path:
     Tests that a path exists.
     """
     path = as_path(path)
+
     if path == STDOUT:
         return path
+
     try:
         return Path(resolve_path(path))
     except IOError:
@@ -214,7 +216,7 @@ def existing_path(path: Union[str, PathLike]) -> Path:
 
 def readable_file(path):
     try:
-        return check_readable_file(path)
+        return check_readable_file(resolve_path(path))
     except IOError:
         raise ArgumentTypeError(
             f"Path {path} does not exist, is not a file, or is not readable"
@@ -223,7 +225,7 @@ def readable_file(path):
 
 def writable_file(path):
     try:
-        return check_writable_file(path)
+        return check_writable_file(as_path(path, "w"))
     except IOError:
         raise ArgumentTypeError(f"Path {path} is not writable")
 

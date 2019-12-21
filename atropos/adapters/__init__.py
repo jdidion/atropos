@@ -1444,19 +1444,23 @@ class AdapterParser:
             raise ValueError(f"cmdline_type cannot be {cmdline_type!r}")
 
         orig_spec = spec
-        where = AdapterType[type_name].value
+        where = AdapterType[type_name]
 
         if name is None:
+            if spec is None:
+                raise ValueError("Either name or spec must be given")
+
             if self.cache and self.cache.has_name(spec):
                 name = spec
                 spec = self.cache.get_for_name(name)
-        elif spec is None:
-            if self.cache and self.cache.has_name(name):
-                spec = self.cache.get_for_name(name)
 
         if spec is None:
-            raise ValueError(f"Name not found: {name}")
-        elif name is None:
+            if self.cache and self.cache.has_name(name):
+                spec = self.cache.get_for_name(name)
+            else:
+                raise ValueError(f"Name not found: {name}")
+
+        if name is None:
             name, spec = _extract_name_from_spec(spec)
 
         if self.cache and name is not None:
@@ -1490,12 +1494,12 @@ class AdapterParser:
 
         if middle == "...":
             if not sequence1:
-                if where == AdapterType.BACK:  # -a ...ADAPTER
+                if where is AdapterType.BACK:  # -a ...ADAPTER
                     spec = sequence2
                 else:  # -g ...ADAPTER
                     raise ValueError(f"Invalid adapter specification: {orig_spec}")
             elif not sequence2:
-                if where == AdapterType.BACK:  # -a ADAPTER...
+                if where is AdapterType.BACK:  # -a ADAPTER...
                     spec = sequence1
                     where = AdapterType.FRONT
                     front_anchored = True
@@ -1509,7 +1513,7 @@ class AdapterParser:
                     )
 
                 # automatically anchor 5' adapter if -a is used
-                if where == AdapterType.BACK:
+                if where is AdapterType.BACK:
                     front_anchored = True
 
                 return LinkedAdapter(
@@ -1528,12 +1532,12 @@ class AdapterParser:
             )
 
         if front_anchored:
-            if where == AdapterType.BACK:
+            if where is AdapterType.BACK:
                 raise ValueError("Cannot anchor the 3' adapter at its 5' end")
 
             where = AdapterType.PREFIX
         elif back_anchored:
-            if where == AdapterType.FRONT:
+            if where is AdapterType.FRONT:
                 raise ValueError("Cannot anchor 5' adapter at 3' end")
 
             where = AdapterType.SUFFIX

@@ -15,6 +15,7 @@ from atropos.commands.console import (
 from atropos.commands.legacy_reports import LegacyReportGenerator
 from atropos.commands.metrics import MetricsMode
 from atropos.commands.trim import TrimCommand, choose_compression_mode
+from atropos.commands.trim.modifiers import TrimAction
 from atropos.io import guess_format_from_name
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
@@ -110,7 +111,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
     def _add_trim_options(parser: AtroposArgumentParser):
         parser.set_defaults(
             zero_cap=None,
-            action="trim",
+            action=TrimAction.TRIM,
             batch_size=None,
             known_adapter=None,
             use_interleaved_output=False,
@@ -203,7 +204,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "--no-trim",
             action="store_const",
             dest="action",
-            const=None,
+            const=TrimAction.NONE,
             help="Match and redirect reads to output/untrimmed-output as "
             "usual, but do not remove adapters. (no)",
         )
@@ -211,7 +212,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "--mask-adapter",
             action="store_const",
             dest="action",
-            const="mask",  # TODO: replace with enum
+            const=TrimAction.MASK,  # TODO: replace with enum
             help="Mask adapters with 'N' characters instead of trimming them. (no)",
         )
         group.add_argument(

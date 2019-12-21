@@ -35,9 +35,9 @@ def guess_format_from_name(path: Union[str, Path, IO], raise_on_failure: bool = 
     if name:
         name, ext1, _ = splitext_compressed(name)
         ext = ext1.lower()
-        if ext in [".fasta", ".fa", ".fna", ".csfasta", ".csfa"]:
+        if ext in (".fasta", ".fa", ".fna", ".csfasta", ".csfa"):
             return "fasta"
-        elif ext in [".fastq", ".fq"] or (ext == ".txt" and name.endswith("_sequence")):
+        elif ext in (".fastq", ".fq") or (ext == ".txt" and name.endswith("_sequence")):
             return "fastq"
         elif ext in (".sam", ".bam"):
             return ext[1:]
