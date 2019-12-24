@@ -232,20 +232,20 @@ class InsertAligner(object):
             START_WITHIN_SEQ1 | STOP_WITHIN_SEQ2,
             min_insert_overlap)
 
-    def __repr__(self) -> str:
-        return f"InsertAligner<adapter1={self.adapter1}, adapter2={self.adapter2}, " \
-               f"match_probability={self.match_probability}, " \
-               f"insert_max_rmp={self.insert_max_rmp}, " \
-               f"adapter_max_rmp={self.adapter_max_rmp}, " \
-               f"min_insert_overlap={self.min_insert_overlap}, " \
-               f"max_insert_mismatch_frac={self.max_insert_mismatch_frac}, " \
-               f"min_adapter_overlap={self.min_adapter_overlap}, " \
-               f"max_adapter_mismatch_frac={self.max_adapter_mismatch_frac}, " \
-               f"adapter_check_cutoff={self.adapter_check_cutoff}, " \
-               f"base_probs={self.base_probs}, " \
-               f"adapter_wildcards={self.adapter_wildcards}, " \
-               f"read_wildcards={self.read_wildcards}, " \
-               f"aligner={self.aligner}>"
+    # def __repr__(self) -> str:
+    #     return f"InsertAligner<adapter1={self.adapter1}, adapter2={self.adapter2}, " \
+    #            f"match_probability={self.match_probability}, " \
+    #            f"insert_max_rmp={self.insert_max_rmp}, " \
+    #            f"adapter_max_rmp={self.adapter_max_rmp}, " \
+    #            f"min_insert_overlap={self.min_insert_overlap}, " \
+    #            f"max_insert_mismatch_frac={self.max_insert_mismatch_frac}, " \
+    #            f"min_adapter_overlap={self.min_adapter_overlap}, " \
+    #            f"max_adapter_mismatch_frac={self.max_adapter_mismatch_frac}, " \
+    #            f"adapter_check_cutoff={self.adapter_check_cutoff}, " \
+    #            f"base_probs={self.base_probs}, " \
+    #            f"adapter_wildcards={self.adapter_wildcards}, " \
+    #            f"read_wildcards={self.read_wildcards}, " \
+    #            f"aligner={self.aligner}>"
 
     def match_insert(self, seq1, seq2):
         """Use cutadapt aligner for insert and adapter matching.

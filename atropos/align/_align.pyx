@@ -562,10 +562,10 @@ cdef class MultiAligner:
         self._num_cols = 0
         self._num_matches = 0
 
-    def __repr__(self):
-        return f"MultiAligner<max_error_rate={self.max_error_rate}, " \
-               f"flags={self.flags}, min_overlap={self._min_overlap}, " \
-               f"_num_cols={self._num_cols}, _num_matches={self._num_matches}>"
+    # def __repr__(self):
+    #     return f"MultiAligner<max_error_rate={self.max_error_rate}, " \
+    #            f"flags={self.flags}, min_overlap={self._min_overlap}, " \
+    #            f"_num_cols={self._num_cols}, _num_matches={self._num_matches}>"
 
     def _resize_matrix(self, size):
         if size > self._num_cols:
