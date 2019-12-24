@@ -454,7 +454,7 @@ class InsertAligner:
         def _match(
             _insert_match: MatchTuple, _offset: int, _insert_match_size: int
         ) -> Optional[InsertMatchResult]:
-            if offset < self.min_adapter_overlap:
+            if _offset < self.min_adapter_overlap:
                 # The reads are mostly overlapping, to the point where
                 # there's not enough overhang to do a confident adapter
                 # match. We return just the insert match to signal that
