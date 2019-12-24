@@ -11,7 +11,7 @@ from atropos.utils import ReturnCode
 
 from .utils import (
     run,
-    files_equal,
+    assert_files_equal,
     datapath,
     cutpath,
     redirect_stderr,
@@ -29,7 +29,7 @@ def run_paired(
     expected2: str,
     aligners: Iterable[str] = ("adapter",),
     callback: Callable = None,
-    assert_files_equal: bool = True,
+    files_equal: bool = True,
     error_on_rc: bool = True,
     output_dir=None,
 ):
@@ -69,9 +69,9 @@ def run_paired(
                         "Return code {} != 0".format(result[0])
                     ) from err["details"][1]
 
-        if assert_files_equal:
-            assert files_equal(cutpath(expected1.format(aligner=aligner)), p1)
-            assert files_equal(cutpath(expected2.format(aligner=aligner)), p2)
+        if files_equal:
+            assert_files_equal(cutpath(expected1.format(aligner=aligner)), p1)
+            assert_files_equal(cutpath(expected2.format(aligner=aligner)), p2)
 
         if callback:
             callback(aligner, infiles, (p1, p2), result)
@@ -120,7 +120,7 @@ def run_interleaved(
                     "details"
                 ][1]
 
-        assert files_equal(cutpath(expected.format(aligner=aligner)), tmp)
+        assert_files_equal(cutpath(expected.format(aligner=aligner)), tmp)
 
 
 # def run_interleaved2(params, inpath, expected1, expected2, aligners=('adapter',)):
@@ -173,8 +173,8 @@ def test_untrimmed_paired_output(tmp_path):
     untrimmed2 = tmp_path / "tmp-untrimmed.2.fastq"
 
     def callback(aligner, infiles, outfiles, result):
-        assert files_equal(cutpath("paired-untrimmed.1.fastq"), untrimmed1)
-        assert files_equal(cutpath("paired-untrimmed.2.fastq"), untrimmed2)
+        assert_files_equal(cutpath("paired-untrimmed.1.fastq"), untrimmed1)
+        assert_files_equal(cutpath("paired-untrimmed.2.fastq"), untrimmed2)
 
     run_paired(
         [
@@ -485,8 +485,8 @@ def test_too_short_paired_output(tmp_path):
     p2 = tmp_path / "temp-too-short.2.fastq"
 
     def callback(aligner, infiles, outfiles, result):
-        assert files_equal(cutpath("paired-too-short.1.fastq"), p1)
-        assert files_equal(cutpath("paired-too-short.2.fastq"), p2)
+        assert_files_equal(cutpath("paired-too-short.1.fastq"), p1)
+        assert_files_equal(cutpath("paired-too-short.2.fastq"), p2)
 
     run_paired(
         "-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output "
@@ -506,10 +506,10 @@ def test_too_long_output(tmp_path):
     p2 = tmp_path /"temp-too-long.2.fastq"
 
     def callback(aligner, infiles, outfiles, result):
-        assert files_equal(
+        assert_files_equal(
             cutpath("paired_{aligner}.1.fastq".format(aligner=aligner)), p1
         )
-        assert files_equal(
+        assert_files_equal(
             cutpath("paired_{aligner}.2.fastq".format(aligner=aligner)), p2
         )
 
@@ -620,7 +620,7 @@ def test_no_writer_process(tmp_path):
         expected1="out.1.fastq",
         expected2="out.2.fastq",
         aligners=BACK_ALIGNERS,
-        assert_files_equal=False,
+        files_equal=False,
         callback=check_multifile,
         output_dir=tmp_path,
     )
@@ -671,7 +671,7 @@ def test_summary(tmp_path):
         expected1="out.1.fastq",
         expected2="out.2.fastq",
         aligners=BACK_ALIGNERS,
-        assert_files_equal=False,
+        files_equal=False,
         callback=check_summary,
         output_dir=tmp_path,
     )

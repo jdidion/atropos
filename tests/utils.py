@@ -37,20 +37,21 @@ def cutpath(path):
     return Path(__file__).parent / "cut" / path
 
 
-def files_equal(path1, path2):
+def assert_files_equal(path1, path2):
     # return os.system("diff -u {0} {1}".format(path1, path2)) == 0
-    with open(path1, "r") as i1, open(path2, "r") as i2:
-        print("<[{}]>".format(i1.read()))
-        print("<[{}]>".format(i2.read()))
+    #with open(path1, "r") as i1, open(path2, "r") as i2:
+    #    print("<[{}]>".format(i1.read()))
+    #    print("<[{}]>".format(i2.read()))
+
     from subprocess import check_output, CalledProcessError
 
     try:
         check_output("diff -u {0} {1}".format(path1, path2), shell=True)
-        return True
-
     except CalledProcessError as e:
-        print("Diff: <{}>".format(e.output.decode("utf-8")))
-        return False
+        raise AssertionError(
+            f"Files not equal: {path1} != {path2}\n"
+            f"Diff: <{e.output.decode('utf-8')}>"
+        )
 
 
 def run(
@@ -115,7 +116,7 @@ def run(
 
     # TODO redirect standard output
     assert os.path.exists(tmp_fastaq)
-    assert files_equal(cutpath(expected), tmp_fastaq)
+    assert_files_equal(cutpath(expected), tmp_fastaq)
 
 
 # TODO diff log files

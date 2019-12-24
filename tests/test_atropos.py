@@ -12,7 +12,7 @@ from atropos.utils import ReturnCode
 
 from .utils import (
     run,
-    files_equal,
+    assert_files_equal,
     datapath,
     datapathstr,
     dataurl,
@@ -76,7 +76,7 @@ def test_rest(tmp_path):
         ["-b", "ADAPTER", "-N", "-r", rest_tmp], "rest.fa", "rest.fa",
         output_dir=tmp_path
     )
-    assert files_equal(datapath("rest.txt"), rest_tmp)
+    assert_files_equal(datapath("rest.txt"), rest_tmp)
 
 
 def test_restfront(tmp_path):
@@ -85,7 +85,7 @@ def test_restfront(tmp_path):
         ["-g", "ADAPTER", "-N", "-r", path], "restfront.fa", "rest.fa",
         output_dir=tmp_path
     )
-    assert files_equal(datapath("restfront.txt"), path)
+    assert_files_equal(datapath("restfront.txt"), path)
 
 
 def test_discard_trimmed(tmp_path):
@@ -145,7 +145,7 @@ def test_too_short(tmp_path):
         "lengths.fa",
         output_dir=tmp_path,
     )
-    assert files_equal(datapath("tooshort.fa"), "tooshort.tmp.fa")
+    assert_files_equal(datapath("tooshort.fa"), "tooshort.tmp.fa")
     os.remove("tooshort.tmp.fa")
 
 
@@ -157,7 +157,7 @@ def test_too_short_no_primer(tmp_path):
         "lengths.fa",
         output_dir=tmp_path,
     )
-    assert files_equal(datapath("tooshort.noprimer.fa"), "tooshort.tmp.fa")
+    assert_files_equal(datapath("tooshort.noprimer.fa"), "tooshort.tmp.fa")
     os.remove("tooshort.tmp.fa")
 
 
@@ -177,7 +177,7 @@ def test_too_long(tmp_path):
         "lengths.fa",
         output_dir=tmp_path,
     )
-    assert files_equal(datapath("toolong.fa"), "toolong.tmp.fa")
+    assert_files_equal(datapath("toolong.fa"), "toolong.tmp.fa")
     os.remove("toolong.tmp.fa")
 
 
@@ -431,7 +431,7 @@ def test_info_file(tmp_path):
         "illumina.fastq.gz",
         output_dir=tmp_path
     )
-    assert files_equal(cutpath("illumina.info.txt"), infotmp)
+    assert_files_equal(cutpath("illumina.info.txt"), infotmp)
 
 
 def test_info_file_times(tmp_path):
@@ -451,7 +451,7 @@ def test_info_file_times(tmp_path):
         "illumina5.fastq",
         output_dir=tmp_path
     )
-    assert files_equal(cutpath("illumina5.info.txt"), infotmp)
+    assert_files_equal(cutpath("illumina5.info.txt"), infotmp)
 
 
 def test_info_file_fasta(tmp_path):
@@ -587,7 +587,7 @@ def test_untrimmed_output(tmp_path):
         "small.fastq",
         output_dir=tmp_path
     )
-    assert files_equal(cutpath("small.untrimmed.fastq"), tmp)
+    assert_files_equal(cutpath("small.untrimmed.fastq"), tmp)
 
 
 def test_adapter_file(tmp_path):
@@ -649,13 +649,13 @@ def test_demultiplex(tmp_path):
     assert isinstance(result, tuple)
     assert len(result) == 2
     assert result[0] == 0
-    assert files_equal(
+    assert_files_equal(
         cutpath("twoadapters.first.fasta"), multiout.format(name="first")
     )
-    assert files_equal(
+    assert_files_equal(
         cutpath("twoadapters.second.fasta"), multiout.format(name="second")
     )
-    assert files_equal(
+    assert_files_equal(
         cutpath("twoadapters.unknown.fasta"), multiout.format(name="unknown")
     )
 

@@ -15,7 +15,7 @@ from atropos.commands.console import (
 from atropos.commands.legacy_reports import LegacyReportGenerator
 from atropos.commands.metrics import MetricsMode
 from atropos.commands.trim import TrimCommand, choose_compression_mode
-from atropos.commands.trim.modifiers import TrimAction
+from atropos.commands.trim.modifiers import MismatchAction, TrimAction
 from atropos.io import guess_format_from_name
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
@@ -362,8 +362,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--correct-mismatches",
-            choices=("liberal", "conservative", "N"),  # TODO: convert to enum
-            default=None,
+            type=EnumChoice(MismatchAction),
+            choices=tuple(m.value for m in MismatchAction),
+            default=MismatchAction.NONE,
             help="How to handle mismatches while aligning/merging. 'Liberal' "
             "and 'conservative' error correction both involve setting the "
             "base to the one with the best quality. They differ only when "
