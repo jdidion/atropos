@@ -564,15 +564,15 @@ class AdapterCache:
         self.path = as_readable_path(path, False)
         self.auto_reverse_complement = auto_reverse_complement
 
-        if self.path and path.exists():
-            with open_(self.path, "rb") as cache:
+        if self.path and self.path.exists():
+            with open(self.path, "rb") as cache:
                 try:
                     self.seq_to_name, self.name_to_seq = pickle.load(cache)
                     return
                 except pickle.UnpicklingError:
                     # It is possible for the cache file to get corrupted - see #71
                     try:
-                        cache.unlink()
+                        self.path.unlink()
                     except IOError:
                         pass
 

@@ -362,6 +362,14 @@ class TrimPipeline(Pipeline, metaclass=ABCMeta):
         summary.update(self.record_handler.summarize())
 
 
+class SingleEndSerialTrimPipeline(SingleEndPipelineMixin, TrimPipeline):
+    pass
+
+
+class PairedEndSerialTrimPipeline(PairedEndPipelineMixin, TrimPipeline):
+    pass
+
+
 class TrimSummary(Summary):
     """
     Summary that adds aggregate values for record and bp metrics.
@@ -787,28 +795,22 @@ class TrimCommand(BaseCommand):
                 when necessary: -A XXX"""
             )
 
-        if options.paired:
-            mixin_class = PairedEndPipelineMixin
-        else:
-            mixin_class = SingleEndPipelineMixin
-
         if options.threads is None:
-            # Run single-threaded version
+            if options.paired:
+                pipeline_class = PairedEndSerialTrimPipeline
+            else:
+                pipeline_class = SingleEndSerialTrimPipeline
+
             result_handler = WorkerResultHandler(WriterResultHandler(writers))
-            pipeline_class = type("TrimPipelineImpl", (mixin_class, TrimPipeline), {})
             pipeline = pipeline_class(record_handler, result_handler)
             self.summary.update(mode="serial", threads=1)
             return run_interruptible(pipeline, self, raise_on_error=True)
         else:
-            # Run multiprocessing version
             self.summary.update(mode="parallel", threads=options.threads)
-            return self.run_parallel(record_handler, writers, mixin_class)
+            return self.run_parallel(record_handler, writers, options.paired)
 
     def run_parallel(
-        self,
-        record_handler: RecordHandler,
-        writers: Writers,
-        mixin_class: Type[Union[SingleEndPipelineMixin, PairedEndPipelineMixin]],
+        self, record_handler: RecordHandler, writers: Writers, paired: bool
     ):
         """
         Parallel implementation of run_atropos. Works as follows:
@@ -934,9 +936,21 @@ class TrimCommand(BaseCommand):
                 WriterResultHandler(writers, use_suffix=True)
             )
 
-        pipeline_class = type(
-            "TrimPipelineImpl", (ParallelPipelineMixin, mixin_class, TrimPipeline), {}
-        )
+        if paired:
+            class PairedEndParallelTrimPipeline(
+                ParallelPipelineMixin, PairedEndPipelineMixin, TrimPipeline
+            ):
+                pass
+
+            pipeline_class = PairedEndParallelTrimPipeline
+        else:
+            class SingleEndParallelTrimPipeline(
+                ParallelPipelineMixin, SingleEndPipelineMixin, TrimPipeline
+            ):
+                pass
+
+            pipeline_class = SingleEndParallelTrimPipeline
+
         pipeline = pipeline_class(record_handler, worker_result_handler)
 
         runner = ParallelTrimPipelineRunner(self, pipeline, threads, writer_manager)
