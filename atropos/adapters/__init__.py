@@ -571,8 +571,11 @@ class AdapterCache:
                     return
                 except pickle.UnpicklingError:
                     # It is possible for the cache file to get corrupted - see #71
-                    pass
-        
+                    try:
+                        cache.unlink()
+                    except IOError:
+                        pass
+
         self.seq_to_name = {}
         self.name_to_seq = {}
 
