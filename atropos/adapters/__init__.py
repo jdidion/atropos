@@ -566,10 +566,15 @@ class AdapterCache:
 
         if self.path and path.exists():
             with open_(self.path, "rb") as cache:
-                self.seq_to_name, self.name_to_seq = pickle.load(cache)
-        else:
-            self.seq_to_name = {}
-            self.name_to_seq = {}
+                try:
+                    self.seq_to_name, self.name_to_seq = pickle.load(cache)
+                    return
+                except pickle.UnpicklingError:
+                    # It is possible for the cache file to get corrupted - see #71
+                    pass
+        
+        self.seq_to_name = {}
+        self.name_to_seq = {}
 
     @property
     def empty(self) -> bool:
