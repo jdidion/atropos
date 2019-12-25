@@ -35,7 +35,8 @@ install_extra_requirements:
 	pip install -r requirements-extra.txt
 
 test: install install_extra_requirements install_test_requirements
-	pytest $(pytestops) $(tests)
+	coverage run -m pytest $(pytestopts) $(tests)
+	coverage report -m
 
 test_release_setup:
 	twine check dist/*

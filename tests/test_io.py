@@ -426,6 +426,7 @@ class TestPairedSequenceReader:
 
 try:
     import ngstream
+    import ngs
 
     ngs_available = True
 except ModuleNotFoundError:
