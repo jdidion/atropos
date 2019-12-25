@@ -201,7 +201,7 @@ class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
 
     def __iter__(self) -> Iterator[Tuple[Sequence, ...]]:
         if self._first_seq is None:
-            raise StopIteration()
+            return
         yield self._first_seq
         yield from self._seq_iter
 

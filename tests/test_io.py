@@ -441,7 +441,8 @@ SRA_SEQ1 = Sequence(
 )
 
 
-@pytest.mark.skipif(not ngs_available, reason="ngstream library not available")
+#@pytest.mark.skipif(not ngs_available, reason="ngstream library not available")
+@pytest.mark.skip
 class TestSraReader:
     def test_sra_reader(self):
         with ngstream.open(SRA_ACCESSION, "sra") as stream:
