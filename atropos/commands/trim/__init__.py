@@ -427,8 +427,8 @@ class TrimCommand(BaseCommand):
         # Create Adapters
         adapters1 = []
         adapters2 = []
-        has_adapters1 = options.adapters or options.anywhere or options.front
-        has_adapters2 = options.adapters2 or options.anywhere2 or options.front2
+        has_adapters1 = bool(options.adapters or options.anywhere or options.front)
+        has_adapters2 = bool(options.adapters2 or options.anywhere2 or options.front2)
 
         if has_adapters1 or has_adapters2:
             adapter_cache = self._load_known_adapters()

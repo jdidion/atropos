@@ -510,7 +510,7 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
         options.input1 = options.interleaved_input
         options.paired = False
     else:
-        if not options.interleaved_input and (not options.input1 or not options.input2):
+        if not options.interleaved_input and not (options.input1 and options.input2):
             parser.error(
                 "Both '-pe1' and '-pe2' are required for paired-end "
                 "trimming. If this is an interleaved file, use '-l' "

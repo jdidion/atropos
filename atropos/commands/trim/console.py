@@ -912,8 +912,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
     def _validate_trim_options(options: Namespace, parser: AtroposArgumentParser):
         paired = options.paired
 
-        # Any of these options imply paired-end and siable legacy mode
-        paired_both = (
+        # Any of these options imply paired-end and disable legacy mode
+        paired_both = bool(
             options.adapters2
             or options.front2
             or options.anywhere2
@@ -928,8 +928,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         # If any of the options in the "paired" group are set, we implicitly
         # expect paired-end input
-        paired_implicit = (
-            paired_both or options.paired_output or options.untrimmed_paired_output
+        paired_implicit = paired_both or bool(
+             options.paired_output or options.untrimmed_paired_output
         )
 
         if options.output_format is None and options.output is not None:
@@ -938,7 +938,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             )
 
         if paired or paired_implicit:
-            any_output = options.output or options.paired_output
+            any_output = bool(options.output or options.paired_output)
 
             if options.interleaved_output:
                 if any_output:
@@ -966,7 +966,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                         "When you use -p or --paired-output, you must "
                         "also use the -o option."
                     )
-                elif options.paired_output is None:
+
+                if options.paired_output is None:
                     parser.error(
                         "When paired-end trimming is enabled, a second "
                         "output file needs to be specified via -p "
