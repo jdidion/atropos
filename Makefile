@@ -19,6 +19,8 @@ clean:
 	rm -Rf build
 	rm -Rf atropos.egg-info
 	rm -f .adapters
+	rm -f .coverage
+	rm -f coverage.xml
 	rm -f MANIFEST
 
 build:
@@ -37,6 +39,7 @@ install_extra_requirements:
 test: install install_extra_requirements install_test_requirements
 	coverage run -m pytest $(pytestopts) $(tests)
 	coverage report -m
+	coverage xml
 
 test_release_setup:
 	twine check dist/*
