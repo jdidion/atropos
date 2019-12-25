@@ -5,8 +5,7 @@ bz2file==0.98
 screed==1.0.1
 jinja2==2.10.3
 MarkupSafe==1.1.1
-ngstream>=0.2.1
-pysam==0.15.3
+ngstream>=0.2.2
 subby==0.1.7
 requests==2.22.0
 certifi==2019.11.28
