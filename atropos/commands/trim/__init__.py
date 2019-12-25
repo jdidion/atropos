@@ -317,6 +317,7 @@ class WriterResultHandler(ResultHandler):
         if self.use_suffix:
             if worker is None:
                 raise ValueError("worker must not be None")
+
             self.writers.suffix = f".{worker.index}"
 
     def write_result(self, batch_num: int, result: dict):
@@ -648,14 +649,14 @@ class TrimCommand(BaseCommand):
 
         # Create Formatters
 
-        if options.interleaved_output:
+        interleaved = options.use_interleaved_output
+
+        if interleaved:
             output1 = options.interleaved_output
             output2 = None
-            interleaved = True
         else:
             output1 = options.output
             output2 = options.paired_output
-            interleaved = False
 
         if options.output_format is None:
             if delivers_qualities:
