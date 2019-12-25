@@ -12,7 +12,7 @@ Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is
 3. Options for trimming specific types of data (miRNA, bisulfite-seq).
 4. A new command ('detect') that will detect adapter sequences and other potential contaminants.
 5. A new command ('error') that will estimate the sequencing error rate, which helps to select the appropriate adapter- and quality- trimming parameter values.
-6. A new command ('qc') that generates read statistics similar to FastQC. The trim command can also compute read metrics both before and after trimming (using the '--metrics' option).
+6. A new command ('qc') that`                                           ``` generates read statistics similar to FastQC. The trim command can also compute read metrics both before and after trimming (using the '--metrics' option).
 7. Improved summary reports, including support for serialization formats (JSON, YAML, pickle), support for user-defined templates (via the optional Jinja2 dependency), and integration with [MultiQC](http://multiqc.info).
 8. The ability to merge overlapping reads (this is experimental and the functionality is limited).
 9. The ability to write the summary report and log messages to separate files.
@@ -28,7 +28,8 @@ First install dependencies:
 
 * Required
     * Python 3.6+ (python 2.x is NOT supported)
-    * Cython 0.25.2+/0.29+/0.29.14+, depending on whether you're using python 3.6/3.7.3.8 (`pip install Cython`)
+        * Note: Reading from SAM/BAM files is not currently supported in Python 3.8, due to the fact that pysam is not compatible with Python 3.8. This is a temporary limitation that will be fixed before the final release of Atropos 2.0.0.
+    * Cython 0.25.2+/0.29+/0.29.14+, depending on whether you're using python 3.6/3.7/3.8 (`pip install Cython`)
     * [loguru]()
     * [pokrok]() 0.2.0+
     * [xphyle]() 4.2.1+

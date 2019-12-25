@@ -50,6 +50,7 @@ paper/workflow/results
 *.ipynb
 *.tar
 .pytest_cache/
-.coverage*
+.coverage
+coverage.xml
 venv/
 .eggs/
