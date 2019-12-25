@@ -45,7 +45,7 @@ read 1 and read 2 files, respectively. Interleaved files (FASTQ, SAM, and BAM)
 are supported using the ``-l`` option. Note that interleaved files must be
 sorted such that both reads appear successively for each read pair. For SAM/BAM,
 the two reads can be in any order since their identity is detected from the
-flags. You must have the ``pysam`` library installed for SAM/BAM support. If you
+flags. You must have the ``bamnostic`` or ``pysam`` library installed for SAM/BAM support. If you
 only want to process one of the read pairs from an interleaved file, you can set
 ``--single-input-read <1|2>``.
 

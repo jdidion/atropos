@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install --yes \
     && pip install matplotlib \
     && pip install seaborn \
     && pip install mako \
-    && pip install pysam \
+    && pip install bamnostic \
     && pip uninstall --yes cython \
     && apt-get remove --purge -y $BUILD_PACKAGES \
     && rm -rf /var/lib/apt/lists/* \

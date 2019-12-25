@@ -2,7 +2,7 @@
 # Dockerfile
 #
 # Software:         Atropos
-# Software Version: 1.1.0
+# Software Version: 2.0.0
 # Description:      Atropos image
 # Website:          https://github.com/jdidion/atropos
 # Provides:         atropos
@@ -28,7 +28,7 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
         zlib-dev bzip2-dev xz-dev
 
 # Additional Atropos dependencies
-RUN pip install tqdm pysam jinja2
+RUN pip install tqdm bamnostic jinja2
 
 # Attach project directory and install
 ADD . /atropos/

@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import csv
+from importlib import import_module
 import math
 from pathlib import Path
 import sys
@@ -602,10 +603,6 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
     """
     Reader for SAM/BAM files. Paired-end files must be name-sorted. Does not support
     secondary/supplementary reads.
-
-    TODO: either drop support for BAM files (require user to pipe output from
-     `samtools view`) and implement pure-python SAM parsing, or replace pysam with a
-     different BAM-parsing library (pysam is not Python 3.8 compatible).
     """
 
     @classproperty
@@ -630,7 +627,7 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
         quality_base: int = 33,
         sequence_factory: Type[Sequence] = Sequence,
         alphabet: Alphabet = None,
-        pysam_kwargs: Optional[dict] = None,
+        bam_kwargs: Optional[dict] = None,
     ):
         """
         Args:
@@ -663,10 +660,10 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
             else:
                 self._file = cast(IO, path)
 
-            if pysam_kwargs is None:
-                pysam_kwargs = {"check_sq": False}
+            if bam_kwargs is None:
+                bam_kwargs = {"check_sq": False}
 
-            self._sam_iter = BAMParser(self._file, **pysam_kwargs)
+            self._sam_iter = BAMParser(self._file, **bam_kwargs)
         else:
             # Todo: open file and check for BAM magic number
             raise ValueError(f"Cannot detect type of file {path}")
@@ -683,9 +680,6 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
         return self._sam_iter.estimate_num_records()
 
     def __iter__(self):
-        # pysam raises an error of the SAM/BAM header is not complete,
-        # even though it's unnecessary for our puroses. In that case,
-        # we use our own simple SAM parser.
         return self._iter(self._sam_iter)
 
     @abstractmethod
@@ -771,10 +765,32 @@ class SAMParser:
 
 
 class BAMParser:
-    def __init__(self, bam_file: IO, **kwargs):
-        import pysam
+    @staticmethod
+    def _load_bam_module():
+        """
+        Tries to load and return a module for parsing BAM files compatible with the
+        pysam API. First tries `bamnostic` then tries `pysam`.
 
-        self._reader = pysam.AlignmentFile(str(bam_file), **kwargs)
+        Raises:
+            ImportError if neithere `bamnostic` nor `pysam` can be imported.
+        """
+        try:
+            return import_module("bamnostic")
+        except ImportError:
+            pass
+
+        try:
+            return import_module("pysam")
+        except ImportError:
+            pass
+
+        raise ImportError(
+            "Reading BAM files requires either 'bamnostic' or 'pysam' "
+            "library to be installed."
+        )
+
+    def __init__(self, bam_file: IO, **kwargs):
+        self._reader = self._load_bam_module().AlignmentFile(str(bam_file), **kwargs)
 
     def estimate_num_records(self):
         """

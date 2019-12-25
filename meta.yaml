@@ -23,7 +23,7 @@ requirements:
   run:
     - python
     - tqdm
-    - pysam
+    - bamnostic
     - jinja2
     - ngstream
 

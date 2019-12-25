@@ -28,21 +28,20 @@ First install dependencies:
 
 * Required
     * Python 3.6+ (python 2.x is NOT supported)
-        * Note: Reading from SAM/BAM files is not currently supported in Python 3.8, due to the fact that pysam is not compatible with Python 3.8. This is a temporary limitation that will be fixed before the final release of Atropos 2.0.0.
     * Cython 0.25.2+/0.29+/0.29.14+, depending on whether you're using python 3.6/3.7/3.8 (`pip install Cython`)
     * [loguru]()
     * [pokrok]() 0.2.0+
     * [xphyle]() 4.2.1+
 * Optional
     * pytest (for running unit tests)
-    * pysam (SAM/BAM support)
+    * bamnostic or pysam (SAM/BAM support)
     * khmer 2.0+ (for detecting low-frequency adapter contamination)
     * jinja2 (for user-defined report formats)
     * ngstream (for SRA streaming), which requires [ngs](https://github.com/ncbi/ngs)
 
 Pip can be used to install atropos and optional dependencies, e.g.:
 
-`pip install atropos[tqdm,pysam,srastream]`
+`pip install atropos[tqdm,bamnostic,ngstream]`
 
 ## Conda
 

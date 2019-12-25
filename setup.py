@@ -147,13 +147,14 @@ install_requirements = [
     "xphyle>=4.2.1",
 ]
 test_requirements = [
-    "pytest",  # 'jinja2', 'pysam',
+    "pytest",
+    "coverage"
 ]
 extra_requirements = {
     "progressbar": ["progressbar2"],
     "tqdm": ["tqdm"],
     "khmer": ["khmer"],
-    "pysam": ["pysam"],
+    "bamnostic": ["bamnostic"],
     "jinja": ["jinja2"],
     "sra": ["ngstream>=0.2.2"],
 }
@@ -204,6 +205,6 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
-        #"Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.8",
     ],
 )
