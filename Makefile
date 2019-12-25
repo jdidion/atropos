@@ -9,14 +9,17 @@ all: clean install install_extra_requirements install_test_requirements test tes
 
 clean:
 	rm -Rf __pycache__
+	rm -Rf .pytest_cache
+	Rm -Rf .eggs
 	rm -Rf **/__pycache__/*
 	rm -Rf **/*.c
 	rm -Rf **/*.so
 	rm -Rf **/*.pyc
 	rm -Rf dist
 	rm -Rf build
-	rm -Rf .adapters
 	rm -Rf atropos.egg-info
+	rm -f .adapters
+	rm -f MANIFEST
 
 build:
 	python setup.py build_ext -i
