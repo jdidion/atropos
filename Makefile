@@ -10,7 +10,7 @@ all: clean install install_extra_requirements install_test_requirements test tes
 clean:
 	rm -Rf __pycache__
 	rm -Rf .pytest_cache
-	Rm -Rf .eggs
+	rm -Rf .eggs
 	rm -Rf **/__pycache__/*
 	rm -Rf **/*.c
 	rm -Rf **/*.so
