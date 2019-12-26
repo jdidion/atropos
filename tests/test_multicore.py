@@ -1,6 +1,5 @@
 import io
 
-from loguru import logger
 from pytest import raises
 
 from atropos.commands.multicore import *

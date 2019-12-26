@@ -18,7 +18,7 @@ from atropos.utils.multicore import (
 )
 
 
-class ParallelPipelineMixin:
+class MulticorePipelineMixin:
     """
     Mixin that implements the `start`, `finish`, and `process_batch` methods of
     :class:`Pipeline`.
@@ -93,7 +93,7 @@ class WorkerProcess(Process):
                 self.summary_queue,
                 (
                     self.index,
-                    cast(ParallelPipelineMixin, self.pipeline).seen_batches,
+                    cast(MulticorePipelineMixin, self.pipeline).seen_batches,
                     summary,
                 ),
                 wait_message=f"{self.name} waiting to queue summary {{}}",

@@ -96,7 +96,7 @@ class QcCommand(BaseCommand):
             The return code.
         """
         from atropos.commands.multicore import (
-            ParallelPipelineMixin,
+            MulticorePipelineMixin,
             ParallelPipelineRunner,
         )
 
@@ -111,7 +111,7 @@ class QcCommand(BaseCommand):
 
         # Start worker processes, reserve a thread for the reader process,
         # which we will get back after it completes
-        pipeline_class = type("QcPipelineImpl", (ParallelPipelineMixin, pipeline_class))
+        pipeline_class = type("QcPipelineImpl", (MulticorePipelineMixin, pipeline_class))
         pipeline = pipeline_class(**pipeline_args)
 
         runner = ParallelPipelineRunner(self, pipeline)

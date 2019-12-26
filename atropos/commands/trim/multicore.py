@@ -6,17 +6,21 @@ from loguru import logger
 import xphyle
 from xphyle.formats import CompressionFormat
 
-from atropos.commands.multicore import ParallelPipelineRunner, WorkerProcess
-from atropos.commands.trim import (
+from atropos.commands import Command, PairedEndPipelineMixin, SingleEndPipelineMixin
+from atropos.commands.multicore import (
+    MulticorePipelineMixin, ParallelPipelineRunner, WorkerProcess
+)
+from atropos.commands.trim.pipeline import (
+    RecordHandler,
     ResultHandler,
     WorkerResultHandler,
     WriterResultHandler,
-    TrimCommand,
     TrimPipeline,
 )
 from atropos.commands.trim.writers import Writers
 from atropos.utils import ReturnCode
 from atropos.utils.multicore import (
+    DEFAULT_RETRY_INTERVAL,
     Control,
     ControlSignal,
     MulticoreError,
@@ -112,7 +116,7 @@ class ParallelTrimPipelineRunner(ParallelPipelineRunner):
 
     def __init__(
         self,
-        command: TrimCommand,
+        command: Command,
         pipeline: TrimPipeline,
         threads: int,
         writer_manager: Optional[WriterManager] = None,
@@ -337,3 +341,151 @@ class ResultProcess(Process):
         finally:
             num_batches = self.control.get_value(lock=True)
             self.result_handler.finish(num_batches if num_batches > 0 else None)
+
+
+class SingleEndMulticoreTrimPipeline(
+    MulticorePipelineMixin, SingleEndPipelineMixin, TrimPipeline
+):
+    pass
+
+
+class PairedEndMulticoreTrimPipeline(
+    MulticorePipelineMixin, PairedEndPipelineMixin, TrimPipeline
+):
+    pass
+
+
+def run_multicore(
+    trim_command: Command,
+    paired: bool,
+    record_handler: RecordHandler,
+    writers: Writers,
+    threads: int,
+    result_queue_size: int,
+    writer_process: bool,
+    preserve_order: bool,
+    compression_mode: str,
+    compression_format: str,
+    process_timeout: int,
+) -> ReturnCode:
+    """
+    Parallel implementation of run_atropos. Works as follows:
+
+    1. Main thread creates N worker processes (where N is the number of
+    threads to be allocated) and (optionally) one writer process.
+    2. Main thread loads batches of reads (or read pairs) from input file(s)
+    and adds them to a queue (the input queue).
+    3. Worker processes take batches from the input queue, process them as
+    Atropos normally does, and either add the results to the result queue
+    (if using a writer process) or write the results to disk. Each result is
+    a dict mapping output file names to strings, where each string is a
+    concatenation of reads (with appropriate line endings) to be written.
+    A parameter also controls whether data compression is done by the workers or
+    the writer.
+    4. If using a writer process, it takes results from the result queue and
+    writes each string to its corresponding file.
+    5. When the main process finishes loading reads from the input file(s),
+    it sends a signal to the worker processes that they should complete when
+    the input queue is empty. It also singals the writer process how many
+    total batches to expect, and the writer process exits after it has processed
+    that many batches.
+    6. When a worker process completes, it adds a summary of its activity to
+    the summary queue.
+    7. The main process reads summaries from the summary queue and merges
+    them to create the complete summary, which is used to generate the report.
+
+    There are several possible points of failure:
+
+    1. The main process may exit due to an unexpected error, or becuase the
+    user forces it to exit (Ctrl-C). In this case, an attempt is made to
+    cancel all processes before exiting.
+    2. A worker or writer process may exit due to an unknown error. To
+    handle this, the main process checks that each process is alive whenver
+    it times out writing to the input queue, and again when waiting for
+    worker summaries. If a process has died, the program exits with an error
+    since some data might have gotten lost.
+    3. More commonly, process will time out blocking on reading from or
+    writing to a queue. Size limits are used (optionally) for the input and
+    result queues to prevent using lots of memory. When few threads are
+    allocated, it is most likely that the main and writer processes will
+    block, whereas with many threads allocated the workers are most likely
+    to block. Also, e.g. in a cluster environment, I/O latency may cause a
+    "backup" resulting in frequent blocking of the main and workers
+    processes. Finally, also e.g. in a cluster environment, processes may
+    suspended for periods of time. Use of a hard timeout period, after which
+    processes are forced to exit, is thus undesirable. Instead, parameters
+    are provided for the user to tune the batch size and max queue sizes to
+    their particular environment. Additionally, a "soft" timeout is used,
+    after which log messages are escallated from DEBUG to ERROR level. The
+    user can then make the decision of whether or not to kill the program.
+
+    Args:
+        threads:
+        process_timeout:
+        compression_mode:
+        result_queue_size:
+        writer_process:
+        compression_format:
+        writers: Writers object
+        preserve_order:
+        paired: Whether the input is paired-end.
+        record_handler: RecordHandler object.
+        trim_command:
+
+    Returns:
+        The return code.
+    """
+    timeout = max(process_timeout, DEFAULT_RETRY_INTERVAL)
+    logger.debug(
+        f"Starting atropos in multicore mode with threads={threads}, "
+        f"timeout={timeout}"
+    )
+
+    if threads < 2:
+        raise ValueError("'threads' must be >= 2")
+
+    # Reserve a thread for the writer process if it will be doing the compression
+    # and if one is available.
+    if compression_mode == "writer" and threads > 2:
+        threads -= 1
+
+    # Queue by which results are sent from the worker processes to the writer
+    # process
+    result_queue = Queue(result_queue_size)
+    writer_manager = None
+
+    if writer_process:
+        if compression_mode == "writer":
+            worker_result_handler = WorkerResultHandler(
+                QueueResultHandler(result_queue)
+            )
+        else:
+            worker_result_handler = CompressingWorkerResultHandler(
+                QueueResultHandler(result_queue),
+                compression_format=compression_format
+            )
+
+        writer_manager = WriterManager(
+            writers,
+            compression_mode,
+            preserve_order,
+            result_queue,
+            timeout,
+        )
+    else:
+        worker_result_handler = WorkerResultHandler(
+            WriterResultHandler(writers, use_suffix=True)
+        )
+
+    if paired:
+        pipeline_class = PairedEndMulticoreTrimPipeline
+    else:
+        pipeline_class = SingleEndMulticoreTrimPipeline
+
+    pipeline = pipeline_class(record_handler, worker_result_handler)
+
+    runner = ParallelTrimPipelineRunner(
+        trim_command, pipeline, threads, writer_manager
+    )
+
+    return runner.run()
