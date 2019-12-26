@@ -7,6 +7,9 @@ from atropos.io import guess_format_from_name
 from atropos.io.sequence import Sequence, ColorspaceSequence
 
 
+DEFAULT_SAM_HEADER = "@HD\tVN:1.6\tSO:unsorted\n"
+
+
 class SequenceFileFormat(metaclass=ABCMeta):
     """
     Base class for sequence formatters.
@@ -22,11 +25,6 @@ class SequenceFileFormat(metaclass=ABCMeta):
         Returns:
             A string representation of the sequence object in the sequence
             file format.
-        """
-
-    def header(self) -> Optional[str]:
-        """
-        Returns the header to be written at the beginning of the file.
         """
 
 
@@ -104,9 +102,6 @@ class ColorspaceFastqFormat(FastqFormat):
 class SAMFormat(SequenceFileFormat):
     """
     SAM SequenceFileFormat.
-
-    TODO: when the input is SAM/BAM and the output is SAM, propagate the header to
-     the output file.
     """
 
     def __init__(self, flag: int):
@@ -125,9 +120,6 @@ class SAMFormat(SequenceFileFormat):
                 "\n",
             )
         )
-
-    def header(self) -> str:
-        return "@HD\tVN:1.6\tSO:unsorted\n"
 
 
 class Formatter(metaclass=ABCMeta):
@@ -153,29 +145,23 @@ class Formatter(metaclass=ABCMeta):
             read2: The second read to format.
         """
 
-    @classmethod
-    def _get_result_list(
-        cls,
-        result: dict,
-        file1: str,
-        seq_format1: SequenceFileFormat,
-        seq_format2: Optional[SequenceFileFormat] = None
-    ) -> List[str]:
+    def _get_result_list(self, result: dict, file1: str) -> List[str]:
         if file1 in result:
             return result[file1]
         else:
             result_list = []
-            header = seq_format1.header()
+
+            header = self._get_header()
 
             if header:
-                if seq_format2 and header != seq_format2.header():
-                    raise ValueError("sequence formats must have same header")
-
                 result_list.append(header)
 
             result[file1] = result_list
 
             return result_list
+
+    def _get_header(self) -> Optional[str]:
+        pass
 
     @property
     def written_bp(self) -> Tuple[int, int]:
@@ -211,7 +197,7 @@ class SingleEndFormatter(Formatter):
             read1:
             read2: The reads to format.
         """
-        result_list = self._get_result_list(result, self._file1, self._seq_format)
+        result_list = self._get_result_list(result, self._file1)
         result_list.append(self._seq_format.format(read1))
         self.written += 1
         self.read1_bp += len(read1)
@@ -226,7 +212,7 @@ class InterleavedFormatter(Formatter):
         self,
         file1: str,
         seq_format1: SequenceFileFormat,
-        seq_format2: Optional[SequenceFileFormat] = None
+        seq_format2: Optional[SequenceFileFormat] = None,
     ):
         super().__init__()
         self._file1 = file1
@@ -236,9 +222,7 @@ class InterleavedFormatter(Formatter):
     def format(
         self, result: dict, read1: Sequence, read2: Optional[Sequence] = None
     ):
-        result_list = self._get_result_list(
-            result, self._file1, self._seq_format1, self._seq_format2
-        )
+        result_list = self._get_result_list(result, self._file1)
         result_list.append(self._seq_format1.format(read1))
         result_list.append(self._seq_format2.format(read2))
         self.written += 1
@@ -257,7 +241,7 @@ class PairedEndFormatter(Formatter):
         file1: str,
         file2: str,
         seq_format1: SequenceFileFormat,
-        seq_format2: Optional[SequenceFileFormat] = None
+        seq_format2: Optional[SequenceFileFormat] = None,
     ):
         super().__init__()
         self._data = [(file1, seq_format1), (file2, seq_format2 or seq_format1)]
@@ -266,7 +250,7 @@ class PairedEndFormatter(Formatter):
         self, result: dict, read1: Sequence, read2: Optional[Sequence] = None
     ):
         for read, (path, seq_format) in zip((read1, read2), self._data):
-            result_list = self._get_result_list(result, path, seq_format)
+            result_list = self._get_result_list(result, path)
             result_list.append(seq_format.format(read))
 
         self.written += 1
@@ -274,14 +258,38 @@ class PairedEndFormatter(Formatter):
         self.read2_bp += len(read2)
 
 
-class SingleEndSAMFormatter(SingleEndFormatter):
-    def __init__(self, file1: str):
-        super().__init__(file1, SAMFormat(0))
+class SAMFormatterMixin:
+    def __init__(self, *args, header: Optional[dict] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._header = header
+
+    def _get_header(self) -> Optional[str]:
+        if not self._header:
+            return DEFAULT_SAM_HEADER
+
+        def create_row(_tags: dict):
+            tags_str = "\t".join(f"{key}:{val}" for key, val in _tags.items())
+            return f"@{header_type}\t{tags_str}"
+
+        rows = []
+
+        for header_type, tags_list in self._header.items():
+            if isinstance(tags_list, dict):
+                rows.append(create_row(tags_list))
+            else:
+                rows.extend(create_row(tags) for tags in tags_list)
+
+        return "\n".join(rows) + "\n"
 
 
-class PairedEndSAMFormatter(InterleavedFormatter):
-    def __init__(self, file1: str):
-        super().__init__(file1, SAMFormat(65), SAMFormat(129))
+class SingleEndSAMFormatter(SAMFormatterMixin, SingleEndFormatter):
+    def __init__(self, file1: str, header: Optional[dict] = None):
+        super().__init__(file1, SAMFormat(0), header=header)
+
+
+class PairedEndSAMFormatter(SAMFormatterMixin, InterleavedFormatter):
+    def __init__(self, file1: str, header: Optional[dict] = None):
+        super().__init__(file1, SAMFormat(65), SAMFormat(129), header=header)
 
 
 def sra_colorspace_sequence(
@@ -301,6 +309,7 @@ def create_seq_formatter(
     file_format: Optional[Union[str, SequenceFileFormat]] = None,
     interleaved: bool = False,
     line_length: Optional[int] = None,
+    bam_header: Optional[dict] = None,
 ):
     """
     Creates a Formatter, deriving the format name from the file extension.
@@ -323,6 +332,8 @@ def create_seq_formatter(
             requested explicitly.
         interleaved: Whether the output should be interleaved (file2 must be None).
         line_length: Maximum length of a sequence line in FASTA output.
+        bam_header: If writing SAM format, optional headers to add at the beginning of
+            the output.
 
     Returns:
         A Formatter instance.
@@ -352,9 +363,9 @@ def create_seq_formatter(
             raise ValueError("Only one output file allowed for SAM format")
 
         if interleaved:
-            return PairedEndSAMFormatter(file1)
+            return PairedEndSAMFormatter(file1, bam_header)
         else:
-            return SingleEndSAMFormatter(file1)
+            return SingleEndSAMFormatter(file1, bam_header)
     else:
         if file_format == "fasta":
             if colorspace:

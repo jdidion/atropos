@@ -1,7 +1,7 @@
 from collections import Sequence as SequenceCollection
 from pathlib import Path
 import sys
-from typing import Dict, Optional, Tuple, Type, Union
+from typing import Dict, Optional, Tuple, Type, Union, cast
 
 from loguru import logger
 from xphyle import STDOUT, STDERR
@@ -66,6 +66,7 @@ from atropos.commands.trim.writers import (
     Writers,
 )
 from atropos.io.sequence import Sequence
+from atropos.io.readers import SAMReader
 from atropos.utils import ReturnCode, classproperty
 from atropos.utils.argparse import Namespace
 from atropos.utils.collections import Summarizable
@@ -480,15 +481,19 @@ class TrimCommand(BaseCommand):
             else:
                 options.output_format = "fasta"
 
-        formatters = Formatters(
-            output1,
-            dict(
-                file_format=options.output_format,
-                qualities=delivers_qualities,
-                colorspace=options.colorspace,
-                interleaved=interleaved,
-            ),
+        seq_formatter_args = dict(
+            file_format=options.output_format,
+            qualities=delivers_qualities,
+            colorspace=options.colorspace,
+            interleaved=interleaved,
         )
+        if (
+            options.output_format.lower() == "sam"
+            and isinstance(self.reader, SAMReader)
+        ):
+            seq_formatter_args["bam_header"] = cast(SAMReader, self.reader).header
+
+        formatters = Formatters(output1, seq_formatter_args)
 
         # Create filters
         min_affected = 2 if options.pair_filter == "both" else 1

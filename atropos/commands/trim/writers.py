@@ -182,7 +182,7 @@ class Formatters(Summarizable):
     Manages multiple formatters.
     """
 
-    def __init__(self, output: str, seq_formatter_args: dict):
+    def __init__(self, output: Path, seq_formatter_args: dict):
         """
         Args:
             output: The output file name template.

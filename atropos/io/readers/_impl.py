@@ -599,6 +599,139 @@ class PairedToSingleEndReader(SequenceReaderWrapper):
             yield record[idx]
 
 
+SAMRead = namedtuple(
+    "SAMRead",
+    ("query_name", "query_sequence", "query_qualities", "is_read1", "is_read2"),
+)
+
+
+class BaseSAMParser(Iterator[SAMRead], metaclass=ABCMeta):
+    @property
+    @abstractmethod
+    def header(self) -> dict:
+        pass
+
+    def estimate_num_records(self) -> Optional[int]:
+        pass
+
+    def __iter__(self):
+        return self
+
+
+class SAMParser(BaseSAMParser):
+    def __init__(self, sam_file: IO):
+        self._sam_file = sam_file
+        self._reader = csv.reader(sam_file, delimiter="\t")
+        self._header = {}
+        self._header_size = 0
+
+        def add_header(fields: SequenceType[str]):
+            header_type = fields[0][1:]
+            tags = dict(
+                (pair[0], pair[1])
+                for pair in (kv.split(":") for kv in fields[1:])
+            )
+
+            if header_type == "HD":
+                self._header["HD"] = tags
+            else:
+                if header_type == "SQ" and "LN" in tags:
+                    tags["LN"] = int(tags["LN"])
+
+                if header_type not in self._header:
+                    self._header[header_type] = []
+
+                self._header[header_type].append(tags)
+
+        for line in self._reader:
+            if line[0].startswith("@"):
+                add_header(line)
+            else:
+                self._next_line = line
+                break
+
+    @property
+    def header(self) -> dict:
+        return self._header
+
+    def estimate_num_records(self) -> Optional[int]:
+        record_len = len("\t".join(self._next_line))
+        return estimate_num_records(
+            self._sam_file, record_len, 1, header_size=self._header_size
+        )
+
+    def __next__(self) -> SAMRead:
+        if self._next_line is None:
+            raise StopIteration()
+
+        is_read1 = (int(self._next_line[1]) & 64) > 0
+
+        read = SAMRead(
+            self._next_line[0],
+            self._next_line[9],
+            self._next_line[10],
+            is_read1,
+            not is_read1,
+        )
+
+        try:
+            self._next_line = next(self._reader)
+        except StopIteration:
+            self._next_line = None
+
+        return read
+
+
+class BAMParser(BaseSAMParser):
+    """
+    Todo: Not sure how to estimate the number of records in a name-sorted BAM file.
+     There is no index, and bgzip doesn't have an option to get the uncompressed
+     size. Not sure if gzip -l will work correctly for a bgzip file.
+    """
+
+    @staticmethod
+    def _load_bam_module():
+        """
+        Tries to load and return a module for parsing BAM files compatible with the
+        pysam API. First tries `bamnostic` then tries `pysam`.
+
+        Raises:
+            ImportError if neithere `bamnostic` nor `pysam` can be imported.
+        """
+        try:
+            return import_module("bamnostic")
+        except ImportError:
+            pass
+
+        try:
+            return import_module("pysam")
+        except ImportError:
+            pass
+
+        raise ImportError(
+            "Reading BAM files requires either 'bamnostic' or 'pysam' "
+            "library to be installed."
+        )
+
+    def __init__(self, bam_file: IO, **kwargs):
+        self._reader = self._load_bam_module().AlignmentFile(str(bam_file), **kwargs)
+
+    @property
+    def header(self) -> dict:
+        return self._reader.header
+
+    def __next__(self):
+        read = next(self._reader)
+
+        return SAMRead(
+            read.query_name,
+            read.query_sequence,
+            "".join(chr(33 + q) for q in read.query_qualities),
+            read.is_read1,
+            read.is_read2,
+        )
+
+
 class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
     """
     Reader for SAM/BAM files. Paired-end files must be name-sorted. Does not support
@@ -653,7 +786,7 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
             else:
                 self._file = cast(IO, path)
 
-            self._sam_iter = SAMParser(self._file)
+            self._parser = SAMParser(self._file)
         elif self.name.endswith(".bam"):
             if is_path:
                 self._file = xopen(path, "rb")
@@ -663,7 +796,7 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
             if bam_kwargs is None:
                 bam_kwargs = {"check_sq": False}
 
-            self._sam_iter = BAMParser(self._file, **bam_kwargs)
+            self._parser = BAMParser(self._file, **bam_kwargs)
         else:
             # Todo: open file and check for BAM magic number
             raise ValueError(f"Cannot detect type of file {path}")
@@ -676,11 +809,15 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
     def quality_base(self) -> int:
         return self._quality_base
 
+    @property
+    def header(self) -> dict:
+        return self._parser.header
+
     def estimate_num_records(self):
-        return self._sam_iter.estimate_num_records()
+        return self._parser.estimate_num_records()
 
     def __iter__(self):
-        return self._iter(self._sam_iter)
+        return self._iter(self._parser)
 
     @abstractmethod
     def _iter(self, sam):
@@ -708,109 +845,6 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
             read.query_sequence,
             read.query_qualities,
             alphabet=self._alphabet
-        )
-
-
-SAMRead = namedtuple(
-    "SAMRead",
-    ("query_name", "query_sequence", "query_qualities", "is_read1", "is_read2"),
-)
-
-
-class SAMParser:
-    def __init__(self, sam_file: IO):
-        self._sam_file = sam_file
-        self._reader = csv.reader(sam_file, delimiter="\t")
-        self._header_size = 0
-
-        line = None
-
-        for line in self._reader:
-            # skip header lines
-            if not line[0].startswith("@"):
-                self._header_size += len(line)
-                break
-
-        self._next_line = line
-
-    def estimate_num_records(self):
-        record_len = len("\t".join(self._next_line))
-        return estimate_num_records(
-            self._sam_file, record_len, 1, header_size=self._header_size
-        )
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self._next_line is None:
-            raise StopIteration()
-
-        is_read1 = (int(self._next_line[1]) & 64) > 0
-
-        read = SAMRead(
-            self._next_line[0],
-            self._next_line[9],
-            self._next_line[10],
-            is_read1,
-            not is_read1,
-        )
-
-        try:
-            self._next_line = next(self._reader)
-        except StopIteration:
-            self._next_line = None
-
-        return read
-
-
-class BAMParser:
-    @staticmethod
-    def _load_bam_module():
-        """
-        Tries to load and return a module for parsing BAM files compatible with the
-        pysam API. First tries `bamnostic` then tries `pysam`.
-
-        Raises:
-            ImportError if neithere `bamnostic` nor `pysam` can be imported.
-        """
-        try:
-            return import_module("bamnostic")
-        except ImportError:
-            pass
-
-        try:
-            return import_module("pysam")
-        except ImportError:
-            pass
-
-        raise ImportError(
-            "Reading BAM files requires either 'bamnostic' or 'pysam' "
-            "library to be installed."
-        )
-
-    def __init__(self, bam_file: IO, **kwargs):
-        self._reader = self._load_bam_module().AlignmentFile(str(bam_file), **kwargs)
-
-    def estimate_num_records(self):
-        """
-        Todo: Not sure how to estimate the number of records in a name-sorted BAM file.
-         There is no index, and bgzip doesn't have an option to get the uncompressed
-         size. Not sure if gzip -l will work correctly for a bgzip file.
-        """
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        read = next(self._reader)
-
-        return SAMRead(
-            read.query_name,
-            read.query_sequence,
-            "".join(chr(33 + q) for q in read.query_qualities),
-            read.is_read1,
-            read.is_read2,
         )
 
 
