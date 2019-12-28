@@ -28,7 +28,8 @@ from atropos.io.readers import (
     sequence_names_match
 )
 from atropos.utils.ngs import ALPHABETS
-from .utils import cutpath, datapath
+
+from .utils import no_import
 
 
 # files tests/data/simple.fast{q,a}
@@ -63,12 +64,12 @@ class TestSequence:
 
 
 class TestFastaReader:
-    def test(self):
+    def test(self, input_data):
         with pytest.raises(ValueError):
             with FastaReader(None) as _:
                 pass
 
-        with FastaReader(datapath("simple.fasta")) as f:
+        with FastaReader(input_data("simple.fasta")) as f:
             reads = list(f)
         assert reads == simple_fasta
 
@@ -109,14 +110,14 @@ class TestFastaReader:
             )
             _ = list(FastaReader(fasta))
 
-    def test_fastareader_keeplinebreaks(self):
-        with FastaReader(datapath("simple.fasta"), keep_linebreaks=True) as f:
+    def test_fastareader_keeplinebreaks(self, input_data):
+        with FastaReader(input_data("simple.fasta"), keep_linebreaks=True) as f:
             reads = list(f)
         assert reads[0] == simple_fasta[0]
         assert reads[1].sequence == "SEQUEN\nCE2"
 
-    def test_context_manager(self):
-        filename = datapath("simple.fasta")
+    def test_context_manager(self, input_data):
+        filename = input_data("simple.fasta")
         with open(filename) as f:
             assert not f.closed
             _ = list(open_reader(f))
@@ -134,20 +135,20 @@ class TestFastaReader:
 
 
 class TestFastqReader:
-    def test_fastqreader(self):
-        with FastqReader(datapath("simple.fastq")) as f:
+    def test_fastqreader(self, input_data):
+        with FastqReader(input_data("simple.fastq")) as f:
             reads = list(f)
         assert reads == simple_fastq
 
-    def test_fastqreader_dos(self):
-        with FastqReader(datapath("dos.fastq")) as f:
+    def test_fastqreader_dos(self, input_data):
+        with FastqReader(input_data("dos.fastq")) as f:
             dos_reads = list(f)
-        with FastqReader(datapath("small.fastq")) as f:
+        with FastqReader(input_data("small.fastq")) as f:
             unix_reads = list(f)
         assert dos_reads == unix_reads
 
-    def test_fastq_wrongformat(self):
-        with pytest.raises(FormatError), FastqReader(datapath("withplus.fastq")) as f:
+    def test_fastq_wrongformat(self, input_data):
+        with pytest.raises(FormatError), FastqReader(input_data("withplus.fastq")) as f:
             _ = list(f)
 
     def test_fastq_incomplete(self):
@@ -155,8 +156,8 @@ class TestFastqReader:
         with pytest.raises(FormatError), FastqReader(fastq) as fq:
             list(fq)
 
-    def test_context_manager(self):
-        filename = datapath("simple.fastq")
+    def test_context_manager(self, input_data):
+        filename = input_data("simple.fastq")
         with open(filename) as f:
             assert not f.closed
             _ = list(open_reader(f))
@@ -169,8 +170,8 @@ class TestFastqReader:
             assert not sr._file.closed
         assert tmp_sr._file is None
 
-    def test_alphabet(self):
-        filename = datapath("bad_bases.fq")
+    def test_alphabet(self, input_data):
+        filename = input_data("bad_bases.fq")
         with FastqReader(filename, alphabet=ALPHABETS["dna"]) as f:
             reads = list(f)
             assert reads[0].sequence == "ACGNGGACT"
@@ -192,23 +193,23 @@ class TestFastaQualReader:
 
 
 class TestSeqioOpen:
-    def test_sequence_reader(self):
+    def test_sequence_reader(self, input_data):
         # test the autodetection
-        with open_reader(datapath("simple.fastq")) as f:
+        with open_reader(input_data("simple.fastq")) as f:
             reads = list(f)
         assert reads == simple_fastq
-        with open_reader(datapath("simple.fasta")) as f:
+        with open_reader(input_data("simple.fasta")) as f:
             reads = list(f)
         assert reads == simple_fasta
-        with open(datapath("simple.fastq")) as f:
+        with open(input_data("simple.fastq")) as f:
             reads = list(open_reader(f))
         assert reads == simple_fastq
         # make the name attribute unavailable
-        with open(datapath("simple.fastq")) as inp:
+        with open(input_data("simple.fastq")) as inp:
             f = StringIO(inp.read())
         reads = list(open_reader(f))
         assert reads == simple_fastq
-        with open(datapath("simple.fasta")) as inp:
+        with open(input_data("simple.fasta")) as inp:
             f = StringIO(inp.read())
         reads = list(open_reader(f))
         assert reads == simple_fasta
@@ -253,7 +254,7 @@ def write_seq_output(reads, fmt):
 
 
 class TestInterleavedReader:
-    def test(self):
+    def test(self, expected_data):
         expected = [
             (
                 Sequence("read1/1 some text", "TTATTTGTCTCCAGC", "##HHHHHHHHHHHHH"),
@@ -264,11 +265,11 @@ class TestInterleavedReader:
                 Sequence("read3/2", "TGTTATTAATATCAAGTTGG", "#HHHHHHHHHHHHHHHHHHH"),
             ),
         ]
-        reads = list(InterleavedSequenceReader(cutpath("interleaved.fastq")))
+        reads = list(InterleavedSequenceReader(expected_data("interleaved.fastq")))
         assert reads == expected
 
         with open_reader(
-            cutpath("interleaved.fastq"),
+            expected_data("interleaved.fastq"),
             interleaved=True,
             input_read=InputRead.PAIRED
         ) as f:
@@ -424,15 +425,6 @@ class TestPairedSequenceReader:
         assert not match("abc", "xyz")
 
 
-try:
-    import ngstream
-    import ngs
-
-    ngs_available = True
-except ModuleNotFoundError:
-    ngs_available = False
-
-
 SRA_ACCESSION = "ERR2009169"
 SRA_SEQ1 = Sequence(
     "D00442:178:C87AVANXX:2:2203:1465:2211",
@@ -441,10 +433,13 @@ SRA_SEQ1 = Sequence(
 )
 
 
-#@pytest.mark.skipif(not ngs_available, reason="ngstream library not available")
-@pytest.mark.skip
+@pytest.mark.skipif(
+    no_import("ngstream") or no_import("ngs"),
+    reason="ngstream library not available"
+)
 class TestSraReader:
     def test_sra_reader(self):
+        import ngstream
         with ngstream.open(SRA_ACCESSION, "sra") as stream:
             reader = open_reader(ngstream_reader=stream)
             assert next(iter(reader)) == (SRA_SEQ1,)

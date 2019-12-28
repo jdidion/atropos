@@ -48,6 +48,14 @@ class LoggingConfig:
 
         self._was_setup = True
 
+    def reset(self):
+        if self._was_setup:
+            logger.remove()
+            self._was_setup = False
+            return True
+        else:
+            return False
+
 
 LOGGING_CONFIG = LoggingConfig()
 

@@ -148,7 +148,9 @@ install_requirements = [
 ]
 test_requirements = [
     "pytest",
-    "coverage"
+    "pytest-datadir-ng",
+    "coverage",
+    "subby",
 ]
 extra_requirements = {
     "progressbar": ["progressbar2"],

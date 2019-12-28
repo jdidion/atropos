@@ -83,7 +83,7 @@ class SequenceReaderBase(
         """
 
     @abstractmethod
-    def __iter__(self) -> Iterator[Tuple[Sequence, ...]]:
+    def __iter__(self) -> Iterator[Union[Sequence, Tuple[Sequence, Sequence]]]:
         pass
 
     def close(self):
@@ -199,7 +199,7 @@ class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
         except StopIteration:
             self._first_seq = None
 
-    def __iter__(self) -> Iterator[Tuple[Sequence, ...]]:
+    def __iter__(self) -> Iterator[Union[Sequence, Tuple[Sequence, Sequence]]]:
         if self._first_seq is None:
             return
         yield self._first_seq

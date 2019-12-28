@@ -3,6 +3,7 @@ from atropos.commands.trim.modifiers import *
 from atropos.io.sequence import Sequence
 from atropos.utils.ngs import reverse_complement as rc
 
+
 DUMMY_ADAPTER = Adapter("ACGT", AdapterType.FRONT)
 
 

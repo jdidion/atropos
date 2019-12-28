@@ -71,7 +71,6 @@ def test_dequeue_timeout():
     with raises(TimeoutException):
         dequeue(Queue(1), timeout=1, block_timeout=2, timeout_callback=TimeoutException)
 
-
-# TODO: port tests from testparallel here
-# Test worker vs writer compression
-# Test without writer process
+# Todo:
+#  Test worker vs writer compression
+#  Test without writer process

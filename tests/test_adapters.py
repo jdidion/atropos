@@ -1,4 +1,4 @@
-from pytest import raises
+import pytest
 
 from atropos.adapters import (
     Adapter,
@@ -10,8 +10,6 @@ from atropos.adapters import (
     parse_braces,
 )
 from atropos.io.sequence import Sequence
-
-from .utils import approx_equal
 
 
 def test_issue_52():
@@ -85,7 +83,7 @@ def test_str():
 
 
 def test_color():
-    with raises(ValueError):
+    with pytest.raises(ValueError):
         ColorspaceAdapter("0123", where=AdapterType.FRONT, max_error_rate=0.1)
 
 
@@ -120,7 +118,7 @@ def test_parse_braces_fail():
         "A{6X}",
         "A{X6}",
     ]:
-        with raises(ValueError):
+        with pytest.raises(ValueError):
             parse_braces(expression)
 
 
@@ -149,7 +147,7 @@ def test_match_probability():
     i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
     i4 = (120 / 24) * (0.25 ** 4) * 0.75
     i5 = 0.25 ** 5
-    assert approx_equal(a.match_probability(k, n), i3 + i4 + i5, 0.0001)
+    assert a.match_probability(k, n) == pytest.approx(i3 + i4 + i5, 0.0001)
 
 
 def test_insert_align():

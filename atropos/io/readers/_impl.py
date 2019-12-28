@@ -148,13 +148,13 @@ class NgstreamSequenceReader(SequenceReader):
     def estimate_num_records(self):
         return self._file.read_count
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Union[Sequence, Tuple[Sequence, Sequence]]]:
         if self._input_read == InputRead.PAIRED:
             for read in self._file:
                 yield tuple(self._as_sequence(read[i]) for i in (0, 1))
         else:
             for read in self._file:
-                yield self._as_sequence(read),
+                yield self._as_sequence(read)
 
     def _as_sequence(self, frag):
         return self._sequence_factory(
@@ -230,7 +230,7 @@ class FastaQualReader(SequenceReaderBase):
     def estimate_num_records(self):
         return self._fastareader.estimate_num_records()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Sequence]:
         """
         Yields Sequence objects.
         """
@@ -410,7 +410,7 @@ class PairedSequenceReader(SequenceReaderBase):
     def __getattr__(self, name):
         return getattr(self._reader1, name)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[Sequence, Sequence]]:
         """
         Iterates over the paired reads. Each item is a pair of Sequence objects.
         """
@@ -508,7 +508,7 @@ class SequenceReaderWrapper(SequenceReaderBase):
     def estimate_num_records(self) -> Optional[int]:
         return self._reader.estimate_num_records()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Union[Sequence, Tuple[Sequence, Sequence]]]:
         return iter(self._reader)
 
     def close(self):
@@ -593,7 +593,7 @@ class PairedToSingleEndReader(SequenceReaderWrapper):
         super().__init__(reader)
         self._input_read = input_read
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Sequence]:
         idx = 1 if self._input_read == InputRead.READ2 else 0
         for record in self._reader:
             yield record[idx]
@@ -816,7 +816,7 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
     def estimate_num_records(self):
         return self._parser.estimate_num_records()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Union[Sequence, Tuple[Sequence, Sequence]]]:
         return self._iter(self._parser)
 
     @abstractmethod
