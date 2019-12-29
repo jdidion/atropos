@@ -528,7 +528,11 @@ def test_custom_bisulfite_4(run_trimmer):
 
 
 @pytest.mark.skipif(
-    no_internet("https://ncbi.nlm.nih.gov") or no_import("ngstream"),
+    (
+        no_internet("https://ncbi.nlm.nih.gov")
+        or no_import("ngstream")
+        or no_import("ngs")
+    ),
     reason="No internet connection or ngstream not importable",
 )
 def test_sra(run_trimmer):
