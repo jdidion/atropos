@@ -148,7 +148,6 @@ install_requirements = [
 ]
 test_requirements = [
     "pytest",
-    "pytest-datadir-ng",
     "coverage",
     "subby",
 ]

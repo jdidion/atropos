@@ -1,4 +1,5 @@
 from importlib import import_module
+from subprocess import CalledProcessError
 import urllib.request
 
 import subby
@@ -7,10 +8,9 @@ import subby
 def assert_files_equal(path1, path2):
     try:
         subby.sub("diff -u {0} {1}".format(path1, path2))
-    except subby.CalledProcessError as e:
+    except CalledProcessError as e:
         raise AssertionError(
-            f"Files not equal: {path1} != {path2}\n"
-            f"Diff: <{e.output.decode('utf-8')}>"
+            f"Files not equal: {path1} != {path2}\nDiff: <{e.output}>"
         )
 
 

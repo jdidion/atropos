@@ -193,7 +193,7 @@ class TestFastaQualReader:
 
 
 class TestSeqioOpen:
-    def test_sequence_reader(self, input_data):
+    def test_sequence_reader(self, input_data, tmp_path):
         # test the autodetection
         with open_reader(input_data("simple.fastq")) as f:
             reads = list(f)
@@ -442,7 +442,7 @@ class TestSraReader:
         import ngstream
         with ngstream.open(SRA_ACCESSION, "sra") as stream:
             reader = open_reader(ngstream_reader=stream)
-            assert next(iter(reader)) == (SRA_SEQ1,)
+            assert next(iter(reader)) == SRA_SEQ1
 
 
 def create_truncated_file(path):

@@ -11,4 +11,3 @@ py==1.8.0
 wcwidth==0.1.7
 coverage==5.0.1
 subby==0.1.7
-pytest-datadir-ng==1.1.1

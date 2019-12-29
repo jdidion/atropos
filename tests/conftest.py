@@ -9,27 +9,54 @@ from atropos.commands.trim.console import TrimCommandConsole
 from .utils import assert_files_equal
 
 
-class DatadirWrapper:
-    def __init__(self, datadir, subdir: str):
-        self.datadir = datadir
-        self.subdir = subdir
+class Datadir:
+    def __init__(self, request, subdir: str):
+        basedir = Path(str(request.fspath.dirpath())) / "data"
+
+        self._datadirs = []
+
+        def add(d: Path):
+            s = d / subdir
+            if s.exists() and s.is_dir():
+                self._datadirs.append(s)
+
+        testdir = basedir / request.module.__name__
+
+        if request.cls is not None:
+            clsdir = testdir / request.cls.__name__
+            add(clsdir / request.function.__name__)
+            add(clsdir)
+        else:
+            add(testdir / request.function.__name__)
+
+        add(testdir)
+        add(basedir)
 
     def __call__(self, name: str, **kwargs):
         name = name.format(**kwargs)
-        return self.datadir[f"{self.subdir}/{name}"]
+
+        for datadir in self._datadirs:
+            datadir_path = datadir / name
+            if datadir_path.exists():
+                return datadir_path
+
+        raise KeyError(
+            f"File '{name} not found in any of the following datadirs: "
+            f"{self._datadirs}"
+        )
 
     def url(self, name: str, **kwargs):
         return f"file:{self(name, **kwargs)}"
 
 
 @pytest.fixture(scope="function")
-def input_data(datadir):
-    return DatadirWrapper(datadir, "input")
+def input_data(request):
+    return Datadir(request, "input")
 
 
 @pytest.fixture(scope="function")
-def expected_data(datadir):
-    return DatadirWrapper(datadir, "expected")
+def expected_data(request):
+    return Datadir(request, "expected")
 
 
 @pytest.fixture(scope="function")
@@ -58,19 +85,20 @@ def run_trimmer(tmp_path: Path, capsys, input_data, expected_data):
 
         to_compare = []
 
-        output = tmp_path / expected1
+        output = tmp_path / ("tmp1-" + expected1)
         output2 = None
         if expected2:
-            output2 = tmp_path / expected2
+            output2 = tmp_path / ("tmp2-" + expected2)
 
         if expected_multi:
             if stdout:
                 raise ValueError("'stdout' and 'expected_multi' are mutually exclusive")
 
             for name in expected_multi:
-                multi_path = Path(str(output).format(name=name, aligner=aligner))
+                multi_name = expected1.format(name=name, aligner=aligner)
+                multi_path = tmp_path / ("tmp1-" + multi_name)
                 to_compare.append(
-                    (expected_data(multi_path.name), multi_path)
+                    (expected_data(multi_name), multi_path)
                 )
         elif assert_output_equal:
             to_compare.append((expected_data(expected1, aligner=aligner), output))
@@ -81,16 +109,18 @@ def run_trimmer(tmp_path: Path, capsys, input_data, expected_data):
                 )
 
         if expected_other:
-            for other in expected_other:
+            for n, other in enumerate(expected_other, 3):
                 i = param_list.index(other)
-                other_path = tmp_path / other
+                other_path = tmp_path / (f"tmp{n}-" + other)
                 param_list[i] = other_path
                 to_compare.append((expected_data(other, aligner=aligner), other_path))
 
         infiles = [
-            input_data(infile, aligner=aligner) if infile else None
+            input_data(infile, aligner=aligner) if isinstance(infile, str) else infile
             for infile in (inpath1, inpath2)
         ]
+
+        param_list.extend(("--aligner", aligner))
 
         if sra_accn:
             param_list.extend(("--accession", sra_accn))
@@ -102,9 +132,7 @@ def run_trimmer(tmp_path: Path, capsys, input_data, expected_data):
         else:
             param_list.extend(("-se", infiles[0]))
             if qualfile:
-                param_list.extend(("-sq", infiles[0]))
-
-        param_list.extend(("--aligner", aligner))
+                param_list.extend(("-sq", input_data(qualfile, aligner=aligner)))
 
         if stdout:
             # Output is going to stdout, so we need to redirect it to the temp file

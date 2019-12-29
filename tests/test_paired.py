@@ -153,8 +153,8 @@ def test_unmatched_read_names(run_trimmer, input_data, tmp_path):
     with open_(swapped, "w") as f:
         f.writelines(lines)
     result = TrimCommandConsole.execute([
-        "-a", "XX", "-o", out1, "-p", out2, "-pe1", swapped, "-pe2",
-        input_data("paired.2.fastq")
+        "-a", "XX", "-o", str(out1), "-p", str(out2), "-pe1", str(swapped), "-pe2",
+        str(input_data("paired.2.fastq"))
     ])
     assert isinstance(result, tuple)
     assert len(result) == 2
@@ -449,9 +449,9 @@ def test_no_writer_process(run_trimmer, aligner):
     )
     # TODO: If the final worker doesn't get the chance to process any
     #  batches, the last output file is never created.
-    for i in (1,2):
+    for i in (1, 2):
         for j in (0, 1):
-            assert (output_dir / f"out.{i}.{j}.fastq").exists()
+            assert (output_dir / f"tmp{i}-out.{i}.{j}.fastq").exists()
 
 
 @pytest.mark.parametrize("aligner", BACK_ALIGNERS)
@@ -471,7 +471,7 @@ def test_summary(run_trimmer, aligner):
     assert summary is not None
     assert isinstance(summary, dict)
     assert summary["command"] == "trim"
-    assert summary["options"]["orig_args"] == [
+    assert summary["options"]["orig_args"] == (
         "--threads",
         "2",
         "-a",
@@ -480,15 +480,15 @@ def test_summary(run_trimmer, aligner):
         "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT",
         "--aligner",
         aligner,
-        "-o",
-        str(output_dir / "out.1.fastq"),
-        "-p",
-        str(output_dir / "out.2.fastq"),
         "-pe1",
         str(infiles[0]),
         "-pe2",
         str(infiles[1]),
-    ]
+        "-o",
+        str(output_dir / "tmp1-out.1.fastq"),
+        "-p",
+        str(output_dir / "tmp2-out.2.fastq"),
+    )
     assert summary["sample_id"] == "big"
     assert summary["mode"] == "parallel"
     assert summary["threads"] == 2
@@ -507,8 +507,8 @@ def test_summary(run_trimmer, aligner):
 def test_sam(run_trimmer):
     run_trimmer(
         "-a TTAGACATAT -A CAGTGGAGTA -m 14 --output-format sam",
-        "paired.sam",
         "paired_insert.sam",
+        "paired.sam",
         interleaved_input=True,
         interleaved_output=True,
         aligner="insert",
