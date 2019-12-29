@@ -376,32 +376,6 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
 
         group = parser.add_group("Modifications", title="Additional read modifications")
-
-        # UMIs
-        group.add_argument(
-            "--read1_umi",
-            type=int,
-            default=None,
-            metavar="N",
-            help="Clip N UMI bases from the 5' end of read 1 and append them "
-            "to the read name. (default: 0)",
-        )
-        group.add_argument(
-            "--read2_umi",
-            type=int,
-            default=None,
-            metavar="N",
-            help="Clip N UMI bases from the 5' end of read 2 and append them "
-            "to the read name. (default: 0)",
-        )
-        group.add_argument(
-            "--umi-delim",
-            default=":",
-            metavar="CHAR",
-            help="Delimiter for separating UMI from read ID. (default: ':')",
-        )
-
-        # Core operations
         group.add_argument(
             "--op-order",
             type=CharList(choices=("A", "C", "G", "Q", "W")),  # TODO: convert to enum
@@ -450,8 +424,6 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "trimming, and only if a minimum of LENGTH bases was not "
             "already removed. (no)",
         )
-        # TODO: the name of this option should be changed to more generally refer to
-        # trimming two-color chemistry artifacts. (--twocolor-trim)
         group.add_argument(
             "--twocolor-trim",
             type=positive(),
@@ -495,6 +467,30 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "with the correct length of the trimmed read. For example, "
             "use --length-tag 'length=' to correct fields like "
             "'length=123'. (no)",
+        )
+
+        group = parser.add_group("UMIs", title="UMI options")
+        group.add_argument(
+            "--read1-umi",
+            type=int,
+            default=None,
+            metavar="N",
+            help="Clip N UMI bases from the 5' end of read 1 and append them "
+            "to the read name. Mutually exclusive with '--umi-input'. (default: 0)",
+        )
+        group.add_argument(
+            "--read2-umi",
+            type=int,
+            default=None,
+            metavar="N",
+            help="Clip N UMI bases from the 5' end of read 2 and append them "
+            "to the read name. Mutually exclusive with '--umi-input'. (default: 0)",
+        )
+        group.add_argument(
+            "--umi-delim",
+            default=":",
+            metavar="CHAR",
+            help="Delimiter for separating UMI from read ID. (default: ':')",
         )
 
         group = parser.add_group("Filtering", title="Filtering of processed reads")
@@ -1016,11 +1012,17 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 paired = "first"
 
             options.paired = paired
-        elif options.untrimmed_paired_output:
-            parser.error(
-                "Option --untrimmed-paired-output can only be used when "
-                "trimming paired-end reads (with option -p)."
-            )
+        else:
+            if options.read2_umi:
+                parser.error(
+                    "Cannot use '--read2-umi' with single-end input."
+                )
+
+            if options.untrimmed_paired_output:
+                parser.error(
+                    "Option --untrimmed-paired-output can only be used when "
+                    "trimming paired-end reads (with option -p)."
+                )
 
         # Send report to stderr if main output will be going to stdout
         if options.output == options.report_file:
@@ -1149,6 +1151,12 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                     parser.error("Too many bisulfite parameters for single-end reads")
 
                 options.bisulfite = temp
+
+        if (options.read1_umi or options.read2_umi) and options.umi_input:
+            parser.error(
+                "UMIs may be specified using either '--umi-input' or "
+                "'--read1-umi'/'--read2-umi', not both"
+            )
 
         if options.overwrite_low_quality:
             if not paired:

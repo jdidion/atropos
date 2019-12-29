@@ -6,11 +6,11 @@ from typing import (
 )
 
 from xphyle import xopen
-from xphyle.types import ModeArg, PathOrFile
+from xphyle.types import ModeArg
 from xphyle.utils import uncompressed_size
 
 from atropos.io import InputRead
-from atropos.io.sequence import Sequence
+from atropos.io.sequence import FormatError, Sequence
 from atropos.utils import classproperty
 from atropos.utils.ngs import Alphabet
 from atropos.utils.collections import Summarizable
@@ -191,8 +191,14 @@ class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
     inspected before iteration begins.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        umi_reader: Optional[SequenceReaderBase] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
+        self._umi_reader = umi_reader
         self._seq_iter = self._iter()
         try:
             self._first_seq = next(self._seq_iter)
@@ -202,8 +208,33 @@ class PrefetchSequenceReader(SequenceReader, metaclass=ABCMeta):
     def __iter__(self) -> Iterator[Union[Sequence, Tuple[Sequence, Sequence]]]:
         if self._first_seq is None:
             return
-        yield self._first_seq
-        yield from self._seq_iter
+
+        if self._umi_reader:
+            umi_itr = iter(self._umi_reader)
+
+            def add_umi(
+                _read_or_pair: Union[Sequence, Tuple[Sequence, Sequence]]
+            ) -> Union[Sequence, Tuple[Sequence, Sequence]]:
+                try:
+                    umi_read = next(umi_itr)
+                except StopIteration:
+                    raise FormatError("There are more reads than UMIs.")
+
+                if isinstance(_read_or_pair, Sequence):
+                    _read_or_pair.umi = umi_read.sequence
+                else:
+                    # Only set the UMI on one of the reads, since the modifier merges
+                    # the UMIs from both reads
+                    _read_or_pair[0].umi = umi_read.sequence
+
+                return _read_or_pair
+
+            yield add_umi(self._first_seq)
+            for read_or_pair in self._seq_iter:
+                yield add_umi(read_or_pair)
+        else:
+            yield self._first_seq
+            yield from self._seq_iter
 
     @abstractmethod
     def _iter(self) -> Iterator[Tuple[Sequence, ...]]:

@@ -2,8 +2,14 @@
 
 ## 2.0.0-alpha.2 (dev)
 
+* *Breaking changes:*
+  * Renamed '--read1_umi' and '--read2-umi' options to '--read1-umi' and '--read2-umi'
 * Replace pysam with bamnostic
 * Re-enable testing on Python 3.8
+* Added '--umi-input' option to obtain UMIs from a separate input file
+* Refactored test code to use pytest fixtures and generate coverage metrics
+* Added `--umi-input` option to satisfy #66: Support UMIs from a third input file.
+* When writing SAM output for reads with UMIs, write the UMIs using the `BC` tag.
 
 ## 2.0.0-alpha.1 (2019-12-25)
 

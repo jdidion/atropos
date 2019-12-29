@@ -319,12 +319,16 @@ class TrimCommand(BaseCommand):
         else:
             modifiers = SingleEndModifiers()
 
-        if options.read1_umi or options.read2_umi:
+        trim_umis = options.read1_umi or options.read2_umi
+
+        if trim_umis:
             modifiers.add_modifier_pair(
                 UmiTrimmer,
                 dict(number_of_bases=options.read1_umi),
                 dict(number_of_bases=options.read2_umi),
             )
+
+        if trim_umis or options.umi_input:
             if options.paired:
                 modifiers.add_modifier(SyncUmi, delim=options.umi_delim)
             else:

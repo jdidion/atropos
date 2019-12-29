@@ -352,7 +352,8 @@ class PairedSequenceReader(SequenceReaderBase):
         quality_base: int = 33,
         colorspace: bool = False,
         file_format: bool = None,
-        alphabet: Optional[Alphabet] = None
+        alphabet: Optional[Alphabet] = None,
+        umi_reader: Optional[SequenceReaderBase] = None,
     ):
         """
         Args:
@@ -360,20 +361,15 @@ class PairedSequenceReader(SequenceReaderBase):
             colorspace: Whether the sequences are in colorspace.
             file_format: A file_format instance.
         """
-        self._reader1 = open_reader(
-            file1,
+        open_kwargs = dict(
             colorspace=colorspace,
             quality_base=quality_base,
             file_format=file_format,
             alphabet=alphabet,
         )
-        self._reader2 = open_reader(
-            file2,
-            colorspace=colorspace,
-            quality_base=quality_base,
-            file_format=file_format,
-            alphabet=alphabet,
-        )
+        self._reader1 = open_reader(file1, **open_kwargs)
+        self._reader2 = open_reader(file2, **open_kwargs)
+        self._umi_reader = umi_reader
 
     @property
     def input_names(self):
@@ -417,6 +413,7 @@ class PairedSequenceReader(SequenceReaderBase):
         # Avoid usage of zip() below since it will consume one item too many.
         it1 = iter(self._reader1)
         it2 = iter(self._reader2)
+        it3 = iter(self._umi_reader) if self._umi_reader else None
 
         while True:
             try:
@@ -449,6 +446,16 @@ class PairedSequenceReader(SequenceReaderBase):
                     f"does not match '{read2.name}' in file 2."
                 )
 
+            if it3:
+                try:
+                    umi_read = next(it3)
+                except StopIteration:
+                    raise FormatError("There are more reads than UMIs.")
+
+                # Only set the UMI on one of the reads, since the modifier merges the
+                # UMIs from both reads
+                read1.umi = umi_read.sequence
+
             yield read1, read2
 
     def close(self):
@@ -457,6 +464,8 @@ class PairedSequenceReader(SequenceReaderBase):
         """
         self._reader1.close()
         self._reader2.close()
+        if self._umi_reader:
+            self._umi_reader.close()
 
     def __enter__(self):
         return self
@@ -993,6 +1002,7 @@ class FileWithPrependedLine:
 def open_reader(
     file1=None,
     file2=None,
+    umi_input=None,
     ngstream_reader=None,
     qualfile: Union[str, Path, Iterator[str]] = None,
     quality_base: Optional[int] = None,
@@ -1009,6 +1019,7 @@ def open_reader(
     Args:
         file1: Path to read1 regular or compressed file or file-like object.
         file2: Path to read2 regular or compressed file or file-like object.
+        umi_input: Path to input file with UMIs.
         ngstream_reader: An ngstream.Protocol object.
         qualfile: Path to qualfile regular or compressed file or file-like object. If
             specified, then file1 must be a FASTA file and sequences are single-end.
@@ -1040,6 +1051,14 @@ def open_reader(
 
         alphabet = ALPHABETS[alphabet]
 
+    umi_reader = None
+
+    if umi_input:
+        # Currently, only FASTQ is supported for UMI input
+        umi_reader = FastqReader(
+            umi_input, quality_base=quality_base, alphabet=alphabet
+        )
+
     if file2 is not None:
         return PairedSequenceReader(
             file1,
@@ -1048,6 +1067,7 @@ def open_reader(
             colorspace=colorspace,
             file_format=file_format,
             alphabet=alphabet,
+            umi_reader=umi_reader,
         )
 
     if qualfile is not None:
@@ -1126,7 +1146,10 @@ def open_reader(
             elif file_format == "fastq":
                 reader_class = ColorspaceFastqReader if colorspace else FastqReader
                 reader = reader_class(
-                    file1, quality_base=quality_base, alphabet=alphabet
+                    file1,
+                    quality_base=quality_base,
+                    alphabet=alphabet,
+                    umi_reader=umi_reader,
                 )
             elif file_format == "sra-fastq" and colorspace:
                 def sra_colorspace_sequence_factory(

@@ -168,6 +168,9 @@ class BaseCommand(Command, metaclass=ABCMeta):
                 interleaved=interleaved,
             )
 
+        if options.umi_input:
+            open_args.update(umi_file=options.umi_input)
+
         self.reader = reader = open_reader(**open_args)
 
         # Wrap reader in subsampler

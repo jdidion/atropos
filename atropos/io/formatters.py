@@ -56,7 +56,7 @@ class FastaFormat(SequenceFileFormat):
         if self._text_wrapper:
             sequence = self._text_wrapper.fill(sequence)
 
-        return "".join((">", name, "\n", sequence, "\n"))
+        return f">{name}\n{sequence}\n"
 
 
 class ColorspaceFastaFormat(FastaFormat):
@@ -83,9 +83,7 @@ class FastqFormat(SequenceFileFormat):
         """
         Converts a sequence record to a string.
         """
-        return "".join(
-            ("@", name, "\n", sequence, "\n+", name2 or "", "\n", qualities, "\n")
-        )
+        return f"@{name}\n{sequence}\n+{name2 or ''}\n{qualities}\n"
 
 
 class ColorspaceFastqFormat(FastqFormat):
@@ -108,18 +106,9 @@ class SAMFormat(SequenceFileFormat):
         self._flag = str(flag)
 
     def format(self, read: Sequence) -> str:
-        return "".join(
-            (
-                read.name,
-                "\t",
-                self._flag,
-                "\t*\t0\t0\t*\t*\t0\t0\t",
-                read.sequence,
-                "\t",
-                read.qualities,
-                "\n",
-            )
-        )
+        umi = f"\tBC:Z:{read.umi}" if read.umi else ""
+        return f"{read.name}\t{self._flag}\t*\t0\t0\t*\t*\t0\t0\t{read.sequence}\t" \
+               f"{read.qualities}{umi}\n"
 
 
 class Formatter(metaclass=ABCMeta):

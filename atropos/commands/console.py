@@ -364,6 +364,13 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
         help="A single-end qual file.",
     )
     group.add_argument(
+        "--umi-input",
+        type=readable_file,
+        default=None,
+        metavar="FILE",
+        help="Read UMIs from a separate input file."
+    )
+    group.add_argument(
         "--accession",
         default=None,
         metavar="ACCN",
