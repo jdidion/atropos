@@ -23,7 +23,7 @@ from atropos.io import SequenceFileType
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
     AtroposArgumentParser,
-    EnumAction,
+    EnumNameAction,
     EnumCharList,
     Delimited,
     Namespace,
@@ -229,7 +229,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         group.add_argument(
             "--aligner",
-            action=EnumAction,
+            action=EnumNameAction,
             const=AlignerType,
             default=AlignerType.ADAPTER,
             metavar="TYPE",
@@ -367,7 +367,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--correct-mismatches",
-            action=EnumAction,
+            action=EnumNameAction,
             const=MismatchAction,
             default=MismatchAction.NONE,
             metavar="ACTION",
@@ -565,7 +565,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--output-format",
-            action=EnumAction,
+            action=EnumNameAction,
             const=SequenceFileType,
             metavar="FORMAT",
             help="The format of the output file. If not specified, the output "
@@ -798,7 +798,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--pair-filter",
-            action=EnumAction,
+            action=EnumNameAction,
             const=PairFilter,
             metavar="TYPE",
             help="Which of the reads in a paired-end read have to match the "
@@ -909,7 +909,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--compression-mode",
-            action=EnumAction,
+            action=EnumNameAction,
             const=CompressionMode,
             metavar="MODE",
             help="Where data compression should be performed. Defaults to "

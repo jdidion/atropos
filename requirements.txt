@@ -5,5 +5,5 @@ contextvars==2.4
 immutables==0.11
 setuptools-scm==3.3.3
 pokrok==0.2.0
-xphyle==4.2.1
+xphyle==4.2.2
 wheel==0.33.6

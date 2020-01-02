@@ -259,10 +259,13 @@ def estimate_num_records(
     Returns:
         Integer estimate of the number of records in the file.
     """
-    file_size = uncompressed_size(input_file) - header_size
+    usize = uncompressed_size(input_file)
 
-    if file_size is not None:
-        return int(file_size / (record_size + (lineseps * LINESEP_LEN) + format_chars))
+    if usize:
+        return int(
+            (usize - header_size) /
+            (record_size + (lineseps * LINESEP_LEN) + format_chars)
+        )
 
 
 def sequence_names_match(read1: Sequence, read2: Sequence) -> bool:

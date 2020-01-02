@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from argparse import (
     Action, ArgumentParser, ArgumentTypeError, HelpFormatter, Namespace,
 )
@@ -11,6 +12,7 @@ from typing import (
     Callable,
     Sequence,
     List,
+    Tuple,
     Type,
     TypeVar,
     Generic,
@@ -37,20 +39,25 @@ from atropos.utils import Magnitude
 T = TypeVar("T")
 
 
-class EnumAction(Action):
+class EnumAction(Action, metaclass=ABCMeta):
     """
     This action performs conversion from string to enum. This is done in an action
     rather than by using a type conversion to enable enum choices to be printed as
     string values.
     """
 
-    def __init__(self, const: Type[T], **kwargs) -> None:
-        self._enum_class = const
-
-        kwargs["choices"] = tuple(e.name.lower().replace("_", "-") for e in const)
+    def __init__(
+        self, const: Union[Type[T], Tuple[Type[T], Sequence[T]]], **kwargs
+    ) -> None:
+        if isinstance(const, tuple):
+            self._enum_class = const[0]
+            kwargs["choices"] = self._get_choices(const[1])
+        else:
+            self._enum_class = const
+            kwargs["choices"] = self._get_choices(const)
 
         if "metavar" not in kwargs or kwargs["metavar"] is None:
-            kwargs["metavar"] = const.__name__.upper()
+            kwargs["metavar"] = self._enum_class.__name__.upper()
 
         super().__init__(**kwargs)
 
@@ -61,20 +68,38 @@ class EnumAction(Action):
         values: Union[Text, Sequence[Any], None],
         option_string: Optional[Text] = None
     ) -> None:
-        def to_enum_value(val):
-            try:
-                return self._enum_class[val.upper().replace("-", "_")]
-            except KeyError:
-                return self._enum_class(val)
-
         if values is None:
             enum_value = None
         elif isinstance(values, Text):
-            enum_value = to_enum_value(values)
+            enum_value = self._to_enum_value(values)
         else:
-            enum_value = tuple(to_enum_value(value) for value in values)
+            enum_value = tuple(self._to_enum_value(value) for value in values)
 
         setattr(namespace, self.dest, enum_value)
+
+    @abstractmethod
+    def _get_choices(self, choices: Sequence[T]) -> Tuple[str]:
+        pass
+
+    @abstractmethod
+    def _to_enum_value(self, value):
+        pass
+
+
+class EnumNameAction(EnumAction):
+    def _get_choices(self, choices: Sequence[T]) -> Tuple[str]:
+        return tuple(str(c.name).lower().replace("_", "-") for c in choices)
+
+    def _to_enum_value(self, value):
+        return self._enum_class[value.upper().replace("-", "_")]
+
+
+class EnumValueAction(EnumAction):
+    def _get_choices(self, choices: Sequence[T]) -> Tuple[str]:
+        return tuple(str(c.value) for c in choices)
+
+    def _to_enum_value(self, value):
+        return self._enum_class(value)
 
 
 class AtroposArgumentParser(ArgumentParser):

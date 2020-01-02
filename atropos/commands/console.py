@@ -16,11 +16,12 @@ from atropos.io import InputRead, SequenceFileType
 from atropos.utils import (
     LOGGING_CONFIG, ReturnCode, classproperty
 )
-from atropos.utils.argparse import EnumAction, ParagraphHelpFormatter
-from atropos.utils.paths import splitext_compressed
 from atropos.utils.argparse import (
     AtroposArgumentParser,
+    EnumNameAction,
+    EnumValueAction,
     Namespace,
+    ParagraphHelpFormatter,
     int_or_str,
     positive,
     probability,
@@ -28,6 +29,8 @@ from atropos.utils.argparse import (
     writable_file,
 )
 from atropos.utils.ngs import ALPHABETS
+from atropos.utils.paths import splitext_compressed
+from atropos.utils.progress import ProgressBarType
 
 
 class CommandConsole(metaclass=ABCMeta):
@@ -279,11 +282,12 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     parser.add_argument(
         "--progress",
         nargs="?",
-        choices=("bar", "msg"),  # TODO: make enum
-        default=False,
+        action=EnumNameAction,
+        const=ProgressBarType,
+        default=ProgressBarType.NONE,
         help="Show progress. An optional argument determines what type of progress "
-        "meter to use: bar = progress bar; msg = status message. Otherwise the default "
-        "progress meter is shown. (now)"
+        "meter to use: bar = progress bar; msg = status message; any = show any type "
+        "of progress meter; none = do not show a progress meter. (none)"
     )
     parser.add_argument(
         "--quiet",
@@ -293,7 +297,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     )
     parser.add_argument(
         "--log-level",
-        choices=("DEBUG", "INFO", "WARN", "ERROR"),  # TODO: make enum
+        choices=tuple(logger._core.levels.keys()),  # TODO: accessing protected member
         default=None,
         help="Logging level. (ERROR when --quiet else INFO)",
     )
@@ -345,9 +349,9 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     )
     group.add_argument(
         "--single-input-read",
-        type=int,
+        action=EnumValueAction,
+        const=(InputRead, (InputRead.READ1, InputRead.READ2)),
         dest="input_read",
-        choices=(1, 2),  # TODO: make enum
         default=None,
         help="When treating an interleaved FASTQ or paired-end SAM/BAM "
         "file as single-end, this option specifies which of the two "
@@ -387,7 +391,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     group.add_argument(
         "-f",
         "--input-format",
-        action=EnumAction,
+        action=EnumNameAction,
         const=SequenceFileType,
         default=None,
         help="Input file format. Ignored when reading csfasta/qual files. "
@@ -555,13 +559,9 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
             options.sample_id = name
 
     if options.quiet:
-        options.progress = False
-    else:
-        if options.progress is None:
-            options.progress = True
-
-        if options.progress and options.output == STDERR:
-            logger.warning("Progress bar may corrupt output written to STDERR")
+        options.progress = ProgressBarType.NONE
+    elif options.progress != ProgressBarType.NONE and options.output == STDERR:
+        logger.warning("Progress bar may corrupt output written to STDERR")
 
     if options.report_file in (STDOUT, STDERR) and options.quiet:
         logger.warning("Quiet mode - report will not be written to stdout")

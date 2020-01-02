@@ -32,7 +32,10 @@ class FastqReader(PrefetchSequenceReader):
         return False
 
     def estimate_num_records(self):
-        return estimate_num_records(self.name, self._first_seq.size_in_bytes, 4, 2)
+        if self._first_seq is None:
+            return 0
+        else:
+            return estimate_num_records(self.name, self._first_seq.size_in_bytes, 4, 2)
 
     def _iter(self):
         """

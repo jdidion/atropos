@@ -144,7 +144,7 @@ install_requirements = [
     f"Cython>={min_cython_version}",
     "loguru>=0.4.0",
     "pokrok>=0.2.0",
-    "xphyle>=4.2.1",
+    "xphyle>=4.2.2",
 ]
 test_requirements = [
     "pytest",

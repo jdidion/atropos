@@ -3,10 +3,9 @@ import errno
 from importlib import import_module
 from pathlib import Path
 import sys
-from typing import Callable, Iterable, Iterator, Optional, Tuple, TypeVar
+from typing import Callable, Iterable, Optional, Tuple, TypeVar
 
 from loguru import logger
-import pokrok
 from xphyle import STDOUT, STDERR
 
 from atropos.errors import AtroposError
@@ -158,56 +157,6 @@ def run_interruptible(func: Callable, *args, **kwargs) -> ReturnCode:
         logger.exception("Unknown error")
         retcode = ReturnCode.ERROR
     return retcode
-
-
-def create_progress_reader(
-    reader: Iterable[T],
-    progress_type: str = "bar",
-    batch_size: int = 1,
-    max_items: Optional[int] = None,
-    **kwargs
-) -> Iterator[T]:
-    """
-    Wraps an iterable in a progress bar of the specified type.
-
-    Args:
-        reader: The iterable to wrap.
-        progress_type: msg = a custom progress bar that reports via log
-            messages; bar = use a ProgressBar (from the progressbar library)
-            or tqdm.
-        max_items: Max number of items, if known in advance.
-        batch_size: The number of records in each iterable item (iterable is
-            typically a BatchReader).
-        kwargs: Additional arguments to pass to the progress bar constructor.
-
-    Returns:
-        A wrapped iterable. If `progress_type == 'bar'` and neither of the
-        supported libraries are available, a warning is logged and the unwrapped
-        reader is returned.
-    """
-    if progress_type == "msg":
-        pokrok.set_plugins(["logging"])
-
-    if max_items:
-        widgets = [
-            pokrok.Widget.COUNTER,
-            pokrok.Widget.PERCENT,
-            pokrok.Widget.ELAPSED,
-            pokrok.Widget.BAR,
-            pokrok.Widget.ETA,
-        ]
-    else:
-        widgets = [pokrok.Widget.COUNTER, pokrok.Widget.ELAPSED, pokrok.Widget.SPINNER]
-
-    return pokrok.progress_iter(
-        reader,
-        desc="Processed",
-        size=max_items,
-        unit="records",
-        multiplier=batch_size,
-        style=pokrok.Style(widgets),
-        **kwargs,
-    )
 
 
 def no_import(lib):

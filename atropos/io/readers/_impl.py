@@ -108,8 +108,8 @@ class FastaReader(PrefetchSequenceReader):
     def estimate_num_records(self):
         # TODO: this will underestimate the record size (and thus overestimate the
         #  total number of records) for FASTA files with wrapped sequence lines.
-        record_size = sum(seq.size_in_bytes() for seq in self._first_seq)
-        return estimate_num_records([self.name], record_size, 2, 1)
+        record_size = sum(seq.size_in_bytes for seq in self._first_seq)
+        return estimate_num_records(self.name, record_size, 2, 1)
 
 
 class NgstreamSequenceReader(SequenceReader):
@@ -666,7 +666,7 @@ class SAMParser(BaseSAMParser):
     def estimate_num_records(self) -> Optional[int]:
         record_len = len("\t".join(self._next_line))
         return estimate_num_records(
-            self._sam_file, record_len, 1, header_size=self._header_size
+            self._sam_file.name, record_len, 1, header_size=self._header_size
         )
 
     def __next__(self) -> SAMRead:

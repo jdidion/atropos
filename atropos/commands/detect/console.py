@@ -6,7 +6,7 @@ from atropos.commands.detect.reports import DetectReportGenerator, FastaOption
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
     AtroposArgumentParser,
-    EnumAction,
+    EnumNameAction,
     Namespace,
     positive,
     readable_url,
@@ -77,7 +77,7 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         group.add_argument(
             "-i",
             "--include-contaminants",
-            action=EnumAction,
+            action=EnumNameAction,
             const=Include,
             default=Include.ALL,
             help="What conaminants to search for: 'all', only known "
@@ -174,7 +174,7 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         )
         group.add_argument(
             "--fasta",
-            action=EnumAction,
+            action=EnumNameAction,
             const=FastaOption,
             default=FastaOption.UNION,
             nargs="?",

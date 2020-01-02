@@ -10,9 +10,10 @@ from atropos import __version__
 from atropos.adapters import AdapterCache
 from atropos.errors import AtroposError
 from atropos.io.readers import Sequence, open_reader
-from atropos.utils import ReturnCode, classproperty, create_progress_reader
+from atropos.utils import ReturnCode, classproperty
 from atropos.utils.argparse import Namespace
 from atropos.utils.collections import Const, MergingDict, Summarizable, Timing
+from atropos.utils.progress import ProgressBarType, create_progress_reader
 
 
 EXCEPTION_KEY = "exception"
@@ -195,7 +196,7 @@ class BaseCommand(Command, metaclass=ABCMeta):
 
         self.iterable = enumerate(reader, 1)
 
-        if options.progress:
+        if options.progress != ProgressBarType.NONE:
             max_reads = self.get_option("max_reads")
 
             if not max_reads:
@@ -227,11 +228,11 @@ class BaseCommand(Command, metaclass=ABCMeta):
         BaseCommand is itself an iterable, and will be wrapped with a progress bar if
         `_progress_options` is True.
         """
-        if not self._progress_options:
+        if self._progress_options:
+            # Wrap iterator in progress bar
+            return create_progress_reader(self, *self._progress_options)
+        else:
             return self
-
-        # Wrap iterator in progress bar
-        return create_progress_reader(self, *self._progress_options)
 
     def merge_summary(self, summary: dict) -> None:
         if isinstance(self.summary, MergingDict):

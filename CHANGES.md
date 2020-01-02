@@ -7,10 +7,11 @@
   * `detect --fasta` option now accepts only a single value, either 'perinput', 'union', or 'both'
 * Replace pysam with bamnostic
 * Re-enable testing on Python 3.8
-* Added '--umi-input' option to obtain UMIs from a separate input file
-* Refactored test code to use pytest fixtures and generate coverage metrics
-* Added `--umi-input` option to satisfy #66: Support UMIs from a third input file.
+* Added '--umi-input' option to obtain UMIs from a separate input file.
+  * This addresses #66: Support UMIs from a third input file.
 * When writing SAM output for reads with UMIs, write the UMIs using the `BC` tag.
+* Refactored test code to use pytest fixtures and generate coverage metrics
+* Upgrade to xphyle 4.2.2
 
 ## 2.0.0-alpha.1 (2019-12-25)
 
