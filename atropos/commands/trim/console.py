@@ -14,15 +14,18 @@ from atropos.commands.console import (
 )
 from atropos.commands.legacy_reports import LegacyReportGenerator
 from atropos.commands.metrics import MetricsMode
-from atropos.commands.trim import TrimCommand, choose_compression_mode
+from atropos.commands.trim import (
+    AlignerType, PairFilter, TrimCommand, TrimOperation, choose_compression_mode
+)
 from atropos.commands.trim.modifiers import MismatchAction, TrimAction
-from atropos.io import guess_format_from_name
+from atropos.commands.trim.pipeline import CompressionMode
+from atropos.io import SequenceFileType
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
     AtroposArgumentParser,
-    CharList,
+    EnumAction,
+    EnumCharList,
     Delimited,
-    EnumChoice,
     Namespace,
     int_or_str,
     positive,
@@ -107,8 +110,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         validate_common_options(options, parser)
         cls._validate_trim_options(options, parser)
 
-    @staticmethod
-    def _add_trim_options(parser: AtroposArgumentParser):
+    @classmethod
+    def _add_trim_options(cls, parser: AtroposArgumentParser):
         parser.set_defaults(
             zero_cap=None,
             action=TrimAction.TRIM,
@@ -212,7 +215,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "--mask-adapter",
             action="store_const",
             dest="action",
-            const=TrimAction.MASK,  # TODO: replace with enum
+            const=TrimAction.MASK,
             help="Mask adapters with 'N' characters instead of trimming them. (no)",
         )
         group.add_argument(
@@ -226,8 +229,10 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         group.add_argument(
             "--aligner",
-            choices=("adapter", "insert"),  # TODO: replace with enum
-            default="adapter",
+            action=EnumAction,
+            const=AlignerType,
+            default=AlignerType.ADAPTER,
+            metavar="TYPE",
             help="Which alignment algorithm to use for identifying adapters. "
             "Currently, you can choose between the semi-global alignment "
             "strategy used in Cutdapt ('adapter') or the more accurate "
@@ -362,9 +367,10 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--correct-mismatches",
-            type=EnumChoice(MismatchAction),
-            choices=tuple(m.value for m in MismatchAction),
+            action=EnumAction,
+            const=MismatchAction,
             default=MismatchAction.NONE,
+            metavar="ACTION",
             help="How to handle mismatches while aligning/merging. 'Liberal' "
             "and 'conservative' error correction both involve setting the "
             "base to the one with the best quality. They differ only when "
@@ -378,8 +384,14 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group = parser.add_group("Modifications", title="Additional read modifications")
         group.add_argument(
             "--op-order",
-            type=CharList(choices=("A", "C", "G", "Q", "W")),  # TODO: convert to enum
-            default="CGQAW",
+            type=EnumCharList(TrimOperation),
+            default=(
+                TrimOperation.CUT,
+                TrimOperation.TWOCOLOR_TRIM,
+                TrimOperation.QUALITY_TRIM,
+                TrimOperation.ADAPTER_TRIM,
+                TrimOperation.OVERWRITE
+            ),
             help="The order in which trimming operations are be applied. This "
             "is a string of the following characters: A = adapter trimming; C = "
             "cutting (unconditional); G = two-color polyG trimming; Q = quality "
@@ -553,9 +565,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--output-format",
-            choices=("fasta", "fastq", "sam"),  # TODO: convert to enum
+            action=EnumAction,
+            const=SequenceFileType,
             metavar="FORMAT",
-            default=None,
             help="The format of the output file. If not specified, the output "
             "format is determined from the filename. Defaults to FASTQ when writing to "
             "stdout. Note: BAM output is not (yet) supported, but you can output to "
@@ -634,7 +646,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         group.add_argument(
             "--report-formats",
             nargs="*",
-            choices=("txt", "json", "yaml", "pickle"),  # TODO: convert to enum
+            choices=cls.list_report_formats(),
             default=None,
             metavar="FORMAT",
             help="Report type(s) to generate. If multiple, '--report-file' "
@@ -786,9 +798,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--pair-filter",
-            choices=("any", "both"),  # TODO: Convert to enum
-            default=None,
-            metavar="(any|both)",
+            action=EnumAction,
+            const=PairFilter,
+            metavar="TYPE",
             help="Which of the reads in a paired-end read have to match the "
             "filtering criterion in order for it to be filtered. (any)",
         )
@@ -897,8 +909,9 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
         group.add_argument(
             "--compression-mode",
-            choices=("worker", "writer"),  # TODO: convert to enum
-            default=None,
+            action=EnumAction,
+            const=CompressionMode,
+            metavar="MODE",
             help="Where data compression should be performed. Defaults to "
             "'writer' if system-level compression can be used and "
             "(1 < threads < 8), otherwise defaults to 'worker'.",
@@ -929,8 +942,8 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
         )
 
         if options.output_format is None and options.output is not None:
-            options.output_format = guess_format_from_name(
-                options.output, raise_on_failure=True
+            options.output_format = SequenceFileType.guess_from_name(
+                options.output, output=True, raise_on_failure=True
             )
 
         if paired or paired_implicit:
@@ -941,7 +954,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                     parser.error("Cannot specify both interleaved and paired output.")
 
                 options.use_interleaved_output = True
-            elif options.output_format == "sam":
+            elif options.output_format == SequenceFileType.SAM:
                 if any_output:
                     parser.error("SAM output must be specified using the -l option")
 
@@ -1034,7 +1047,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             options.report_file = (STDERR if options.output is STDOUT else STDOUT)
 
         # TODO: This is pretty confusing logic - need to simplify
-        if options.aligner == "adapter":
+        if options.aligner == AlignerType.ADAPTER:
             if options.indels and options.indel_cost is None:
                 options.indel_cost = DEFAULT_ADAPTER_INDEL_COST
 
@@ -1046,7 +1059,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                     options.overlap = DEFAULT_ADAPTER_MIN_OVERLAP
                 else:
                     options.overlap = DEFAULT_ADAPTER_MIN_OVERLAP_WITH_RMP
-        elif options.aligner == "insert":
+        elif options.aligner == AlignerType.INSERT:
             if paired != "both":
                 parser.error("Insert aligner only works with paired-end reads")
 
@@ -1174,7 +1187,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 options.quality_cutoff = [0] + options.quality_cutoff
 
         if options.pair_filter is None:
-            options.pair_filter = "any"
+            options.pair_filter = PairFilter.ANY
 
         if (options.discard_trimmed or options.discard_untrimmed) and (
             options.untrimmed_output is not None
@@ -1294,7 +1307,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
             if options.compression_mode is None:
                 options.compression_mode = choose_compression_mode(options)
-            elif options.compression_mode == "writer":
+            elif options.compression_mode == CompressionMode.WRITER:
                 if not options.writer_process:
                     parser.error(
                         "Writer compression and --no-writer-process are "
@@ -1305,13 +1318,13 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                         "Writer compression requires > 2 threads; using worker "
                         "compression instead"
                     )
-                    options.compression_mode = "worker"
+                    options.compression_mode = CompressionMode.WORKER
 
             # Set queue sizes if necessary.
             # If we are using writer compression, the back-up will be in the
             # result queue, otherwise it will be in the read queue.
             if options.read_queue_size is None:
-                if options.compression_mode == "writer":
+                if options.compression_mode == CompressionMode.WRITER:
                     read_queue_multiplier = WRITER_READ_QUEUE_SIZE_MULTIPLER
                 else:
                     read_queue_multiplier = WORKER_READ_QUEUE_SIZE_MULTIPLIER
@@ -1321,7 +1334,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
                 parser.error("Read queue size must be >= 'threads'")
 
             if options.result_queue_size is None:
-                if options.compression_mode == "worker":
+                if options.compression_mode == CompressionMode.WORKER:
                     result_queue_multiplier = WORKER_RESULT_QUEUE_SIZE_MULTIPLIER
                 else:
                     result_queue_multiplier = WRITER_RESULT_QUEUE_SIZE_MULTIPLIER

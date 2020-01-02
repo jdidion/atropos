@@ -2,10 +2,15 @@ from argparse import Namespace
 
 import math
 import textwrap
-from typing import Any, Dict, IO, Optional, Sequence, Tuple, TypeVar, Union, cast
+from typing import (
+    Any, Dict, IO, Optional, Sequence, Tuple, TypeVar, Union, cast,
+    Callable,
+)
 
-from atropos.commands.reports import BaseReportGenerator, BaseReportWriter, ReportWriter
-from atropos.utils import truncate_string
+from atropos.commands.reports import (
+    DefaultReportGenerator, BaseReportWriter, ReportWriter
+)
+from atropos.utils import classproperty, truncate_string
 from atropos.utils.statistics import weighted_median
 
 
@@ -288,8 +293,12 @@ class RowPrinter(Printer):
 
 
 class LegacyTextReportWriter(BaseReportWriter):
+    @classproperty
+    def extensions(cls) -> Sequence[str]:
+        return "txt",
+
     def __init__(self, options: Namespace):
-        super().__init__("txt", options)
+        super().__init__(options)
 
     def serialize(self, summary: dict, stream: IO) -> None:
         self._print_summary_report(summary, stream)
@@ -1072,10 +1081,9 @@ def sizeof(*x: Union[str, int, float], seps: bool = True, prec: int = 1):
         return numlen
 
 
-class LegacyReportGenerator(BaseReportGenerator):
-    @classmethod
-    def _create_report_writer(cls, fmt: str, options: Namespace) -> ReportWriter:
-        if fmt == "txt":
-            return LegacyTextReportWriter(options)
-        else:
-            return super()._create_report_writer(fmt, options)
+class LegacyReportGenerator(DefaultReportGenerator):
+    @classproperty
+    def report_formats(cls) -> Dict[str, Callable[[Namespace], ReportWriter]]:
+        report_formats = super().report_formats
+        report_formats["txt"] = LegacyTextReportWriter
+        return report_formats

@@ -3,7 +3,9 @@ from collections import defaultdict
 from enum import IntFlag
 import math
 import re
-from typing import Iterable, Optional, Sequence as SequenceType, Tuple, Union
+from typing import (
+    Dict, Iterable, Optional, Sequence as SequenceType, Tuple, Type, Union
+)
 
 from loguru import logger
 
@@ -17,7 +19,8 @@ from atropos.commands import (
     Summary,
 )
 from atropos.io.sequence import Sequence
-from atropos.utils import ReturnCode, classproperty, run_interruptible
+from atropos.utils import ReturnCode, classproperty, no_import, run_interruptible
+from atropos.utils.argparse import Namespace
 from atropos.utils.collections import Summarizable
 from atropos.utils.ngs import reverse_complement, sequence_complexity
 
@@ -37,39 +40,26 @@ class DetectCommand(BaseCommand):
         else:
             include = Include.ALL
 
-        known_contaminants = None
-        if include != Include.UNKNOWN:
+        if include == Include.UNKNOWN:
+            known_contaminants = None
+        else:
             known_contaminants = self._load_known_adapters()
 
-        detector = self.get_option("detector")
-        if not detector:
-            if known_contaminants and include == Include.KNOWN:
-                detector = "known"
-            elif n_reads <= 50000:
-                detector = "heuristic"
-            else:
-                detector = "khmer"
+        detector_name = self.get_option("detector")
 
-        detector_args = dict(known_contaminants=known_contaminants)
-
-        if detector == "known":
-            logger.debug("Detecting contaminants using the known-only algorithm")
+        if detector_name:
+            detector_class = DETECTORS[detector_name]
+        elif known_contaminants and include == Include.KNOWN:
             detector_class = KnownContaminantDetector
-            detector_args["min_kmer_match_frac"] = self.get_option(
-                "min_kmer_match_frac"
-            )
-        elif detector == "heuristic":
-            logger.debug("Detecting contaminants using the heuristic algorithm")
+        elif n_reads <= 50000 or no_import("khmer"):
             detector_class = HeuristicDetector
-            detector_args["min_frequency"] = self.get_option("min_frequency")
-            detector_args["min_contaminant_match_frac"] = self.get_option(
-                "min_contaminant_match_frac"
-            )
-        elif detector == "khmer":
-            logger.debug("Detecting contaminants using the kmer-based algorithm")
-            detector_class = KhmerDetector
         else:
-            raise ValueError(f"Invalid value for 'detector': {detector}")
+            detector_class = KhmerDetector
+
+        detector_args = dict(
+            options=self.options,
+            known_contaminants=known_contaminants
+        )
 
         summary_args = dict(
             kmer_size=kmer_size,
@@ -95,11 +85,10 @@ class DetectCommand(BaseCommand):
         self.summary.update(mode="serial", threads=1)
 
         logger.info(
-            "Detecting adapters and other potential contaminant "
-            "sequences based on %d-mers in %d reads",
-            kmer_size,
-            n_reads,
+            f"Detecting adapters and other potential contaminant sequences based on "
+            f"{kmer_size}-mers in {n_reads} reads using {detector_class.description}"
         )
+
         return run_interruptible(detector, self, raise_on_error=True)
 
 
@@ -191,7 +180,7 @@ class Match(Summarizable):
         self,
         seq_or_contam: Union[str, ContaminantMatcher],
         count: int = 0,
-        names: Optional[SequenceType[str]] = None,
+        names: Optional[Iterable[str]] = None,
         match_frac: Optional[float] = None,
         match_frac2: Optional[float] = None,
         abundance: Optional[float] = None,
@@ -332,10 +321,37 @@ class Include(IntFlag):
     ALL = KNOWN | UNKNOWN
 
 
-class Detector(SingleEndPipelineMixin, Pipeline, metaclass=ABCMeta):
+DETECTORS: Dict[str, Type["Detector"]] = {}
+
+
+def list_detectors() -> Tuple[str]:
+    return tuple(DETECTORS.keys())
+
+
+class DetectorMeta(ABCMeta):
+    def __init__(cls: Type["Detector"], name, bases, namespace):
+        super().__init__(name, bases, namespace)
+        # Avoid registering the base class
+        if not (
+            hasattr(cls, "__abstractmethods__") and getattr(cls, "__abstractmethods__")
+        ):
+            DETECTORS[cls.name] = cls
+
+
+class Detector(SingleEndPipelineMixin, Pipeline, metaclass=DetectorMeta):
     """
     Base class for contaminant detectors.
     """
+
+    @classproperty
+    @abstractmethod
+    def name(cls) -> str:
+        pass
+
+    @classproperty
+    @abstractmethod
+    def description(cls) -> str:
+        pass
 
     def __init__(
         self,
@@ -343,7 +359,7 @@ class Detector(SingleEndPipelineMixin, Pipeline, metaclass=ABCMeta):
         n_reads: int = 10000,
         overrep_cutoff: int = 100,
         include: Include = Include.ALL,
-        known_contaminants=None,
+        known_contaminants: Optional[AdapterCache] = None,
         past_end_bases: SequenceType[str] = ("A",),
     ):
         """
@@ -571,11 +587,16 @@ class KnownContaminantDetector(Detector):
     contaminants.
     """
 
+    @classproperty
+    def name(cls) -> str:
+        return "known"
+
+    @classproperty
+    def description(cls) -> str:
+        return "the known-only algorithm"
+
     def __init__(
-        self,
-        known_contaminants: AdapterCache,
-        min_kmer_match_frac: float = 0.5,
-        **kwargs
+        self, options: Namespace, known_contaminants: AdapterCache, **kwargs
     ):
         """
         Args:
@@ -585,7 +606,7 @@ class KnownContaminantDetector(Detector):
                 constructor.
         """
         super().__init__(known_contaminants=known_contaminants, **kwargs)
-        self.min_kmer_match_frac = min_kmer_match_frac
+        self.min_kmer_match_frac = options.min_kmer_match_frac
         self._min_k = min(len(s) for s in known_contaminants.sequences)
 
     @property
@@ -639,15 +660,18 @@ class HeuristicDetector(Detector):
     and becomes too slow/memory-intenstive when n_reads > 50k.
     """
 
-    def __init__(
-        self,
-        min_frequency: float = 0.001,
-        min_contaminant_match_frac: float = 0.9,
-        **kwargs,
-    ):
+    @classproperty
+    def name(cls) -> str:
+        return "heeuristic"
+
+    @classproperty
+    def description(cls) -> str:
+        return "the heuristic algorithm"
+
+    def __init__(self, options: Namespace, **kwargs):
         super().__init__(**kwargs)
-        self.min_frequency = min_frequency
-        self.min_contaminant_match_frac = min_contaminant_match_frac
+        self.min_frequency = options.min_frequency
+        self.min_contaminant_match_frac = options.min_contaminant_match_frac
 
     @property
     def min_report_freq(self) -> float:
@@ -846,6 +870,17 @@ class KhmerDetector(Detector):
     approach (as implemented in the khmer library). This approach is fast but
     not as accurate as the other two.
     """
+
+    @classproperty
+    def name(cls) -> str:
+        return "khmer"
+
+    @classproperty
+    def description(cls) -> str:
+        return "the kmer-based algorithm"
+
+    def __init__(self, options: Namespace, **kwargs):
+        super().__init__(**kwargs)
 
     @property
     def min_report_freq(self) -> float:

@@ -5,9 +5,9 @@ import pytest
 from xphyle import open_
 
 from atropos.console import execute_cli
-from atropos.utils import LOGGING_CONFIG, ReturnCode
+from atropos.utils import LOGGING_CONFIG, ReturnCode, no_import
 
-from .utils import no_internet, no_import
+from .utils import no_internet
 
 try:
     import lzma

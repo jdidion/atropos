@@ -3,6 +3,7 @@
 from atropos.errors import FormatError
 from atropos.utils import classproperty
 
+from . import SequenceFileType
 from ._base import PrefetchSequenceReader, estimate_num_records
 
 
@@ -11,8 +12,8 @@ class FastqReader(PrefetchSequenceReader):
     Reader for FASTQ files. Does not support multi-line FASTQ files.
     """
     @classproperty
-    def file_format(cls) -> str:
-        return "FASTQ"
+    def file_format(cls) -> SequenceFileType:
+        return SequenceFileType.FASTQ
 
     @classproperty
     def delivers_qualities(cls) -> bool:

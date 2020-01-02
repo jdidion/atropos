@@ -1,4 +1,3 @@
-from importlib import import_module
 from subprocess import CalledProcessError
 import urllib.request
 
@@ -22,15 +21,4 @@ def no_internet(url="https://github.com"):
         urllib.request.urlopen(url).info()
         return False
     except:
-        return True
-
-
-def no_import(lib):
-    """
-    Tests whether a library is importable.
-    """
-    try:
-        mod = import_module(lib)
-        return mod is None
-    except ImportError:
         return True

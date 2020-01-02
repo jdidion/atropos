@@ -1,7 +1,6 @@
 tests = tests
 package = atropos
-#pytestops = --full-trace
-#pytestops = -v -s
+#pytestopts = -s -vv --show-capture=all
 repo = jdidion/$(package)
 desc = Release $(version)
 

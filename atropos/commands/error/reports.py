@@ -1,14 +1,21 @@
 from itertools import repeat
-from typing import IO
+from typing import IO, Sequence, Dict, Callable
 
-from atropos.commands.reports import BaseReportGenerator, BaseReportWriter, ReportWriter
+from atropos.commands.reports import (
+    DefaultReportGenerator, BaseReportWriter, ReportWriter
+)
 from atropos.commands.legacy_reports import Printer, TitlePrinter
+from atropos.utils import classproperty
 from atropos.utils.argparse import Namespace
 
 
 class ErrorTextReportWriter(BaseReportWriter):
+    @classproperty
+    def extensions(self) -> Sequence[str]:
+        return "txt",
+
     def __init__(self, options: Namespace):
-        super().__init__("txt", options)
+        super().__init__(options)
 
     def serialize(self, summary: dict, stream: IO) -> None:
         names = summary['input']['input_names'] or repeat(None)
@@ -67,10 +74,9 @@ class ErrorTextReportWriter(BaseReportWriter):
                 )
 
 
-class ErrorReportGenerator(BaseReportGenerator):
-    @classmethod
-    def _create_report_writer(cls, fmt: str, options: Namespace) -> ReportWriter:
-        if fmt == "txt":
-            return ErrorTextReportWriter(options)
-        else:
-            return super()._create_report_writer(fmt, options)
+class ErrorReportGenerator(DefaultReportGenerator):
+    @classproperty
+    def report_formats(cls) -> Dict[str, Callable[[Namespace], ReportWriter]]:
+        report_formats = super().report_formats()
+        report_formats["txt"] = ErrorTextReportWriter
+        return report_formats

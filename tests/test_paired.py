@@ -4,11 +4,14 @@ import pytest
 from xphyle import open_
 
 from atropos.console import execute_cli
+from atropos.commands.trim import AlignerType
 from atropos.commands.trim.console import TrimCommandConsole
 from atropos.utils import ReturnCode
 
 
-BACK_ALIGNERS = ("adapter", "insert")
+BACK_ALIGNERS = tuple(
+    a.name.lower() for a in (AlignerType.ADAPTER, AlignerType.INSERT)
+)
 
 
 def test_paired_separate(run_trimmer):

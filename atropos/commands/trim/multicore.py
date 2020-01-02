@@ -11,6 +11,7 @@ from atropos.commands.multicore import (
     MulticorePipelineMixin, ParallelPipelineRunner, WorkerProcess
 )
 from atropos.commands.trim.pipeline import (
+    CompressionMode,
     RecordHandler,
     ResultHandler,
     WorkerResultHandler,
@@ -56,19 +57,20 @@ class WriterManager:
     def __init__(
         self,
         writers: Writers,
-        compression_mode: str,
+        compression_mode: CompressionMode,
         preserve_order: bool,
         result_queue: Queue,
         timeout: int,
     ):
-        # result handler
+        compressed = (compression_mode == CompressionMode.WORKER)
+
         if preserve_order:
             writer_result_handler = OrderPreservingWriterResultHandler(
-                writers, compressed=compression_mode == "worker"
+                writers, compressed=compressed
             )
         else:
             writer_result_handler = WriterResultHandler(
-                writers, compressed=compression_mode == "worker"
+                writers, compressed=compressed
             )
 
         self.timeout = timeout
@@ -364,7 +366,7 @@ def run_multicore(
     result_queue_size: int,
     writer_process: bool,
     preserve_order: bool,
-    compression_mode: str,
+    compression_mode: CompressionMode,
     compression_format: str,
     process_timeout: int,
 ) -> ReturnCode:
@@ -446,7 +448,7 @@ def run_multicore(
 
     # Reserve a thread for the writer process if it will be doing the compression
     # and if one is available.
-    if compression_mode == "writer" and threads > 2:
+    if compression_mode == CompressionMode.WRITER and threads > 2:
         threads -= 1
 
     # Queue by which results are sent from the worker processes to the writer
@@ -455,7 +457,7 @@ def run_multicore(
     writer_manager = None
 
     if writer_process:
-        if compression_mode == "writer":
+        if compression_mode == CompressionMode.WRITER:
             worker_result_handler = WorkerResultHandler(
                 QueueResultHandler(result_queue)
             )

@@ -4,6 +4,7 @@
 
 * *Breaking changes:*
   * Renamed '--read1_umi' and '--read2-umi' options to '--read1-umi' and '--read2-umi'
+  * `detect --fasta` option now accepts only a single value, either 'perinput', 'union', or 'both'
 * Replace pysam with bamnostic
 * Re-enable testing on Python 3.8
 * Added '--umi-input' option to obtain UMIs from a separate input file

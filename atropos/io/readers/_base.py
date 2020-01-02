@@ -9,7 +9,7 @@ from xphyle import xopen
 from xphyle.types import ModeArg
 from xphyle.utils import uncompressed_size
 
-from atropos.io import InputRead
+from atropos.io import InputRead, SequenceFileType
 from atropos.io.sequence import FormatError, Sequence
 from atropos.utils import classproperty
 from atropos.utils.ngs import Alphabet
@@ -28,7 +28,7 @@ class SequenceReaderBase(
 
     @classproperty
     @abstractmethod
-    def file_format(cls) -> str:
+    def file_format(cls) -> SequenceFileType:
         pass
 
     @classproperty

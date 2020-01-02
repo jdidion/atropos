@@ -1,10 +1,23 @@
-from argparse import ArgumentParser, ArgumentTypeError, HelpFormatter, Namespace
+from argparse import (
+    Action, ArgumentParser, ArgumentTypeError, HelpFormatter, Namespace,
+)
 from numbers import Number
 import operator
 from pathlib import Path
 import re
 import textwrap
-from typing import Callable, Sequence, List, Type, TypeVar, Generic, Union, Optional
+from typing import (
+    Any,
+    Callable,
+    Sequence,
+    List,
+    Type,
+    TypeVar,
+    Generic,
+    Union,
+    Optional,
+    Text,
+)
 from urllib.parse import urlparse
 
 from xphyle.paths import (
@@ -19,6 +32,49 @@ from xphyle.paths import (
 from xphyle.types import PathLike, PathType, Permission
 
 from atropos.utils import Magnitude
+
+
+T = TypeVar("T")
+
+
+class EnumAction(Action):
+    """
+    This action performs conversion from string to enum. This is done in an action
+    rather than by using a type conversion to enable enum choices to be printed as
+    string values.
+    """
+
+    def __init__(self, const: Type[T], **kwargs) -> None:
+        self._enum_class = const
+
+        kwargs["choices"] = tuple(e.name.lower().replace("_", "-") for e in const)
+
+        if "metavar" not in kwargs or kwargs["metavar"] is None:
+            kwargs["metavar"] = const.__name__.upper()
+
+        super().__init__(**kwargs)
+
+    def __call__(
+        self,
+        parser: ArgumentParser,
+        namespace: Namespace,
+        values: Union[Text, Sequence[Any], None],
+        option_string: Optional[Text] = None
+    ) -> None:
+        def to_enum_value(val):
+            try:
+                return self._enum_class[val.upper().replace("-", "_")]
+            except KeyError:
+                return self._enum_class(val)
+
+        if values is None:
+            enum_value = None
+        elif isinstance(values, Text):
+            enum_value = to_enum_value(values)
+        else:
+            enum_value = tuple(to_enum_value(value) for value in values)
+
+        setattr(namespace, self.dest, enum_value)
 
 
 class AtroposArgumentParser(ArgumentParser):
@@ -73,9 +129,6 @@ class ParagraphHelpFormatter(HelpFormatter):
         return "\n\n".join(paragraphs)
 
 
-T = TypeVar("T")
-
-
 class CompositeType:
     """A composite of multiple data types.
     """
@@ -107,26 +160,6 @@ class ComparisonValidator(Generic[T]):
             )
 
         return lhs
-
-
-class CharList:
-    """
-    Parses a string into a list of characters and ensures they are all in the choices
-    tuple.
-    """
-
-    def __init__(self, choices):
-        self.choices = set(choices)
-
-    def __call__(self, string):
-        chars = list(string)
-
-        if not all(char in self.choices for char in chars):
-            raise ArgumentTypeError(
-                f"One or more characters in {chars} not in {self.choices}"
-            )
-
-        return chars
 
 
 class Delimited(Generic[T]):
@@ -167,12 +200,21 @@ class Delimited(Generic[T]):
         return vals
 
 
-class EnumChoice(Generic[T]):
-    def __init__(self, enum_class: Callable[[str], T] = None):
+class EnumCharList:
+    """
+    Parses a string into a list of characters and then converts each into an enum value.
+    """
+
+    def __init__(self, enum_class: Callable[[str], T]):
         self.enum_class = enum_class
 
-    def __call__(self, arg: str) -> T:
-        return self.enum_class(arg)
+    def __call__(self, string: str) -> Sequence[T]:
+        try:
+            return [self.enum_class(c) for c in string]
+        except KeyError:
+            raise ArgumentTypeError(
+                f"One or more characters in {string} not a {self.enum_class}"
+            )
 
 
 class AccessiblePath:

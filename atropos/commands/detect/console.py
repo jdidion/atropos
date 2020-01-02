@@ -1,11 +1,12 @@
 from atropos.commands.console import (
     BaseCommandConsole, add_common_options, validate_common_options
 )
-from atropos.commands.detect import DetectCommand
-from atropos.commands.detect.reports import DetectReportGenerator
+from atropos.commands.detect import DetectCommand, Include, list_detectors
+from atropos.commands.detect.reports import DetectReportGenerator, FastaOption
 from atropos.utils import classproperty
 from atropos.utils.argparse import (
     AtroposArgumentParser,
+    EnumAction,
     Namespace,
     positive,
     readable_url,
@@ -44,14 +45,14 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         validate_common_options(options, parser)
         cls._validate_detect_options(options, parser)
 
-    @staticmethod
-    def _add_detect_options(parser):
+    @classmethod
+    def _add_detect_options(cls, parser):
         parser.set_defaults(max_reads=10000, counter_magnitude="K")
         group = parser.add_group("Adapter Detection")
         group.add_argument(
             "-d",
             "--detector",
-            choices=("known", "heuristic", "khmer"),
+            choices=list_detectors(),
             default=None,
             help="Which detector to use. (automatically choose based on other options)",
         )
@@ -76,9 +77,10 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         group.add_argument(
             "-i",
             "--include-contaminants",
-            choices=("all", "known", "unknown"),
-            default="all",
-            help="What conaminants to search for: all, only known "
+            action=EnumAction,
+            const=Include,
+            default=Include.ALL,
+            help="What conaminants to search for: 'all', only known "
             "adapters/contaminants ('known'), or only unknown contaminants "
             "('unknown'). (all)",
         )
@@ -159,7 +161,7 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
             "-O",
             "--output-formats",
             nargs="*",
-            choices=("txt", "fasta", "json", "yaml", "pickle"),
+            choices=cls.list_report_formats(),
             default=None,
             metavar="FORMAT",
             dest="report_formats",
@@ -172,14 +174,15 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
         )
         group.add_argument(
             "--fasta",
-            nargs="*",
-            choices=("union", "perinput"),
-            default=None,
-            metavar="OPTIONS",
+            action=EnumAction,
+            const=FastaOption,
+            default=FastaOption.UNION,
+            nargs="?",
+            metavar="OPTION",
             help="Additional arguments for fasta output. Adds 'fasta' to the list of "
             "output formats if not already specified. Options are: perinput=generate "
             "one output file per input file, union=generate a single output file with "
-            "all sequences merged.",
+            "all sequences merged. (union)",
         )
         group.add_argument(
             "-m",
@@ -192,13 +195,16 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
     @staticmethod
     def _validate_detect_options(options, parser):
         options.report_file = options.output
+
         is_std = options.report_file in {STDOUT, STDERR}
+
         if options.fasta:
-            if is_std and "perinput" in options.fasta:
+            if is_std and (options.fasta & FastaOption.PERINPUT):
                 parser.error("Per-input fasta cannot be written to stdout")
+
             if not options.report_formats:
                 options.report_formats = ["fasta"]
             elif "fasta" not in options.report_formats:
                 options.report_formats = list(options.report_formats) + ["fasta"]
         elif is_std and options.report_formats and "fasta" in options.report_formats:
-            options.fasta = ["union"]
+            options.fasta = FastaOption.UNION

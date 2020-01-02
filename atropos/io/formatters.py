@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 from atropos.errors import UnknownFileTypeError
-from atropos.io import guess_format_from_name
+from atropos.io import SequenceFileType
 from atropos.io.sequence import Sequence, ColorspaceSequence
 
 
@@ -295,7 +295,7 @@ def create_seq_formatter(
     file2: Optional[Union[str, Path]] = None,
     qualities: Optional[bool] = None,
     colorspace: bool = False,
-    file_format: Optional[Union[str, SequenceFileFormat]] = None,
+    file_format: Optional[Union[SequenceFileType, SequenceFileFormat]] = None,
     interleaved: bool = False,
     line_length: Optional[int] = None,
     bam_header: Optional[dict] = None,
@@ -316,9 +316,8 @@ def create_seq_formatter(
               the auto-detected output format is FASTQ.
         colorspace: If True, instances of the Colorspace... formats are returned.
         file_format: If set to None, file format is autodetected from the file
-            name extension. Set to 'fasta', 'fastq', or 'sra-fastq' to not
-            auto-detect. Colorspace is not auto-detected and must always be
-            requested explicitly.
+            name extension. Set to FASTA, FASTQ, or SAM to not auto-detect.
+            Colorspace is not auto-detected and must always be requested explicitly.
         interleaved: Whether the output should be interleaved (file2 must be None).
         line_length: Maximum length of a sequence line in FASTA output.
         bam_header: If writing SAM format, optional headers to add at the beginning of
@@ -328,26 +327,30 @@ def create_seq_formatter(
         A Formatter instance.
     """
     if file_format is None:
-        file_format = guess_format_from_name(file1, raise_on_failure=qualities is None)
+        file_format = SequenceFileType.guess_from_name(
+            file1, output=True, raise_on_failure=qualities is None
+        )
 
-    if file_format is not None:
-        file_format = file_format.lower()
-    elif qualities is True:
-        # Format not recognized, but know we want to write reads with qualities.
-        file_format = "fastq"
-    elif qualities is False:
-        # Same, but we know that we want to write reads without qualities.
-        file_format = "fasta"
-    else:
-        raise UnknownFileTypeError("Could not determine file type.")
+    if file_format is None:
+        if qualities is True:
+            # Format not recognized, but know we want to write reads with qualities.
+            file_format = SequenceFileType.FASTQ
+        elif qualities is False:
+            # Same, but we know that we want to write reads without qualities.
+            file_format = SequenceFileType.FASTA
+        else:
+            raise UnknownFileTypeError("Could not determine file type.")
 
-    if file_format in ("sam", "fastq") and qualities is False:
+    if (
+        file_format in (SequenceFileType.FASTQ, SequenceFileType.SAM)
+        and qualities is False
+    ):
         raise ValueError(
             f"Output format cannot be {file_format} since no quality values are "
             f"available."
         )
 
-    if file_format == "sam":
+    if file_format == SequenceFileType.SAM:
         if file2 is not None:
             raise ValueError("Only one output file allowed for SAM format")
 
@@ -356,12 +359,12 @@ def create_seq_formatter(
         else:
             return SingleEndSAMFormatter(file1, bam_header)
     else:
-        if file_format == "fasta":
+        if file_format == SequenceFileType.FASTA:
             if colorspace:
                 fmt = ColorspaceFastaFormat(line_length)
             else:
                 fmt = FastaFormat(line_length)
-        elif file_format == "fastq":
+        elif file_format == SequenceFileType.FASTQ:
             if colorspace:
                 fmt = ColorspaceFastqFormat()
             else:

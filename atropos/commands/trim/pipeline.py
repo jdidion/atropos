@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from enum import Enum
 from multiprocessing import Process
 from typing import (
     Iterable,
@@ -15,6 +16,11 @@ from atropos.commands.trim.filters import Filter, Filters
 from atropos.commands.trim.writers import Formatters, Writers
 from atropos.io.sequence import Sequence
 from atropos.utils.collections import Summarizable
+
+
+class CompressionMode(Enum):
+    WORKER = "worker"
+    WRITER = "writer"
 
 
 class RecordHandler(Summarizable):

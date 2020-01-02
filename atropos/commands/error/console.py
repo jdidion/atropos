@@ -42,8 +42,8 @@ class ErrorCommandConsole(ErrorCommand, ErrorReportGenerator, BaseCommandConsole
         validate_common_options(options, parser)
         cls._validate_error_options(options, parser)
 
-    @staticmethod
-    def _add_error_options(parser: AtroposArgumentParser):
+    @classmethod
+    def _add_error_options(cls, parser: AtroposArgumentParser):
         parser.set_defaults(
             max_reads=10000, counter_magnitude="K", report_formats=['txt']
         )
@@ -77,7 +77,7 @@ class ErrorCommandConsole(ErrorCommand, ErrorReportGenerator, BaseCommandConsole
         group.add_argument(
             "--output_formats",
             nargs="*",
-            choices=("txt", "json", "yaml", "pickle"),
+            choices=cls.list_report_formats(),
             default=None,
             metavar="FORMAT",
             dest="report_formats",
@@ -85,7 +85,7 @@ class ErrorCommandConsole(ErrorCommand, ErrorReportGenerator, BaseCommandConsole
             "is treated as a prefix and the appropriate extensions are "
             "appended. If unspecified, the format is guessed from the "
             "file extension. Supported formats are: txt, json, yaml, "
-            "pickle. See the documentation for a  full description of "
+            "pickle. See the documentation for a full description of "
             "the structured output (json/yaml/pickle formats).",
         )
 

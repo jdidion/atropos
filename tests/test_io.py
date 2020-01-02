@@ -27,9 +27,8 @@ from atropos.io.readers import (
     open_reader,
     sequence_names_match
 )
+from atropos.utils import no_import
 from atropos.utils.ngs import ALPHABETS
-
-from .utils import no_import
 
 
 # files tests/data/simple.fast{q,a}

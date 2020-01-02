@@ -1,7 +1,8 @@
 from abc import ABCMeta, abstractmethod
+from functools import partial
 from importlib import import_module
 from pathlib import Path
-from typing import IO, Optional, Sequence
+from typing import Callable, Dict, IO, Optional, Sequence
 
 from xphyle import STDOUT, STDERR, open_
 
@@ -11,13 +12,13 @@ from atropos.utils.argparse import Namespace
 
 
 class ReportWriter(metaclass=ABCMeta):
-    def __init__(self, name: str, options: Namespace):
-        self.name = name
+    def __init__(self, options: Namespace):
         self.options = options
 
     @property
+    @abstractmethod
     def extensions(self) -> Sequence[str]:
-        return self.name,
+        pass
 
     @abstractmethod
     def write_report(self, summary: dict, output_file: Path) -> None:
@@ -62,10 +63,15 @@ class TemplateReportWriter(BaseReportWriter):
             template_globals: Dict of additional globals to add to the template
                 environment.
         """
-        super().__init__(name, options)
+        super().__init__(options)
+        self.name = name
         self.template_name = template_name
         self.template_paths = template_paths
         self.template_globals = template_globals
+
+    @property
+    def extensions(self) -> Sequence[str]:
+        return self.name,
 
     def serialize(self, summary: dict, stream: IO):
         """
@@ -87,19 +93,56 @@ class TemplateReportWriter(BaseReportWriter):
         stream.write(template.render(summary=summary))
 
 
-class DumpReportWriter(BaseReportWriter):
-    def __init__(self, name: str, options: Namespace):
-        super().__init__(name, options)
+class DumpReportWriter(BaseReportWriter, metaclass=ABCMeta):
+    def __init__(self, options: Namespace):
+        super().__init__(options)
+
+    @classproperty
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+    @property
+    def extensions(self) -> Sequence[str]:
+        return self.name,
 
     def serialize(self, summary: dict, stream: IO):
         mod = import_module(self.name)
         mod.dump(summary, stream)
 
 
-class BaseReportGenerator(metaclass=ABCMeta):
+class JsonReportWriter(DumpReportWriter):
+    @classproperty
+    def name(self) -> str:
+        return "json"
+
+
+class YamlReportWriter(DumpReportWriter):
+    @classproperty
+    def name(self) -> str:
+        return "yaml"
+
+
+class PickleReportWriter(DumpReportWriter):
+    @classproperty
+    def name(self) -> str:
+        return "pickle"
+
+
+class DefaultReportGenerator(metaclass=ABCMeta):
     """
     Base class for command report generators.
     """
+
+    @classproperty
+    def report_formats(cls) -> Dict[str, Callable[[Namespace], ReportWriter]]:
+        return dict((cls.name, cls) for cls in (
+            JsonReportWriter, YamlReportWriter, PickleReportWriter
+        ))
+
+    @classmethod
+    def list_report_formats(cls) -> Sequence[str]:
+        return tuple(sorted(cls.report_formats.keys()))
 
     @classproperty
     def default_report_formats(cls) -> Sequence[str]:
@@ -141,26 +184,29 @@ class BaseReportGenerator(metaclass=ABCMeta):
             )
         }
         inp = summary["input"]
-        fmt = inp["file_format"]
+        fmt = [inp["file_format"].name]
         if inp["input_read"] == InputRead.PAIRED:
-            fmt += ", Paired"
+            fmt.append("Paired")
         else:
-            fmt += f", Read {inp['input_read']}"
+            fmt.append(f"Read {inp['input_read']}")
         if inp["colorspace"]:
-            fmt += ", Colorspace"
+            fmt.append("Colorspace")
         if inp["interleaved"]:
-            fmt += ", Interleaved"
+            fmt.append("Interleaved")
         if inp["delivers_qualities"]:
-            fmt += ", w/ Qualities"
+            fmt.append("w/ Qualities")
         else:
-            fmt += ", w/o Qualities"
-        derived["input_format"] = fmt
+            fmt.append("w/o Qualities")
+        derived["input_format"] = ", ".join(fmt)
         summary["derived"] = derived
 
     @classmethod
     def _create_report_writer(cls, fmt: str, options: Namespace) -> ReportWriter:
-        if fmt in ("json", "yaml", "pickle"):
-            return DumpReportWriter(fmt, options)
+        report_formats = cls.report_formats
+
+        if fmt in report_formats:
+            report_writer_class = report_formats[fmt]
+            return report_writer_class(options)
         else:
             try:
                 return TemplateReportWriter(fmt, options)

@@ -1,18 +1,26 @@
 from argparse import Namespace
+from enum import IntFlag
 from itertools import repeat
 from pathlib import Path
-from typing import IO, Optional, Sequence
+from typing import IO, Optional, Sequence, Dict, Callable
 
 from xphyle import open_
 
 from atropos.commands.legacy_reports import Printer, TitlePrinter
-from atropos.commands.reports import BaseReportGenerator, ReportWriter, BaseReportWriter
+from atropos.commands.reports import (
+    DefaultReportGenerator, ReportWriter, BaseReportWriter
+)
 from atropos.io.formatters import FastaFormat
+from atropos.utils import classproperty
 
 
 class DetectTextReportWriter(BaseReportWriter):
+    @classproperty
+    def extensions(self) -> Sequence[str]:
+        return "txt",
+
     def __init__(self, options: Namespace):
-        super().__init__("txt", options)
+        super().__init__(options)
 
     def serialize(self, summary: dict, stream: IO) -> None:
         names = summary["input"]["input_names"] or repeat(None)
@@ -86,19 +94,23 @@ class DetectTextReportWriter(BaseReportWriter):
                 _print_indent(f"Number of k-mer matches: {match['kmer_freq']}")
 
 
+class FastaOption(IntFlag):
+    UNION = 1
+    PERINPUT = 2
+    BOTH = UNION | PERINPUT
+
+
 class DetectFastaReportWriter(ReportWriter):
     """
-
     """
+
+    @classproperty
+    def extensions(self) -> Sequence[str]:
+        return "fasta", "fa"
+
     def __init__(self, options: Namespace):
-        super().__init__("fasta", options)
-        self.union = False
-        if options.fasta:
-            self.perinput = False
-            for arg in options.fasta:
-                setattr(self, arg, True)
-        else:
-            self.perinput = True
+        super().__init__(options)
+        self._fasta_option = options.fasta or FastaOption.PERINPUT
 
     def write_report(self, summary: dict, output_file: Path):
         names = summary["input"]["input_names"] or repeat(None)
@@ -156,24 +168,22 @@ class DetectFastaReportWriter(ReportWriter):
             records = []
             for idx, match in enumerate(matches, 1):
                 format_match(idx, match, records)
-            if self.union:
+            if self._fasta_option & FastaOption.UNION:
                 union_records.extend(records)
-            if self.perinput:
+            if self._fasta_option & FastaOption.PERINPUT:
                 path = self._get_output_file(output_file, (f"{i}.fasta",))
                 with open_(path, "wt") as out:
                     out.write("".join(records))
 
-        if self.union:
+        if self._fasta_option & FastaOption.UNION:
             with open_(self._get_output_file(output_file), "wt") as stream:
                 stream.write("".join(union_records))
 
 
-class DetectReportGenerator(BaseReportGenerator):
-    @classmethod
-    def _create_report_writer(cls, fmt: str, options: Namespace) -> ReportWriter:
-        if fmt == "txt":
-            return DetectTextReportWriter(options)
-        elif fmt == "fasta":
-            return DetectFastaReportWriter(options)
-        else:
-            return super()._create_report_writer(fmt, options)
+class DetectReportGenerator(DefaultReportGenerator):
+    @classproperty
+    def report_formats(cls) -> Dict[str, Callable[[Namespace], ReportWriter]]:
+        report_formats = super().report_formats()
+        report_formats["txt"] = DetectTextReportWriter
+        report_formats["fasta"] = DetectFastaReportWriter
+        return report_formats

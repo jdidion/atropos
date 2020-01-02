@@ -45,8 +45,8 @@ class QcCommandConsole(QcCommand, LegacyReportGenerator, BaseCommandConsole):
         validate_common_options(options, parser)
         cls._validate_qc_options(options, parser)
 
-    @staticmethod
-    def _add_qc_options(parser: AtroposArgumentParser):
+    @classmethod
+    def _add_qc_options(cls, parser: AtroposArgumentParser):
         parser.set_defaults(action="qc", batch_size=None)
         group = parser.add_group("Output")
         group.add_argument(
@@ -63,7 +63,7 @@ class QcCommandConsole(QcCommand, LegacyReportGenerator, BaseCommandConsole):
         group.add_argument(
             "--report-formats",
             nargs="*",
-            choices=("txt", "json"),
+            choices=cls.list_report_formats(),
             default=None,
             metavar="FORMAT",
             help="Report type(s) to generate. If multiple, '--output' "

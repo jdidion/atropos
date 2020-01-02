@@ -12,13 +12,11 @@ from xphyle.paths import STDOUT, STDERR
 
 from atropos import __version__
 from atropos.commands import BaseCommand
-from atropos.io import InputRead
+from atropos.io import InputRead, SequenceFileType
 from atropos.utils import (
     LOGGING_CONFIG, ReturnCode, classproperty
 )
-from atropos.utils.argparse import (
-    ParagraphHelpFormatter
-)
+from atropos.utils.argparse import EnumAction, ParagraphHelpFormatter
 from atropos.utils.paths import splitext_compressed
 from atropos.utils.argparse import (
     AtroposArgumentParser,
@@ -281,10 +279,10 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     parser.add_argument(
         "--progress",
         nargs="?",
-        choices=("bar", "msg"),
+        choices=("bar", "msg"),  # TODO: make enum
         default=False,
         help="Show progress. An optional argument determines what type of progress "
-        "meter to use: bar = progress bar; msg = status message. Ohterwise the default "
+        "meter to use: bar = progress bar; msg = status message. Otherwise the default "
         "progress meter is shown. (now)"
     )
     parser.add_argument(
@@ -295,7 +293,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     )
     parser.add_argument(
         "--log-level",
-        choices=("DEBUG", "INFO", "WARN", "ERROR"),
+        choices=("DEBUG", "INFO", "WARN", "ERROR"),  # TODO: make enum
         default=None,
         help="Logging level. (ERROR when --quiet else INFO)",
     )
@@ -349,7 +347,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
         "--single-input-read",
         type=int,
         dest="input_read",
-        choices=(1, 2),
+        choices=(1, 2),  # TODO: make enum
         default=None,
         help="When treating an interleaved FASTQ or paired-end SAM/BAM "
         "file as single-end, this option specifies which of the two "
@@ -389,7 +387,8 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
     group.add_argument(
         "-f",
         "--input-format",
-        choices=("fasta", "fastq", "sra-fastq", "sam", "bam"),
+        action=EnumAction,
+        const=SequenceFileType,
         default=None,
         help="Input file format. Ignored when reading csfasta/qual files. "
         "(auto-detect from file name extension)",
@@ -464,8 +463,13 @@ def validate_common_options(options: Namespace, parser: AtroposArgumentParser) -
     # TODO: unit tests for SRA streaming
     if options.accession or options.query:
         if options.input_format is None:
-            options.input_format = "fastq"
-        elif options.input_format not in ("fastq", "sra-fastq", "sam", "bam"):
+            options.input_format = SequenceFileType.FASTQ
+        elif options.input_format not in {
+            SequenceFileType.FASTQ,
+            SequenceFileType.SRA_FASTQ,
+            SequenceFileType.SAM,
+            SequenceFileType.BAM,
+        }:
             raise ValueError(
                 f"Invalid file format for accession/query: {options.input_format}"
             )

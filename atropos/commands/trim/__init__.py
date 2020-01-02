@@ -1,9 +1,12 @@
 from collections import Sequence as SequenceCollection
+from enum import Enum
 from pathlib import Path
 import sys
 from typing import Dict, Optional, Tuple, Type, Union, cast
 
 from loguru import logger
+
+from atropos.io import SequenceFileType
 from xphyle import STDOUT, STDERR
 
 from atropos.adapters import AdapterParser, AdapterType
@@ -52,6 +55,7 @@ from atropos.commands.trim.modifiers import (
     Modifiers,
 )
 from atropos.commands.trim.pipeline import (
+    CompressionMode,
     RecordHandler,
     ResultHandler,
     TrimPipeline,
@@ -229,6 +233,24 @@ class TrimSummary(Summary):
                     dict_val[frac_key] = frac(value, sum_total_bp)
 
 
+class AlignerType(Enum):
+    ADAPTER = "adapter"
+    INSERT = "insert"
+
+
+class TrimOperation(Enum):
+    OVERWRITE = "W"
+    ADAPTER_TRIM = "A"
+    CUT = "C"
+    TWOCOLOR_TRIM = "G"
+    QUALITY_TRIM = "Q"
+
+
+class PairFilter(Enum):
+    ANY = "any"
+    BOTH = "both"
+
+
 class TrimCommand(BaseCommand):
     @classproperty
     def name(cls) -> str:
@@ -302,7 +324,7 @@ class TrimCommand(BaseCommand):
         ):
             raise ValueError("You need to provide at least one adapter sequence.")
 
-        if options.aligner == "insert" and any(
+        if options.aligner == AlignerType.INSERT and any(
             not a or len(a) != 1 or a[0].where != AdapterType.BACK
             for a in (adapters1, adapters2)
         ):
@@ -335,7 +357,7 @@ class TrimCommand(BaseCommand):
                 modifiers.add_modifier(AddUmi, delim=options.umi_delim)
 
         for oper in options.op_order:
-            if oper == "W" and options.overwrite_low_quality:
+            if oper == TrimOperation.OVERWRITE and options.overwrite_low_quality:
                 lowq, highq, window = options.overwrite_low_quality
                 modifiers.add_modifier(
                     OverwriteRead,
@@ -344,9 +366,9 @@ class TrimCommand(BaseCommand):
                     window_size=window,
                     base=options.quality_base,
                 )
-            elif oper == "A" and (adapters1 or adapters2):
+            elif oper == TrimOperation.ADAPTER_TRIM and (adapters1 or adapters2):
                 # TODO: generalize this using some kind of factory class
-                if options.aligner == "insert":
+                if options.aligner == AlignerType.INSERT:
                     # Use different base probabilities if we're trimming
                     # bisulfite data.
                     # TODO: this doesn't seem to help things, so commenting it
@@ -369,7 +391,7 @@ class TrimCommand(BaseCommand):
                         read_wildcards=options.match_read_wildcards,
                         adapter_wildcards=options.match_adapter_wildcards,
                     )
-                else:
+                elif options.aligner == AlignerType.ADAPTER:
                     a1_args = (
                         dict(
                             adapters=adapters1,
@@ -389,19 +411,22 @@ class TrimCommand(BaseCommand):
                         else None
                     )
                     modifiers.add_modifier_pair(AdapterCutter, a1_args, a2_args)
-            elif oper == "C" and (options.cut or options.cut2):
+            elif oper == TrimOperation.CUT and (options.cut or options.cut2):
                 modifiers.add_modifier_pair(
                     UnconditionalCutter,
                     dict(lengths=options.cut),
                     dict(lengths=options.cut2),
                 )
-            elif oper == "G" and (options.twocolor_trim is not None):
+            elif (
+                oper == TrimOperation.TWOCOLOR_TRIM
+                and (options.twocolor_trim is not None)
+            ):
                 modifiers.add_modifier(
                     TwoColorQualityTrimmer,
                     cutoff=options.twocolor_trim,
                     base=options.quality_base,
                 )
-            elif oper == "Q" and options.quality_cutoff:
+            elif oper == TrimOperation.QUALITY_TRIM and options.quality_cutoff:
                 modifiers.add_modifier(
                     QualityTrimmer,
                     cutoff_front=options.quality_cutoff[0],
@@ -481,9 +506,9 @@ class TrimCommand(BaseCommand):
 
         if options.output_format is None:
             if delivers_qualities:
-                options.output_format = "fastq"
+                options.output_format = SequenceFileType.FASTQ
             else:
-                options.output_format = "fasta"
+                options.output_format = SequenceFileType.FASTA
 
         seq_formatter_args = dict(
             file_format=options.output_format,
@@ -492,7 +517,7 @@ class TrimCommand(BaseCommand):
             interleaved=interleaved,
         )
         if (
-            options.output_format.lower() == "sam"
+            options.output_format == SequenceFileType.SAM
             and isinstance(self.reader, SAMReader)
         ):
             seq_formatter_args["bam_header"] = cast(SAMReader, self.reader).header
@@ -500,7 +525,7 @@ class TrimCommand(BaseCommand):
         formatters = Formatters(output1, seq_formatter_args)
 
         # Create filters
-        min_affected = 2 if options.pair_filter == "both" else 1
+        min_affected = 2 if options.pair_filter == PairFilter.BOTH else 1
         filters = Filters(FilterFactory(options.paired, min_affected))
         force_create = []
 
@@ -648,7 +673,7 @@ class TrimCommand(BaseCommand):
             )
 
 
-def choose_compression_mode(options: Namespace) -> str:
+def choose_compression_mode(options: Namespace) -> CompressionMode:
     if (
         options.output is None or
         options.output in (STDOUT, STDERR) or (
@@ -659,6 +684,6 @@ def choose_compression_mode(options: Namespace) -> str:
     ):
         # We must use a writer process to write to stdout/stderr. Otherwise, our
         # tests show that with 8 or more threads, worker compression is more efficient.
-        return "writer"
+        return CompressionMode.WRITER
     else:
-        return "worker"
+        return CompressionMode.WORKER

@@ -110,9 +110,6 @@ class AdapterType(int, Enum):
         return dict(name=self.name, desc=self.desc, flags=Const(self.value))
 
 
-ADAPTER_TYPE_NAMES = set(AdapterType.__members__.keys())
-
-
 MatchInfo = namedtuple(
     "MatchInfo",
     (
@@ -1411,8 +1408,6 @@ class AdapterParser:
     """
     Factory for Adapter classes that all use the same parameters (error rate,
     indels etc.). The given **kwargs will be passed to the Adapter constructors.
-
-    Todo: Use an enum for cmdline_type
     """
 
     def __init__(
@@ -1428,7 +1423,9 @@ class AdapterParser:
         self.constructor_args = kwargs
         self.adapter_class = ColorspaceAdapter if colorspace else Adapter
 
-    def parse(self, spec: str, cmdline_type: str = "back") -> Iterable[Adapter]:
+    def parse(
+        self, spec: str, where: AdapterType = AdapterType.BACK
+    ) -> Iterable[Adapter]:
         """
         Parse an adapter specification not using ``file:`` notation and return an
         object of an appropriate Adapter class. The notation for anchored 5' and 3'
@@ -1438,7 +1435,7 @@ class AdapterParser:
 
         Args:
             spec: The adapter spec.
-            cmdline_type: describes which commandline parameter was used (``-a``
+            where: describes which commandline parameter was used (``-a``
                 is 'back', ``-b`` is 'anywhere', and ``-g`` is 'front').
 
         Todo: describe the adapter spec format
@@ -1451,23 +1448,21 @@ class AdapterParser:
             with FastaReader(spec[5:]) as fasta:
                 for record in fasta:
                     name = record.name.split(None, 1)[0]
-                    yield self.parse_from_spec(record.sequence, cmdline_type, name)
+                    yield self.parse_from_spec(record.sequence, where, name)
         else:
-            yield self.parse_from_spec(spec, cmdline_type)
+            yield self.parse_from_spec(spec, where)
 
     def parse_from_spec(
-        self, spec: str, cmdline_type: str = "back", name: Optional[str] = None
+        self,
+        spec: str,
+        where: AdapterType = AdapterType.BACK,
+        name: Optional[str] =
+        None
     ) -> Union[Adapter, LinkedAdapter]:
         if name is None and spec is None:
             raise ValueError("Either name or spec must be given")
 
-        type_name = cmdline_type.upper()
-
-        if type_name not in ADAPTER_TYPE_NAMES:
-            raise ValueError(f"cmdline_type cannot be {cmdline_type!r}")
-
         orig_spec = spec
-        where = AdapterType[type_name]
 
         if name is None:
             if spec is None:
@@ -1590,11 +1585,11 @@ class AdapterParser:
         """
         return list(
             itertools.chain.from_iterable(
-                self.parse(spec, cmdline_type)
-                for specs, cmdline_type in (
-                    (back, "back"),
-                    (anywhere, "anywhere"),
-                    (front, "front"),
+                self.parse(spec, where)
+                for specs, where in (
+                    (back, AdapterType.BACK),
+                    (anywhere, AdapterType.ANYWHERE),
+                    (front, AdapterType.FRONT),
                 )
                 for spec in specs or ()
             )

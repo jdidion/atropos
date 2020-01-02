@@ -1,5 +1,6 @@
 from enum import Enum, IntEnum
 import errno
+from importlib import import_module
 from pathlib import Path
 import sys
 from typing import Callable, Iterable, Iterator, Optional, Tuple, TypeVar
@@ -207,3 +208,14 @@ def create_progress_reader(
         style=pokrok.Style(widgets),
         **kwargs,
     )
+
+
+def no_import(lib):
+    """
+    Tests whether a library is importable.
+    """
+    try:
+        mod = import_module(lib)
+        return mod is None
+    except ImportError:
+        return True
