@@ -997,7 +997,9 @@ class OverhangDetector(InsertAligner, PairedEndPipelineMixin, Detector):
         return seq1[insert_match_size:], seq2[insert_match_size:]
 
     def finish(self, summary: dict, **kwargs) -> None:
-        super().finish(summary, **kwargs)
+        # TODO: finish implementation
+        raise NotImplementedError()
+        # super().finish(summary, **kwargs)
         # summary["detect"]["matches"] = (
         #     [match.summarize() for match in self.read1_detector.matches(**kwargs)],
         #     [match.summarize() for match in self.read2_detector.matches(**kwargs)],

@@ -147,7 +147,7 @@ def test_match_probability():
     i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
     i4 = (120 / 24) * (0.25 ** 4) * 0.75
     i5 = 0.25 ** 5
-    assert a.match_probability(k, n) == pytest.approx(i3 + i4 + i5, 0.0001)
+    assert a._match_probability(k, n) == pytest.approx(i3 + i4 + i5, 0.0001)
 
 
 def test_insert_align():

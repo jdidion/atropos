@@ -1497,7 +1497,7 @@ class SingleEndModifiers(Modifiers):
             summary[mod.name] = dict(
                 (key, (value,)) for key, value in mod.summarize().items()
             )
-            summary[mod.name]["desc"] = mod.method
+            summary[mod.name]["desc"] = mod.description
 
         return summary
 
@@ -1571,7 +1571,7 @@ class PairedEndModifiers(Modifiers):
 
                 if mods[0]:
                     name = mods[0].name
-                    desc = mods[0].method
+                    desc = mods[0].description
                     summ1 = mods[0].summarize()
                     if summ1:
                         keys = summ1.keys()
@@ -1581,11 +1581,11 @@ class PairedEndModifiers(Modifiers):
                     if summ2:
                         if name:
                             assert name == mods[1].name
-                            assert desc == mods[1].method
+                            assert desc == mods[1].description
                             assert set(keys) == set(summ2.keys())
                         else:
                             name = mods[1].name
-                            desc = mods[1].method
+                            desc = mods[1].description
                             keys = summ2.keys()
 
                 if keys:
