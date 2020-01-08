@@ -21,7 +21,7 @@ from typing import (
     cast,
 )
 
-from atropos.adapters import Adapter, AdapterMatch, GapRule, InsertAligner
+from atropos.adapters import Adapter, AdapterMatch, GapRule, InsertAdapterMatcher
 from atropos.aligner import Aligner, MatchTuple
 from atropos.errors import AtroposError
 from atropos.io.sequence import Sequence
@@ -487,7 +487,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         ErrorCorrectorMixin.__init__(self, mismatch_action)
         self.adapter1 = adapter1
         self.adapter2 = adapter2
-        self.aligner = InsertAligner(
+        self.matcher = InsertAdapterMatcher(
             adapter1.sequence,
             adapter2.sequence,
             min_insert_overlap=min_insert_overlap,
@@ -504,7 +504,7 @@ class InsertAdapterCutter(ReadPairModifier, ErrorCorrectorMixin):
         if any(length < self.min_insert_len for length in read_lengths):
             return read1, read2
 
-        match = self.aligner.match_insert(read1.sequence, read2.sequence)
+        match = self.matcher.match_insert(read1.sequence, read2.sequence)
         read1.insert_overlap = read2.insert_overlap = match is not None
         insert_match = None
         correct_errors = False
@@ -1497,7 +1497,7 @@ class SingleEndModifiers(Modifiers):
             summary[mod.name] = dict(
                 (key, (value,)) for key, value in mod.summarize().items()
             )
-            summary[mod.name]["desc"] = mod.description
+            summary[mod.name]["desc"] = mod.method
 
         return summary
 
@@ -1571,7 +1571,7 @@ class PairedEndModifiers(Modifiers):
 
                 if mods[0]:
                     name = mods[0].name
-                    desc = mods[0].description
+                    desc = mods[0].method
                     summ1 = mods[0].summarize()
                     if summ1:
                         keys = summ1.keys()
@@ -1581,11 +1581,11 @@ class PairedEndModifiers(Modifiers):
                     if summ2:
                         if name:
                             assert name == mods[1].name
-                            assert desc == mods[1].description
+                            assert desc == mods[1].method
                             assert set(keys) == set(summ2.keys())
                         else:
                             name = mods[1].name
-                            desc = mods[1].description
+                            desc = mods[1].method
                             keys = summ2.keys()
 
                 if keys:

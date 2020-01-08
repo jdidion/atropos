@@ -4,6 +4,9 @@ from typing import Tuple
 from ._aligner import Aligner, MultiAligner, compare_prefixes, locate
 
 
+MatchTuple = Tuple[int, int, int, int, int, int]
+
+
 class GapRule(IntFlag):
     START_WITHIN_SEQ1 = 1
     """Gaps at begining of seq2 have no penalty."""
@@ -20,9 +23,6 @@ class GapRule(IntFlag):
         | STOP_WITHIN_SEQ2
     )
     """Typical semiglobal alignment (all gaps in the beginning or end are free)"""
-
-
-MatchTuple = Tuple[int, int, int, int, int, int]
 
 
 def compare_suffixes(

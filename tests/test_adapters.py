@@ -5,7 +5,7 @@ from atropos.adapters import (
     AdapterMatch,
     AdapterType,
     ColorspaceAdapter,
-    InsertAligner,
+    InsertAdapterMatcher,
     LinkedAdapter,
     parse_braces,
 )
@@ -141,7 +141,7 @@ def test_random_match_probabilities():
 
 
 def test_match_probability():
-    a = InsertAligner("TTAGACATAT", "CAGTGGAGTA")
+    a = InsertAdapterMatcher("TTAGACATAT", "CAGTGGAGTA")
     k = 3
     n = 5
     i3 = (120 / (6 * 2)) * (0.25 ** 3) * (0.75 ** 2)
@@ -153,7 +153,7 @@ def test_match_probability():
 def test_insert_align():
     a1_seq = "TTAGACATATGG"
     a2_seq = "CAGTGGAGTATA"
-    aligner = InsertAligner(a1_seq, a2_seq)
+    aligner = InsertAdapterMatcher(a1_seq, a2_seq)
     r1 = "AGTCGAGCCCATTGCAGACT" + a1_seq[0:10]
     r2 = "AGTCTGCAATGGGCTCGACT" + a2_seq[0:10]
     insert_match, match1, match2 = aligner.match_insert(r1, r2)
@@ -168,7 +168,7 @@ def test_short_adapter_overlap():
     a2_seq = "CAGTGGAGTA"
     seq1 = "GACAGGCCGTTTGAATGTTGACGGGATGTT"
     seq2 = "CATCCCGTCAACATTCAAACGGCCTGTCCA"
-    aligner = InsertAligner(a1_seq, a2_seq)
+    aligner = InsertAdapterMatcher(a1_seq, a2_seq)
     insert_match, match1, match2 = aligner.match_insert(seq1, seq2)
     assert match1.rstart == 28
     assert match1.length == 2

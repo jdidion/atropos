@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from enum import Enum
 import itertools
@@ -5,6 +6,7 @@ from pathlib import Path
 import pickle
 import re
 from typing import (
+    Any,
     Callable,
     Dict,
     Generic,
@@ -25,12 +27,19 @@ from xphyle import open_
 from xphyle.types import PathLike
 
 from atropos.aligner import (
-    Aligner, GapRule, MatchTuple, MultiAligner, compare_prefixes, compare_suffixes
+    Aligner,
+    GapRule,
+    MatchTuple,
+    MultiAligner,
+    compare_prefixes,
+    compare_suffixes,
 )
 from atropos.io.sequence import ColorspaceSequence, Sequence
 from atropos.io.readers import FastaReader
 from atropos.utils import colorspace
-from atropos.utils.collections import Const, CountingDict, MergingDict, NestedDict
+from atropos.utils.collections import (
+    Const, CountingDict, MergingDict, NestedDict, Summarizable
+)
 from atropos.utils.ngs import (
     ALPHABETS,
     GC_BASES,
@@ -51,16 +60,17 @@ DEFAULT_INSERT_MAX_RMP = 1e-6
 """Default value for InsertAligner max insert random match probability"""
 DEFAULT_ADAPTER_MAX_RMP = 0.001
 """Default value for InsertAligner max adapter random match probability"""
-DEFAULT_MIN_INSERT_OVERLAP = 1
-"""Default value for InsertAligner min insert overlap"""
-DEFAULT_MAX_INSERT_MISMATCH_FRAC = 0.2
-"""Default value for InsertAligner max insert mismatch fraction"""
 DEFAULT_MIN_ADAPTER_OVERLAP = 1
 """Default value for InsertAligner min adapter overlap"""
 DEFAULT_MAX_ADAPTER_MISMATCH_FRAC = 0.2
 """Default value for InsertAligner max adapter mismatch fraction"""
 DEFAULT_ADAPTER_CHECK_CUTOFF = 9
 """Default value for InsertAligner adapter check cutoff"""
+DEFAULT_MAX_INSERT_MISMATCH_FRAC = 0.2
+"""Default value for InsertAligner max insert mismatch fraction"""
+DEFAULT_MIN_INSERT_OVERLAP = 1
+"""Default value for InsertAligner min insert overlap"""
+
 
 M = TypeVar("M", bound="Match")
 S = TypeVar("S", bound=Sequence)
@@ -336,96 +346,38 @@ class AdapterMatch(Match, Generic[S]):
         )
 
 
-InsertMatchResult = Tuple[MatchTuple, Optional[AdapterMatch], Optional[AdapterMatch]]
-
-
-class InsertAligner:
-    """
-    Implementation of an insert matching algorithm.
-
-    If the inserts align, the overhangs are searched for the adapter sequences.
-    Otherwise, each read is search for its adapter separately.
-
-    This only works with paired-end reads with 3' adapters.
-    """
-
+class InsertAligner(Summarizable, metaclass=ABCMeta):
     def __init__(
         self,
-        adapter1: str,
-        adapter2: str,
         match_probability: Optional[RandomMatchProbability] = None,
-        insert_max_rmp: float = DEFAULT_INSERT_MAX_RMP,
-        adapter_max_rmp: float = DEFAULT_ADAPTER_MAX_RMP,
-        min_insert_overlap: int = DEFAULT_MIN_INSERT_OVERLAP,
-        max_insert_mismatch_frac: Union[str, float] = DEFAULT_MAX_INSERT_MISMATCH_FRAC,
-        min_adapter_overlap: int = DEFAULT_MIN_ADAPTER_OVERLAP,
-        max_adapter_mismatch_frac: Union[str, float] =
-        DEFAULT_MAX_ADAPTER_MISMATCH_FRAC,
-        adapter_check_cutoff: int = DEFAULT_ADAPTER_CHECK_CUTOFF,
         base_probs: Optional[Dict[str, float]] = None,
-        adapter_wildcards: bool = True,
-        read_wildcards: bool = False,
+        insert_max_rmp: float = DEFAULT_INSERT_MAX_RMP,
+        max_insert_mismatch_frac: Union[str, float] = DEFAULT_MAX_INSERT_MISMATCH_FRAC,
+        min_insert_overlap: int = DEFAULT_MIN_INSERT_OVERLAP,
     ):
         """
         Args:
-            adapter1: read1 adapter.
-            adapter2: read2 adapter.
             match_probability: Callable that calculates random match probability
                 given arguments (num_matches, match_len).
+            base_probs: Dict of (match_prob, mismatch_prob), which are the
+                probabilities passed to
+                :method:`atropos.util.RandomMatchProbability.__call__()`.
             insert_max_rmp: Max random match probability for the insert match.
-            adapter_max_rmp: Max random match probability for the adapter match.
             min_insert_overlap: Minimum number of bases the inserts must overlap
                 to be considered matching.
             max_insert_mismatch_frac: Maximum fraction of mismatching bases between
                 the inserts to be considered matching.
-            min_adapter_overlap: Minimum number of bases the adapter must overlap
-                the read to be considered matching.
-            max_adapter_mismatch_frac: Maximum fraction of mismatching bases between
-                the adapter and the read to be considered matching.
-            adapter_check_cutoff: Threshold number of matching bases required before
-                adapter matches are checked against random match probability.
-            base_probs: Dict of (match_prob, mismatch_prob), which are the
-                probabilities passed to
-                :method:`atropos.util.RandomMatchProbability.__call__()`.
         """
-
-        self.adapter1 = adapter1
-        self.adapter1_len = len(adapter1)
-        self.adapter2 = adapter2
-        self.adapter2_len = len(adapter2)
-        self.match_probability = match_probability or RandomMatchProbability()
-        self.insert_max_rmp = insert_max_rmp
-        self.adapter_max_rmp = adapter_max_rmp
-        self.min_insert_overlap = min_insert_overlap
-        self.max_insert_mismatch_frac = float(max_insert_mismatch_frac)
-        self.min_adapter_overlap = min_adapter_overlap
-        self.max_adapter_mismatch_frac = float(max_adapter_mismatch_frac)
-        self.adapter_check_cutoff = adapter_check_cutoff
-        self.base_probs = base_probs or dict(match_prob=0.25, mismatch_prob=0.75)
-        self.adapter_wildcards = adapter_wildcards
-        self.read_wildcards = read_wildcards
-        self.aligner = MultiAligner(
-            max_insert_mismatch_frac,
+        self._aligner = MultiAligner(
+            float(max_insert_mismatch_frac),
             GapRule.START_WITHIN_SEQ1 | GapRule.STOP_WITHIN_SEQ2,
             min_insert_overlap,
         )
+        self._insert_max_rmp = insert_max_rmp
+        self._match_probability = match_probability or RandomMatchProbability()
+        self._base_probs = base_probs or dict(match_prob=0.25, mismatch_prob=0.75)
 
-    def __repr__(self) -> str:
-        return f"InsertAligner<adapter1={self.adapter1}, adapter2={self.adapter2}, " \
-               f"match_probability={self.match_probability}, " \
-               f"insert_max_rmp={self.insert_max_rmp}, " \
-               f"adapter_max_rmp={self.adapter_max_rmp}, " \
-               f"min_insert_overlap={self.min_insert_overlap}, " \
-               f"max_insert_mismatch_frac={self.max_insert_mismatch_frac}, " \
-               f"min_adapter_overlap={self.min_adapter_overlap}, " \
-               f"max_adapter_mismatch_frac={self.max_adapter_mismatch_frac}, " \
-               f"adapter_check_cutoff={self.adapter_check_cutoff}, " \
-               f"base_probs={self.base_probs}, " \
-               f"adapter_wildcards={self.adapter_wildcards}, " \
-               f"read_wildcards={self.read_wildcards}, " \
-               f"aligner={self.aligner}>"
-
-    def match_insert(self, seq1: str, seq2: str) -> Optional[InsertMatchResult]:
+    def match_insert(self, seq1: str, seq2: str) -> Optional[Any]:
         """
         Uses cutadapt aligner for insert and adapter matching.
 
@@ -448,69 +400,7 @@ class InsertAligner:
 
         seq2_rc = reverse_complement(seq2)
 
-        def _match(
-            _insert_match: MatchTuple, _offset: int, _insert_match_size: int
-        ) -> Optional[InsertMatchResult]:
-            if _offset < self.min_adapter_overlap:
-                # The reads are mostly overlapping, to the point where
-                # there's not enough overhang to do a confident adapter
-                # match. We return just the insert match to signal that
-                # error correction can be done even though no adapter
-                # trimming is required.
-                return _insert_match, None, None
-
-            # TODO: this is very sensitive to the exact correct choice of adapter.
-            #  For example, if you specifiy GATCGGAA... and the correct adapter is
-            #  AGATCGGAA..., the prefixes will not match exactly and the alignment
-            #  will fail. We need to use a comparison that is a bit more forgiving.
-            def _match_adapter(
-                insert_seq: str, adapter_seq: str, adapter_len: int
-            ) -> Tuple[MatchTuple, int, float]:
-                amatch = compare_prefixes(
-                    insert_seq[_insert_match_size:],
-                    adapter_seq,
-                    wildcard_ref=self.adapter_wildcards,
-                    wildcard_query=self.read_wildcards
-                )
-                alen = min(_offset, adapter_len)
-                return amatch, alen, round(alen * self.max_adapter_mismatch_frac)
-
-            a1_match, a1_length, a1_max_mismatches = _match_adapter(
-                seq1, self.adapter1, self.adapter1_len
-            )
-            a2_match, a2_length, a2_max_mismatches = _match_adapter(
-                seq2, self.adapter2, self.adapter2_len
-            )
-
-            if (
-                a1_match[5] > a1_max_mismatches and
-                a2_match[5] > a2_max_mismatches
-            ):
-                return None
-
-            if min(a1_length, a2_length) > self.adapter_check_cutoff:
-                a1_prob = self.match_probability(a1_match[4], a1_length)
-                a2_prob = self.match_probability(a2_match[4], a2_length)
-                if (a1_prob * a2_prob) > self.adapter_max_rmp:
-                    return None
-
-            mismatches = min(a1_match[5], a2_match[5])
-
-            def _create_adapter_match(alen: int, slen: int) -> AdapterMatch:
-                alen = min(alen, slen - _insert_match_size)
-                _mismatches = min(alen, mismatches)
-                _matches = alen - _mismatches
-                return AdapterMatch(
-                    0, alen, _insert_match_size, slen, _matches, _mismatches
-                )
-
-            return (
-                _insert_match,
-                _create_adapter_match(a1_length, seq_len1),
-                _create_adapter_match(a2_length, seq_len2)
-            )
-
-        insert_matches = self.aligner.locate(seq2_rc, seq1)
+        insert_matches = self._aligner.locate(seq2_rc, seq1)
 
         if insert_matches:
             # Filter by random-match probability
@@ -519,17 +409,19 @@ class InsertAligner:
             for insert_match in insert_matches:
                 offset = min(insert_match[0], seq_len - insert_match[3])
                 insert_match_size = seq_len - offset
-                prob = self.match_probability(
-                    insert_match[4], insert_match_size, **self.base_probs
+                prob = self._match_probability(
+                    insert_match[4], insert_match_size, **self._base_probs
                 )
-                if prob <= self.insert_max_rmp:
+                if prob <= self._insert_max_rmp:
                     filtered_matches.append(
                         (insert_match, offset, insert_match_size, prob)
                     )
 
             if filtered_matches:
                 if len(filtered_matches) == 1:
-                    return _match(*filtered_matches[0][0:3])
+                    return self._handle_match(
+                        seq1, seq2, seq_len1, seq_len2, *filtered_matches[0][0:3],
+                    )
                 else:
                     # Test matches in order of random-match probability.
                     # TODO: compare against sorting by length (which is how
@@ -537,9 +429,188 @@ class InsertAligner:
                     #  filtered_matches.sort(key=lambda x: x[2], reverse=True)
                     filtered_matches.sort(key=lambda x: x[3])
                     for match_args in filtered_matches:
-                        match = _match(*match_args[0:3])
+                        match = self._handle_match(
+                            seq1, seq2, seq_len1, seq_len2, *match_args[0:3],
+                        )
                         if match:
                             return match
+
+    @abstractmethod
+    def _handle_match(
+        self,
+        seq1: str,
+        seq2: str,
+        seq_len1: int,
+        seq_len2: int,
+        insert_match: MatchTuple,
+        offset: int,
+        insert_match_size: int,
+    ) -> Optional[Any]:
+        """
+        Handles a potential match.
+
+        Args:
+            seq1:
+            seq2:
+            seq_len1:
+            seq_len2:
+            insert_match:
+            offset:
+            insert_match_size:
+
+        Returns:
+            The match result, or None to skip this match and try the next one.
+        """
+        pass
+
+    def __repr__(self):
+        props = ", ".join(f"{key}={value}" for key, value in self.summarize().items())
+        return f"{self.__class__.__name__}<{props}>"
+
+    def summarize(self) -> dict:
+        return dict(
+            aligner=str(self._aligner),
+            insert_max_rmp=self._insert_max_rmp,
+            base_probs=self._base_probs
+        )
+
+
+InsertMatchResult = Tuple[MatchTuple, Optional[AdapterMatch], Optional[AdapterMatch]]
+
+
+class InsertAdapterMatcher(InsertAligner):
+    """
+    Implementation of an insert matching algorithm.
+
+    If the inserts align, the overhangs are searched for the adapter sequences.
+    Otherwise, each read is search for its adapter separately.
+
+    This only works with paired-end reads with 3' adapters.
+    """
+
+    def __init__(
+        self,
+        adapter1: str,
+        adapter2: str,
+        adapter_max_rmp: float = DEFAULT_ADAPTER_MAX_RMP,
+        min_adapter_overlap: int = DEFAULT_MIN_ADAPTER_OVERLAP,
+        max_adapter_mismatch_frac: Union[str, float] =
+        DEFAULT_MAX_ADAPTER_MISMATCH_FRAC,
+        adapter_check_cutoff: int = DEFAULT_ADAPTER_CHECK_CUTOFF,
+        adapter_wildcards: bool = True,
+        read_wildcards: bool = False,
+        **aligner_kwargs,
+    ):
+        """
+        Args:
+            adapter1: read1 adapter.
+            adapter2: read2 adapter.
+            adapter_max_rmp: Max random match probability for the adapter match.
+            min_adapter_overlap: Minimum number of bases the adapter must overlap
+                the read to be considered matching.
+            max_adapter_mismatch_frac: Maximum fraction of mismatching bases between
+                the adapter and the read to be considered matching.
+            adapter_check_cutoff: Threshold number of matching bases required before
+                adapter matches are checked against random match probability.
+            adapter_wildcards:
+            read_wildcards:
+            aligner_kwargs:
+        """
+        super().__init__(**aligner_kwargs)
+        self.adapter1 = adapter1
+        self.adapter1_len = len(adapter1)
+        self.adapter2 = adapter2
+        self.adapter2_len = len(adapter2)
+        self.adapter_max_rmp = adapter_max_rmp
+        self.min_adapter_overlap = min_adapter_overlap
+        self.max_adapter_mismatch_frac = float(max_adapter_mismatch_frac)
+        self.adapter_check_cutoff = adapter_check_cutoff
+        self.adapter_wildcards = adapter_wildcards
+        self.read_wildcards = read_wildcards
+
+    def summarize(self) -> dict:
+        summary = super().summarize()
+        summary.update(dict(
+            adapter1=self.adapter1,
+            adapter2=self.adapter2,
+            adapter_max_rmp=self.adapter_max_rmp,
+            min_adapter_overlap=self.min_adapter_overlap,
+            max_adapter_mismatch_frac=self.max_adapter_mismatch_frac,
+            adapter_check_cutoff=self.adapter_check_cutoff,
+            adapter_wildcards=self.adapter_wildcards,
+            read_wildcards=self.read_wildcards
+        ))
+        return summary
+
+    def _handle_match(
+        self,
+        seq1: str,
+        seq2: str,
+        seq_len1: int,
+        seq_len2: int,
+        insert_match: MatchTuple,
+        offset: int,
+        insert_match_size: int,
+    ) -> Optional[InsertMatchResult]:
+        if offset < self.min_adapter_overlap:
+            # The reads are mostly overlapping, to the point where
+            # there's not enough overhang to do a confident adapter
+            # match. We return just the insert match to signal that
+            # error correction can be done even though no adapter
+            # trimming is required.
+            return insert_match, None, None
+
+        # TODO: this is very sensitive to the exact correct choice of adapter.
+        #  For example, if you specifiy GATCGGAA... and the correct adapter is
+        #  AGATCGGAA..., the prefixes will not match exactly and the alignment
+        #  will fail. We need to use a comparison that is a bit more forgiving.
+        def _match_adapter(
+            insert_seq: str, adapter_seq: str, adapter_len: int
+        ) -> Tuple[MatchTuple, int, float]:
+            # TODO: wildcard_ref and wildcard_query are flipped here compared to other
+            #  uses of compare_prefixes because here we are using the read sequence as
+            #  the ref and the adapter as the query. Flip them around and test that we
+            #  get the same results.
+            amatch = compare_prefixes(
+                insert_seq[insert_match_size:],
+                adapter_seq,
+                wildcard_ref=self.read_wildcards,
+                wildcard_query=self.adapter_wildcards,
+            )
+            alen = min(offset, adapter_len)
+            return amatch, alen, round(alen * self.max_adapter_mismatch_frac)
+
+        a1_match, a1_length, a1_max_mismatches = _match_adapter(
+            seq1, self.adapter1, self.adapter1_len
+        )
+        a2_match, a2_length, a2_max_mismatches = _match_adapter(
+            seq2, self.adapter2, self.adapter2_len
+        )
+
+        if a1_match[5] > a1_max_mismatches and a2_match[5] > a2_max_mismatches:
+            return None
+
+        if min(a1_length, a2_length) > self.adapter_check_cutoff:
+            a1_prob = self._match_probability(a1_match[4], a1_length)
+            a2_prob = self._match_probability(a2_match[4], a2_length)
+            if (a1_prob * a2_prob) > self.adapter_max_rmp:
+                return None
+
+        mismatches = min(a1_match[5], a2_match[5])
+
+        def _create_adapter_match(alen: int, slen: int) -> AdapterMatch:
+            alen = min(alen, slen - insert_match_size)
+            _mismatches = min(alen, mismatches)
+            _matches = alen - _mismatches
+            return AdapterMatch(
+                0, alen, insert_match_size, slen, _matches, _mismatches
+            )
+
+        return (
+            insert_match,
+            _create_adapter_match(a1_length, seq_len1),
+            _create_adapter_match(a2_length, seq_len2),
+        )
 
 
 class AdapterCache:
@@ -938,25 +1009,26 @@ class Adapter(AdapterBase):
             )
 
         # try approximate matching
-        if not self.indels and self.where in (AdapterType.PREFIX, AdapterType.SUFFIX):
-            if self.where == AdapterType.PREFIX:
-                alignment = compare_prefixes(
-                    self.sequence,
-                    read_seq,
-                    wildcard_ref=self.adapter_wildcards,
-                    wildcard_query=self.read_wildcards,
-                )
-            else:
-                alignment = compare_suffixes(
-                    self.sequence,
-                    read_seq,
-                    wildcard_ref=self.adapter_wildcards,
-                    wildcard_query=self.read_wildcards,
-                )
-        else:
+        if self.indels or self.where not in (AdapterType.PREFIX, AdapterType.SUFFIX):
             alignment = self.aligner.locate(read_seq)
             if self.debug:
                 print(self.aligner.dpmatrix)  # pragma: no cover
+        # TODO: copy PrefixComparer and SuffixComparer classes used in cutadapt and
+        #  use them here (look at adapters.SingleAdapter)
+        elif self.where == AdapterType.PREFIX:
+            alignment = compare_prefixes(
+                self.sequence,
+                read_seq,
+                wildcard_ref=self.adapter_wildcards,
+                wildcard_query=self.read_wildcards,
+            )
+        else:
+            alignment = compare_suffixes(
+                self.sequence,
+                read_seq,
+                wildcard_ref=self.adapter_wildcards,
+                wildcard_query=self.read_wildcards,
+            )
 
         if alignment:
             astart, astop, rstart, rstop, matches, errors = alignment
@@ -1456,8 +1528,7 @@ class AdapterParser:
         self,
         spec: str,
         where: AdapterType = AdapterType.BACK,
-        name: Optional[str] =
-        None
+        name: Optional[str] = None,
     ) -> Union[Adapter, LinkedAdapter]:
         if name is None and spec is None:
             raise ValueError("Either name or spec must be given")

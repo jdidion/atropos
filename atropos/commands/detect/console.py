@@ -47,7 +47,11 @@ class DetectCommandConsole(DetectCommand, DetectReportGenerator, BaseCommandCons
 
     @classmethod
     def _add_detect_options(cls, parser):
-        parser.set_defaults(max_reads=10000, counter_magnitude="K")
+        parser.set_defaults(
+            max_reads=10000,
+            counter_magnitude="K",
+            overrep_cutoff=100,
+        )
         group = parser.add_group("Adapter Detection")
         group.add_argument(
             "-d",
