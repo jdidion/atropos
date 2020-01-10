@@ -26,7 +26,9 @@ Atropos is available from [pypi](https://pypi.python.org/pypi/atropos) and can b
 First install dependencies:
 
 * Required
-    * Python 3.4.5+ (python 2.x is NOT supported)
+    * Python 3.4.5+
+        * Python 2.x is NOT supported
+        * Python 3.5.2 has a [bug](https://bugs.python.org/issue28387) that [has been reported to cause random SEGFAULTs](https://github.com/jdidion/atropos/issues/88)
     * Cython 0.25.2+ (`pip install Cython`)
 * Maybe python libraries
     * pytest (for running unit tests)
