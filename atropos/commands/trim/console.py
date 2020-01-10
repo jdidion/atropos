@@ -1216,7 +1216,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         if compression_format is not None:
             fmt = FORMATS.get_compression_format(compression_format)
-            options.can_use_system_compression = fmt.can_use_system_compression()
+            options.can_use_system_compression = fmt.can_use_system_compression
 
         if options.maq:
             options.colorspace = True
