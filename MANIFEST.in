@@ -1,5 +1,5 @@
 # documentation
-include README.rst
+include README.md
 include CHANGES.md
 include CITATION
 include LICENSE.txt
@@ -12,9 +12,7 @@ include atropos/commands/trim/_qualtrim.c
 include atropos/io/readers/_readers.c
 include atropos/io/sequence/_sequence.c
 include atropos/adapters/*.fa
-include atropos/report/templates/*
-include bin/_preamble.py
 include tests/test*.py
 include tests/utils.py
-graft tests/data
-graft tests/cut
+graft tests/data/input
+graft tests/data/expected
