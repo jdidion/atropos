@@ -14,13 +14,13 @@ from atropos import align
 from atropos.align import Match
 from atropos.io.seqio import ColorspaceSequence, FastaReader
 from atropos.util import (
-    IUPAC_BASES, GC_BASES, MergingDict, NestedDict, CountingDict, Const, 
+    IUPAC_BASES, GC_BASES, MergingDict, NestedDict, CountingDict, Const,
     reverse_complement, ALPHABETS)
 from atropos.util import colorspace as cs
 
 class AdapterType(object):
     """Struct for adapter type information.
-    
+
     Args:
         name: Adapter type name.
         desc: Adapter type description.
@@ -32,7 +32,7 @@ class AdapterType(object):
         self.flags = flags[0]
         for i in range(1, len(flags)):
             self.flags |= flags[i]
-    
+
     def asdict(self):
         """Returns AdapterType fields in a dict.
         """
@@ -80,7 +80,7 @@ DEFAULT_ADAPTERS_PATH = os.path.join(
 class AdapterParser(object):
     """Factory for Adapter classes that all use the same parameters (error rate,
     indels etc.). The given **kwargs will be passed to the Adapter constructors.
-    
+
     Args:
         colorspace: Whether the adapter sequences are in colorspace.
         cache: The AdapterCache to use for fetching/storing named adapters.
@@ -90,23 +90,23 @@ class AdapterParser(object):
         self.cache = cache
         self.constructor_args = kwargs
         self.adapter_class = ColorspaceAdapter if colorspace else Adapter
-    
+
     def parse(self, spec, cmdline_type='back'):
         """Parse an adapter specification not using ``file:`` notation and return
         an object of an appropriate Adapter class. The notation for anchored
         5' and 3' adapters is supported. If the name parameter is None, then
         an attempt is made to extract the name from the specification
         (If spec is 'name=ADAPTER', name will be 'name'.)
-        
+
         Args:
             spec: The adapter spec.
             name: The adapter name. If not provided, one is automatically
                 generated.
             cmdline_type: describes which commandline parameter was used (``-a``
                 is 'back', ``-b`` is 'anywhere', and ``-g`` is 'front').
-        
+
         TODO: describe the adapter spec format
-        
+
         Returns:
             An :class:`Adapter` instance.
         """
@@ -119,14 +119,14 @@ class AdapterParser(object):
                         record.sequence, cmdline_type, name)
         else:
             yield self.parse_from_spec(spec, cmdline_type)
-    
+
     def parse_from_spec(self, spec, cmdline_type='back', name=None):
         if cmdline_type not in ADAPTER_TYPES:
             raise ValueError(
                 'cmdline_type cannot be {0!r}'.format(cmdline_type))
         orig_spec = spec
         where = ADAPTER_TYPES[cmdline_type].flags
-        
+
         if name is None and spec is None:
             raise ValueError('Either name or spec must be given')
         elif name is None:
@@ -136,15 +136,15 @@ class AdapterParser(object):
         elif spec is None:
             if self.cache and self.cache.has_name(name):
                 spec = self.cache.get_for_name(name)
-        
+
         if spec is None:
             raise ValueError('Name not found: {}'.format(name))
         elif name is None:
             name, spec = _extract_name_from_spec(spec)
-        
+
         if self.cache and name is not None:
             self.cache.add(name, spec)
-        
+
         front_anchored, back_anchored = False, False
         if spec.startswith('^'):
             spec = spec[1:]
@@ -152,9 +152,9 @@ class AdapterParser(object):
         if spec.endswith('$'):
             spec = spec[:-1]
             back_anchored = True
-        
+
         sequence1, middle, sequence2 = spec.partition('...')
-        
+
         if where == ANYWHERE:
             if front_anchored or back_anchored:
                 raise ValueError("'anywhere' (-b) adapters may not be anchored")
@@ -162,7 +162,7 @@ class AdapterParser(object):
                 raise ValueError("'anywhere' (-b) adapters may not be linked")
             return self.adapter_class(
                 sequence=spec, where=where, name=name, **self.constructor_args)
-        
+
         assert where == FRONT or where == BACK
         if middle == '...':
             if not sequence1:
@@ -185,11 +185,11 @@ class AdapterParser(object):
                 # automatically anchor 5' adapter if -a is used
                 if where == BACK:
                     front_anchored = True
-                
+
                 return LinkedAdapter(sequence1, sequence2, name=name,
                     front_anchored=front_anchored, back_anchored=back_anchored,
                     **self.constructor_args)
-        
+
         if front_anchored and back_anchored:
             raise ValueError(
                 'Trying to use both "^" and "$" in adapter specification '
@@ -202,20 +202,20 @@ class AdapterParser(object):
             if where == FRONT:
                 raise ValueError("Cannot anchor 5' adapter at 3' end")
             where = SUFFIX
-        
+
         return self.adapter_class(
             sequence=spec, where=where, name=name, **self.constructor_args)
-    
+
     def parse_multi(self, back=None, anywhere=None, front=None):
         """Parse all three types of commandline options that can be used to
         specify adapters. back, anywhere and front are lists of strings,
         corresponding to the respective commandline types (-a, -b, -g).
-        
+
         Args:
             back: Back-adapter specs.
             anywhere: Anywhere-adapter specs.
             front: Front-adapter specs.
-        
+
         Return:
             A list of appropriate Adapter classes.
         """
@@ -231,7 +231,7 @@ class AdapterParser(object):
 class Adapter(object):
     """An adapter knows how to match itself to a read. In particular, it knows
     where it should be within the read and how to interpret wildcard characters.
-    
+
     Args:
         sequence: The adapter sequence as string. Will be converted to
             uppercase. Also, Us will be converted to Ts.
@@ -276,7 +276,7 @@ class Adapter(object):
             if isinstance(alphabet, str):
                 alphabet = ALPHABETS[alphabet]
             alphabet.validate_string(sequence)
-        
+
         self.debug = False
         self.name = _generate_adapter_name() if name is None else name
         self.sequence = sequence
@@ -320,34 +320,34 @@ class Adapter(object):
             # When indels are disallowed, an entirely different algorithm
             # should be used.
             self.aligner.indel_cost = 100000
-    
+
     def __repr__(self):
         return '<Adapter(name="{name}", sequence="{sequence}", where={where}, '\
             'max_error_rate={max_error_rate}, min_overlap={min_overlap}, '\
             'read_wildcards={read_wildcards}, '\
             'adapter_wildcards={adapter_wildcards}, '\
             'indels={indels})>'.format(**vars(self))
-    
+
     def enable_debug(self):
         """Print out the dynamic programming matrix after matching a read to an
         adapter.
         """
         self.debug = True
         self.aligner.enable_debug()
-    
+
     def match_to(self, read):
         """Attempt to match this adapter to the given read.
-        
+
         Args:
             read: A :class:`Sequence` instance.
-        
+
         Returns:
             A :class:`Match` instance if a match was found; return None if no
             match was found given the matching criteria (minimum overlap length,
             maximum error rate).
         """
         read_seq = read.sequence.upper()
-        
+
         # try to find an exact match first unless wildcards are allowed
         pos = -1
         if not self.adapter_wildcards:
@@ -359,13 +359,13 @@ class Adapter(object):
                     pos = (len(read_seq) - len(self.sequence))
             else:
                 pos = read_seq.find(self.sequence)
-        
+
         if pos >= 0:
             seqlen = len(self.sequence)
             return Match(
                 0, seqlen, pos, pos + seqlen, seqlen, 0, self._front_flag,
                 self, read)
-        
+
         # try approximate matching
         if not self.indels and self.where in (PREFIX, SUFFIX):
             if self.where == PREFIX:
@@ -382,7 +382,7 @@ class Adapter(object):
             alignment = self.aligner.locate(read_seq)
             if self.debug:
                 print(self.aligner.dpmatrix)  # pragma: no cover
-        
+
         if alignment:
             astart, astop, rstart, rstop, matches, errors = alignment
             size = astop - astart
@@ -396,12 +396,12 @@ class Adapter(object):
                 return Match(
                     astart, astop, rstart, rstop, matches, errors,
                     self._front_flag, self, read)
-        
+
         return None
-    
+
     def _trimmed_anywhere(self, match):
         """Trims an adapter from either the front or back of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -409,10 +409,10 @@ class Adapter(object):
             return self._trimmed_front(match)
         else:
             return self._trimmed_back(match)
-    
+
     def _trimmed_front(self, match):
         """Trims an adapter from the front of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -420,10 +420,10 @@ class Adapter(object):
         self.lengths_front[match.rstop] += 1
         self.errors_front[match.rstop][match.errors] += 1
         return match.read[match.rstop:]
-    
+
     def _trimmed_back(self, match):
         """Trims an adapter from the back of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -434,12 +434,12 @@ class Adapter(object):
             adjacent_base = ''
         self.adjacent_bases[adjacent_base] += 1
         return match.read[:match.rstart]
-    
+
     def __len__(self):
         return len(self.sequence)
-    
+
     def random_match_probabilities(self):
-        """Estimate probabilities that this adapter matches a random sequence. 
+        """Estimate probabilities that this adapter matches a random sequence.
         Indels are not taken into account.
 
         Returns:
@@ -451,12 +451,12 @@ class Adapter(object):
             seq = self.sequence[::-1]
         else:
             seq = self.sequence
-        
+
         #matches = 0
         base_probs = (self.gc_content / 2.0, (1 - self.gc_content) / 2.0)
         probabilities = [1.0] + ([0] * len(seq))
         c_bases = frozenset(GC_BASES if self.adapter_wildcards else 'GC')
-        
+
         # TODO: this doesn't work; need to figure out if RandomMatchProbability
         # can be used for this.
         #for idx, base in enumerate(seq, 1):
@@ -464,32 +464,32 @@ class Adapter(object):
         #        matches += 1
         #    probabilities[idx] = self.match_probability(
         #        matches, idx, *base_probs)
-        
+
         cur_p = 1.0
         for idx, base in enumerate(seq, 1):
             cur_p *= base_probs[0 if base in c_bases else 1]
             probabilities[idx] = cur_p
         return probabilities
-    
+
     def summarize(self):
         """Summarize the activities of this :class:`Adapter`.
         """
         total_front = sum(self.lengths_front.values())
         total_back = sum(self.lengths_back.values())
-        
+
         stats = MergingDict(
             adapter_class=self.__class__.__name__,
             total_front=total_front,
             total_back=total_back,
             total=total_front + total_back,
             match_probabilities=Const(self.random_match_probabilities()))
-        
+
         where = self.where
         assert (
             where in (ANYWHERE, LINKED) or
             (where in (BACK, SUFFIX) and total_front == 0) or
             (where in (FRONT, PREFIX) and total_back == 0))
-        
+
         stats["where"] = where_int_to_dict(where)
         stats["sequence"] = Const(self.sequence)
         stats["max_error_rate"] = Const(self.max_error_rate)
@@ -501,12 +501,12 @@ class Adapter(object):
             stats["errors_back"] = self.errors_back
         if where in (BACK, SUFFIX):
             stats["adjacent_bases"] = self.adjacent_bases
-        
+
         return stats
 
 class ColorspaceAdapter(Adapter):
     """An adapter for a colorspace sequence.
-    
+
     Args:
         args, kwargs: Arguments to pass to :class:`Adapter` constructor.
     """
@@ -525,13 +525,13 @@ class ColorspaceAdapter(Adapter):
             raise ValueError(
                 "A 5' colorspace adapter needs to be given in nucleotide space")
         self.aligner.reference = self.sequence
-    
+
     def match_to(self, read):
         """Attempt to match this adapter to the given read.
-        
+
         Args:
             read: A :class:`Sequence` instance.
-        
+
         Returns:
             A :class:`Match` instance if a match was found; return None if no
             match was found given the matching criteria (minimum overlap length,
@@ -544,7 +544,7 @@ class ColorspaceAdapter(Adapter):
         asequence = (
             cs.ENCODE[read.primer + self.nucleotide_sequence[0:1]] +
             self.sequence)
-        
+
         pos = 0 if read.sequence.startswith(asequence) else -1
         if pos >= 0:
             match = Match(
@@ -560,7 +560,7 @@ class ColorspaceAdapter(Adapter):
                 match = Match(*(alignment + (self._front_flag, self, read)))
             else:
                 match = None
-        
+
         if match is None:
             return None
         assert (
@@ -571,7 +571,7 @@ class ColorspaceAdapter(Adapter):
 
     def _trimmed_front(self, match):
         """Trims an adapter from the front of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -596,7 +596,7 @@ class ColorspaceAdapter(Adapter):
 
     def _trimmed_back(self, match):
         """Trims an adapter from the back of sequence.
-        
+
         Returns:
             A :class:`Sequence` instance: the trimmed read.
         """
@@ -614,7 +614,7 @@ class ColorspaceAdapter(Adapter):
 
 class LinkedMatch(object):
     """Represent a match of a LinkedAdapter.
-    
+
     Args:
         front_match: The match to the front of the sequence.
         back_match: The match to the back of the sequence.
@@ -625,7 +625,7 @@ class LinkedMatch(object):
         self.back_match = back_match
         self.adapter = adapter
         assert front_match is not None
-    
+
     def get_info_record(self):
         """Returns the info record for the either the back or forward match.
         """
@@ -636,7 +636,7 @@ class LinkedMatch(object):
 
 class LinkedAdapter(object):
     """An adapter with linked front and back sequences.
-    
+
     Args:
         front_sequence: Front adapter sequence.
         back_sequence: Back adapter sequence.
@@ -653,7 +653,7 @@ class LinkedAdapter(object):
         where2 = SUFFIX if back_anchored else BACK
         self.front_anchored = front_anchored
         self.back_anchored = back_anchored
-        
+
         # The following attributes are needed for the report
         self.where = LINKED
         self.name = _generate_adapter_name() if name is None else name
@@ -661,20 +661,20 @@ class LinkedAdapter(object):
             front_sequence, where=where1, name=None, **kwargs)
         self.back_adapter = Adapter(
             back_sequence, where=where2, name=None, **kwargs)
-    
+
     def enable_debug(self):
         """Enable debug on adapters.
         """
         self.front_adapter.enable_debug()
         self.back_adapter.enable_debug()
-    
+
     def match_to(self, read):
         """Match the linked adapters against the given read. If the 'front'
         adapter is not found, the 'back' adapter is not searched for.
-        
+
         Args:
             read: A :class:`Sequence` instance.
-        
+
         Returns:
             A :class:`Match` instance if a match was found; return None if no
             match was found given the matching criteria (minimum overlap length,
@@ -692,10 +692,10 @@ class LinkedAdapter(object):
     def trimmed(self, match):
         """Returns the read trimmed with the front and/or back adapter
         trimmer(s).
-        
+
         Args:
             match: The match to trim.
-        
+
         Returns:
             The trimmed read.
         """
@@ -704,24 +704,24 @@ class LinkedAdapter(object):
             return self.back_adapter.trimmed(match.back_match)
         else:
             return front_trimmed
-    
+
     def summarize(self):
         """Returns the summary dict for this adapter.
         """
         total_front = sum(self.front_adapter.lengths_front.values())
         total_back = sum(self.back_adapter.lengths_back.values())
-        
+
         stats = MergingDict(
             total_front=total_front,
             total_back=total_back,
             total=total_front + total_back)
-        
+
         where = self.where
         assert (
             where in (ANYWHERE, LINKED) or
             (where in (BACK, SUFFIX) and total_front == 0) or
             (where in (FRONT, PREFIX) and total_back == 0))
-        
+
         stats["where"] = where_int_to_dict(where)
         stats["front_sequence"] = Const(self.front_adapter.sequence)
         stats["front_match_probabilities"] = Const(
@@ -741,12 +741,12 @@ class LinkedAdapter(object):
         stats["front_errors_back"] = self.front_adapter.errors_back
         stats["back_errors_front"] = self.back_adapter.errors_front
         stats["back_errors_back"] = self.back_adapter.errors_back
-        
+
         return stats
 
 class AdapterCache(object):
     """Cache for known adapters.
-    
+
     Args:
         path: Path to file where cache is written.
         auto_reverse_complement: Whether adapter reverse-complements should
@@ -757,27 +757,32 @@ class AdapterCache(object):
         self.auto_reverse_complement = auto_reverse_complement
         if path and os.path.exists(path):
             with open(path, "rb") as cache:
-                self.seq_to_name, self.name_to_seq = pickle.load(cache)
-        else:
-            self.seq_to_name = {}
-            self.name_to_seq = {}
-    
+                try:
+                    self.seq_to_name, self.name_to_seq = pickle.load(cache)
+                    return
+                except:
+                    # It is possible for the cache file to get corrupted - see #71
+                    pass
+
+        self.seq_to_name = {}
+        self.name_to_seq = {}
+
     @property
     def empty(self):
         """Whether the cache is empty.
         """
         return len(self.seq_to_name) == 0
-    
+
     def save(self):
         """Save the cache to file.
         """
         if self.path is not None:
             with open(self.path, "wb") as cache:
                 pickle.dump((self.seq_to_name, self.name_to_seq), cache)
-    
+
     def add(self, name, seq):
         """Add a sequence to the cache.
-        
+
         Args:
             name: Adapter name.
             seq: Adapter sequence.
@@ -785,16 +790,16 @@ class AdapterCache(object):
         self._add(name, seq)
         if self.auto_reverse_complement:
             self._add("{}_rc".format(name), reverse_complement(seq))
-    
+
     def _add(self, name, seq):
         if seq not in self.seq_to_name:
             self.seq_to_name[seq] = set()
         self.seq_to_name[seq].add(name)
         self.name_to_seq[name] = seq
-    
+
     def load_from_file(self, path=DEFAULT_ADAPTERS_PATH):
         """Load cached data from a file.
-        
+
         Args:
             path: Path from which to load.
         """
@@ -803,7 +808,7 @@ class AdapterCache(object):
 
     def load_from_url(self, url=DEFAULT_ADAPTERS_URL):
         """Load adapter data from a URL.
-        
+
         Args:
             url: URL from which to load.
         """
@@ -816,10 +821,10 @@ class AdapterCache(object):
             if url.startswith("file:"):
                 url = url[5:]
             return self.load_from_file(url)
-    
+
     def load_from_fasta(self, fasta):
         """Load adapter data from a FASTA file.
-        
+
         Args:
             fasta: FASTA file.
         """
@@ -836,7 +841,7 @@ class AdapterCache(object):
         if close:
             fasta.close()
         return num_records
-    
+
     def load_default(self):
         """Tries to load from default URL first, then from default path.
         """
@@ -852,70 +857,70 @@ class AdapterCache(object):
             logging.getLogger().warning(
                 "Error loading adapters from file %s; loading from file",
                 DEFAULT_ADAPTERS_PATH)
-    
+
     @property
     def names(self):
         """Sequence of adapter names.
         """
         return list(self.name_to_seq.keys())
-    
+
     @property
     def sequences(self):
         """Sequence of adapter sequences.
         """
         return list(self.seq_to_name.keys())
-    
+
     def iter_names(self):
         """Returns an iterator over adapter names.
         """
         return self.name_to_seq.items()
-    
+
     def iter_sequences(self):
         """Returns an iterator over adapter sequences.
         """
         return self.seq_to_name.items()
-    
+
     def has_name(self, name):
         """Returns whether this cache contains the specified name.
-        
+
         Args:
             name: The adapter name.
         """
         return name in self.name_to_seq
-    
+
     def get_for_name(self, name):
         """Returns the sequence associated with a name.
-        
+
         Args:
             name: The name to fetch.
-        
+
         Returns:
             The sequence.
         """
         return self.name_to_seq[name]
-    
+
     def has_seq(self, seq):
         """Tests whether a sequence is in the cache.
-        
+
         Args:
             seq: The sequence to check.
-        
+
         Returns:
             True if the sequence is in the cache.
         """
         return seq in self.seq_to_name
-    
+
     def get_for_seq(self, seq):
         """Returns the name associated with a given sequence.
-        
+
         Args:
             seq: The sequence to fetch.
-        
+
         Returns:
             The name associated with the sequence.
         """
         return list(self.seq_to_name[seq])
-    
+
     def summarize(self):
         """Returns a summary dict. Does *not* add sequence info.
         """
@@ -928,7 +933,7 @@ class AdapterCache(object):
 def parse_braces(sequence):
     """Replace all occurrences of ``x{n}`` (where x is any character) with n
     occurrences of x. Raise ValueError if the expression cannot be parsed.
-    
+
     Examples:
         >>> parse_braces('TGA{5}CT')
         TGAAAAACT
@@ -967,10 +972,10 @@ def parse_braces(sequence):
 def _extract_name_from_spec(spec):
     """Parse an adapter specification given as 'name=adapt' into 'name'
     and 'adapt'.
-    
+
     Args:
         spec: Adapter spec.
-    
+
     Returns:
         (name, spec)
     """
