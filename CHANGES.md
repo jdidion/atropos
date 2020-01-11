@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.25 (2020.01.10)
+
+* Fix #71 - handle corrupted adapter cache file
+
 v1.1.24 (2019.11.27)
 
 * Fix #87 - Python 3.8 compatibility, time.clock removed
