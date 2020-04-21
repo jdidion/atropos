@@ -14,6 +14,7 @@
 FROM phusion/baseimage:latest
 WORKDIR /tmp
 ENV VERSION 1.1.17
+ENV DEBIAN_FRONTEND=noninteractive
 ENV BUILD_PACKAGES \
     git
 ENV RUNTIME_PACKAGES \
@@ -21,7 +22,9 @@ ENV RUNTIME_PACKAGES \
     time
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade \
+        --option=Dpkg::Options::=--force-confdef \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        --option=Dpkg::Options::=--force-confdef \
         $BUILD_PACKAGES \
         $RUNTIME_PACKAGES \
     && ln -s /usr/bin/python3 /usr/bin/python \
