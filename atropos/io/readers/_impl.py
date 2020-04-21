@@ -723,7 +723,7 @@ class BAMParser(BaseSAMParser):
         )
 
     def __init__(self, bam_file: IO, **kwargs):
-        self._reader = self._load_bam_module().AlignmentFile(str(bam_file), **kwargs)
+        self._reader = self._load_bam_module().AlignmentFile(bam_file.name, **kwargs)
 
     @property
     def header(self) -> dict:
