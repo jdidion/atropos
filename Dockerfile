@@ -28,7 +28,7 @@ RUN export NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
         zlib-dev bzip2-dev xz-dev
 
 # Additional Atropos dependencies
-RUN pip install tqdm bamnostic jinja2
+RUN pip install tqdm bamnostic jinja2 wheel
 
 # Attach project directory and install
 ADD . /atropos/
