@@ -3,8 +3,10 @@
 text-based reports. This will eventually be deprecated in favor of the Jinja2
 and MultiQC reports.
 """
+from abc import ABCMeta, abstractmethod
 import math
 import textwrap
+
 from atropos.io import open_output
 from atropos.util import truncate_string, weighted_median
 from .reports import BaseReportGenerator
@@ -690,28 +692,25 @@ def print_post_trim_report(summary, outfile):
             _print()
             print_stats_report(data, outfile)
 
-def print_stats_report(data, outfile):
-    """Print stats.
 
-    Args:
-        data: The stats dict.
-        outfile: The output file.
-    """
-    paired = 'read2' in data
-    max_count = data['read1']['counts']
-    if paired:
-        max_count = max(max_count, data['read2']['counts'])
-    max_width = len(str(max_count))
-    # add space for commas and column separation
-    max_width += (max_width // 3) + 1
+class StatsPrinter(metaclass=ABCMeta):
+    def __init__(self, data, outfile):
+        self._data = data
+        self._title_printer = TitlePrinter(outfile)
+        max_count = self._max_count()
+        max_width = len(str(max_count))
+        # add space for commas and column separation
+        max_width += (max_width // 3) + 1
+        self._printer = RowPrinter(outfile, (35, max_width))
 
-    _print_title = TitlePrinter(outfile)
-    _print = RowPrinter(outfile, (35, max_width))
+    @abstractmethod
+    def _max_count(self):
+        pass
 
-    def _print_histogram(title, hist1, hist2=None):
-        _print_title(title, level=2)
+    def _print_histogram(self, title, hist1, hist2=None):
+        self._title_printer(title, level=2)
         if hist1 is None:
-            _print("No Data")
+            self._printer("No Data")
             return
         if hist2:
             hist = (
@@ -720,118 +719,203 @@ def print_stats_report(data, outfile):
         else:
             hist = sorted(hist1.items(), key=lambda x: x[0])
         for histbin in hist:
-            _print(*histbin)
+            self._printer(*histbin)
 
-    def _print_base_histogram(title, hist, extra_width=4, index_name='Pos'):
-        _print_title(title, level=2)
+    def _print_base_histogram(self, title, hist, extra_width=4, index_name='Pos'):
+        self._title_printer(title, level=2)
         if hist is None:
-            _print("No Data")
+            self._printer("No Data")
             return
-        _print(
+        self._printer(
             index_name, *hist['columns'], header=True, extra_width=extra_width)
         for pos, row in hist['rows'].items():
             total_count = sum(row)
             base_pcts = (
                 round(count * 100 / total_count, 1)
                 for count in row)
-            _print(pos, *base_pcts, extra_width=extra_width)
+            self._printer(pos, *base_pcts, extra_width=extra_width)
 
-    def _print_tile_histogram(title, hist):
+    def _print_tile_histogram(self, title, hist):
         if hist is None:
-            _print_title(title, level=2)
-            _print("No Data")
+            self._title_printer(title, level=2)
+            self._printer("No Data")
             return
         ncol = len(hist['columns'])
         max_tile_width = max(
-            4, len(str(math.ceil(data['read1']['counts'] / ncol)))) + 1
-        _print_base_histogram(
+            4, len(str(math.ceil(self._data['read1']['counts'] / ncol)))) + 1
+        self._print_base_histogram(
             title, hist, extra_width=max_tile_width, index_name='Tile')
 
-    def _print_tile_base_histogram(title, hist):
+    def _print_tile_base_histogram(self, title, hist):
         """Print a histogram of position x tile, with values as the median
         base quality.
         """
-        _print_title(title, level=2)
+        self._title_printer(title, level=2)
         if hist is None:
-            _print("No Data")
+            self._printer("No Data")
             return
         quals = hist['columns']
         tiles = hist['columns2']
         ncol = len(tiles)
         max_tile_width = max(
-            4, len(str(math.ceil(data['read1']['counts'] / ncol)))) + 1
-        _print('Pos', *tiles, header=True, extra_width=max_tile_width)
+            4, len(str(math.ceil(self._data['read1']['counts'] / ncol)))) + 1
+        self._printer('Pos', *tiles, header=True, extra_width=max_tile_width)
         for pos, tiles in hist['rows'].items():
             # compute the weighted median for each tile at each position
-            _print(
+            self._printer(
                 pos,
                 *(
                     weighted_median(quals, tile_counts)
                     for tile_counts in tiles.values()),
                 extra_width=max_tile_width)
 
-    _print('', 'Read1', 'Read2', header=True)
+    @abstractmethod
+    def print_header(self):
+        pass
+
+    @abstractmethod
+    def print_counts(self):
+        pass
+
+    @abstractmethod
+    def print_histogram(self, title, key1, key2):
+        pass
+
+    @abstractmethod
+    def print_tile_histograms(self, title, key):
+        pass
+
+    @abstractmethod
+    def print_base_histograms(self, title, key):
+        pass
+
+    @abstractmethod
+    def print_tile_base_histograms(self, title, key):
+        pass
+
+
+class SingleEndStatsPrinter(StatsPrinter):
+    def _max_count(self):
+        return self._data['read1']['counts']
+
+    def print_header(self):
+        self._printer('', 'Read1', header=True)
+
+    def print_counts(self):
+        self._printer("Reads:", self._data['read1']['counts'])
+        self._printer()
+
+    def print_histogram(self, title, key1, key2):
+        if key1 in self._data['read1']:
+            self._print_histogram(title, self._data['read1'][key1][key2])
+            self._printer()
+
+    def print_tile_histograms(self, title, key):
+        if key in self._data['read1']:
+            self._print_tile_histogram(
+                "Read 1 {}".format(title),
+                self._data['read1'][key])
+            self._printer()
+
+    def print_base_histograms(self, title, key):
+        if key in self._data['read1']:
+            self._print_base_histogram(
+                "Read 1 {}".format(title),
+                self._data['read1'][key])
+            self._printer()
+
+    def print_tile_base_histograms(self, title, key):
+        if key in self._data['read1']:
+            self._print_tile_base_histogram(
+                "Read 1 {}".format(title),
+                self._data['read1'][key])
+
+
+class PairedEndStatsPrinter(StatsPrinter):
+    def _max_count(self):
+        return max(self._data['read1']['counts'], self._data['read2']['counts'])
+
+    def print_header(self):
+        self._printer('', 'Read1', 'Read2', header=True)
+
+    def print_counts(self):
+        self._printer(
+            "Read pairs:",
+            self._data['read1']['counts'],
+            self._data['read2']['counts'])
+        self._printer()
+
+    def print_histogram(self, title, key1, key2):
+        if key1 in self._data:
+            self._print_histogram(
+                title,
+                self._data['read1'][key1][key2],
+                self._data['read2'][key1][key2])
+            self._printer()
+
+    def print_tile_histograms(self, title, key):
+        if 'tile_sequence_qualities' in self._data['read1']:
+            self._print_tile_histogram(
+                "Read 1 {}".format(title),
+                self._data['read1'][key])
+            self._printer()
+            self._print_tile_histogram(
+                "Read 2 {}".format(title),
+                self._data['read2'][key])
+            self._printer()
+
+    def print_base_histograms(self, title, key):
+        if key in self._data:
+            self._print_base_histogram(
+                "Read 1 {}".format(title),
+                self._data['read1'][key])
+            self._printer()
+            self._print_base_histogram(
+                "Read 2 {}".format(title),
+                self._data['read2'][key])
+            self._printer()
+
+    def print_tile_base_histograms(self, title, key):
+        if key in self._data['read1']:
+            self._print_tile_base_histogram(
+                "Read 1 {}".format(title),
+                self._data['read1'][key])
+            self._printer()
+            self._print_tile_base_histogram(
+                "Read 2 {}".format(title),
+                self._data['read2'][key])
+            self._printer()
+
+
+def print_stats_report(data, outfile):
+    """Print stats.
+
+    Args:
+        data: The stats dict.
+        outfile: The output file.
+    """
+    paired = 'read2' in data
+    if paired:
+        printer = PairedEndStatsPrinter(data, outfile)
+    else:
+        printer = SingleEndStatsPrinter(data, outfile)
+
+    printer.print_header()
 
     # Sequence-level stats
-    _print(
-        "Read pairs:" if paired else "Reads:",
-        data['read1']['counts'],
-        data['read2']['counts'])
-    _print()
-    _print_histogram(
-        "Sequence lengths:",
-        data['read1']['lengths']['hist'],
-        data['read2']['lengths']['hist'])
-    _print()
-    if 'qualities' in data['read1']:
-        _print_histogram(
-            "Sequence qualities:",
-            data['read1']['qualities']['hist'],
-            data['read2']['qualities']['hist'])
-        _print()
-    _print_histogram(
-        "Sequence GC content (%)",
-        data['read1']['gc']['hist'],
-        data['read2']['gc']['hist'])
-    _print()
-
-    if 'tile_sequence_qualities' in data['read1']:
-        _print_tile_histogram(
-            "Read 1 per-tile sequence qualities (%)",
-            data['read1']['tile_sequence_qualities'])
-        _print()
-        _print_tile_histogram(
-            "Read 2 per-tile sequence qualities (%)",
-            data['read2']['tile_sequence_qualities'])
-        _print()
+    printer.print_counts()
+    printer.print_histogram("Sequence lengths:", "lengths", "hist")
+    printer.print_histogram("Sequence qualities:", "qualities", "hist")
+    printer.print_histogram("Sequence GC content (%)", "gc", "hist")
+    printer.print_tile_histograms(
+        "per-tile sequence qualities (%)", 'tile_sequence_qualities')
 
     # Base-level stats
-    if 'base_qualities' in data['read1']:
-        _print_base_histogram(
-            "Read 1 base qualities (%)",
-            data['read1']['base_qualities'])
-        _print()
-        _print_base_histogram(
-            "Read 2 base qualities (%)",
-            data['read2']['base_qualities'])
-        _print()
-    _print_base_histogram(
-        "Read 1 base composition (%)",
-        data['read1']['bases'])
-    _print()
-    _print_base_histogram(
-        "Read 2 base composition (%)",
-        data['read2']['bases'])
-    _print()
-    if 'tile_base_qualities' in data['read1']:
-        _print_tile_base_histogram(
-            "Read 1 per-tile base qualities (%)",
-            data['read1']['tile_base_qualities'])
-        _print()
-        _print_tile_base_histogram(
-            "Read 2 per-tile base qualities (%)",
-            data['read2']['tile_base_qualities'])
-        _print()
+    printer.print_base_histograms("base qualities (%)", 'base_qualities')
+    printer.print_base_histograms("base composition (%)", 'bases')
+    printer.print_tile_base_histograms(
+        "per-tile base qualities (%)", 'tile_base_qualities')
+
 
 def sizeof(*x, seps=True, prec=1):
     """Returns the largest string size of all objects in x, where x is a

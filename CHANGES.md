@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.26 (2020.05.04)
+
+* Fix #97 - handle single-end data in QC report
+
 v1.1.25 (2020.01.10)
 
 * Fix #71 - handle corrupted adapter cache file
