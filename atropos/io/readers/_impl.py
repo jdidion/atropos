@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 import sys
 from typing import (
-    Callable, Iterator, IO, Optional, Sequence as SequenceType, Tuple, Type,
+    Callable, Dict, Iterator, IO, Optional, Sequence as SequenceType, Tuple, Type,
     Union, cast
 )
 
@@ -634,23 +634,30 @@ class SAMParser(BaseSAMParser):
         self._header = {}
         self._header_size = 0
 
-        def add_header(fields: SequenceType[str]):
-            header_type = fields[0][1:]
-            tags = dict(
+        def fields_to_tags(fields: SequenceType[str]) -> Dict[str, str]:
+            return dict(
                 (pair[0], pair[1])
-                for pair in (kv.split(":") for kv in fields[1:])
+                for pair in (kv.split(":") for kv in fields)
             )
 
+        def add_header(fields: SequenceType[str]):
+            header_type = fields[0][1:]
             if header_type == "HD":
-                self._header["HD"] = tags
+                self._header["HD"] = fields_to_tags(fields[1:])
             else:
-                if header_type == "SQ" and "LN" in tags:
-                    tags["LN"] = int(tags["LN"])
-
                 if header_type not in self._header:
                     self._header[header_type] = []
 
-                self._header[header_type].append(tags)
+                if header_type == "CO":
+                    # the text after the first tab is free-form - even tab is allowed
+                    self._header[header_type].append("\t".join(fields[1:]))
+                else:
+                    tags = fields_to_tags(fields)
+
+                    if header_type == "SQ" and "LN" in tags:
+                        tags["LN"] = int(tags["LN"])
+
+                    self._header[header_type].append(tags)
 
         for line in self._reader:
             if line[0].startswith("@"):

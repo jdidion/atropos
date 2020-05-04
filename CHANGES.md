@@ -1,6 +1,17 @@
 # Changes
 
-## 2.0.0-alpha.3 (dev)
+## 2.0.0-alpha.5 (2020.05.04)
+
+* Fix #97 (port from 1.1 branch)
+* Fix #96 - properly handle @CO tags in SAM files
+
+## 2.0.0-alpha.4 (2020.01.10)
+
+* bugfixes
+
+## 2.0.0-alpha.3 (2020.01.10)
+
+* bugfixes
 
 ## 2.0.0-alpha.2 (2020.01.02)
 
@@ -36,6 +47,14 @@
 * Added --query option to specify a URL for a supported streaming protocol (e.g. htsget).
 * Enabled output to stdout by default with single-end and interleaved reads.
 * Migrated to setuptools_scm for version management.
+
+## v1.1.26 (2020.05.04)
+
+Fix #97 - handle single-end data in QC report
+
+## v1.1.25 (2020.01.10)
+
+Fix #71 - handle corrupted adapter cache file
 
 ## v1.1.24 (2019.11.17)
 
