@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, cast
 
 from atropos.errors import UnknownFileTypeError
 from atropos.io import SequenceFileType
@@ -256,17 +256,20 @@ class SAMFormatterMixin:
         if not self._header:
             return DEFAULT_SAM_HEADER
 
-        def create_row(_tags: dict):
-            tags_str = "\t".join(f"{key}:{val}" for key, val in _tags.items())
+        def create_row(_tags: Union[str, dict]):
+            if isinstance(_tags, dict):
+                tags_str = "\t".join(f"{key}:{val}" for key, val in _tags.items())
+            else:
+                tags_str = cast(str, _tags)
             return f"@{header_type}\t{tags_str}"
 
         rows = []
 
-        for header_type, tags_list in self._header.items():
-            if isinstance(tags_list, dict):
-                rows.append(create_row(tags_list))
+        for header_type, header_value in self._header.items():
+            if isinstance(header_value, dict):
+                rows.append(create_row(header_value))
             else:
-                rows.extend(create_row(tags) for tags in tags_list)
+                rows.extend(create_row(tags) for tags in header_value)
 
         return "\n".join(rows) + "\n"
 
