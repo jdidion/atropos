@@ -374,8 +374,8 @@ def create_seq_formatter(
                 fmt = FastqFormat()
         else:
             raise UnknownFileTypeError(
-                f"File format {file_format!r} is unknown (expected 'fasta' or "
-                f"'fastq')."
+                f"File format {file_format!r} is unknown (expected one of "
+                f"{','.join(t.name for t in SequenceFileType)}"
             )
 
         if file2 is not None:
