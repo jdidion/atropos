@@ -3,6 +3,7 @@ from typing import cast
 
 from loguru import logger
 from xphyle import STDOUT, STDERR, FORMATS
+from xphyle.paths import check_std
 
 from atropos.adapters import DEFAULT_ADAPTER_CACHE_FILE
 from atropos.commands.console import (
@@ -1201,7 +1202,7 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
         if options.output is not None:
             # Guess compression format from filename
-            if compression_format is None:
+            if compression_format is None and not check_std(options.output):
                 compression_format = FORMATS.guess_compression_format(options.output)
 
             # Multiplexed output
