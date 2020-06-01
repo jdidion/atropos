@@ -143,6 +143,8 @@ class ParallelPipelineRunner:
         self.command = command
         self.pipeline = pipeline
         self.threads = threads or command.get_option("threads")
+        if self.get_option("threads") < 2:
+            raise ValueError("'threads' must be >= 2")
         self.timeout = max(
             command.get_option("process_timeout", 0), DEFAULT_RETRY_INTERVAL
         )
