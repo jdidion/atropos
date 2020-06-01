@@ -48,13 +48,17 @@
 * Enabled output to stdout by default with single-end and interleaved reads.
 * Migrated to setuptools_scm for version management.
 
+## v1.1.27 (2020.06.01)
+
+* Fix #100 - use correct property to get timeout when running `qc` in parallel
+  
 ## v1.1.26 (2020.05.04)
 
-Fix #97 - handle single-end data in QC report
+* Fix #97 - handle single-end data in QC report
 
 ## v1.1.25 (2020.01.10)
 
-Fix #71 - handle corrupted adapter cache file
+* Fix #71 - handle corrupted adapter cache file
 
 ## v1.1.24 (2019.11.17)
 

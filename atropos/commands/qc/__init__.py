@@ -100,20 +100,15 @@ class QcCommand(BaseCommand):
             ParallelPipelineRunner,
         )
 
+        pipeline_class = type("QcPipelineImpl",
+                              (MulticorePipelineMixin, pipeline_class))
+        pipeline = pipeline_class(**pipeline_args)
+        runner = ParallelPipelineRunner(self, pipeline)
+
         logger.debug(
             f"Starting atropos qc in parallel mode with "
-            f"threads={self.get_option('threads')}, "
-            f"timeout={self.get_option('timeout')}"
+            f"threads={runner.threads}, "
+            f"timeout={runner.timeout}"
         )
-
-        if self.get_option("threads") < 2:
-            raise ValueError("'threads' must be >= 2")
-
-        # Start worker processes, reserve a thread for the reader process,
-        # which we will get back after it completes
-        pipeline_class = type("QcPipelineImpl", (MulticorePipelineMixin, pipeline_class))
-        pipeline = pipeline_class(**pipeline_args)
-
-        runner = ParallelPipelineRunner(self, pipeline)
 
         return runner.run()
