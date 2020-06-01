@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.27 (2020.06.01)
+
+* Fix #100 - use correct property to determine timeout when running `qc` in parallel
+
 v1.1.26 (2020.05.04)
 
 * Fix #97 - handle single-end data in QC report
