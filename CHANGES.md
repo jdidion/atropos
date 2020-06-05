@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.28 (2020.06.05)
+
+* Further fix for #100
+
 v1.1.27 (2020.06.01)
 
 * Fix #100 - use correct property to determine timeout when running `qc` in parallel
