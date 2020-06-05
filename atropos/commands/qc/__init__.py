@@ -101,7 +101,7 @@ class QcCommand(BaseCommand):
         )
 
         pipeline_class = type("QcPipelineImpl",
-                              (MulticorePipelineMixin, pipeline_class))
+                              (MulticorePipelineMixin, pipeline_class), {})
         pipeline = pipeline_class(**pipeline_args)
         runner = ParallelPipelineRunner(self, pipeline)
 
