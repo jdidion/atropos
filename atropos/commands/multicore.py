@@ -231,7 +231,7 @@ class ParallelPipelineRunner(object):
     """
     def __init__(self, command_runner, pipeline, threads=None):
         self.threads = threads or command_runner.threads
-        if threads < 2:
+        if self.threads < 2:
             raise ValueError("'threads' must be >= 2")
         self.command_runner = command_runner
         self.pipeline = pipeline

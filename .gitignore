@@ -3,6 +3,7 @@ MANIFEST
 build/
 dist/
 .coverage
+coverage.xml
 *~
 .tox
 galaxy/package/

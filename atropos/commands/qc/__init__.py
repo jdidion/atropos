@@ -76,10 +76,10 @@ class CommandRunner(BaseCommandRunner):
             The return code.
         """
         from atropos.commands.multicore import (
-            ParallelPipelineMixin, ParallelPipelineRunner, RETRY_INTERVAL)
+            ParallelPipelineMixin, ParallelPipelineRunner)
 
         pipeline_class = type(
-            'QcPipelineImpl', (ParallelPipelineMixin, pipeline_class))
+            'QcPipelineImpl', (ParallelPipelineMixin, pipeline_class), {})
         pipeline = pipeline_class(**pipeline_args)
         runner = ParallelPipelineRunner(self, pipeline)
 
