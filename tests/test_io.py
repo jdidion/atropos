@@ -371,43 +371,72 @@ class TestInterleavedWriter:
 class TestSAMWriter:
     def test_single_end(self):
         reads = [Sequence("A/1", "TTA", "##H"), Sequence("B/1", "CC", "HH")]
+        expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
+        expected_reads = (
+            "A/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
+            "B/1\t0\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
+        )
         fmt = SingleEndSAMFormatter("foo")
-        result = defaultdict(lambda: [])
+
+        # simulate writing multiple batches - should only have one header
+        # batch 1
+        batch1 = defaultdict(lambda: [])
         for read in reads:
-            fmt.format(result, read)
+            fmt.format(batch1, read)
         assert fmt.written == 2
         assert fmt.read1_bp == 5
         assert fmt.read2_bp == 0
-        assert "foo" in result
-        result_str = "".join(result["foo"])
-        expected = (
-            "@HD\tVN:1.6\tSO:unsorted\nA/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nB/1\t0"
-            "\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
-        )
-        print(result_str)
-        print(expected)
-        assert result_str == expected
+        assert "foo" in batch1
+        result_str1 = "".join(batch1["foo"])
+        assert result_str1 == expected_header + expected_reads
+
+        # batch 2
+        batch2 = defaultdict(lambda: [])
+        for read in reads:
+            fmt.format(batch2, read)
+        assert fmt.written == 4
+        assert fmt.read1_bp == 10
+        assert fmt.read2_bp == 0
+        assert "foo" in batch2
+        result_str2 = "".join(batch2["foo"])
+        assert result_str2 == expected_reads
 
     def test_paired_end(self):
         reads = [
             (Sequence("A/1", "TTA", "##H"), Sequence("A/2", "GCT", "HH#")),
             (Sequence("B/1", "CC", "HH"), Sequence("B/2", "TG", "#H")),
         ]
+        expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
+        expected_reads = (
+            "A/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
+            "A/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\n"
+            "B/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
+            "B/2\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n"
+        )
         fmt = PairedEndSAMFormatter("foo")
-        result = defaultdict(lambda: [])
+
+        # simulate writing multiple batches - should only have one header
+        # batch 1
+        batch1 = defaultdict(lambda: [])
         for read1, read2 in reads:
-            fmt.format(result, read1, read2)
+            fmt.format(batch1, read1, read2)
         assert fmt.written == 2
         assert fmt.read1_bp == 5
         assert fmt.read2_bp == 5
-        assert "foo" in result
-        result_str = "".join(result["foo"])
-        expected = (
-            "@HD\tVN:1.6\tSO:unsorted\nA/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\nA/2\t129"
-            "\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\nB/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\nB/2"
-            "\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n"
-        )
-        assert result_str == expected
+        assert "foo" in batch1
+        result_str1 = "".join(batch1["foo"])
+        assert result_str1 == expected_header + expected_reads
+
+        # batch2
+        batch2 = defaultdict(lambda: [])
+        for read1, read2 in reads:
+            fmt.format(batch2, read1, read2)
+        assert fmt.written == 4
+        assert fmt.read1_bp == 10
+        assert fmt.read2_bp == 10
+        assert "foo" in batch2
+        result_str2 = "".join(batch2["foo"])
+        assert result_str2 == expected_reads
 
 
 class TestPairedSequenceReader:
