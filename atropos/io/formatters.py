@@ -134,19 +134,19 @@ class Formatter(metaclass=ABCMeta):
             read2: The second read to format.
         """
 
-    def _get_result_list(self, result: dict, file1: str) -> List[str]:
-        if file1 in result:
-            return result[file1]
+    def _get_result_list(self, result: dict, filename: str) -> List[str]:
+        if filename in result:
+            return result[filename]
         else:
             result_list = []
 
-            header = self._get_header()
+            # Add the header only if this is the first batch
+            if self.written == 0:
+                header = self._get_header()
+                if header:
+                    result_list.append(header)
 
-            if header:
-                result_list.append(header)
-
-            result[file1] = result_list
-
+            result[filename] = result_list
             return result_list
 
     def _get_header(self) -> Optional[str]:
