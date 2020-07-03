@@ -1,5 +1,9 @@
 # Changes
 
+## 2.0.0-alpha.6 (development)
+
+* Fix #101 - don't write extra header lines for each batch
+
 ## 2.0.0-alpha.5 (2020.05.04)
 
 * Fix #97 (port from 1.1 branch)
