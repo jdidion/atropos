@@ -609,8 +609,14 @@ class PairedToSingleEndReader(SequenceReaderWrapper):
 
 
 SAMRead = namedtuple(
-    "SAMRead",
-    ("query_name", "query_sequence", "query_qualities", "is_read1", "is_read2"),
+    "SAMRead", (
+        "query_name",
+        "query_sequence",
+        "query_qualities",
+        "is_read1",
+        "is_read2",
+        "tags"
+    ),
 )
 
 
@@ -677,17 +683,26 @@ class SAMParser(BaseSAMParser):
         )
 
     def __next__(self) -> SAMRead:
-        if self._next_line is None:
+        fields = self._next_line
+
+        if fields is None:
             raise StopIteration()
 
-        is_read1 = (int(self._next_line[1]) & 64) > 0
+        def get_tag_name(tag: str) -> str:
+            return tag[:tag.index(":")]
 
+        is_read1 = (int(fields[1]) & 64) > 0
+        tags = dict(
+            (get_tag_name(tag), tag)
+            for tag in fields[11:]
+        )
         read = SAMRead(
-            self._next_line[0],
-            self._next_line[9],
-            self._next_line[10],
+            fields[0],
+            fields[9],
+            fields[10],
             is_read1,
             not is_read1,
+            tags
         )
 
         try:
@@ -738,13 +753,17 @@ class BAMParser(BaseSAMParser):
 
     def __next__(self):
         read = next(self._reader)
-
+        tags = dict(
+            (tag[0], f"{tag[0]}:{tag[2]}:{tag[1]}")
+            for tag in read.get_tags(True)
+        )
         return SAMRead(
             read.query_name,
             read.query_sequence,
             "".join(chr(33 + q) for q in read.query_qualities),
             read.is_read1,
             read.is_read2,
+            tags
         )
 
 
@@ -860,6 +879,7 @@ class SAMReader(SequenceReaderBase, metaclass=ABCMeta):
             read.query_name,
             read.query_sequence,
             read.query_qualities,
+            annotations=read.tags,
             alphabet=self._alphabet
         )
 

@@ -101,14 +101,31 @@ class SAMFormat(SequenceFileFormat):
     """
     SAM SequenceFileFormat.
     """
+    _CONST_PART = "\t*\t0\t0\t*\t*\t0\t0\t"
 
     def __init__(self, flag: int):
         self._flag = str(flag)
 
     def format(self, read: Sequence) -> str:
-        umi = f"\tBC:Z:{read.umi}" if read.umi else ""
-        return f"{read.name}\t{self._flag}\t*\t0\t0\t*\t*\t0\t0\t{read.sequence}\t" \
-               f"{read.qualities}{umi}\n"
+        tags = read.annotations
+
+        if read.umi:
+            if "BC" in tags:
+                # TODO: log warning
+                pass
+            tags["BC"] = f"\tBC:Z:{read.umi}"
+
+        if tags:
+            tags_part = "\t" + "\t".join(tags.values())
+        else:
+            tags_part = ""
+
+        return (
+            f"{read.name}\t{self._flag}"
+            f"{SAMFormat._CONST_PART}"
+            f"{read.sequence}\t{read.qualities}"
+            f"{tags_part}\n"
+        )
 
 
 class Formatter(metaclass=ABCMeta):
