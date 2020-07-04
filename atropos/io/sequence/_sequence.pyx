@@ -9,9 +9,9 @@ from atropos.utils.ngs import reverse_complement
 
 cdef class Sequence(object):
     """
-    A record in a FASTQ file. Also used for FASTA (then the qualities attribute
-    is None). qualities is a string and it contains the qualities encoded as
-    ascii(qual+33).
+    A record in a sequence file. Used for FASTQ, SAM/BAM, and FASTA (then the
+    qualities attribute is None). qualities is a string and it contains the
+    qualities encoded as ascii(qual+33).
 
     If an adapter has been matched to the sequence, the 'match' attribute is
     set to the corresponding Match instance.
@@ -25,6 +25,7 @@ cdef class Sequence(object):
         public str sequence
         public str qualities
         public str name2
+        public dict annotations
         public int original_length
         public object match
         public object match_info
@@ -35,9 +36,21 @@ cdef class Sequence(object):
         public str umi
 
     def __init__(
-        self, str name, str sequence, str qualities=None, str name2='',
-        original_length=None, match=None, match_info=None, clipped=None,
-        insert_overlap=False, merged=False, corrected=0, str umi=None, alphabet=None,
+        self,
+        str name,
+        str sequence,
+        str qualities=None,
+        str name2='',
+        annotations=None,
+        original_length=None,
+        match=None,
+        match_info=None,
+        clipped=None,
+        insert_overlap=False,
+        merged=False,
+        corrected=0,
+        str umi=None,
+        alphabet=None,
     ):
         # Validate sequence and qualities lengths are equal
         if qualities is not None:
@@ -61,6 +74,7 @@ cdef class Sequence(object):
         self.sequence = sequence
         self.qualities = qualities
         self.name2 = name2
+        self.annotations = annotations
         self.original_length = original_length or len(sequence)
         self.match = match
         self.match_info = match_info
@@ -93,7 +107,7 @@ cdef class Sequence(object):
         if front:
             new_read.clipped[offset] += front
         if back:
-            new_read.clipped[offset+1] += back
+            new_read.clipped[offset + 1] += back
         return front, back, new_read
 
     def reverse_complement(self):
@@ -115,6 +129,7 @@ cdef class Sequence(object):
             sequence,
             qualities,
             self.name2,
+            self.annotations,
             self.original_length,
             None,
             match_info,
@@ -148,6 +163,7 @@ cdef class Sequence(object):
             self.sequence[key],
             self.qualities[key] if self.qualities is not None else None,
             self.name2,
+            self.annotations,
             self.original_length,
             self.match,
             self.match_info,
@@ -181,4 +197,6 @@ cdef class Sequence(object):
             raise NotImplementedError()
 
     def __reduce__(self):
-        return Sequence, (self.name, self.sequence, self.qualities, self.name2)
+        return Sequence, (
+            self.name, self.sequence, self.qualities, self.name2, self.annotations
+        )

@@ -95,7 +95,11 @@ class FastqReader(PrefetchSequenceReader):
                     qualities = line.rstrip('\r\n')
                 try:
                     yield sequence_factory(
-                        name, sequence, qualities, name2=name2, alphabet=self._alphabet
+                        name,
+                        sequence,
+                        qualities,
+                        name2=name2,
+                        alphabet=self._alphabet
                     )
                 except Exception as err:
                     raise FormatError(

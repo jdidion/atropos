@@ -481,6 +481,22 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             "use --length-tag 'length=' to correct fields like "
             "'length=123'. (no)",
         )
+        group.add_argument(
+            "--remove-sam-tags",
+            action="store_true",
+            default=False,
+            help="Remove all optional SAM tags when both the input and output are "
+                 "SAM/BAM format."
+        )
+        group.add_argument(
+            "--keep-sam-tag",
+            action="append",
+            default=[],
+            metavar="TAG",
+            help="Tag to retain when both the input and output are SAM/BAM format. Can "
+                 "be given multiple times. By default, all tags are retained unless "
+                 "the '--remove-sam-tags' option is specified."
+        )
 
         group = parser.add_group("UMIs", title="UMI options")
         group.add_argument(

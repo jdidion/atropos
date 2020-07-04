@@ -30,6 +30,7 @@ from atropos.commands.trim.filters import (
 )
 from atropos.commands.trim.modifiers import (
     AdapterCutter,
+    AnnotationsModifier,
     DoubleEncoder,
     InsertAdapterCutter,
     LengthTagModifier,
@@ -473,6 +474,15 @@ class TrimCommand(BaseCommand):
             modifiers.add_modifier(
                 PrefixSuffixAdder, prefix=options.prefix, suffix=options.suffix
             )
+
+        if (
+            options.remove_sam_tags or options.keep_sam_tag
+        ) and (
+            options.input_format in {SequenceFileType.SAM, SequenceFileType.BAM}
+        ) and (
+            options.output_format in {SequenceFileType.SAM, SequenceFileType.BAM}
+        ):
+            modifiers.add_modifier(AnnotationsModifier, keep=options.keep_sam_tag)
 
         if options.double_encode:
             modifiers.add_modifier(DoubleEncoder)
