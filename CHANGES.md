@@ -5,7 +5,8 @@
 * Fix #101 - don't write extra header lines for each batch
 * Fix #102 - errors with serializing report to JSON/YAML
 * Fix #103 - SAM tags are now retained by default when both reading from and writing to SAM/BAM format
-* Added new options `--remove-sam-tags` and `--keep-sam-tag` to filter out all/specific SAM tags.
+* Added new options `--remove-sam-tags` and `--keep-sam-tag` to filter out all/specific SAM tags
+* Fix #104 - set unmapped flags for reads in SAM/BAM output
 
 ## 2.0.0-alpha.5 (2020.05.04)
 

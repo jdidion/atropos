@@ -373,8 +373,8 @@ class TestSAMWriter:
         reads = [Sequence("A/1", "TTA", "##H"), Sequence("B/1", "CC", "HH")]
         expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
         expected_reads = (
-            "A/1\t0\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
-            "B/1\t0\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
+            "A/1\t4\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
+            "B/1\t4\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
         )
         fmt = SingleEndSAMFormatter("foo")
 
@@ -408,10 +408,10 @@ class TestSAMWriter:
         ]
         expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
         expected_reads = (
-            "A/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
-            "A/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\n"
-            "B/1\t65\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
-            "B/2\t129\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n"
+            "A/1\t77\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
+            "A/2\t141\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\n"
+            "B/1\t77\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
+            "B/2\t141\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n"
         )
         fmt = PairedEndSAMFormatter("foo")
 
@@ -447,8 +447,8 @@ class TestSAMWriter:
         ]
         expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
         expected_reads = (
-            "A/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\tXX:i:0\n"
-            "A/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\tXX:i:1\n"
+            "A/1\t77\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\tXX:i:0\n"
+            "A/2\t141\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\tXX:i:1\n"
         )
         fmt = PairedEndSAMFormatter("foo")
         # simulate writing multiple batches - should only have one header
