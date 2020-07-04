@@ -889,6 +889,28 @@ class PrefixSuffixAdder(Modifier):
         return read
 
 
+class AnnotationsModifier(Modifier):
+    """
+    Removes some/all SAM tags.
+    """
+    def __init__(self, keep: Optional[SequenceType[str]] = None):
+        self.keep = set(keep) if keep else None
+
+    def __call__(self, read: Sequence) -> Sequence:
+        if read.annotations:
+            read = read[:]
+            if self.keep:
+                read.annotations = dict(
+                    (k, v)
+                    for k, v in read.annotations.items()
+                    if k in self.keep
+                )
+            else:
+                read.annoations = None
+
+        return read
+
+
 class DoubleEncoder(Modifier):
     """
     Double-encodes colorspace reads, using characters ACGTN to represent colors.

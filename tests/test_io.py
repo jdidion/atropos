@@ -438,6 +438,31 @@ class TestSAMWriter:
         result_str2 = "".join(batch2["foo"])
         assert result_str2 == expected_reads
 
+    def test_tags(self):
+        reads = [
+            (
+                Sequence("A/1", "TTA", "##H", annotations={"XX": "XX:i:0"}),
+                Sequence("A/2", "GCT", "HH#", annotations={"XX": "XX:i:1"})
+            )
+        ]
+        expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
+        expected_reads = (
+            "A/1\t65\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\tXX:i:0\n"
+            "A/2\t129\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\tXX:i:1\n"
+        )
+        fmt = PairedEndSAMFormatter("foo")
+        # simulate writing multiple batches - should only have one header
+        # batch 1
+        batch1 = defaultdict(lambda: [])
+        for read1, read2 in reads:
+            fmt.format(batch1, read1, read2)
+        assert fmt.written == 1
+        assert fmt.read1_bp == 3
+        assert fmt.read2_bp == 3
+        assert "foo" in batch1
+        result_str1 = "".join(batch1["foo"])
+        assert result_str1 == expected_header + expected_reads
+
 
 class TestPairedSequenceReader:
     def test_sequence_names_match(self):
