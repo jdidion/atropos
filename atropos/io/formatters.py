@@ -290,15 +290,17 @@ class SAMFormatterMixin:
 
         return "\n".join(rows) + "\n"
 
+# TODO: don't use constant flag - flag should only be 0 for mapped read, otherwise
+#  read_unmapped flag should be set
 
 class SingleEndSAMFormatter(SAMFormatterMixin, SingleEndFormatter):
     def __init__(self, file1: str, header: Optional[dict] = None):
-        super().__init__(file1, SAMFormat(0), header=header)
+        super().__init__(file1, SAMFormat(4), header=header)
 
 
 class PairedEndSAMFormatter(SAMFormatterMixin, InterleavedFormatter):
     def __init__(self, file1: str, header: Optional[dict] = None):
-        super().__init__(file1, SAMFormat(65), SAMFormat(129), header=header)
+        super().__init__(file1, SAMFormat(77), SAMFormat(141), header=header)
 
 
 def sra_colorspace_sequence(
