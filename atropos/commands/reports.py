@@ -1,8 +1,8 @@
 from abc import ABCMeta, abstractmethod
-from functools import partial
+from enum import Enum
 from importlib import import_module
 from pathlib import Path
-from typing import Callable, Dict, IO, Optional, Sequence
+from typing import Any, Callable, Dict, IO, Optional, Sequence, cast
 
 from xphyle import STDOUT, STDERR, open_
 
@@ -108,7 +108,24 @@ class DumpReportWriter(BaseReportWriter, metaclass=ABCMeta):
 
     def serialize(self, summary: dict, stream: IO):
         mod = import_module(self.name)
-        mod.dump(summary, stream)
+        serializable_summary = self._make_serializable(summary)
+        mod.dump(serializable_summary, stream)
+
+    def _make_serializable(self, obj: Any) -> Any:
+        if obj is None:
+            return obj
+        if isinstance(obj, (str, int, float, bool)):
+            return obj
+        if isinstance(obj, dict):
+            return dict(
+                (key, self._make_serializable(value))
+                for key, value in cast(dict, obj).items()
+            )
+        if isinstance(obj, Sequence):
+            return list(self._make_serializable(item) for item in cast(Sequence, obj))
+        if isinstance(obj, Enum):
+            return self._make_serializable(cast(Enum, obj).value)
+        return str(obj)
 
 
 class JsonReportWriter(DumpReportWriter):
