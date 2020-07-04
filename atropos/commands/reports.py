@@ -108,8 +108,18 @@ class DumpReportWriter(BaseReportWriter, metaclass=ABCMeta):
 
     def serialize(self, summary: dict, stream: IO):
         mod = import_module(self.name)
-        serializable_summary = self._make_serializable(summary)
-        mod.dump(serializable_summary, stream)
+        mod.dump(summary, stream)
+
+
+class PickleReportWriter(DumpReportWriter):
+    @classproperty
+    def name(self) -> str:
+        return "pickle"
+
+
+class DumpEncodedReportWriter(DumpReportWriter, metaclass=ABCMeta):
+    def serialize(self, summary: dict, stream: IO):
+        super().serialize(self._make_serializable(summary), stream)
 
     def _make_serializable(self, obj: Any) -> Any:
         if obj is None:
@@ -128,22 +138,16 @@ class DumpReportWriter(BaseReportWriter, metaclass=ABCMeta):
         return str(obj)
 
 
-class JsonReportWriter(DumpReportWriter):
+class JsonReportWriter(DumpEncodedReportWriter):
     @classproperty
     def name(self) -> str:
         return "json"
 
 
-class YamlReportWriter(DumpReportWriter):
+class YamlReportWriter(DumpEncodedReportWriter):
     @classproperty
     def name(self) -> str:
         return "yaml"
-
-
-class PickleReportWriter(DumpReportWriter):
-    @classproperty
-    def name(self) -> str:
-        return "pickle"
 
 
 class DefaultReportGenerator(metaclass=ABCMeta):
