@@ -530,7 +530,10 @@ class TrimCommand(BaseCommand):
             options.output_format == SequenceFileType.SAM
             and isinstance(self.reader, SAMReader)
         ):
-            seq_formatter_args["bam_header"] = cast(SAMReader, self.reader).header
+            seq_formatter_args["sam_options"] = {
+                "command": " ".join(("atropos", "trim") + options.orig_args),
+                "header": cast(SAMReader, self.reader).header,
+            }
 
         formatters = Formatters(output1, seq_formatter_args)
 

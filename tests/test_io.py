@@ -7,6 +7,7 @@ from textwrap import dedent
 import pytest
 from xphyle import open_, xopen
 
+from atropos import __version__
 from atropos.errors import FormatError
 from atropos.io import InputRead
 from atropos.io.sequence import Sequence, ColorspaceSequence
@@ -30,6 +31,7 @@ from atropos.io.readers import (
 from atropos.utils import no_import
 from atropos.utils.ngs import ALPHABETS
 
+from .utils import no_internet
 
 # files tests/data/simple.fast{q,a}
 simple_fastq = [
@@ -372,11 +374,12 @@ class TestSAMWriter:
     def test_single_end(self):
         reads = [Sequence("A/1", "TTA", "##H"), Sequence("B/1", "CC", "HH")]
         expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
+        expected_pg = f"@PG\tID:Atropos\tPN:Atropos\tVN:{__version__}\tCL:test\n"
         expected_reads = (
             "A/1\t4\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
             "B/1\t4\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
         )
-        fmt = SingleEndSAMFormatter("foo")
+        fmt = SingleEndSAMFormatter("foo", command="test")
 
         # simulate writing multiple batches - should only have one header
         # batch 1
@@ -388,7 +391,7 @@ class TestSAMWriter:
         assert fmt.read2_bp == 0
         assert "foo" in batch1
         result_str1 = "".join(batch1["foo"])
-        assert result_str1 == expected_header + expected_reads
+        assert result_str1 == expected_header + expected_pg + expected_reads
 
         # batch 2
         batch2 = defaultdict(lambda: [])
@@ -407,13 +410,14 @@ class TestSAMWriter:
             (Sequence("B/1", "CC", "HH"), Sequence("B/2", "TG", "#H")),
         ]
         expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
+        expected_pg = f"@PG\tID:Atropos\tPN:Atropos\tVN:{__version__}\tCL:test\n"
         expected_reads = (
             "A/1\t77\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\n"
             "A/2\t141\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\n"
             "B/1\t77\t*\t0\t0\t*\t*\t0\t0\tCC\tHH\n"
             "B/2\t141\t*\t0\t0\t*\t*\t0\t0\tTG\t#H\n"
         )
-        fmt = PairedEndSAMFormatter("foo")
+        fmt = PairedEndSAMFormatter("foo", command="test")
 
         # simulate writing multiple batches - should only have one header
         # batch 1
@@ -425,7 +429,7 @@ class TestSAMWriter:
         assert fmt.read2_bp == 5
         assert "foo" in batch1
         result_str1 = "".join(batch1["foo"])
-        assert result_str1 == expected_header + expected_reads
+        assert result_str1 == expected_header + expected_pg + expected_reads
 
         # batch2
         batch2 = defaultdict(lambda: [])
@@ -446,11 +450,12 @@ class TestSAMWriter:
             )
         ]
         expected_header = "@HD\tVN:1.6\tSO:unsorted\n"
+        expected_pg = f"@PG\tID:Atropos\tPN:Atropos\tVN:{__version__}\tCL:test\n"
         expected_reads = (
             "A/1\t77\t*\t0\t0\t*\t*\t0\t0\tTTA\t##H\tXX:i:0\n"
             "A/2\t141\t*\t0\t0\t*\t*\t0\t0\tGCT\tHH#\tXX:i:1\n"
         )
-        fmt = PairedEndSAMFormatter("foo")
+        fmt = PairedEndSAMFormatter("foo", command="test")
         # simulate writing multiple batches - should only have one header
         # batch 1
         batch1 = defaultdict(lambda: [])
@@ -461,7 +466,7 @@ class TestSAMWriter:
         assert fmt.read2_bp == 3
         assert "foo" in batch1
         result_str1 = "".join(batch1["foo"])
-        assert result_str1 == expected_header + expected_reads
+        assert result_str1 == expected_header + expected_pg + expected_reads
 
 
 class TestPairedSequenceReader:
@@ -487,7 +492,9 @@ SRA_SEQ1 = Sequence(
 
 
 @pytest.mark.skipif(
-    no_import("ngstream") or no_import("ngs"),
+    no_internet("https://ncbi.nlm.nih.gov") or
+    no_import("ngstream") or
+    no_import("ngs"),
     reason="ngstream library not available"
 )
 class TestSraReader:

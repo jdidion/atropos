@@ -3,6 +3,7 @@ import shutil
 import pytest
 from xphyle import open_
 
+from atropos import __version__
 from atropos.console import execute_cli
 from atropos.commands.trim import AlignerType
 from atropos.commands.trim.console import TrimCommandConsole
@@ -515,6 +516,9 @@ def test_sam(run_trimmer):
         interleaved_input=True,
         interleaved_output=True,
         aligner="insert",
+        version=__version__,
+        command="atropos trim -a TTAGACATAT -A CAGTGGAGTA -m 14 --output-format sam "
+                "--aligner insert -l {infiles[0]} -L {output}"
     )
 
 
