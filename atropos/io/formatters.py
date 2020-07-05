@@ -2,12 +2,10 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Tuple, Union, cast
 
+from atropos import __version__
 from atropos.errors import UnknownFileTypeError
 from atropos.io import SequenceFileType
 from atropos.io.sequence import Sequence, ColorspaceSequence
-
-
-DEFAULT_SAM_HEADER = "@HD\tVN:1.6\tSO:unsorted\n"
 
 
 class SequenceFileFormat(metaclass=ABCMeta):
@@ -265,13 +263,26 @@ class PairedEndFormatter(Formatter):
 
 
 class SAMFormatterMixin:
-    def __init__(self, *args, header: Optional[dict] = None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        version: str = __version__,
+        command: str = "",
+        header: Optional[dict] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
+        self._version = version
+        self._command = command
         self._header = header
 
     def _get_header(self) -> Optional[str]:
+        pg_header = f"\n@PG\tID:Atropos\tPN:Atropos\tVN:{self._version}\tCL:" \
+                    f"{self._command}\n"
+
         if not self._header:
-            return DEFAULT_SAM_HEADER
+            default_sam_header = "@HD\tVN:1.6\tSO:unsorted" + pg_header
+            return default_sam_header
 
         def create_row(_tags: Union[str, dict]):
             if isinstance(_tags, dict):
@@ -288,19 +299,38 @@ class SAMFormatterMixin:
             else:
                 rows.extend(create_row(tags) for tags in header_value)
 
-        return "\n".join(rows) + "\n"
+        return "\n".join(rows) + pg_header
 
-# TODO: don't use constant flag - flag should only be 0 for mapped read, otherwise
-#  read_unmapped flag should be set
 
 class SingleEndSAMFormatter(SAMFormatterMixin, SingleEndFormatter):
-    def __init__(self, file1: str, header: Optional[dict] = None):
-        super().__init__(file1, SAMFormat(4), header=header)
+    def __init__(
+        self,
+        file1: str,
+        version: str = __version__,
+        command: str = "",
+        header: Optional[dict] = None
+    ):
+        super().__init__(
+            file1, SAMFormat(4), version=version, command=command, header=header
+        )
 
 
 class PairedEndSAMFormatter(SAMFormatterMixin, InterleavedFormatter):
-    def __init__(self, file1: str, header: Optional[dict] = None):
-        super().__init__(file1, SAMFormat(77), SAMFormat(141), header=header)
+    def __init__(
+        self,
+        file1: str,
+        version: str = __version__,
+        command: str = "",
+        header: Optional[dict] = None
+    ):
+        super().__init__(
+            file1,
+            SAMFormat(77),
+            SAMFormat(141),
+            version=version,
+            command=command,
+            header=header
+        )
 
 
 def sra_colorspace_sequence(
@@ -320,7 +350,7 @@ def create_seq_formatter(
     file_format: Optional[Union[SequenceFileType, SequenceFileFormat]] = None,
     interleaved: bool = False,
     line_length: Optional[int] = None,
-    bam_header: Optional[dict] = None,
+    sam_options: dict = {},
 ):
     """
     Creates a Formatter, deriving the format name from the file extension.
@@ -342,8 +372,7 @@ def create_seq_formatter(
             Colorspace is not auto-detected and must always be requested explicitly.
         interleaved: Whether the output should be interleaved (file2 must be None).
         line_length: Maximum length of a sequence line in FASTA output.
-        bam_header: If writing SAM format, optional headers to add at the beginning of
-            the output.
+        sam_options: Options specifically for SAM/BAM format.
 
     Returns:
         A Formatter instance.
@@ -377,9 +406,9 @@ def create_seq_formatter(
             raise ValueError("Only one output file allowed for SAM format")
 
         if interleaved:
-            return PairedEndSAMFormatter(file1, bam_header)
+            return PairedEndSAMFormatter(file1, **sam_options)
         else:
-            return SingleEndSAMFormatter(file1, bam_header)
+            return SingleEndSAMFormatter(file1, **sam_options)
     else:
         if file_format == SequenceFileType.FASTA:
             if colorspace:
