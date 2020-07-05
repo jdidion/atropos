@@ -7,6 +7,7 @@
 * Fix #103 - SAM tags are now retained by default when both reading from and writing to SAM/BAM format
 * Added new options `--remove-sam-tags` and `--keep-sam-tag` to filter out all/specific SAM tags
 * Fix #104 - set unmapped flags for reads in SAM/BAM output
+* Add enhancement #105 - add @PG tag for SAM output
 
 ## 2.0.0-alpha.5 (2020.05.04)
 
