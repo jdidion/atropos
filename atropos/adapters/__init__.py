@@ -52,7 +52,7 @@ from atropos.utils.statistics import RandomMatchProbability
 
 
 # TODO: specify this externally rather than hard-coding
-DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/master/atropos/adapters/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/main/atropos/adapters/sequencing_adapters.fa"
 DEFAULT_ADAPTERS_PATH = Path(__file__).parent / "sequencing_adapters.fa"
 DEFAULT_ADAPTER_CACHE_FILE = ".adapters"
 
