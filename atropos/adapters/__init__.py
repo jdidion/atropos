@@ -23,6 +23,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from loguru import logger
+import pkg_resources
 from xphyle import open_
 from xphyle.types import PathLike
 
@@ -52,8 +53,8 @@ from atropos.utils.statistics import RandomMatchProbability
 
 
 # TODO: specify this externally rather than hard-coding
-DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/main/atropos/adapters/sequencing_adapters.fa"
-DEFAULT_ADAPTERS_PATH = Path(__file__).parent / "sequencing_adapters.fa"
+DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/develop/atropos/resources/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_RESOURCE = "resources/sequencing_adapters.fa"
 DEFAULT_ADAPTER_CACHE_FILE = ".adapters"
 
 DEFAULT_INSERT_MAX_RMP = 1e-6
@@ -680,7 +681,7 @@ class AdapterCache:
         self.seq_to_name[seq].add(name)
         self.name_to_seq[name] = seq
 
-    def load_from_file(self, path: Union[str, Path] = DEFAULT_ADAPTERS_PATH) -> int:
+    def load_from_file(self, path: Union[str, Path]) -> int:
         """
         Loads cached data from a file.
 
@@ -728,18 +729,22 @@ class AdapterCache:
         Tries to load from default URL first, then from default path.
         """
         try:
+            fasta = pkg_resources.resource_string(
+                "atropos", DEFAULT_ADAPTERS_RESOURCE
+            ).split("\n")
+            return self.load_from_fasta(fasta)
+        except (OSError, IOError):
+            logger.opt(exception=True).warning(
+                f"Error loading adapters from package resource "
+                f"{DEFAULT_ADAPTERS_RESOURCE}; loading from URL instead"
+            )
+
+        try:
             return self.load_from_url()
         except (OSError, IOError):
             logger.opt(exception=True).warning(
                 f"Error loading adapters from URL {DEFAULT_ADAPTERS_URL}; loading from"
                 f"file instead"
-            )
-
-        try:
-            return self.load_from_file()
-        except IOError:
-            logger.opt(exception=True).warning(
-                f"Error loading adapters from file {DEFAULT_ADAPTERS_PATH}"
             )
 
     @property

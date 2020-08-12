@@ -3,6 +3,7 @@ loguru==0.4.0
 aiocontextvars==0.2.2
 contextvars==2.4
 immutables==0.11
+setuptools==40.6.2
 setuptools-scm==3.3.3
 pokrok==0.2.0
 xphyle==4.2.2

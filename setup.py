@@ -145,6 +145,7 @@ install_requirements = [
     "loguru>=0.4.0",
     "pokrok>=0.2.0",
     "xphyle>=4.2.2",
+    "setuptools"
 ]
 test_requirements = [
     "pytest",

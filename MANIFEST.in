@@ -11,7 +11,7 @@ include atropos/aligner/_aligner.c
 include atropos/commands/trim/_qualtrim.c
 include atropos/io/readers/_readers.c
 include atropos/io/sequence/_sequence.c
-include atropos/adapters/*.fa
+include resources/*
 include tests/test*.py
 include tests/utils.py
 graft tests/data/input

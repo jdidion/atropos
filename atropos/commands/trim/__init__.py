@@ -531,7 +531,7 @@ class TrimCommand(BaseCommand):
             and isinstance(self.reader, SAMReader)
         ):
             seq_formatter_args["sam_options"] = {
-                "command": " ".join(["atropos", "trim"] + options.orig_args),
+                "command": " ".join(("atropos", "trim") + tuple(options.orig_args)),
                 "header": cast(SAMReader, self.reader).header,
             }
 
