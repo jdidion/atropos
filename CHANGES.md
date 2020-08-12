@@ -3,7 +3,8 @@
 ## 2.0.0-alpha.7 (development)
 
 * Update adapters file link
-* Fix #112 (thanks to @plijnzaad)
+* Package adapters file with wheel (#116)
+* Fix #112 - type error (thanks to @plijnzaad)
 
 ## 2.0.0-alpha.6 (2020.07.05)
 
