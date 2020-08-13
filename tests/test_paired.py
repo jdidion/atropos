@@ -366,16 +366,16 @@ def test_too_long_output(run_trimmer, aligner):
 
 @pytest.mark.parametrize("aligner", BACK_ALIGNERS)
 def test_too_short_output_paired_option_missing(run_trimmer, aligner, tmp_path):
-    with pytest.raises(SystemExit):
-        p1 = tmp_path / "temp-too-short.1.fastq"
-        run_trimmer(
-            f"-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output {p1}",
-            inpath1="paired.1.fastq",
-            inpath2="paired.2.fastq",
-            expected1="paired.1.fastq",
-            expected2="paired.2.fastq",
-            aligner=aligner,
-        )
+    p1 = tmp_path / "temp-too-short.1.fastq"
+    run_trimmer(
+        f"-a TTAGACATAT -A CAGTGGAGTA -m 14 --too-short-output {p1}",
+        inpath1="paired.1.fastq",
+        inpath2="paired.2.fastq",
+        expected1="paired.1.fastq",
+        expected2="paired.2.fastq",
+        aligner=aligner,
+        expected_rc=1
+    )
 
 
 @pytest.mark.parametrize("aligner", BACK_ALIGNERS)

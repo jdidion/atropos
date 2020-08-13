@@ -4,6 +4,7 @@ from multiprocessing import cpu_count
 from pathlib import Path
 import platform
 import re
+import sys
 import textwrap
 from typing import Dict, Sequence as SequenceType, Tuple, Type, Union, cast
 
@@ -139,14 +140,29 @@ class BaseCommandConsole(metaclass=ABCMeta):
         Returns:
             The tuple (return_code, summary)
         """
-        options = cls._parse_args(args)
+        try:
+            options = cls._parse_args(args)
+        except SystemExit as err:
+            # the --help and --version commands raise SystemExit
+            # catch it here and return an error code
+            if err.code == 0:
+                return ReturnCode.SUCCESS, {}
+            else:
+                return ReturnCode.ERROR, {
+                    "exception": dict(
+                        message=str(err), details=sys.exc_info()
+                    )
+                }
+
         command = cls._create_command(options)
         retcode, summary = command.run()
+
         if retcode is ReturnCode.SUCCESS and options.report_file:
             logger.debug(f"Writing report to {options.report_file}")
             cls.generate_reports(summary, options)
         else:
             logger.debug("Not generating report file")
+
         return retcode, summary
 
     @classmethod

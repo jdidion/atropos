@@ -105,7 +105,7 @@ def execute_cli(args: Sequence[str] = ()) -> ReturnCode:
     """
     commands = discover_commands()
 
-    if len(args) == 0 or args[0] in ("-h", "--help"):
+    def print_help():
         print(
             HELP_TEXT.format(
                 __version__,
@@ -113,8 +113,24 @@ def execute_cli(args: Sequence[str] = ()) -> ReturnCode:
             ),
             file=sys.stderr
         )
+
+    # exit early with help message - return error code since
+    # the user did not supply valid arguments
+    if len(args) == 0:
+        print_help()
         return ReturnCode.ERROR
 
+    # exit early with help message
+    if args[0] in ("-h", "--help"):
+        print_help()
+        return ReturnCode.SUCCESS
+
+    # exit early with version
+    if args[0] in ("-v", "--version"):
+        print(__version__, file=sys.stderr)
+        return ReturnCode.SUCCESS
+
+    # load command line arguments from config file
     if args[0] == "--config":
         config_path = as_readable_path(args[1])
         args = args[2:]

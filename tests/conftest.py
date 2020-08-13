@@ -76,7 +76,7 @@ def run_trimmer(tmp_path: Path, capsys, input_data, expected_data):
         expected_multi: Optional[Sequence[str]] = None,
         expected_other: Optional[Sequence[str]] = None,
         assert_output_equal: bool = True,
-        error_on_rc: bool = True,
+        expected_rc: int = 0,
         **expected_vars
     ) -> Tuple[Path, List[Path], dict]:
         if isinstance(params, str):
@@ -164,20 +164,21 @@ def run_trimmer(tmp_path: Path, capsys, input_data, expected_data):
             assert retcode != 0
             err = summary["exception"]
             traceback.print_exception(*err["details"])
-            if error_on_rc:
+            if expected_rc != retcode:
                 raise AssertionError(
                     f"Return code {retcode} != 0; error: {err['message']}"
                 )
-        elif error_on_rc:
-            assert retcode == 0
+        else:
+            assert retcode == expected_rc
 
-        expected_vars = dict(
-            (k, v.format(infiles=infiles, output=output) if isinstance(v, str) else v)
-            for k, v in expected_vars.items()
-        )
-        for expected_path, actual_path in to_compare:
-            assert actual_path.exists()
-            assert_files_equal(expected_path, actual_path, **expected_vars)
+        if retcode == 0:
+            expected_vars = dict(
+                (k, v.format(infiles=infiles, output=output) if isinstance(v, str) else v)
+                for k, v in expected_vars.items()
+            )
+            for expected_path, actual_path in to_compare:
+                assert actual_path.exists()
+                assert_files_equal(expected_path, actual_path, **expected_vars)
 
         return tmp_path, infiles, summary
 

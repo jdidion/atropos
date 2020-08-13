@@ -1,5 +1,6 @@
 from multiprocessing import Process, Queue
 import os
+import sys
 from typing import Iterator, Optional, Type, cast
 
 from loguru import logger
@@ -119,7 +120,9 @@ class WorkerProcess(Process):
             logger.debug(f"{self.name} finished normally")
         except Exception as err:
             logger.exception(f"Unexpected error in {self.name}")
-            summary["exception"] = err
+            summary["exception"] = dict(
+                message=str(err), details=sys.exc_info()
+            )
 
         logger.debug(f"{self.name} sending summary")
         enqueue_summary()
