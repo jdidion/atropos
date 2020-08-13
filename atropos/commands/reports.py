@@ -128,7 +128,7 @@ class DumpEncodedReportWriter(DumpReportWriter, metaclass=ABCMeta):
             return obj
         if isinstance(obj, dict):
             return dict(
-                (key, self._make_serializable(value))
+                (self._make_serializable(key), self._make_serializable(value))
                 for key, value in cast(dict, obj).items()
             )
         if isinstance(obj, Sequence):

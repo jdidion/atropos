@@ -119,6 +119,9 @@ class MetricsRecordHandlerWrapper(Summarizable):
         else:
             self.post = None
 
+    def __getattr__(self, item):
+        return getattr(self.record_handler, item)
+
     def handle_record(
         self, context: dict, read1: Sequence, read2: Optional[Sequence] = None
     ) -> Tuple[Type[Filter], Tuple[Sequence, Optional[Sequence]]]:
