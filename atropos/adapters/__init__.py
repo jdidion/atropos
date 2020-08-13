@@ -18,6 +18,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    cast
 )
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -44,7 +45,7 @@ from atropos.utils.collections import (
 from atropos.utils.ngs import (
     ALPHABETS,
     GC_BASES,
-    IUPAC_BASES,
+    DNA_BASES,
     Alphabet,
     reverse_complement,
 )
@@ -52,9 +53,8 @@ from atropos.utils.paths import as_readable_path
 from atropos.utils.statistics import RandomMatchProbability
 
 
-# TODO: specify this externally rather than hard-coding
-DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/develop/atropos/resources/sequencing_adapters.fa"
-DEFAULT_ADAPTERS_RESOURCE = "resources/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_URL = "https://raw.githubusercontent.com/jdidion/atropos/develop/atropos/adapters/sequencing_adapters.fa"
+DEFAULT_ADAPTERS_RESOURCE = "adapters/sequencing_adapters.fa"
 DEFAULT_ADAPTER_CACHE_FILE = ".adapters"
 
 DEFAULT_INSERT_MAX_RMP = 1e-6
@@ -731,7 +731,7 @@ class AdapterCache:
         try:
             fasta = pkg_resources.resource_string(
                 "atropos", DEFAULT_ADAPTERS_RESOURCE
-            ).split("\n")
+            ).decode().split("\n")
             return self.load_from_fasta(fasta)
         except (OSError, IOError):
             logger.opt(exception=True).warning(
@@ -846,14 +846,13 @@ class Adapter(AdapterBase):
         max_error_rate: float = 0.1,
         min_overlap: int = 3,
         read_wildcards: bool = False,
-        adapter_wildcards: bool = True,
         name: Optional[str] = None,
         indels: bool = True,
         indel_cost: int = 1,
         match_probability: Optional[RandomMatchProbability] = None,
         max_rmp: Optional[float] = None,
         gc_content: float = 0.5,
-        alphabet: Optional[Alphabet] = None,
+        alphabet: Optional[Union[str, Alphabet]] = None,
     ):
         """
         Args:
@@ -868,7 +867,6 @@ class Adapter(AdapterBase):
             min_overlap: Minimum length of the part of the alignment that
                 matches the adapter.
             read_wildcards: Whether IUPAC wildcards in the read are allowed.
-            adapter_wildcards: Whether IUPAC wildcards in the adapter are allowed.
             name: optional name of the adapter. If not provided, the name is set to
                 a unique number.
             indels: Whether indels are allowed in adapter matches.
@@ -878,32 +876,18 @@ class Adapter(AdapterBase):
             max_rmp: Maximum random-match probability below which a match is
                 considered genuine.
             gc_content: Expected GC content of sequences.
-            alphabet: The Alphabet to use to validate the adapter sequence.
+            alphabet: The Alphabet to use to validate the adapter sequence. "none"
+                (or a None value) means do not validate and do not allow adapter
+                wildcards; "auto" means detect the alphabet from the sequence.
         """
         if len(sequence) == 0:
             raise ValueError("Empty adapter sequence")
 
-        # TODO: all of this validation code should be wrapped up in Alphabet
-        sequence = parse_braces(sequence.upper().replace("U", "T"))
-        seq_set = set(sequence)
-
-        if seq_set <= set("ACGT"):
-            adapter_wildcards = False
-
-        if adapter_wildcards and not seq_set <= IUPAC_BASES:
-            raise ValueError(
-                f"Invalid character(s) in adapter sequence: "
-                f"{','.join(seq_set - IUPAC_BASES)}"
-            )
-
-        if alphabet:
-            if isinstance(alphabet, str):
-                alphabet = ALPHABETS[alphabet]
-            alphabet.validate_string(sequence)
-
+        self.sequence, self.adapter_wildcards = self._transform_and_validate_sequence(
+            sequence, where, alphabet
+        )
         self.debug = False
         self.name = name or AdapterBase._generate_adapter_name()
-        self.sequence = sequence
         self.where = where
         self.max_error_rate = max_error_rate
         self.min_overlap = min(min_overlap, len(self.sequence))
@@ -911,7 +895,6 @@ class Adapter(AdapterBase):
         self.max_rmp = max_rmp
         self.gc_content = gc_content
         self.indels = indels
-        self.adapter_wildcards = adapter_wildcards
         self.read_wildcards = read_wildcards
 
         # redirect trimmed() to appropriate function depending on adapter type
@@ -950,6 +933,41 @@ class Adapter(AdapterBase):
         self.errors_front = NestedDict()
         self.errors_back = NestedDict()
         self.adjacent_bases = {"A": 0, "C": 0, "G": 0, "T": 0, "": 0}
+
+    def _transform_and_validate_sequence(
+        self,
+        sequence: str,
+        where: int,
+        alphabet: Optional[Union[str, Alphabet]]
+    ) -> Tuple[str, bool]:
+        sequence = parse_braces(sequence.upper().replace("U", "T"))
+
+        if alphabet in (None, "none"):
+            alphabet_obj = None
+        else:
+            if alphabet == "auto":
+                # try to autodetect alphabet
+                for alphabet in ("dna", "iupac"):
+                    temp = ALPHABETS[alphabet]
+                    if temp.contains_all(sequence):
+                        alphabet_obj = temp
+                        break
+                else:
+                    raise Exception(
+                        f"Could not auto-detect alphabet for adapter {sequence}; "
+                        f"set '--adapter-alphabet' to 'none' or to the correct "
+                        f"alphabet"
+                    )
+            elif isinstance(alphabet, str):
+                alphabet_obj = ALPHABETS[alphabet]
+            else:
+                alphabet_obj = cast(Alphabet, alphabet)
+
+            alphabet_obj.validate_string(sequence)
+
+        adapter_wildcards = alphabet_obj and alphabet_obj.name == "iupac"
+
+        return sequence, adapter_wildcards
 
     def __len__(self) -> int:
         return len(self.sequence)
@@ -1174,29 +1192,43 @@ class ColorspaceAdapter(Adapter):
     An adapter for a colorspace sequence.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, sequence: str, where: int, *args, **kwargs):
         """
         Args:
             args: Positional arguments passed to :class:`Adapter` constructor.
             kwargs: Keyword arguments passed to :class:`Adapter` constructor.
         """
-        if kwargs.get("adapter_wildcards"):
-            raise ValueError("Wildcards not supported for colorspace adapters")
-        else:
-            kwargs["adapter_wildcards"] = False
+        self.nucleotide_sequence = None
+        kwargs["alphabet"] = "colorspace"
+        super().__init__(sequence, where, *args, **kwargs)
 
-        super().__init__(*args, **kwargs)
+    def _transform_and_validate_sequence(
+        self,
+        sequence: str,
+        where: int,
+        alphabet: Optional[Union[str, Alphabet]]
+    ) -> Tuple[str, bool]:
+        validate = alphabet not in (None, "none")
 
-        if set(self.sequence) <= set("ACGT"):
+        if validate and alphabet not in ("auto", "dna", "colorspace"):
+            raise ValueError(f"Invalid alphabet for colorspace: {alphabet}")
+
+        if set(sequence) <= DNA_BASES:
             # adapter was given in basespace
-            self.nucleotide_sequence = self.sequence
-            self.sequence = colorspace.encode(self.sequence)[1:]
-        elif self.where in (AdapterType.PREFIX, AdapterType.FRONT):
+            self.nucleotide_sequence = parse_braces(sequence.upper())
+            if validate:
+                ALPHABETS["dna"].validate_string(self.nucleotide_sequence)
+            sequence = colorspace.encode(self.nucleotide_sequence)[1:]
+        elif where in (AdapterType.PREFIX, AdapterType.FRONT):
             raise ValueError(
                 "A 5' colorspace adapter needs to be given in nucleotide space"
             )
+        else:
+            sequence = parse_braces(sequence.upper())
+            if validate:
+                ALPHABETS["colorspace"].validate_string(sequence)
 
-        self.aligner.reference = self.sequence
+        return sequence, False
 
     def match_to(self, read: ColorspaceSequence) -> Optional[AdapterMatch]:
         """

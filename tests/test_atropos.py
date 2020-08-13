@@ -16,11 +16,11 @@ except ImportError:
 
 
 def test_example(run_trimmer):
-    run_trimmer("-N -b ADAPTER", "example.fa", "example.fa")
+    run_trimmer("--adapter-alphabet none -b ADAPTER", "example.fa", "example.fa")
 
 
 def test_example_stdout(run_trimmer):
-    run_trimmer("-N -b ADAPTER", "example.fa", "example.fa", stdout=True)
+    run_trimmer("--adapter-alphabet none -b ADAPTER", "example.fa", "example.fa", stdout=True)
 
 
 def test_small(run_trimmer):
@@ -41,7 +41,7 @@ def test_lowercase(run_trimmer):
 
 def test_rest(run_trimmer, tmp_path):
     run_trimmer(
-        ["-b", "ADAPTER", "-N", "-r", "rest.txt"],
+        ["-b", "ADAPTER", "--adapter-alphabet", "none", "-r", "rest.txt"],
         "rest.fa",
         "rest.fa",
         expected_other=["rest.txt"],
@@ -50,7 +50,7 @@ def test_rest(run_trimmer, tmp_path):
 
 def test_restfront(run_trimmer, tmp_path):
     run_trimmer(
-        ["-g", "ADAPTER", "-N", "-r", "restfront.txt"],
+        ["-g", "ADAPTER", "--adapter-alphabet", "none", "-r", "restfront.txt"],
         "restfront.fa",
         "rest.fa",
         expected_other=["restfront.txt"],
@@ -128,11 +128,11 @@ def test_length_tag(run_trimmer):
 
 
 def test_overlap_a(run_trimmer):
-    run_trimmer("-O 10 -a 330201030313112312 -e 0.0 -N", "overlapa.fa", "overlapa.fa")
+    run_trimmer("-O 10 -a 330201030313112312 -e 0.0 --adapter-alphabet none", "overlapa.fa", "overlapa.fa")
 
 
 def test_overlap_b(run_trimmer):
-    run_trimmer("-O 10 -b TTAGACATATCTCCGTCG -N", "overlapb.fa", "overlapb.fa")
+    run_trimmer("-O 10 -b TTAGACATATCTCCGTCG --adapter-alphabet none", "overlapb.fa", "overlapb.fa")
 
 
 def test_qualtrim(run_trimmer):
@@ -222,40 +222,40 @@ def test_illumina_adapter_wildcard(run_trimmer):
 
 
 def test_adapter_front(run_trimmer):
-    run_trimmer("--front ADAPTER -N", "examplefront.fa", "example.fa")
+    run_trimmer("--front ADAPTER --adapter-alphabet none", "examplefront.fa", "example.fa")
 
 
 def test_literal_n(run_trimmer):
-    run_trimmer("-N -e 0.2 -a NNNNNNNNNNNNNN", "trimN3.fasta", "trimN3.fasta")
+    run_trimmer("--adapter-alphabet none -e 0.2 -a NNNNNNNNNNNNNN", "trimN3.fasta", "trimN3.fasta")
 
 
 def test_literal_n2(run_trimmer):
-    run_trimmer("-N -O 1 -g NNNNNNNNNNNNNN", "trimN5.fasta", "trimN5.fasta")
+    run_trimmer("--adapter-alphabet none -O 1 -g NNNNNNNNNNNNNN", "trimN5.fasta", "trimN5.fasta")
 
 
 def test_literal_n_brace_notation(run_trimmer):
-    run_trimmer("-N -e 0.2 -a N{14}", "trimN3.fasta", "trimN3.fasta")
+    run_trimmer("--adapter-alphabet none -e 0.2 -a N{14}", "trimN3.fasta", "trimN3.fasta")
 
 
 def test_literal_n2_brace_notation(run_trimmer):
-    run_trimmer("-N -O 1 -g N{14}", "trimN5.fasta", "trimN5.fasta")
+    run_trimmer("--adapter-alphabet none -O 1 -g N{14}", "trimN5.fasta", "trimN5.fasta")
 
 
 def test_anchored_front(run_trimmer):
-    run_trimmer("-g ^FRONTADAPT -N", "anchored.fasta", "anchored.fasta")
+    run_trimmer("-g ^FRONTADAPT --adapter-alphabet none", "anchored.fasta", "anchored.fasta")
 
 
 def test_anchored_front_ellipsis_notation(run_trimmer):
-    run_trimmer("-a FRONTADAPT... -N", "anchored.fasta", "anchored.fasta")
+    run_trimmer("-a FRONTADAPT... --adapter-alphabet none", "anchored.fasta", "anchored.fasta")
 
 
 def test_anchored_back(run_trimmer):
-    run_trimmer("-a BACKADAPTER$ -N", "anchored-back.fasta", "anchored-back.fasta")
+    run_trimmer("-a BACKADAPTER$ --adapter-alphabet none", "anchored-back.fasta", "anchored-back.fasta")
 
 
 def test_anchored_back_no_indels(run_trimmer):
     run_trimmer(
-        "-a BACKADAPTER$ -N --no-indels", "anchored-back.fasta", "anchored-back.fasta"
+        "-a BACKADAPTER$ --adapter-alphabet none --no-indels", "anchored-back.fasta", "anchored-back.fasta"
     )
 
 
@@ -419,7 +419,7 @@ def test_adapter_file(run_trimmer, input_data):
 
 def test_adapter_file_5p_anchored(run_trimmer, input_data):
     run_trimmer(
-        "-N -g " + input_data.url("prefix-adapter.fasta"),
+        "--adapter-alphabet none -g " + input_data.url("prefix-adapter.fasta"),
         "anchored.fasta",
         "anchored.fasta",
     )
@@ -427,7 +427,7 @@ def test_adapter_file_5p_anchored(run_trimmer, input_data):
 
 def test_adapter_file_3p_anchored(run_trimmer, input_data):
     run_trimmer(
-        "-N -a " + input_data.url("suffix-adapter.fasta"),
+        "--adapter-alphabet none -a " + input_data.url("suffix-adapter.fasta"),
         "anchored-back.fasta",
         "anchored-back.fasta",
     )
@@ -435,7 +435,7 @@ def test_adapter_file_3p_anchored(run_trimmer, input_data):
 
 def test_adapter_file_5p_anchored_no_indels(run_trimmer, input_data):
     run_trimmer(
-        "-N --no-indels -g " + input_data.url("prefix-adapter.fasta"),
+        "--adapter-alphabet none --no-indels -g " + input_data.url("prefix-adapter.fasta"),
         "anchored.fasta",
         "anchored.fasta",
     )
@@ -443,7 +443,7 @@ def test_adapter_file_5p_anchored_no_indels(run_trimmer, input_data):
 
 def test_adapter_file_3p_anchored_no_indels(run_trimmer, input_data):
     run_trimmer(
-        "-N --no-indels -a " + input_data.url("suffix-adapter.fasta"),
+        "--adapter-alphabet none --no-indels -a " + input_data.url("suffix-adapter.fasta"),
         "anchored-back.fasta",
         "anchored-back.fasta",
     )

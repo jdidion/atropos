@@ -191,7 +191,7 @@ def test_paired_end(run_trimmer, aligner):
 
 def test_paired_anchored_back_no_indels(run_trimmer):
     run_trimmer(
-        "-a BACKADAPTER$ -A BACKADAPTER$ -N --no-indels",
+        "-a BACKADAPTER$ -A BACKADAPTER$ --no-indels --adapter-alphabet none",
         inpath1="anchored-back.fasta",
         inpath2="anchored-back.fasta",
         expected1="anchored-back.fasta",

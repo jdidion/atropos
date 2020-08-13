@@ -35,6 +35,7 @@ from atropos.utils.argparse import (
     readwritable_file,
     writable_file,
 )
+from atropos.utils.ngs import ALPHABETS
 
 
 DEFAULT_ADAPTER_MAX_RMP = 1e-6
@@ -225,6 +226,15 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             default=DEFAULT_GC_CONTENT,
             help=f"Expected GC content of sequences. ({DEFAULT_GC_CONTENT})",
         )
+        group.add_argument(
+            "--adapter-alphabet",
+            default="auto",
+            metavar="NAME",
+            choices=tuple(ALPHABETS.keys()) + ("auto", "none"),
+            help="Specify a sequence alphabet to use for validating adapters. "
+                 "By default, the alphabet is automatically detected from the "
+                 "adapter sequence. (auto)",
+        )
 
         # Arguments specific to the choice of aligner
 
@@ -284,14 +294,6 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
             action="store_true",
             default=False,
             help="Interpret IUPAC wildcards in reads. (no)",
-        )
-        group.add_argument(
-            "-N",
-            "--no-match-adapter-wildcards",
-            action="store_false",
-            dest="match_adapter_wildcards",
-            default=True,
-            help="Do not interpret IUPAC wildcards in adapters. (no)",
         )
         group.add_argument(
             "-O",
@@ -1257,8 +1259,6 @@ class TrimCommandConsole(TrimCommand, LegacyReportGenerator, BaseCommandConsole)
 
             if options.match_read_wildcards:
                 parser.error("IUPAC wildcards not supported in colorspace")
-
-            options.match_adapter_wildcards = False
         else:
             if options.trim_primer:
                 parser.error("Trimming the primer makes only sense in colorspace.")

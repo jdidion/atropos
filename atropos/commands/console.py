@@ -471,7 +471,7 @@ def add_common_options(parser: AtroposArgumentParser) -> None:
         metavar="NAME",
         choices=tuple(ALPHABETS.keys()),
         help="Specify a sequence alphabet to use for validating inputs. "
-        "Currently, only 'dna' is supported. (no validation)",
+        "By default, no validation is performed.",
     )
 
 

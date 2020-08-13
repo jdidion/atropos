@@ -32,7 +32,7 @@ class PositionDicts(Mergeable, Summarizable, metaclass=ABCMeta):
     A sequence of dicts, one for each position in a sequence.
     """
 
-    @classproperty
+    @classmethod
     def _create_dict(cls) -> BaseMergeableDict:
         pass
 
@@ -84,7 +84,7 @@ class BaseCountingDicts(PositionDicts):
     items associated with each nucleotide base.
     """
 
-    @classproperty
+    @classmethod
     def _create_dict(cls) -> BaseMergeableDict:
         return CountingDict()
 

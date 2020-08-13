@@ -1,22 +1,26 @@
 import math
-from typing import Dict, Sequence, Optional
+from typing import Dict, Iterable, Optional, Sequence
 
 from atropos.errors import NotInAlphabetError
 
 
 class Alphabet:
     def __init__(
-        self, valid_characters: Sequence[str], default_character: Optional[str] = None
+        self, name: str,
+        valid_characters: Iterable[str],
+        default_character: Optional[str] = None
     ):
-        if not isinstance(valid_characters, set):
-            valid_characters = set(valid_characters)
-        if default_character not in valid_characters:
-            valid_characters.add(default_character)
-        self.valid_characters = valid_characters
+        self.name = name
+        self.valid_characters = set(valid_characters)
         self.default_character = default_character
+        if self.default_character not in self.valid_characters:
+            self.valid_characters.add(self.default_character)
 
     def __contains__(self, character: str) -> bool:
         return character in self.valid_characters
+
+    def contains_all(self, string: str) -> bool:
+        return set(string) <= self.valid_characters
 
     def validate(self, character: str) -> None:
         """
@@ -29,8 +33,9 @@ class Alphabet:
         """
         Raises NotInAlphabetError if any character in 'string' is not in the alphabet.
         """
-        for character in string:
-            self.validate(character)
+        diff = set(string) - self.valid_characters
+        if diff:
+            raise NotInAlphabetError("".join(diff))
 
     def resolve(self, character: str) -> str:
         """
@@ -39,9 +44,12 @@ class Alphabet:
         """
         if character in self.valid_characters:
             return character
-
-        else:
+        elif self.default_character:
             return self.default_character
+        else:
+            raise ValueError(
+                f"Alphabet {self.name} does not contain character" f" {character}"
+            )
 
     def resolve_string(self, string: str) -> str:
         """
@@ -49,13 +57,6 @@ class Alphabet:
         default character.
         """
         return "".join(self.resolve(c) for c in string)
-
-
-ALPHABETS = dict(
-    dna=Alphabet("ACGT", "N"),
-    iso=None,
-    colorspace=Alphabet("0123", None)
-)
 
 
 def build_iso_nucleotide_table() -> Dict[str, str]:
@@ -84,11 +85,22 @@ def build_iso_nucleotide_table() -> Dict[str, str]:
 
 
 BASE_COMPLEMENTS = build_iso_nucleotide_table()
+DNA_BASES = frozenset("ACGT")
 IUPAC_BASES = frozenset(("X",) + tuple(BASE_COMPLEMENTS.keys()))
 """Valid IUPAC bases, plus 'X'"""
 GC_BASES = frozenset("CGRYSKMBDHVN")
 """IUPAC bases that include C or G."""
 LOG2 = math.log(2)
+
+
+ALPHABETS = {
+    a.name: a
+    for a in (
+        Alphabet("dna", DNA_BASES, None),
+        Alphabet("iupac", IUPAC_BASES, "N"),
+        Alphabet("colorspace", "0123", None)
+    )
+}
 
 
 def complement(seq: str) -> str:

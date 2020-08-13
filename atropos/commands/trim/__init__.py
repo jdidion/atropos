@@ -279,13 +279,12 @@ class TrimCommand(BaseCommand):
                 max_error_rate=options.error_rate,
                 min_overlap=options.overlap,
                 read_wildcards=options.match_read_wildcards,
-                adapter_wildcards=options.match_adapter_wildcards,
                 indels=options.indels,
                 indel_cost=options.indel_cost,
                 cache=adapter_cache,
                 gc_content=options.gc_content,
                 match_probability=match_probability,
-                alphabet=options.alphabet,
+                alphabet=options.adapter_alphabet,
             )
             if options.adapter_max_rmp:
                 parser_args["max_rmp"] = options.adapter_max_rmp
@@ -390,7 +389,6 @@ class TrimCommand(BaseCommand):
                         match_probability=match_probability,
                         insert_max_rmp=options.insert_max_rmp,
                         read_wildcards=options.match_read_wildcards,
-                        adapter_wildcards=options.match_adapter_wildcards,
                     )
                 elif options.aligner == AlignerType.ADAPTER:
                     a1_args = (

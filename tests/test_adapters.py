@@ -19,7 +19,6 @@ def test_issue_52():
         max_error_rate=0.12,
         min_overlap=5,
         read_wildcards=False,
-        adapter_wildcards=True,
     )
     read = Sequence(name="abc", sequence="CCCCAGAACTACAGTCCCGGC")
     am = AdapterMatch(
@@ -64,7 +63,7 @@ def test_issue_80():
         max_error_rate=0.2,
         min_overlap=3,
         read_wildcards=False,
-        adapter_wildcards=False,
+        alphabet="dna",
     )
     read = Sequence(name="seq2", sequence="TCGTATGCCCTCC")
     result = adapter.match_to(read)

@@ -42,12 +42,18 @@ simple_fasta = [Sequence(x.name, x.sequence, None) for x in simple_fastq]
 
 
 class TestAlphabet:
-    def test_alphabet(self):
+    def test_dna_alphabet(self):
         alphabet = ALPHABETS["dna"]
-        for base in ("A", "C", "G", "T", "N"):
+        for base in ("A", "C", "G", "T"):
             assert base in alphabet
         assert "X" not in alphabet
-        assert alphabet.resolve("X") == "N"
+        with pytest.raises(ValueError):
+            alphabet.resolve("X")
+
+    def test_iupac_alphabet(self):
+        alphabet = ALPHABETS["iupac"]
+        assert "P" not in alphabet
+        assert alphabet.resolve("P") is "N"
 
 
 class TestSequence:
@@ -173,10 +179,13 @@ class TestFastqReader:
 
     def test_alphabet(self, input_data):
         filename = input_data("bad_bases.fq")
-        with FastqReader(filename, alphabet=ALPHABETS["dna"]) as f:
+        with FastqReader(filename, alphabet=ALPHABETS["iupac"]) as f:
             reads = list(f)
-            assert reads[0].sequence == "ACGNGGACT"
-            assert reads[1].sequence == "CGGACNNNC"
+            assert reads[0].sequence == "ACGXGGACT"
+            assert reads[1].sequence == "CGGACXBNC"
+        with pytest.raises(FormatError):
+            with FastqReader(filename, alphabet=ALPHABETS["dna"]) as f:
+                list(f)
 
 
 class TestFastaQualReader:
