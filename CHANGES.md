@@ -1,12 +1,13 @@
 # Changes
 
-## 2.0.0-alpha.7 (development)
+## 2.0.0-alpha.7 (2020.08.13)
 
 * Added `--adapter-alphabet` option to trim command
 * *Breaking change:* removed the `-N/--no-match-adapter-wildcards` option; if `--adapter-alphabet` is `none` or `dna`, adapter wildcards are not matched; if `--adapter-alphabet` is `auto` (the default), the alphabet (`dna` or `iupac`) is automatically detected from the adapter sequence. Adapter wildcards are only matched if the adapter alphabet is `iupac`.
 * Update adapters file link
 * Package adapters file with wheel and preferentially load default adapters from this file rather than the GitHub URL (#116)
 * Fix #112 - type error (thanks to @plijnzaad)
+* Fix #117 - error computing metrics
 
 ## 2.0.0-alpha.6 (2020.07.05)
 
