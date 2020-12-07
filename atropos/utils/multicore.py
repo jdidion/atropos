@@ -18,9 +18,9 @@ DEFAULT_BLOCK_TIMEOUT = 5
 
 
 class ControlSignal(IntEnum):
-    ACTIVE = 0
+    ACTIVE = -1
     """Controlled process should run normally."""
-    ERROR = -1
+    ERROR = -2
     """Controlled process should exit."""
 
 
@@ -50,12 +50,12 @@ class Control:
 
     def check_value_positive(self, lock=False):
         """
-        Checks that the current control value is positive.
+        Checks that the current control value is >= 0.
 
         Args:
             lock: Whether to lock the shared variable before checking.
         """
-        return self.get_value(lock=lock) > 0
+        return self.get_value(lock=lock) >= 0
 
     def get_value(self, lock=True):
         """
@@ -67,7 +67,6 @@ class Control:
         if lock:
             with self.control.get_lock():
                 return self.control.value
-
         else:
             return self.control.value
 

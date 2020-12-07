@@ -1,5 +1,9 @@
 # Changes
 
+## 2.0.0-alpha.8 (dev)
+
+* Fix #122 - Atropos hangs on empty input files
+
 ## 2.0.0-alpha.7 (2020.08.13)
 
 * Added `--adapter-alphabet` option to trim command
