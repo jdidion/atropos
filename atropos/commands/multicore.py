@@ -5,6 +5,7 @@ import logging
 from multiprocessing import Process, Value, Queue
 import os
 from queue import Empty, Full
+import sys
 import time
 from atropos import AtroposError
 from atropos.util import run_interruptible
@@ -13,9 +14,9 @@ RETRY_INTERVAL = 5
 """Max time to wait between retrying operations."""
 
 # Control values
-CONTROL_ACTIVE = 0
+CONTROL_ACTIVE = -1
 """Controlled process should run normally."""
-CONTROL_ERROR = -1
+CONTROL_ERROR = -2
 """Controlled process should exit."""
 
 class MulticoreError(AtroposError):
@@ -46,12 +47,12 @@ class Control(object):
         return self.get_value(lock=lock) == value
 
     def check_value_positive(self, lock=False):
-        """Check that the current control value is positive.
+        """Check that the current control value is >= 0.
 
         Args:
             lock: Whether to lock the shared variable before checking.
         """
-        return self.get_value(lock=lock) > 0
+        return self.get_value(lock=lock) >= 0
 
     def get_value(self, lock=True):
         """Returns the current control value.

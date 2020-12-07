@@ -2,6 +2,7 @@
 import os
 import shutil
 from unittest import TestCase
+import pytest
 from pytest import raises
 from atropos.commands import execute_cli, get_command
 from tests.utils import (
@@ -607,11 +608,12 @@ class IssueTests(TestCase):
             aligners=['insert'],
         )
 
-    # def test_issue122(self):
-    #     run_paired(
-    #         "--threads 2 --preserve-order --no-default-adapters -a TTAGACATAT -A CAGTGGAGTA",
-    #         in1="empty.fastq",
-    #         in2="empty.fastq",
-    #         expected1="empty.fastq",
-    #         expected2="empty.fastq",
-    #     )
+    @pytest.mark.timeout(10)
+    def test_issue122(self):
+        run_paired(
+            "--threads 2 --preserve-order --no-default-adapters -a TTAGACATAT -A CAGTGGAGTA",
+            in1="empty.fastq",
+            in2="empty.fastq",
+            expected1="empty.fastq",
+            expected2="empty.fastq",
+        )
