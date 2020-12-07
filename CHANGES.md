@@ -1,5 +1,9 @@
 # Changes
 
+v1.1.29 (2020.12.06)
+
+* Fix #122 - Atropos hangs on empty input files in multi-process mode
+
 v1.1.28 (2020.06.05)
 
 * Further fix for #100
