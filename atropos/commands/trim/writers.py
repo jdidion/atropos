@@ -8,7 +8,7 @@ from .filters import NoFilter
 
 class Writers(object):
     """Manages writing to one or more outputs.
-    
+
     Args:
         force_create: Whether empty output files should be created.
     """
@@ -16,16 +16,16 @@ class Writers(object):
         self.writers = {}
         self.force_create = force_create
         self.suffix = None
-    
+
     def get_writer(self, file_desc, compressed=False):
         """Create the writer for a file descriptor if it does not already
         exist.
-        
+
         Args:
             file_desc: File descriptor. If `compressed==True`, this is a tuple
                 (path, mode), otherwise it's only a path.
             compressed: Whether data has already been compressed.
-        
+
         Returns:
             The writer.
         """
@@ -33,7 +33,7 @@ class Writers(object):
             path, mode = file_desc
         else:
             path = file_desc
-        
+
         if path not in self.writers:
             if self.suffix:
                 real_path = add_suffix_to_path(path, self.suffix)
@@ -44,12 +44,12 @@ class Writers(object):
                 self.writers[path] = open_output(real_path, mode)
             else:
                 self.writers[path] = xopen(real_path, "w")
-        
+
         return self.writers[path]
-    
+
     def write_result(self, result, compressed=False):
         """Write results to output.
-        
+
         Args:
             result: Dict with keys being file descriptors and values being data
                 (either bytes or strings). Strings are expected to already have
@@ -58,11 +58,11 @@ class Writers(object):
         """
         for file_desc, data in result.items():
             self.write(file_desc, data, compressed)
-    
+
     def write(self, file_desc, data, compressed=False):
         """Write data to output. If the specified path has not been seen before,
         the output is opened.
-        
+
         Args:
             file_desc: File descriptor. If `compressed==True`, this is a tuple
                 (path, mode), otherwise it's only a path.
@@ -70,13 +70,13 @@ class Writers(object):
             compressed: Whether data has already been compressed.
         """
         self.get_writer(file_desc, compressed).write(data)
-    
+
     def close(self):
         """Close all outputs.
         """
         for path in self.force_create:
             if path not in self.writers and path != STDOUT:
-                with open_output(path, "w"):
+                with xopen(path, "w"):
                     pass
         for writer in self.writers.values():
             if writer not in (sys.stdout, sys.stderr):
@@ -84,7 +84,7 @@ class Writers(object):
 
 class Formatters(object):
     """Manages multiple formatters.
-    
+
     Args:
         output: The output file name template.
         seq_formatter_args: Additional arguments to pass to the formatter
@@ -98,10 +98,10 @@ class Formatters(object):
         self.mux_formatters = {}
         self.info_formatters = []
         self.discarded = 0
-    
+
     def add_seq_formatter(self, filter_type, file1, file2=None):
         """Add a formatter.
-        
+
         Args:
             filter_type: The type of filter that triggers writing with the
                 formatter.
@@ -109,13 +109,13 @@ class Formatters(object):
         """
         self.seq_formatters[filter_type] = create_seq_formatter(
             file1, file2, **self.seq_formatter_args)
-    
+
     def add_info_formatter(self, formatter):
         """Add a formatter for one of the delimited detail files
         (rest, info, wildcard).
         """
         self.info_formatters.append(formatter)
-    
+
     def get_mux_formatter(self, name):
         """Returns the formatter associated with the given name (barcode) when
         running in multiplexed mode.
@@ -126,7 +126,7 @@ class Formatters(object):
             self.mux_formatters[name] = create_seq_formatter(
                 path, **self.seq_formatter_args)
         return self.mux_formatters[name]
-    
+
     def get_seq_formatters(self):
         """Returns a set containing all formatters that have handled at least
         one record.
@@ -134,11 +134,11 @@ class Formatters(object):
         return (
             set(f for f in self.seq_formatters.values() if f.written > 0) |
             set(f for f in self.mux_formatters.values() if f.written > 0))
-    
+
     def format(self, result, dest, read1, read2=None):
         """Format read(s) and add to a result dict. Also writes info records
         to any registered info formatters.
-        
+
         Args:
             result: The result dict.
             dest: The destination (filter type).
@@ -152,12 +152,12 @@ class Formatters(object):
             self.seq_formatters[dest].format(result, read1, read2)
         else:
             self.discarded += 1
-        
+
         for fmtr in self.info_formatters:
             fmtr.format(result, read1)
             if read2:
                 fmtr.format(result, read2)
-    
+
     def summarize(self):
         """Returns a summary dict.
         """
@@ -171,7 +171,7 @@ class Formatters(object):
 
 class DelimFormatter(object):
     """Base class for formatters that write to a delimited file.
-    
+
     Args:
         path: The output file path.
         delim: The field delimiter.
@@ -179,12 +179,12 @@ class DelimFormatter(object):
     def __init__(self, path, delim=' '):
         self.path = path
         self.delim = delim
-    
+
     def format(self, result, read):
         """Format a read and add it to `result`.
         """
         raise NotImplementedError()
-    
+
     def _format(self, result, fields):
         result[self.path].append("".join((
             self.delim.join(str(f) for f in fields),
@@ -204,7 +204,7 @@ class InfoFormatter(DelimFormatter):
     """
     def __init__(self, path):
         super(InfoFormatter, self).__init__(path, delim='\t')
-    
+
     def format(self, result, read):
         if read.match:
             for match_info in read.match_info:
