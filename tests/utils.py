@@ -5,29 +5,35 @@ import urllib.request
 
 import subby
 
+from xphyle import open_
+
 
 def assert_files_equal(path1, path2, **format_vars):
-    def cmp(p1):
-        try:
-            subby.sub("diff -u {0} {1}".format(p1, path2))
-        except CalledProcessError as e:
-            raise AssertionError(
-                f"Files not equal: {path1} != {path2}\nDiff: <{e.output}>"
-            )
+    with open_(path1, 'r') as i1, open_(path2, 'r') as i2:
+        # write contents to temp files in case the files are compressed
+        content1 = i1.read()
+        content2 = i2.read()
 
-    if format_vars:
-        # read the file, substitute in vars, and write it out to a tempfile
-        with open(path1, "rt") as inp:
-            formatted = inp.read().format(**format_vars)
-            tmppath = tempfile.mkstemp()[1]
-            with open(tmppath, "wt") as out:
-                out.write(formatted)
-            try:
-                cmp(tmppath)
-            finally:
-                os.remove(tmppath)
-    else:
-        cmp(path1)
+    temp1 = tempfile.mkstemp()[1]
+    temp2 = tempfile.mkstemp()[1]
+
+    try:
+        with open(temp1, "w") as out:
+            if format_vars:
+                out.write(content1.format(**format_vars))
+            else:
+                out.write(content1)
+        with open(temp2, "w") as out:
+            out.write(content2)
+        subby.sub("diff -u {0} {1}".format(temp1, temp2))
+        return True
+    except CalledProcessError as e:
+        raise AssertionError(
+            f"Files not equal: {path1} != {path2}\nDiff: <{e.output}>"
+        )
+    finally:
+        os.remove(temp1)
+        os.remove(temp2)
 
 
 def no_internet(url="https://github.com", timeout: int = 10):

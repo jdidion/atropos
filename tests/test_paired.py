@@ -540,3 +540,14 @@ def test_issue68(run_trimmer):
         expected2="issue68.2.fq",
         aligner="insert",
     )
+
+
+@pytest.mark.timeout(10)
+def test_issue122(run_trimmer):
+    output_dir, _, _ = run_trimmer(
+        "--threads 2 --preserve-order --no-default-adapters -a TTAGACATAT -A CAGTGGAGTA",
+        inpath1="empty.fastq",
+        inpath2="empty.fastq",
+        expected1="empty.fastq.gz",
+        expected2="empty.fastq.gz",
+    )
