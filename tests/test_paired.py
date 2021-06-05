@@ -1,4 +1,5 @@
 # coding: utf-8
+import gzip
 import os
 import shutil
 from unittest import TestCase
@@ -610,10 +611,15 @@ class IssueTests(TestCase):
 
     @pytest.mark.timeout(10)
     def test_issue122(self):
+        # test that the empty fastq.gz files are valid gzip files
+        def callback(aligner, infiles, outfiles, result):
+            for out in outfiles:
+                with gzip.open(out) as z:
+                    assert z.read() == ""
         run_paired(
             "--threads 2 --preserve-order --no-default-adapters -a TTAGACATAT -A CAGTGGAGTA",
             in1="empty.fastq",
             in2="empty.fastq",
-            expected1="empty.fastq",
-            expected2="empty.fastq",
+            expected1="empty.fastq.gz",
+            expected2="empty.fastq.gz",
         )

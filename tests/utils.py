@@ -2,11 +2,13 @@
 from contextlib import contextmanager
 from importlib import import_module
 import os
+from subprocess import check_output, CalledProcessError
 import sys
+import tempfile
 import traceback
 import urllib.request
 from atropos.commands import get_command
-
+from atropos.io import xopen
 
 @contextmanager
 def redirect_stderr():
@@ -39,19 +41,27 @@ def cutpath(path):
 
 
 def files_equal(path1, path2):
-    # return os.system("diff -u {0} {1}".format(path1, path2)) == 0
-    with open(path1, 'r') as i1, open(path2, 'r') as i2:
-        print("<[{}]>".format(i1.read()))
-        print("<[{}]>".format(i2.read()))
-    from subprocess import check_output, CalledProcessError
-
+    temp1 = tempfile.mkstemp()[1]
+    temp2 = tempfile.mkstemp()[1]
     try:
-        check_output("diff -u {0} {1}".format(path1, path2), shell=True)
+        with xopen(path1, 'r') as i1, xopen(path2, 'r') as i2:
+            # write contents to temp files in case the files are compressed
+            content1 = i1.read()
+            content2 = i2.read()
+        print("<[{}]>".format(content1))
+        print("<[{}]>".format(content2))
+        with open(temp1, "w") as out:
+            out.write(content1)
+        with open(temp2, "w") as out:
+            out.write(content2)
+        check_output("diff -u {0} {1}".format(temp1, temp2), shell=True)
         return True
-
     except CalledProcessError as e:
         print("Diff: <{}>".format(e.output.decode("utf-8")))
         return False
+    finally:
+        os.remove(temp1)
+        os.remove(temp2)
 
 
 def run(
