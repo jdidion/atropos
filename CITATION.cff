@@ -1,0 +1,16 @@
+cff-version: 1.1.0
+message: If you use this software, please cite it as below.
+title: 'Atropos: specific, sensitive, and speedy trimming of sequencing reads'
+authors:
+- family-names: Didion
+  given-names: John P.
+  orcid: http://orcid.org/0000-0002-8111-6261
+- family-names: Martin
+  given-names: Marcel
+  orcid: http://orcid.org/0000-0002-0680-200X
+- family-names: Collins
+  given-names: Francis S.
+  orcid: null
+doi: 10.7717/peerj.3720
+date-released: 2017-8-30
+version: 1.1.17
