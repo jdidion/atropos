@@ -1,6 +1,7 @@
 """Implementation of the 'trim' command.
 """
-from collections import Sequence, defaultdict
+from collections import defaultdict
+from collections.abc import Sequence
 import logging
 import os
 import sys
