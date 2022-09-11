@@ -1,6 +1,6 @@
 """Common classes/functions used in commands.
 """
-from collections import Sequence
+from collections.abc import Sequence
 import copy
 import platform
 import sys
