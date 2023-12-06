@@ -18,7 +18,7 @@ install: clean build
 	python setup.py install $(installargs)
 
 test:
-	py.test $(pytestops) $(tests)
+	pytest $(pytestops) $(tests)
 
 docs:
 	make -C doc html
