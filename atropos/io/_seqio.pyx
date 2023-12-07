@@ -1,7 +1,6 @@
 # kate: syntax Python;
 # cython: profile=False, emit_code_comments=False
 import copy
-from atropos.io import xopen
 from atropos.io.seqio import FormatError, SequenceReader
 from atropos.util import reverse_complement, truncate_string
 
@@ -188,7 +187,10 @@ class FastqReader(SequenceReader):
         sequence_class = self.sequence_class
 
         it = iter(self._file)
-        line = next(it)
+        try:
+            line = next(it)
+        except StopIteration:
+            return
         if not (line and line[0] == '@'):
             raise FormatError("Line {0} in FASTQ file is expected to start "
                               "with '@', but found {1!r}".format(i+1, line[:10]))

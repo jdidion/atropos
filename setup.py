@@ -76,13 +76,16 @@ def check_cython_version():
         from Cython import __version__ as cyversion
     except ImportError:
         sys.stdout.write(
-            "ERROR: Cython is not installed. Install at least Cython version " +
-            str(MIN_CYTHON_VERSION) + " to continue.\n")
+            "ERROR: Cython is not installed. Install at least Cython version "
+            + str(MIN_CYTHON_VERSION)
+            + " to continue.\n"
+        )
         sys.exit(1)
     if LooseVersion(cyversion) < LooseVersion(MIN_CYTHON_VERSION):
         sys.stdout.write(
             "ERROR: Your Cython is at version '{}' but at least version '{}' "
-            "is required.\n".format(cyversion, MIN_CYTHON_VERSION))
+            "is required.\n".format(cyversion, MIN_CYTHON_VERSION)
+        )
         sys.exit(1)
 
 
@@ -90,7 +93,7 @@ extensions = [
     Extension("atropos.align._align", sources=["atropos/align/_align.pyx"]),
     Extension(
         "atropos.commands.trim._qualtrim",
-        sources=["atropos/commands/trim/_qualtrim.pyx"]
+        sources=["atropos/commands/trim/_qualtrim.pyx"],
     ),
     Extension("atropos.io._seqio", sources=["atropos/io/_seqio.pyx"]),
 ]
@@ -112,6 +115,7 @@ class BuildExt(versioneer_build_ext):
             # only sensible thing is to require Cython to be installed.
             check_cython_version()
             from Cython.Build import cythonize
+
             self.extensions = cythonize(self.extensions)
         _build_ext.run(self)
 
@@ -123,6 +127,7 @@ class SDist(versioneer_sdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
+
         check_cython_version()
         cythonize(extensions)
         versioneer_sdist.run(self)
@@ -140,33 +145,25 @@ setup(
     url="https://atropos.readthedocs.org/",
     description="trim adapters from high-throughput sequencing reads",
     long_description=codecs.open(
-        os.path.join(
-            os.path.dirname(os.path.realpath(__file__)),
-            "README.md"
-        ),
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "README.md"),
         "rb",
-        "utf-8"
+        "utf-8",
     ).read(),
     long_description_content_type="text/markdown",
     license="MIT",
     ext_modules=extensions,
     packages=find_packages(),
     scripts=["bin/atropos"],
-    package_data={
-        "atropos": [
-            "adapters/*.fa",
-            "commands/**/templates/*"
-        ]
-    },
+    package_data={"atropos": ["adapters/*.fa", "commands/**/templates/*"]},
     install_requires=["cython>={}".format(MIN_CYTHON_VERSION)],
-    tests_require=["pytest"],  # , "jinja2", "pysam"],
+    tests_require=["pytest", "pytest-timeout"],  # , "jinja2", "pysam"],
     extras_require={
         "progressbar": ["progressbar2"],
         "tqdm": ["tqdm"],
         "khmer": ["khmer"],
         "pysam": ["pysam"],
         "jinja": ["jinja2"],
-        "sra": ["srastream>=0.1.3"]
+        "sra": ["srastream>=0.1.3"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -182,6 +179,6 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9"
-    ]
+        "Programming Language :: Python :: 3.9",
+    ],
 )

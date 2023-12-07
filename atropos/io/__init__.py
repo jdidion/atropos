@@ -1,7 +1,6 @@
 """Open compressed files transparently.
 """
 import errno
-import io
 import os
 import sys
 

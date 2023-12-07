@@ -277,10 +277,13 @@ class ParallelPipelineRunner(object):
         Args:
             retcode: The return code.
         """
-        # notify all threads that they should stop
-        logging.getLogger().debug("Exiting all processes")
-        for process in self.worker_processes:
-            kill(process, retcode, self.timeout)
+        if self.worker_processes is None:
+            logging.getLogger().warning("Called terminate before starting workers")
+        else:
+            # notify all threads that they should stop
+            logging.getLogger().debug("Exiting all processes")
+            for process in self.worker_processes:
+                kill(process, retcode, self.timeout)
 
     def __call__(self):
         # Start worker processes, reserve a thread for the reader process,

@@ -5,9 +5,7 @@ import random
 import sys
 import os
 from io import StringIO
-import shutil
 from textwrap import dedent
-from tempfile import mkdtemp
 from atropos.io import xopen, open_output
 from atropos.io.seqio import (
     Sequence,
@@ -25,7 +23,6 @@ from atropos.io.seqio import (
     sequence_names_match,
 )
 from atropos.util import ALPHABETS
-from .utils import temporary_path
 
 # files tests/data/simple.fast{q,a}
 simple_fastq = [
@@ -36,17 +33,15 @@ simple_fasta = [Sequence(x.name, x.sequence, None) for x in simple_fastq]
 
 
 class TestAlphabet:
-
     def test_alphabet(self):
-        alphabet = ALPHABETS['dna']
-        for base in ('A', 'C', 'G', 'T', 'N'):
+        alphabet = ALPHABETS["dna"]
+        for base in ("A", "C", "G", "T", "N"):
             assert base in alphabet
-        assert 'X' not in alphabet
-        assert alphabet.resolve('X') == 'N'
+        assert "X" not in alphabet
+        assert alphabet.resolve("X") == "N"
 
 
 class TestSequence:
-
     def test_too_many_qualities(self):
         with raises(FormatError):
             Sequence(name="name", sequence="ACGT", qualities="#####")
@@ -61,7 +56,6 @@ class TestSequence:
 
 
 class TestFastaReader:
-
     def test(self):
         with FastaReader("tests/data/simple.fasta") as f:
             reads = list(f)
@@ -72,14 +66,16 @@ class TestFastaReader:
 
     def test_with_comments(self):
         fasta = StringIO(
-            dedent("""
+            dedent(
+                """
             # a comment
             # another one
             >first_sequence
             SEQUENCE1
             >second_sequence
             SEQUENCE2
-            """)
+            """
+            )
         )
         reads = list(FastaReader(fasta))
         assert reads == simple_fasta
@@ -87,7 +83,8 @@ class TestFastaReader:
     def test_wrong_format(self):
         with raises(FormatError):
             fasta = StringIO(
-                dedent("""
+                dedent(
+                    """
                 # a comment
                 # another one
                 unexpected
@@ -95,7 +92,8 @@ class TestFastaReader:
                 SEQUENCE1
                 >second_sequence
                 SEQUENCE2
-                """)
+                """
+                )
             )
             reads = list(FastaReader(fasta))
 
@@ -103,7 +101,7 @@ class TestFastaReader:
         with FastaReader("tests/data/simple.fasta", keep_linebreaks=True) as f:
             reads = list(f)
         assert reads[0] == simple_fasta[0]
-        assert reads[1].sequence == 'SEQUEN\nCE2'
+        assert reads[1].sequence == "SEQUEN\nCE2"
 
     def test_context_manager(self):
         filename = "tests/data/simple.fasta"
@@ -124,7 +122,6 @@ class TestFastaReader:
 
 
 class TestFastqReader:
-
     def test_fastqreader(self):
         with FastqReader("tests/data/simple.fastq") as f:
             reads = list(f)
@@ -162,14 +159,13 @@ class TestFastqReader:
 
     def test_alphabet(self):
         filename = "tests/data/bad_bases.fq"
-        with FastqReader(filename, alphabet=ALPHABETS['dna']) as f:
+        with FastqReader(filename, alphabet=ALPHABETS["dna"]) as f:
             reads = list(f)
-            assert reads[0].sequence == 'ACGNGGACT'
-            assert reads[1].sequence == 'CGGACNNNC'
+            assert reads[0].sequence == "ACGNGGACT"
+            assert reads[1].sequence == "CGGACNNNC"
 
 
 class TestFastaQualReader:
-
     def test_mismatching_read_names(self):
         with raises(FormatError):
             fasta = StringIO(">name\nACG")
@@ -184,13 +180,6 @@ class TestFastaQualReader:
 
 
 class TestSeqioOpen:
-
-    def setup(self):
-        self._tmpdir = mkdtemp()
-
-    def teardown(self):
-        shutil.rmtree(self._tmpdir)
-
     def test_sequence_reader(self):
         # test the autodetection
         with openseq("tests/data/simple.fastq") as f:
@@ -210,52 +199,52 @@ class TestSeqioOpen:
         reads = list(openseq(f))
         assert reads == simple_fasta
 
-    def test_autodetect_fasta_format(self):
-        path = os.path.join(self._tmpdir, 'tmp.fasta')
-        fmt = get_format(path)
+    def test_autodetect_fasta_format(self, tmp_path):
+        path = tmp_path / "tmp.fasta"
+        fmt = get_format(str(path))
         assert isinstance(fmt, FastaFormat)
-        with open_output(path, "w") as f:
+        with open_output(str(path), "w") as f:
             for seq in simple_fasta:
                 f.write(fmt.format(seq))
-        assert list(openseq(path)) == simple_fasta
+        assert list(openseq(str(path))) == simple_fasta
 
-    def test_write_qualities_to_fasta(self):
-        path = os.path.join(self._tmpdir, 'tmp.fasta')
-        fmt = get_format(path, qualities=True)
+    def test_write_qualities_to_fasta(self, tmp_path):
+        path = tmp_path / "tmp.fasta"
+        fmt = get_format(str(path), qualities=True)
         assert isinstance(fmt, FastaFormat)
-        with open_output(path, "w") as f:
+        with open_output(str(path), "w") as f:
             for seq in simple_fastq:
                 f.write(fmt.format(seq))
-        assert list(openseq(path)) == simple_fasta
+        assert list(openseq(str(path))) == simple_fasta
 
-    def test_autodetect_fastq_format(self):
-        path = os.path.join(self._tmpdir, 'tmp.fastq')
+    def test_autodetect_fastq_format(self, tmp_path):
+        path = tmp_path / "tmp.fastq"
         fmt = get_format(path)
-        with open_output(path, "w") as f:
+        with open_output(str(path), "w") as f:
             for seq in simple_fastq:
                 f.write(fmt.format(seq))
-        assert list(openseq(path)) == simple_fastq
+        assert list(openseq(str(path))) == simple_fastq
 
-    def test_fastq_qualities_missing(self):
+    def test_fastq_qualities_missing(self, tmp_path):
         with raises(ValueError):
-            path = os.path.join(self._tmpdir, 'tmp.fastq')
-            get_format(path, qualities=False)
+            path = tmp_path / "tmp.fastq"
+            get_format(str(path), qualities=False)
 
 
 class TestInterleavedReader:
-
     def test(self):
         expected = [
             (
-                Sequence('read1/1 some text', 'TTATTTGTCTCCAGC', '##HHHHHHHHHHHHH'),
-                Sequence('read1/2 other text', 'GCTGGAGACAAATAA', 'HHHHHHHHHHHHHHH'),
+                Sequence("read1/1 some text", "TTATTTGTCTCCAGC", "##HHHHHHHHHHHHH"),
+                Sequence("read1/2 other text", "GCTGGAGACAAATAA", "HHHHHHHHHHHHHHH"),
             ),
             (
-                Sequence('read3/1', 'CCAACTTGATATTAATAACA', 'HHHHHHHHHHHHHHHHHHHH'),
-                Sequence('read3/2', 'TGTTATTAATATCAAGTTGG', '#HHHHHHHHHHHHHHHHHHH'),
+                Sequence("read3/1", "CCAACTTGATATTAATAACA", "HHHHHHHHHHHHHHHHHHHH"),
+                Sequence("read3/2", "TGTTATTAATATCAAGTTGG", "#HHHHHHHHHHHHHHHHHHH"),
             ),
         ]
-        reads = list(InterleavedSequenceReader("tests/cut/interleaved.fastq"))
+        with InterleavedSequenceReader("tests/cut/interleaved.fastq") as reader:
+            reads = list(reader)
         for (r1, r2), (e1, e2) in zip(reads, expected):
             print(r1, r2, e1, e2)
         assert reads == expected
@@ -265,93 +254,84 @@ class TestInterleavedReader:
 
     def test_missing_partner(self):
         with raises(FormatError):
-            s = StringIO('@r1\nACG\n+\nHHH')
-            list(InterleavedSequenceReader(s))
+            s = StringIO("@r1\nACG\n+\nHHH")
+            with InterleavedSequenceReader(s) as reader:
+                list(reader)
 
     def test_incorrectly_paired(self):
         with raises(FormatError):
-            s = StringIO('@r1/1\nACG\n+\nHHH\n@wrong_name\nTTT\n+\nHHH')
-            list(InterleavedSequenceReader(s))
+            s = StringIO("@r1/1\nACG\n+\nHHH\n@wrong_name\nTTT\n+\nHHH")
+            with InterleavedSequenceReader(s) as reader:
+                list(reader)
 
 
 class TestFastaWriter:
-
-    def setup(self):
-        self._tmpdir = mkdtemp()
-        self.path = os.path.join(self._tmpdir, 'tmp.fasta')
-
-    def teardown(self):
-        shutil.rmtree(self._tmpdir)
-
-    def test(self):
+    def test(self, tmp_path):
         fmt = FastaFormat()
-        with open_output(self.path, "w") as fw:
+        path = tmp_path / "tmp.fasta"
+        with open_output(str(path), "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA"))
             fw.write(fmt.format_entry("name2", "HELLO"))
-        with open(self.path) as t:
-            assert t.read() == '>name\nCCATA\n>name2\nHELLO\n'
+        with open(path) as t:
+            assert t.read() == ">name\nCCATA\n>name2\nHELLO\n"
 
-    def test_linelength(self):
+    def test_linelength(self, tmp_path):
         fmt = FastaFormat(line_length=3)
-        with open_output(self.path, "w") as fw:
+        path = tmp_path / "tmp.fasta"
+        with open_output(str(path), "w") as fw:
             fw.write(fmt.format_entry("r1", "ACG"))
             fw.write(fmt.format_entry("r2", "CCAT"))
             fw.write(fmt.format_entry("r3", "TACCAG"))
-        with open(self.path) as t:
+        with open(path) as t:
             x = t.read()
             print(x)
-            assert x == '>r1\nACG\n>r2\nCCA\nT\n>r3\nTAC\nCAG\n'
+            assert x == ">r1\nACG\n>r2\nCCA\nT\n>r3\nTAC\nCAG\n"
 
-    def test_write_sequence_object(self):
+    def test_write_sequence_object(self, tmp_path):
         fmt = FastaFormat()
-        with open_output(self.path, "w") as fw:
+        path = tmp_path / "tmp.fasta"
+        with open_output(str(path), "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA")))
             fw.write(fmt.format(Sequence("name2", "HELLO")))
-        with open(self.path) as t:
-            assert t.read() == '>name\nCCATA\n>name2\nHELLO\n'
+        with open(path) as t:
+            assert t.read() == ">name\nCCATA\n>name2\nHELLO\n"
 
     def test_write_zero_length_sequence(self):
         fmt = FastaFormat()
         s = fmt.format_entry("name", "")
-        assert s == '>name\n\n', '{0!r}'.format(s)
+        assert s == ">name\n\n", "{0!r}".format(s)
 
 
 class TestFastqWriter:
-
-    def setup(self):
-        self._tmpdir = mkdtemp()
-        self.path = os.path.join(self._tmpdir, 'tmp.fastq')
-
-    def teardown(self):
-        shutil.rmtree(self._tmpdir)
-
-    def test(self):
+    def test(self, tmp_path):
         fmt = FastqFormat()
-        with open_output(self.path, "w") as fw:
+        path = tmp_path / "tmp.fasta"
+        with open_output(str(path), "w") as fw:
             fw.write(fmt.format_entry("name", "CCATA", "!#!#!"))
             fw.write(fmt.format_entry("name2", "HELLO", "&&&!&&"))
-        with open(self.path) as t:
-            assert t.read() == '@name\nCCATA\n+\n!#!#!\n@name2\nHELLO\n+\n&&&!&&\n'
+        with open(path) as t:
+            assert t.read() == "@name\nCCATA\n+\n!#!#!\n@name2\nHELLO\n+\n&&&!&&\n"
 
-    def test_twoheaders(self):
+    def test_twoheaders(self, tmp_path):
         fmt = FastqFormat()
-        with open_output(self.path, "w") as fw:
+        path = tmp_path / "tmp.fasta"
+        with open_output(str(path), "w") as fw:
             fw.write(fmt.format(Sequence("name", "CCATA", "!#!#!", name2="name")))
             fw.write(fmt.format(Sequence("name2", "HELLO", "&&&!&", name2="name2")))
-        with open(self.path) as t:
-            assert t.read(
-            ) == '@name\nCCATA\n+name\n!#!#!\n@name2\nHELLO\n+name2\n&&&!&\n'
+        with open(path) as t:
+            assert (
+                t.read() == "@name\nCCATA\n+name\n!#!#!\n@name2\nHELLO\n+name2\n&&&!&\n"
+            )
 
 
 class TestInterleavedWriter:
-
     def test(self):
         reads = [
             (
-                Sequence('A/1 comment', 'TTA', '##H'),
-                Sequence('A/2 comment', 'GCT', 'HH#'),
+                Sequence("A/1 comment", "TTA", "##H"),
+                Sequence("A/2 comment", "GCT", "HH#"),
             ),
-            (Sequence('B/1', 'CC', 'HH'), Sequence('B/2', 'TG', '#H')),
+            (Sequence("B/1", "CC", "HH"), Sequence("B/2", "TG", "#H")),
         ]
         fmt = InterleavedFormatter(FastqFormat(), "foo")
         result = defaultdict(lambda: [])
@@ -361,52 +341,71 @@ class TestInterleavedWriter:
         assert fmt.read1_bp == 5
         assert fmt.read2_bp == 5
         assert "foo" in result
-        assert "".join(
-            result["foo"]
-        ) == '@A/1 comment\nTTA\n+\n##H\n@A/2 comment\nGCT\n+\nHH#\n@B/1\nCC\n+\nHH\n@B/2\nTG\n+\n#H\n'
+        assert (
+            "".join(result["foo"])
+            == "@A/1 comment\nTTA\n+\n##H\n@A/2 comment\nGCT\n+\nHH#\n@B/1\nCC\n+\nHH\n@B/2\nTG\n+\n#H\n"
+        )
 
 
 class TestPairedSequenceReader:
-
     def test_sequence_names_match(self):
-
         def match(name1, name2):
-            seq1 = Sequence(name1, 'ACGT')
-            seq2 = Sequence(name2, 'AACC')
+            seq1 = Sequence(name1, "ACGT")
+            seq2 = Sequence(name2, "AACC")
             return sequence_names_match(seq1, seq2)
 
-        assert match('abc', 'abc')
-        assert match('abc/1', 'abc/2')
-        assert match('abc.1', 'abc.2')
-        assert match('abc1', 'abc2')
-        assert not match('abc', 'xyz')
+        assert match("abc", "abc")
+        assert match("abc/1", "abc/2")
+        assert match("abc.1", "abc.2")
+        assert match("abc1", "abc2")
+        assert not match("abc", "xyz")
 
 
 def create_truncated_file(path):
     # Random text
-    text = ''.join(random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ') for _ in range(200))
-    f = xopen(path, 'w')
-    f.write(text)
-    f.close()
-    f = open(path, 'a')
-    f.truncate(os.stat(path).st_size - 10)
-    f.close()
+    text = "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(200))
+
+    f = None
+    try:
+        f = xopen(path, "w")
+        f.write(text)
+    finally:
+        if f is not None:
+            f.close()
+
+    f = None
+    try:
+        f = open(path, "a")
+        f.truncate(os.stat(path).st_size - 10)
+    finally:
+        if f is not None:
+            f.close()
 
 
 # Disable these tests in Python 3.2 and 3.3
 if not ((3, 2) <= sys.version_info[:2] <= (3, 3)):
 
-    def test_truncated_gz():
-        with raises(EOFError), temporary_path('truncated.gz') as path:
-            create_truncated_file(path)
-            f = xopen(path, 'r')
-            f.read()
-            f.close()
+    def test_truncated_gz(tmp_path):
+        path = tmp_path / "truncated.gz"
+        with raises(EOFError):
+            create_truncated_file(str(path))
+            f = None
+            try:
+                f = xopen(str(path), "r")
+                f.read()
+            finally:
+                if f is not None:
+                    f.close()
 
-    def test_truncated_gz_iter():
-        with raises(EOFError), temporary_path('truncated.gz') as path:
-            create_truncated_file(path)
-            f = xopen(path, 'r', use_system=False)  # work around bug in py3.4
-            for line in f:
-                pass
-            f.close()
+    def test_truncated_gz_iter(tmp_path):
+        path = tmp_path / "truncated.gz"
+        with raises(EOFError):
+            create_truncated_file(str(path))
+            f = None
+            try:
+                f = xopen(str(path), "r", use_system=False)  # work around bug in py3.4
+                for _ in f:
+                    pass
+            finally:
+                if f is not None:
+                    f.close()
