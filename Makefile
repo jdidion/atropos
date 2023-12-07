@@ -58,15 +58,26 @@ tag:
 	git tag $(version)
 
 release: clean tag install test
-	twine upload dist/*
+	echo "Releasing version $(version)"
+	# pypi doesn't accept eggs
+	rm dist/*.egg
+	# release
+	twine upload -u "__token__" -p "$(pypi_token)" dist/*
+	# push new tag after successful build
 	git push origin --tags
-
-	# github release
+	# create release in GitHub
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \
 		-H "Authorization: token $(token)" \
 		https://api.github.com/repos/$(repo)/releases \
-		-d '{"tag_name":"$(version)","target_commitish": "1.1","name": "$(version)","body": "$(desc)","draft": false,"prerelease": false}'
+		-d '{ \
+		  "tag_name":"$(version)", \
+		  "target_commitish": "master", \
+		  "name": "$(version)", \
+		  "body": "$(desc)", \
+		  "draft": false, \
+		  "prerelease": false \
+		}'
 
 # build a package with the files needed to run the workflows
 workflow:
