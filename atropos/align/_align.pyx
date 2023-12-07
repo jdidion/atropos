@@ -206,6 +206,10 @@ cdef class Aligner:
         self.indel_cost = indel_cost
         self.debug = False
         self._dpmatrix = None
+    
+    def __reduce__(self):
+        assert self._insertion_cost == self._deletion_cost
+        return (Aligner, (self.str_reference, self.max_error_rate, self.flags, self.wildcard_ref, self.wildcard_query, self._min_overlap, self._insertion_cost))
 
     property min_overlap:
         def __get__(self):
@@ -561,6 +565,9 @@ cdef class MultiAligner:
         self._min_overlap = min_overlap
         self._num_cols = 0
         self._num_matches = 0
+
+    def __reduce__(self):
+        return (MultiAligner, (self.max_error_rate, self.flags, self._min_overlap))
 
     # def __repr__(self):
     #     return f"MultiAligner<max_error_rate={self.max_error_rate}, " \

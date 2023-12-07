@@ -10,6 +10,10 @@ TEST =
 
 all: clean install test
 
+# install prerequisites
+init:
+	pip install cython pytest pytest-timeout twine
+
 build:
 	python setup.py build_ext -i
 	python setup.py sdist bdist_wheel
@@ -54,15 +58,24 @@ tag:
 	git tag $(version)
 
 release: clean tag install test
-	twine upload dist/*
+	echo "Releasing version $(version)"
+	# release
+	twine upload -u "__token__" -p "$(pypi_token)" dist/*.whl dist/*.tar.gz
+	# push new tag after successful build
 	git push origin --tags
-
-	# github release
+	# create release in GitHub
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \
 		-H "Authorization: token $(token)" \
 		https://api.github.com/repos/$(repo)/releases \
-		-d '{"tag_name":"$(version)","target_commitish": "1.1","name": "$(version)","body": "$(desc)","draft": false,"prerelease": false}'
+		-d '{ \
+		  "tag_name":"$(version)", \
+		  "target_commitish": "master", \
+		  "name": "$(version)", \
+		  "body": "$(desc)", \
+		  "draft": false, \
+		  "prerelease": false \
+		}'
 
 # build a package with the files needed to run the workflows
 workflow:

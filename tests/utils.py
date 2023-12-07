@@ -10,6 +10,7 @@ import urllib.request
 from atropos.commands import get_command
 from atropos.io import xopen
 
+
 @contextmanager
 def redirect_stderr():
     "Send stderr to stdout. Nose doesn't capture stderr, yet."
@@ -20,31 +21,19 @@ def redirect_stderr():
     sys.stderr = old_stderr
 
 
-@contextmanager
-def temporary_path(name):
-    directory = os.path.join(os.path.dirname(__file__), 'testtmp')
-    if not os.path.isdir(directory):
-        os.mkdir(directory)
-    path = os.path.join(directory, name)
-    yield path
-
-    if os.path.exists(path):
-        os.remove(path)
-
-
 def datapath(path):
-    return os.path.join(os.path.dirname(__file__), 'data', path)
+    return os.path.join(os.path.dirname(__file__), "data", path)
 
 
 def cutpath(path):
-    return os.path.join(os.path.dirname(__file__), 'cut', path)
+    return os.path.join(os.path.dirname(__file__), "cut", path)
 
 
 def files_equal(path1, path2):
     temp1 = tempfile.mkstemp()[1]
     temp2 = tempfile.mkstemp()[1]
     try:
-        with xopen(path1, 'r') as i1, xopen(path2, 'r') as i2:
+        with xopen(path1, "r") as i1, xopen(path2, "r") as i2:
             # write contents to temp files in case the files are compressed
             content1 = i1.read()
             content2 = i2.read()
@@ -65,6 +54,7 @@ def files_equal(path1, path2):
 
 
 def run(
+    tmp_path,
     params,
     expected,
     inpath=None,
@@ -76,40 +66,38 @@ def run(
 ):
     if type(params) is str:
         params = params.split()
-    with temporary_path(expected) as tmp_fastaq:
-        if sra_accn:
-            params += ['-sra', sra_accn]
-        elif interleaved_input:
-            params += ['-l', inpath]
-        elif inpath2:
-            params += ['-pe1', datapath(inpath)]
-            params += ['-pe2', datapath(inpath2)]
-        else:
-            params += ['-se', datapath(inpath)]
-            if qualfile:
-                params += ['-sq', datapath(qualfile)]
-        if interleaved_output:
-            params += ['-L', tmp_fastaq]
-        else:
-            params += ['-o', tmp_fastaq]  # TODO not parallelizable
-        # print(params)
-        command = get_command('trim')
-        retcode, summary = command.execute(params)
-        assert summary is not None
-        assert isinstance(summary, dict)
-        if 'exception' in summary and summary['exception'] is not None:
-            assert retcode != 0
-            err = summary['exception']
-            traceback.print_exception(* err['details'])
-            raise Exception("Unexpected error: {}".format(err['message']))
+    tmp_fastaq = str(tmp_path / expected)
+    if sra_accn:
+        params += ["-sra", sra_accn]
+    elif interleaved_input:
+        params += ["-l", inpath]
+    elif inpath2:
+        params += ["-pe1", datapath(inpath)]
+        params += ["-pe2", datapath(inpath2)]
+    else:
+        params += ["-se", datapath(inpath)]
+        if qualfile:
+            params += ["-sq", datapath(qualfile)]
+    if interleaved_output:
+        params += ["-L", tmp_fastaq]
+    else:
+        params += ["-o", tmp_fastaq]  # TODO not parallelizable
+    # print(params)
+    command = get_command("trim")
+    retcode, summary = command.execute(params)
+    assert summary is not None
+    assert isinstance(summary, dict)
+    if "exception" in summary and summary["exception"] is not None:
+        assert retcode != 0
+        err = summary["exception"]
+        traceback.print_exception(*err["details"])
+        raise Exception("Unexpected error: {}".format(err["message"]))
 
-        else:
-            assert retcode == 0
-        # TODO redirect standard output
-        assert os.path.exists(tmp_fastaq)
-        assert files_equal(cutpath(expected), tmp_fastaq)
-
-
+    else:
+        assert retcode == 0
+    # TODO redirect standard output
+    assert os.path.exists(tmp_fastaq)
+    assert files_equal(cutpath(expected), tmp_fastaq)
 
 
 # TODO diff log files
@@ -118,8 +106,7 @@ def approx_equal(a, b, tol):
 
 
 def no_internet(url="https://github.com"):
-    """Test whether there's no internet connection available.
-    """
+    """Test whether there's no internet connection available."""
     try:
         urllib.request.urlopen(url).info()
         return False
@@ -129,8 +116,7 @@ def no_internet(url="https://github.com"):
 
 
 def no_import(lib):
-    """Test whether a library is importable.
-    """
+    """Test whether a library is importable."""
     try:
         mod = import_module(lib)
         return mod is None
