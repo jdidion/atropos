@@ -59,10 +59,8 @@ tag:
 
 release: clean tag install test
 	echo "Releasing version $(version)"
-	# pypi doesn't accept eggs
-	rm dist/*.egg
 	# release
-	twine upload -u "__token__" -p "$(pypi_token)" dist/*
+	twine upload -u "__token__" -p "$(pypi_token)" dist/*.whl dist/*.tar.gz
 	# push new tag after successful build
 	git push origin --tags
 	# create release in GitHub
