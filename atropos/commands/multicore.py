@@ -138,7 +138,7 @@ class PendingQueue(object):
         return len(self.queue) == 0
 
 
-class ParallelPipelineMixin(object):
+class ParallelPipelineMixin:
     """Mixin that implements the `start`, `finish`, and `process_batch` methods
     of :class:`Pipeline`.
     """

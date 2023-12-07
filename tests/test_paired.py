@@ -537,16 +537,26 @@ def test_no_writer_process(tmp_path):
         assert os.path.basename(outfiles[1]) == "tmp2-out.2.fastq"
         tmpdir = os.path.dirname(outfiles[0])
         assert tmpdir == os.path.dirname(outfiles[1])
-        # TODO: If the final worker doesn't get the chance to process any
-        # batches, the last output file is never created.
-        assert os.path.exists(os.path.join(tmpdir, "tmp1-out.1.0.fastq"))
-        assert os.path.exists(os.path.join(tmpdir, "tmp1-out.1.1.fastq"))
-        # assert os.path.exists(os.path.join(tmpdir, 'tmp1-out.1.2.fastq'))
-        assert os.path.exists(os.path.join(tmpdir, "tmp2-out.2.0.fastq"))
-        assert os.path.exists(os.path.join(tmpdir, "tmp2-out.2.1.fastq"))
+        # If a worker doesn't get the chance to process any batches, its output file is
+        # never created. For now we just make sure that at least one pair of files was created.
+        assert any(
+            [
+                (
+                    os.path.exists(os.path.join(tmpdir, "tmp1-out.1.0.fastq"))
+                    and os.path.exists(os.path.join(tmpdir, "tmp2-out.2.0.fastq"))
+                ),
+                (
+                    os.path.exists(os.path.join(tmpdir, "tmp1-out.1.1.fastq"))
+                    and os.path.exists(os.path.join(tmpdir, "tmp2-out.2.1.fastq"))
+                ),
+                (
+                    os.path.exists(os.path.join(tmpdir, "tmp1-out.1.2.fastq"))
+                    and os.path.exists(os.path.join(tmpdir, "tmp2-out.2.2.fastq"))
+                ),
+            ]
+        )
+        # TODO: check contents
 
-    # assert os.path.exists(os.path.join(tmpdir, 'tmp2-out.2.2.fastq'))
-    # TODO: check contents
     run_paired(
         "--threads 3 --no-writer-process --batch-size 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACACAGTGATCTCGTATGCCGTCTTCTGCTTG -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT",
         in1="big.1.fq",

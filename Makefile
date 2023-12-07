@@ -10,6 +10,10 @@ TEST =
 
 all: clean install test
 
+# install prerequisites
+init:
+	pip install cython pytest pytest-timeout twine
+
 build:
 	python setup.py build_ext -i
 	python setup.py sdist bdist_wheel

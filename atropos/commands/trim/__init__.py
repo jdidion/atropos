@@ -754,13 +754,9 @@ class CommandRunner(BaseCommandRunner):
         from multiprocessing import Manager
         from atropos.commands.multicore import RETRY_INTERVAL
         from atropos.commands.trim.multicore import (
-            Done,
-            Killed,
             ParallelTrimPipelineRunner,
             QueueResultHandler,
             CompressingWorkerResultHandler,
-            OrderPreservingWriterResultHandler,
-            ResultProcess,
             WriterManager,
         )
         from atropos.io.compression import can_use_system_compression
