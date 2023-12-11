@@ -155,7 +155,6 @@ setup(
     packages=find_packages(),
     scripts=["bin/atropos"],
     package_data={"atropos": ["adapters/*.fa", "commands/**/templates/*"]},
-    install_requires=["cython>={}".format(MIN_CYTHON_VERSION)],
     tests_require=["pytest", "pytest-timeout"],  # , "jinja2", "pysam"],
     extras_require={
         "progressbar": ["progressbar2"],
