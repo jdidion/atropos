@@ -64,7 +64,7 @@ release: clean tag install test
 	# push new tag after successful build
 	git push origin --tags
 	# create release in GitHub
-	curl -v -i -X POST \
+	curl -v -i POST \
 		-H "Content-Type:application/json" \
 		-H "Authorization: token $(token)" \
 		https://api.github.com/repos/$(repo)/releases \
