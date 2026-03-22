@@ -4,9 +4,11 @@
 import os
 import sys
 
-from atropos._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+try:
+    from importlib.metadata import version as _get_version
+    __version__ = _get_version("atropos")
+except Exception:
+    __version__ = "0.0.0"
 
 class AtroposError(Exception):
     """Base class for Atropos-specific errors.
