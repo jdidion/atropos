@@ -2,6 +2,18 @@
 [![PyPi](https://img.shields.io/pypi/v/atropos.svg)](https://pypi.python.org/pypi/atropos)
 [![DOI](https://zenodo.org/badge/61393086.svg)](https://zenodo.org/badge/latestdoi/61393086)
 
+> **⚠️ Archived — use [fastp](https://github.com/OpenGene/fastp) or [cutadapt](https://github.com/marcelm/cutadapt) instead.**
+>
+> Atropos has not received substantive feature work since 2019; recent commits are Python version-compatibility fixes only. Most of its capabilities are now covered by actively-maintained tools like fastp. For the small number of atropos-unique features, I've filed feature requests upstream:
+>
+> - [fastp: empirical sequencing-error-rate estimation](https://github.com/OpenGene/fastp/issues/688)
+> - [fastp: library-type presets for common sequencing workflows](https://github.com/OpenGene/fastp/issues/689)
+> - [fastp: standalone adapter-detection subcommand](https://github.com/OpenGene/fastp/issues/690)
+> - [fastp: tile-level QC partitioning via regex on read name](https://github.com/OpenGene/fastp/issues/691)
+> - [cutadapt: empirical sequencing-error-rate estimation](https://github.com/marcelm/cutadapt/issues/881)
+>
+> Niche capabilities that are not being proposed upstream: SAM/BAM input, direct SRA streaming, colorspace (SOLiD) trimming, Jinja2-templated reports. If you depend on any of these, the last release (v1.1.32) will remain installable from PyPI.
+
 # Atropos
 
 Atropos is tool for specific, sensitive, and speedy trimming of NGS reads. It is a fork of the venerable Cutadapt read trimmer (https://github.com/marcelm/cutadapt, [DOI:10.14806/ej.17.1.200](http://dx.doi.org/10.14806/ej.17.1.200)), with the primary improvements being:
