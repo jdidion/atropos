@@ -1,3 +1,5 @@
+SPDX-License-Identifier: MIT
+
 Atropos began as a fork of Cutadapt [1]. Specifically, it is a fork of commit
 2f3cc0717aa9ff1e0326ea6bcb36b712950d4999 on June 22, 2016. All
 code that remains in its original form is subject to the MIT license (below):
