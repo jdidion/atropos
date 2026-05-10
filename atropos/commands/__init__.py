@@ -225,6 +225,15 @@ def execute_cli(args=()):
             "Error executing command: %s", command_name, exc_info=err)
         return 2
 
+def execute_cli_main():
+    """Entry point for console_scripts.
+
+    Calls execute_cli with sys.argv and exits with the return code.
+    """
+    import sys
+    sys.exit(execute_cli(sys.argv[1:]))
+
+
 def print_subcommands():
     """Prints usage message listing the available subcommands.
     """

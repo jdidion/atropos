@@ -1,28 +1,22 @@
 """
-Build atropos.
+Build Cython extensions for atropos.
 
-Cython is run when
+This setup.py is retained solely for building C extensions from .pyx files.
+All project metadata lives in pyproject.toml.
+
+Cython is run when:
 * no pre-generated C sources are found,
 * or the pre-generated C sources are out of date,
 * or when --cython is given on the command line.
 """
-import codecs
-import os.path
-import sys
+import os
 
-from setuptools import setup, Extension, find_packages
-from distutils.version import LooseVersion
-from distutils.command.sdist import sdist as _sdist
-from distutils.command.build_ext import build_ext as _build_ext
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext as _build_ext
+from setuptools.command.sdist import sdist as _sdist
 
-import versioneer
 
 MIN_CYTHON_VERSION = "0.25.2"
-
-
-if sys.version_info < (3, 3):
-    sys.stdout.write("At least Python 3.3 is required.\n")
-    sys.exit(1)
 
 
 def out_of_date(_extensions):
@@ -71,22 +65,22 @@ def no_cythonize(_extensions, **_ignore):
 
 
 def check_cython_version():
-    """Exit if Cython was not found or is too old"""
+    """Exit if Cython was not found or is too old."""
+    from packaging.version import Version
+
     try:
         from Cython import __version__ as cyversion
     except ImportError:
-        sys.stdout.write(
-            "ERROR: Cython is not installed. Install at least Cython version "
+        raise RuntimeError(
+            "Cython is not installed. Install at least Cython version "
             + str(MIN_CYTHON_VERSION)
-            + " to continue.\n"
+            + " to continue."
         )
-        sys.exit(1)
-    if LooseVersion(cyversion) < LooseVersion(MIN_CYTHON_VERSION):
-        sys.stdout.write(
-            "ERROR: Your Cython is at version '{}' but at least version '{}' "
-            "is required.\n".format(cyversion, MIN_CYTHON_VERSION)
+    if Version(cyversion) < Version(MIN_CYTHON_VERSION):
+        raise RuntimeError(
+            "Your Cython is at version '{}' but at least version '{}' "
+            "is required.".format(cyversion, MIN_CYTHON_VERSION)
         )
-        sys.exit(1)
 
 
 extensions = [
@@ -98,12 +92,8 @@ extensions = [
     Extension("atropos.io._seqio", sources=["atropos/io/_seqio.pyx"]),
 ]
 
-cmdclass = versioneer.get_cmdclass()
-versioneer_build_ext = cmdclass.get("build_ext", _build_ext)
-versioneer_sdist = cmdclass.get("sdist", _sdist)
 
-
-class BuildExt(versioneer_build_ext):
+class BuildExt(_build_ext):
     def run(self):
         # If we encounter a PKG-INFO file, then this is likely a .tar.gz/.zip
         # file retrieved from PyPI that already includes the pre-cythonized
@@ -120,67 +110,17 @@ class BuildExt(versioneer_build_ext):
         _build_ext.run(self)
 
 
-cmdclass["build_ext"] = BuildExt
-
-
-class SDist(versioneer_sdist):
+class SDist(_sdist):
     def run(self):
         # Make sure the compiled Cython files in the distribution are up-to-date
         from Cython.Build import cythonize
 
         check_cython_version()
         cythonize(extensions)
-        versioneer_sdist.run(self)
-
-
-cmdclass["sdist"] = SDist
+        _sdist.run(self)
 
 
 setup(
-    name="atropos",
-    version=versioneer.get_version(),
-    cmdclass=cmdclass,
-    author="John Didion",
-    author_email="john.didion@nih.gov",
-    url="https://atropos.readthedocs.org/",
-    description="trim adapters from high-throughput sequencing reads",
-    long_description=codecs.open(
-        os.path.join(os.path.dirname(os.path.realpath(__file__)), "README.md"),
-        "rb",
-        "utf-8",
-    ).read(),
-    long_description_content_type="text/markdown",
-    license="MIT",
     ext_modules=extensions,
-    packages=find_packages(),
-    scripts=["bin/atropos"],
-    package_data={"atropos": ["adapters/*.fa", "commands/**/templates/*"]},
-    tests_require=["pytest", "pytest-timeout"],  # , "jinja2", "pysam"],
-    extras_require={
-        "progressbar": ["progressbar2"],
-        "tqdm": ["tqdm"],
-        "khmer": ["khmer"],
-        "pysam": ["pysam"],
-        "jinja": ["jinja2"],
-        "sra": ["srastream>=0.1.3"],
-    },
-    classifiers=[
-        "Development Status :: 5 - Production/Stable",
-        "Environment :: Console",
-        "Intended Audience :: Science/Research",
-        "Topic :: Scientific/Engineering :: Bio-Informatics",
-        "License :: OSI Approved :: MIT License",
-        "License :: Public Domain",
-        "Natural Language :: English",
-        "Programming Language :: Cython",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-    ],
+    cmdclass={"build_ext": BuildExt, "sdist": SDist},
 )
